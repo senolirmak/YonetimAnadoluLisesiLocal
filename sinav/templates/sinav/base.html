@@ -7,8 +7,8 @@
 <style>
   /* ===== Sinav Navigasyon ===== */
   .sinav-nav {
-    background: #16213e;
-    padding: .45rem 2rem;
+    background: #35607a;
+    padding: .7rem 2rem;
     display: flex;
     align-items: center;
     gap: 1.5rem;
@@ -17,18 +17,18 @@
   /* Dropdown */
   .sinav-dropdown { position: relative; }
   .sinav-dropdown-trigger {
-    color: #a5b4fc;
-    font-size: .85rem;
+    color: #e8f0f5;
+    font-size: .95rem;
     font-weight: 600;
-    padding: .35rem .75rem;
-    background: rgba(255,255,255,.07);
+    padding: .45rem .9rem;
+    background: rgba(255,255,255,.1);
     border-radius: 5px;
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
   }
   .sinav-dropdown:hover .sinav-dropdown-trigger {
-    background: rgba(255,255,255,.14);
+    background: rgba(255,255,255,.2);
     color: #fff;
   }
   .sinav-dropdown-menu {
@@ -36,10 +36,10 @@
     position: absolute;
     top: calc(100% + .4rem);
     left: 0;
-    background: #1e2d50;
-    border: 1px solid #2d3f6a;
+    background: #2c5169;
+    border: 1px solid #4a7a96;
     border-radius: 7px;
-    min-width: 200px;
+    min-width: 210px;
     box-shadow: 0 8px 24px rgba(0,0,0,.35);
     z-index: 999;
     overflow: hidden;
@@ -47,45 +47,45 @@
   .sinav-dropdown:hover .sinav-dropdown-menu { display: block; }
   .sinav-dropdown-menu a {
     display: block;
-    color: #a5b4fc;
+    color: #c8dce8;
     text-decoration: none;
-    font-size: .85rem;
+    font-size: .9rem;
     font-weight: 500;
-    padding: .55rem 1.1rem;
+    padding: .6rem 1.2rem;
     border-left: 3px solid transparent;
     transition: background .12s, color .12s;
   }
   .sinav-dropdown-menu a:hover {
-    background: rgba(255,255,255,.07);
+    background: rgba(255,255,255,.1);
     color: #fff;
-    border-left-color: #6366f1;
+    border-left-color: #7dd3fc;
   }
   .sinav-dropdown-menu hr {
     border: none;
-    border-top: 1px solid #2d3f6a;
+    border-top: 1px solid #4a7a96;
     margin: .25rem 0;
   }
 
   /* Sağ taraf */
   .sinav-nav-sag { margin-left: auto; display: flex; align-items: center; gap: .9rem; }
   .sinav-nav-geri {
-    color: #f87171;
+    color: #fca5a5;
     text-decoration: none;
-    font-size: .85rem;
+    font-size: .9rem;
     font-weight: 500;
     white-space: nowrap;
   }
-  .sinav-nav-geri:hover { color: #fca5a5; }
+  .sinav-nav-geri:hover { color: #fff; }
   .sinav-badge {
     background: #16a34a;
     color: #fff;
-    font-size: 0.8rem;
+    font-size: .82rem;
     font-weight: 600;
-    padding: .3rem .9rem;
+    padding: .35rem 1rem;
     border-radius: 99px;
     white-space: nowrap;
   }
-  .sinav-badge.yok { background: #374151; color: #9ca3af; }
+  .sinav-badge.yok { background: rgba(255,255,255,.15); color: #c8dce8; }
 
   /* ===== Layout ===== */
   .sinav-container { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
