@@ -251,6 +251,7 @@
 {% block extra_js %}
 <script>
 const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? "";
+const GOREV_URL = "{% url 'sinav:gorev_durumu' '00' %}".replace('/00/', '/');
 
 async function postJSON(url) {
   const r = await fetch(url, {
@@ -268,7 +269,7 @@ async function pollTask(taskId, logEl, badgeEl, btnEl) {
 
   while (true) {
     await new Promise(r => setTimeout(r, 1200));
-    const data = await fetch(`/gorev/${taskId}/`).then(r => r.json());
+    const data = await fetch(`${GOREV_URL}${taskId}/`).then(r => r.json());
     logEl.textContent = data.logs.join("\n");
     logEl.scrollTop = logEl.scrollHeight;
 
@@ -299,7 +300,7 @@ async function iptalAdim(durdurBtnId) {
   if (!_activeTaskId) return;
   const durdurBtn = durdurBtnId ? document.getElementById(durdurBtnId) : null;
   if (durdurBtn) durdurBtn.disabled = true;
-  await fetch(`/gorev/${_activeTaskId}/iptal/`, {
+  await fetch(`${GOREV_URL}${_activeTaskId}/iptal/`, {
     method: "POST",
     headers: { "X-CSRFToken": CSRF },
   });
