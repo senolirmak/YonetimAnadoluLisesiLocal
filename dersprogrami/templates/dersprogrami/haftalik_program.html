@@ -1,0 +1,231 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} – Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+  .hp-kart {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .hp-baslik {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 1rem;
+  }
+
+  /* Öğretmen seçim formu */
+  .hp-secim-form {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+  }
+  .hp-secim-form label {
+    font-size: .88rem;
+    font-weight: 600;
+    color: #495057;
+    white-space: nowrap;
+  }
+  .hp-secim-form select {
+    padding: .4rem .65rem;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    font-size: .9rem;
+    min-width: 220px;
+  }
+  .hp-secim-form button {
+    padding: .4rem 1rem;
+    background: #417690;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: .88rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .hp-secim-form button:hover { background: #345f75; }
+
+  /* Öğretmen başlık bilgisi */
+  .hp-ogretmen-bilgi {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: .5rem;
+  }
+  .hp-ogretmen-adi {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1a1a2e;
+  }
+  .hp-ogretmen-brans {
+    font-size: .85rem;
+    color: #6b7280;
+    background: #f0f4ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 99px;
+    padding: .15rem .6rem;
+  }
+
+  /* Program tablosu */
+  .hp-tablo-wrap {
+    overflow-x: auto;
+  }
+  .hp-tablo {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .88rem;
+  }
+  .hp-tablo th {
+    background: #417690;
+    color: #fff;
+    padding: .55rem .9rem;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .hp-tablo th.th-saat {
+    background: #2c5169;
+    min-width: 90px;
+  }
+  .hp-tablo td {
+    border: 1px solid #e5e7eb;
+    padding: .5rem .75rem;
+    vertical-align: top;
+    text-align: center;
+  }
+  .hp-tablo tr:nth-child(even) td { background: #f9fafb; }
+  .hp-tablo tr:hover td { background: #f0f4ff; }
+  .td-saat {
+    background: #f1f5f9 !important;
+    font-weight: 600;
+    color: #1a1a2e;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .td-saat small {
+    display: block;
+    font-size: .76rem;
+    font-weight: 400;
+    color: #6b7280;
+  }
+  .td-ders {
+    color: #1a1a2e;
+  }
+  .td-ders .ders-adi {
+    font-weight: 600;
+    font-size: .88rem;
+  }
+  .td-ders .sinif-adi {
+    font-size: .78rem;
+    color: #417690;
+    margin-top: .15rem;
+  }
+  .td-bos {
+    color: #d1d5db;
+    font-size: .8rem;
+  }
+
+  .hp-bos-mesaj {
+    text-align: center;
+    color: #9ca3af;
+    padding: 2rem;
+    font-size: .95rem;
+  }
+</style>
+
+<div class="container">
+  <h2 class="page-title mb-20">{{ title }}</h2>
+
+  {% if is_yonetici %}
+  <!-- Yönetici: Öğretmen Seçimi -->
+  <div class="hp-kart">
+    <form method="get" class="hp-secim-form">
+      <label for="id_ogretmen">Öğretmen:</label>
+      <select id="id_ogretmen" name="ogretmen">
+        <option value="">-- Öğretmen seçin --</option>
+        {% for ogr in tum_ogretmenler %}
+        <option value="{{ ogr.pk }}" {% if ogr.pk|stringformat:"s" == secilen_ogretmen_id %}selected{% endif %}>
+          {{ ogr.adi_soyadi }}{% if ogr.brans %} ({{ ogr.brans }}){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <button type="submit">Göster</button>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if secilen_personel %}
+  <!-- Öğretmen Bilgisi -->
+  <div class="hp-kart">
+    <div class="hp-ogretmen-bilgi">
+      <span class="hp-ogretmen-adi">{{ secilen_personel.adi_soyadi }}</span>
+      {% if secilen_personel.brans %}
+      <span class="hp-ogretmen-brans">{{ secilen_personel.brans }}</span>
+      {% endif %}
+    </div>
+
+    {% if program_tablo %}
+    <div class="hp-tablo-wrap">
+      <table class="hp-tablo">
+        <thead>
+          <tr>
+            <th class="th-saat">Ders Saati</th>
+            {% for gun in gun_tr_list %}
+            <th>{{ gun }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for satir in program_tablo %}
+          <tr>
+            <td class="td-saat">
+              {{ satir.ders_saati_adi|default:satir.ders_saati }}
+              {% if satir.giris_saat and satir.cikis_saat %}
+              <small>{{ satir.giris_saat|time:"H:i" }}–{{ satir.cikis_saat|time:"H:i" }}</small>
+              {% endif %}
+            </td>
+            {% for ders in satir.cells %}
+            <td>
+              {% if ders %}
+              <div class="td-ders">
+                <div class="ders-adi">{{ ders.ders_adi }}</div>
+                {% if ders.sinif_sube %}
+                <div class="sinif-adi">{{ ders.sinif_sube }}</div>
+                {% endif %}
+              </div>
+              {% else %}
+              <span class="td-bos">–</span>
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="hp-bos-mesaj">Bu öğretmene ait ders programı kaydı bulunamadı.</div>
+    {% endif %}
+  </div>
+
+  {% elif is_yonetici %}
+  <div class="hp-kart">
+    <div class="hp-bos-mesaj">Ders programını görüntülemek için bir öğretmen seçin.</div>
+  </div>
+
+  {% else %}
+  <div class="hp-kart">
+    <div class="hp-bos-mesaj">Hesabınıza bağlı bir öğretmen kaydı bulunamadı.</div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

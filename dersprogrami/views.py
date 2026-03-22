@@ -616,6 +616,78 @@ def dersprogrami_listesi(request):
 
 
 # ─────────────────────────────────────────────
+# Öğretmen Haftalık Ders Programı Tablosu
+# ─────────────────────────────────────────────
+
+
+@login_required
+def haftalik_ders_programi(request):
+    GUN_DB = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    GUN_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]
+
+    is_yonetici = _is_yonetici(request.user)
+
+    secilen_personel = None
+    tum_ogretmenler = None
+
+    if is_yonetici:
+        tum_ogretmenler = NobetPersonel.objects.order_by("adi_soyadi")
+        ogretmen_id = request.GET.get("ogretmen", "").strip()
+        if ogretmen_id:
+            try:
+                secilen_personel = NobetPersonel.objects.get(pk=int(ogretmen_id))
+            except (NobetPersonel.DoesNotExist, ValueError, TypeError):
+                pass
+    else:
+        try:
+            secilen_personel = request.user.personel
+        except NobetPersonel.DoesNotExist:
+            secilen_personel = None
+
+    program_tablo = []
+    if secilen_personel:
+        dersler = (
+            NobetDersProgrami.objects.filter(ogretmen=secilen_personel)
+            .select_related("sinif_sube")
+            .order_by("ders_saati")
+        )
+        ders_saatleri_bilgi = {}
+        for d in dersler:
+            if d.ders_saati not in ders_saatleri_bilgi:
+                ders_saatleri_bilgi[d.ders_saati] = {
+                    "ders_saati_adi": d.ders_saati_adi,
+                    "giris_saat": d.giris_saat,
+                    "cikis_saat": d.cikis_saat,
+                }
+        for ds in sorted(ders_saatleri_bilgi.keys()):
+            bilgi = ders_saatleri_bilgi[ds]
+            cells = []
+            for gun_db in GUN_DB:
+                match = next(
+                    (d for d in dersler if d.ders_saati == ds and d.gun == gun_db), None
+                )
+                cells.append(match)
+            program_tablo.append({
+                "ders_saati": ds,
+                "ders_saati_adi": bilgi["ders_saati_adi"],
+                "giris_saat": bilgi["giris_saat"],
+                "cikis_saat": bilgi["cikis_saat"],
+                "cells": cells,
+            })
+
+    context = {
+        "title": "Haftalık Ders Programı",
+        "is_yonetici": is_yonetici,
+        "tum_ogretmenler": tum_ogretmenler,
+        "secilen_personel": secilen_personel,
+        "secilen_ogretmen_id": str(secilen_personel.pk) if secilen_personel else "",
+        "gun_tr_list": GUN_TR,
+        "program_tablo": program_tablo,
+    }
+    return render(request, "dersprogrami/haftalik_program.html", context)
+
+
+# ─────────────────────────────────────────────
 # Veri Yükleme — Haftalık Ders Programı
 # ─────────────────────────────────────────────
 
