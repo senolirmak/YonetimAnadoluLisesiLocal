@@ -68,14 +68,6 @@
 
   /* Sağ taraf */
   .sinav-nav-sag { margin-left: auto; display: flex; align-items: center; gap: .9rem; }
-  .sinav-nav-geri {
-    color: #fca5a5;
-    text-decoration: none;
-    font-size: .9rem;
-    font-weight: 500;
-    white-space: nowrap;
-  }
-  .sinav-nav-geri:hover { color: #fff; }
   .sinav-badge {
     background: #16a34a;
     color: #fff;
@@ -212,7 +204,6 @@
   </div>
 
   <div class="sinav-nav-sag">
-    <a href="{% url 'index' %}" class="sinav-nav-geri">&#8592; Okul Yönetimine Dön</a>
     {% if aktif_sinav %}
       <span class="sinav-badge">
         {{ aktif_sinav.egitim_ogretim_yili }} &nbsp;|&nbsp;
