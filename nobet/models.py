@@ -165,6 +165,37 @@ class OkulBilgi(models.Model):
         return self.okul_adi or "Okul Bilgisi"
 
 
+class OkulDonem(models.Model):
+    DONEM_CHOICES = (
+        (1, "1. Dönem"),
+        (2, "2. Dönem"),
+    )
+
+    kurum = models.ForeignKey(
+        OkulBilgi,
+        on_delete=models.CASCADE,
+        related_name="donemleri",
+        verbose_name="Kurum",
+    )
+    donem = models.PositiveSmallIntegerField(
+        choices=DONEM_CHOICES,
+        verbose_name="Dönem",
+    )
+    baslangic = models.DateField(verbose_name="Başlangıç Tarihi")
+    bitis = models.DateField(verbose_name="Bitiş Tarihi")
+
+    class Meta:
+        db_table = "okul_donem"
+        unique_together = ("kurum", "donem")
+        verbose_name = "Okul Dönemi"
+        verbose_name_plural = "Okul Dönemleri"
+        ordering = ["donem"]
+
+    def __str__(self):
+        donem_adi = dict(self.DONEM_CHOICES).get(self.donem, str(self.donem))
+        return f"{self.kurum.okul_kodu} – {donem_adi} ({self.baslangic} / {self.bitis})"
+
+
 class VeriYukleme(models.Model):
     """Admin panelinde veri yükleme arayüzü için kullanılan proxy model."""
 
