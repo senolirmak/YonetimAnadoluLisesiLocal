@@ -187,14 +187,9 @@ class OkulDonem(models.Model):
         (2, "2. Dönem"),
     )
 
-    kurum = models.ForeignKey(
-        OkulBilgi,
-        on_delete=models.CASCADE,
-        related_name="donemleri",
-        verbose_name="Kurum",
-    )
     donem = models.PositiveSmallIntegerField(
         choices=DONEM_CHOICES,
+        unique=True,
         verbose_name="Dönem",
     )
     baslangic = models.DateField(verbose_name="Başlangıç Tarihi")
@@ -202,25 +197,19 @@ class OkulDonem(models.Model):
 
     class Meta:
         db_table = "okul_donem"
-        unique_together = ("kurum", "baslangic", "bitis")
         verbose_name = "Okul Dönemi"
         verbose_name_plural = "Okul Dönemleri"
         ordering = ["baslangic"]
 
     def __str__(self):
         donem_adi = dict(self.DONEM_CHOICES).get(self.donem, str(self.donem))
-        return f"{self.kurum.okul_kodu} – {donem_adi} ({self.baslangic} / {self.bitis})"
+        return f"{donem_adi} ({self.baslangic} / {self.bitis})"
 
 
 class EgitimOgretimYili(models.Model):
-    kurum = models.ForeignKey(
-        OkulBilgi,
-        on_delete=models.CASCADE,
-        related_name="egitim_yillari",
-        verbose_name="Kurum",
-    )
     egitim_yili = models.CharField(
         max_length=9,
+        unique=True,
         verbose_name="Eğitim-Öğretim Yılı",
         help_text="Örnek: 2025-2026",
     )
@@ -229,13 +218,12 @@ class EgitimOgretimYili(models.Model):
 
     class Meta:
         db_table = "egitim_ogretim_yili"
-        unique_together = ("kurum", "egitim_yili")
         verbose_name = "Eğitim-Öğretim Yılı"
         verbose_name_plural = "Eğitim-Öğretim Yılları"
         ordering = ["-egitim_yili"]
 
     def __str__(self):
-        return f"{self.kurum.okul_kodu} – {self.egitim_yili}"
+        return self.egitim_yili
 
 
 class VeriYukleme(models.Model):
