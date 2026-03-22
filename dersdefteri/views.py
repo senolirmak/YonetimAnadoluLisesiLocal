@@ -140,15 +140,28 @@ def kayit_form(request, dp_pk):
             cikis_saat=dp.cikis_saat,
         )
 
-    form = DersDefterForm(
-        request.POST or None,
-        instance=instance,
-        sinif_sube=dp.sinif_sube,
-    )
+    # Yoklama verisinden devamsız öğrencileri çek
+    from devamsizlik.models import OgrenciDevamsizlik
+    devamsiz_qs = OgrenciDevamsizlik.objects.none()
+    if dp.sinif_sube:
+        from django.db.models import IntegerField
+        from django.db.models.functions import Cast
+        devamsiz_qs = (
+            OgrenciDevamsizlik.objects.filter(
+                tarih=today,
+                ders_saati=dp.ders_saati,
+                ogrenci__sinif=dp.sinif_sube.sinif,
+                ogrenci__sube=dp.sinif_sube.sube,
+            )
+            .select_related("ogrenci")
+            .annotate(okulno_int=Cast("ogrenci__okulno", IntegerField()))
+            .order_by("okulno_int")
+        )
+
+    form = DersDefterForm(request.POST or None, instance=instance)
 
     if request.method == "POST" and form.is_valid():
         kayit = form.save(commit=False)
-        # Yeni kayıt için temel alanları set et
         if not kayit.pk:
             kayit.ogretmen = kayit_personel
             kayit.tarih = today
@@ -158,21 +171,12 @@ def kayit_form(request, dp_pk):
             kayit.giris_saat = dp.giris_saat
             kayit.cikis_saat = dp.cikis_saat
         kayit.save()
-        form.save_m2m()
+        # Yoklama verisinden devamsız öğrencileri M2M'e yaz
+        devamsiz_ogrenci_ids = devamsiz_qs.values_list("ogrenci_id", flat=True)
+        kayit.devamsiz_ogrenciler.set(devamsiz_ogrenci_ids)
         messages.success(request, "Ders kaydı başarıyla kaydedildi.")
         redirect_url = f"{request.path}?tarih={today.strftime('%Y-%m-%d')}"
         return redirect(redirect_url)
-
-    # Sınıf öğrencileri (devamsızlık seçimi için)
-    sinif_ogrencileri = []
-    if dp.sinif_sube:
-        from ogrenci.models import Ogrenci
-        sinif_ogrencileri = list(
-            Ogrenci.objects.filter(
-                sinif=dp.sinif_sube.sinif,
-                sube=dp.sinif_sube.sube,
-            ).order_by("soyadi", "adi")
-        )
 
     context = {
         "title": "Ders Kaydı",
@@ -181,7 +185,7 @@ def kayit_form(request, dp_pk):
         "form": form,
         "today": today,
         "today_str": today.strftime("%Y-%m-%d"),
-        "sinif_ogrencileri": sinif_ogrencileri,
+        "devamsiz_listesi": list(devamsiz_qs),
         "is_yonetici": is_yonetici,
     }
     return render(request, "dersdefteri/kayit_form.html", context)

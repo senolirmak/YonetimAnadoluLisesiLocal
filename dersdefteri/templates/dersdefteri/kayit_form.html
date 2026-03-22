@@ -43,50 +43,40 @@
   }
   .dd-form-group textarea:focus { outline: 2px solid #417690; border-color: transparent; }
 
-  /* Öğrenci listesi */
-  .dd-ogrenci-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: .4rem .75rem;
+  /* Devamsız öğrenci listesi */
+  .dd-devamsiz-liste {
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
     max-height: 320px;
     overflow-y: auto;
-    padding: .5rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    background: #fafafa;
   }
-  .dd-ogrenci-item {
+  .dd-devamsiz-satir {
     display: flex;
     align-items: center;
-    gap: .5rem;
-    padding: .35rem .5rem;
+    gap: .75rem;
+    padding: .4rem .6rem;
     border-radius: 5px;
-    cursor: pointer;
-    transition: background .1s;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    font-size: .88rem;
   }
-  .dd-ogrenci-item:hover { background: #f0f4ff; }
-  .dd-ogrenci-item input[type=checkbox] {
-    width: 16px; height: 16px; cursor: pointer; accent-color: #dc2626;
+  .dd-devamsiz-satir .okulno {
+    font-size: .78rem; color: #9ca3af; min-width: 50px;
   }
-  .dd-ogrenci-item label {
-    font-size: .88rem; color: #1a1a2e; cursor: pointer; margin: 0;
-    flex: 1;
+  .dd-devamsiz-satir .adi { font-weight: 600; color: #1a1a2e; flex: 1; }
+  .dd-devamsiz-satir .aciklama { font-size: .78rem; color: #6b7280; }
+  .dd-devamsiz-bos {
+    color: #16a34a; font-size: .88rem;
+    padding: .75rem; background: #f0fdf4;
+    border: 1px solid #bbf7d0; border-radius: 6px;
+    text-align: center;
   }
-  .dd-ogrenci-item label span.okulno {
-    font-size: .75rem; color: #9ca3af; margin-left: .3rem;
+  .dd-yoklama-link {
+    display: inline-flex; align-items: center; gap: .35rem;
+    font-size: .82rem; color: #417690; text-decoration: none; font-weight: 500;
   }
-
-  .dd-secim-araclari {
-    display: flex; gap: .5rem; margin-bottom: .5rem; flex-wrap: wrap;
-  }
-  .dd-secim-btn {
-    padding: .2rem .6rem;
-    font-size: .78rem; font-weight: 500;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    background: #fff; cursor: pointer;
-  }
-  .dd-secim-btn:hover { background: #f0f4ff; border-color: #417690; }
+  .dd-yoklama-link:hover { text-decoration: underline; }
 
   /* Butonlar */
   .dd-btn-row { display: flex; gap: .75rem; margin-top: 1.25rem; flex-wrap: wrap; }
@@ -107,10 +97,6 @@
   }
   .btn-iptal:hover { background: #f9fafb; }
 
-  .devamsiz-sayac {
-    font-size: .82rem; color: #dc2626; font-weight: 600;
-    margin-left: auto;
-  }
 </style>
 
 <div class="container">
@@ -170,32 +156,34 @@
       </div>
     </div>
 
-    <!-- Devamsız Öğrenciler -->
-    {% if sinif_ogrencileri %}
+    <!-- Devamsız Öğrenciler Listesi -->
+    {% if dp.sinif_sube %}
     <div class="dd-kart">
-      <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.5rem; flex-wrap:wrap;">
-        <strong style="font-size:.95rem; color:#1a1a2e;">Devamsız Öğrenciler</strong>
-        <span style="font-size:.8rem; color:#6b7280;">{{ dp.sinif_sube }} – {{ sinif_ogrencileri|length }} öğrenci</span>
-        <span class="devamsiz-sayac" id="devamsiz-sayac">0 seçili</span>
+      <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.75rem; flex-wrap:wrap;">
+        <strong style="font-size:.95rem; color:#1a1a2e;">Devamsız Öğrenciler Listesi</strong>
+        <span style="font-size:.8rem; color:#6b7280;">{{ dp.sinif_sube }} · {{ dp.ders_saati_adi|default:dp.ders_saati }} · {{ today|date:"d.m.Y" }}</span>
+        {% if devamsiz_listesi %}
+        <span style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; border-radius:99px; font-size:.78rem; font-weight:600; padding:.1rem .55rem;">
+          {{ devamsiz_listesi|length }} devamsız
+        </span>
+        {% endif %}
+        <a href="{% url 'devamsizlik:ogretmen_devamsizlik_ders' dp.ders_saati %}" class="dd-yoklama-link" style="margin-left:auto;" target="_blank">
+          Yoklamaya Git ↗
+        </a>
       </div>
 
-      <div class="dd-secim-araclari">
-        <button type="button" class="dd-secim-btn" onclick="tumunuSec()">Tümünü Seç</button>
-        <button type="button" class="dd-secim-btn" onclick="secimiBozDisp()">Tümünü Kaldır</button>
-      </div>
-
-      <div class="dd-ogrenci-grid" id="ogrenci-grid">
-        {% for ogrenci in sinif_ogrencileri %}
-        <div class="dd-ogrenci-item">
-          <input type="checkbox"
-                 name="devamsiz_ogrenciler"
-                 value="{{ ogrenci.pk }}"
-                 id="ogr_{{ ogrenci.pk }}"
-                 {% if instance.pk and ogrenci in instance.devamsiz_ogrenciler.all %}checked{% endif %}
-                 onchange="sayacGuncelle()">
-          <label for="ogr_{{ ogrenci.pk }}">
-            <span class="okulno">{{ ogrenci.okulno }}</span> {{ ogrenci.adi }} {{ ogrenci.soyadi }}
-          </label>
+      <div class="dd-devamsiz-liste">
+        {% for kayit in devamsiz_listesi %}
+        <div class="dd-devamsiz-satir">
+          <span class="okulno">{{ kayit.ogrenci.okulno }}</span>
+          <span class="adi">{{ kayit.ogrenci.adi }} {{ kayit.ogrenci.soyadi }}</span>
+          {% if kayit.aciklama %}
+          <span class="aciklama">{{ kayit.aciklama }}</span>
+          {% endif %}
+        </div>
+        {% empty %}
+        <div class="dd-devamsiz-bos">
+          Bu ders saati için yoklamada devamsız öğrenci bulunmuyor.
         </div>
         {% endfor %}
       </div>
@@ -209,19 +197,4 @@
   </form>
 </div>
 
-<script>
-function sayacGuncelle() {
-  const sayi = document.querySelectorAll('input[name="devamsiz_ogrenciler"]:checked').length;
-  document.getElementById('devamsiz-sayac').textContent = sayi + ' seçili';
-}
-function tumunuSec() {
-  document.querySelectorAll('input[name="devamsiz_ogrenciler"]').forEach(cb => cb.checked = true);
-  sayacGuncelle();
-}
-function secimiBozDisp() {
-  document.querySelectorAll('input[name="devamsiz_ogrenciler"]').forEach(cb => cb.checked = false);
-  sayacGuncelle();
-}
-document.addEventListener('DOMContentLoaded', sayacGuncelle);
-</script>
 {% endblock %}
