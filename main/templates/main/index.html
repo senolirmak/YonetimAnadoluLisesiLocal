@@ -166,6 +166,7 @@
                         {% endif %}
                         <a href="{% url 'sinif_ogretmenleri' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Sınıfta Ders Listesi</a>
                         <a href="{% url 'haftalik_ders_programi' %}" class="btn btn-lg" style="background-color: #6610f2; color: white;">Öğretmen Ders Programı</a>
+                        <a href="{% url 'dersdefteri:ders_listesi' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Ders Defteri</a>
                     </div>
                 </div>
                 {% endif %}
@@ -219,6 +220,7 @@
                     <div class="menu-button-group">
                         <a href="{% url 'devamsizlik:ogretmen_devamsizlik' %}" class="btn btn-lg" style="background-color: #e83e8c; color: white;">Yoklama Gir</a>
                         <a href="{% url 'haftalik_ders_programi' %}" class="btn btn-lg" style="background-color: #6610f2; color: white;">Ders Programım</a>
+                        <a href="{% url 'dersdefteri:ders_listesi' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Ders Defterim</a>
                     </div>
                 </div>
                 {% endif %}
