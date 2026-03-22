@@ -155,6 +155,22 @@ class OkulBilgi(models.Model):
     okul_kodu = models.CharField(max_length=20, blank=True, verbose_name="Okul Kodu")
     okul_adi = models.CharField(max_length=200, blank=True, verbose_name="Okul Adı")
     okul_muduru = models.CharField(max_length=100, blank=True, verbose_name="Okul Müdürü")
+    okul_donem = models.ForeignKey(
+        "OkulDonem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Aktif Dönem",
+    )
+    okul_egtyil = models.ForeignKey(
+        "EgitimOgretimYili",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Aktif Eğitim-Öğretim Yılı",
+    )
 
     class Meta:
         db_table = "okul_bilgi"
