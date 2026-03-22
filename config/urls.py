@@ -49,6 +49,7 @@ urlpatterns = [
     path("ogrencinobet/", include("ogrencinobet.urls")),
     path("pano/", include("pano.urls")),
     path("sinav/", include("sinav.urls")),
+    path("dersdefteri/", include("dersdefteri.urls")),
     path("", include("main.urls")),
     path("", include("nobet.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

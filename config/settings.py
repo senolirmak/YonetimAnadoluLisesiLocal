@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "ogrencinobet",
     "pano",
     "sinav",
+    "dersdefteri",
 ]
 
 MIDDLEWARE = [
