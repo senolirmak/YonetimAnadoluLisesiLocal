@@ -194,8 +194,7 @@
                  {% if instance.pk and ogrenci in instance.devamsiz_ogrenciler.all %}checked{% endif %}
                  onchange="sayacGuncelle()">
           <label for="ogr_{{ ogrenci.pk }}">
-            {{ ogrenci.adi }} {{ ogrenci.soyadi }}
-            <span class="okulno">{{ ogrenci.okulno }}</span>
+            <span class="okulno">{{ ogrenci.okulno }}</span> {{ ogrenci.adi }} {{ ogrenci.soyadi }}
           </label>
         </div>
         {% endfor %}
