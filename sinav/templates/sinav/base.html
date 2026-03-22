@@ -69,13 +69,21 @@
   /* Sağ taraf */
   .sinav-nav-sag { margin-left: auto; display: flex; align-items: center; gap: .9rem; }
   .sinav-nav-geri {
-    color: #fca5a5;
+    color: #e8f0f5;
     text-decoration: none;
-    font-size: .9rem;
+    font-size: .85rem;
     font-weight: 500;
     white-space: nowrap;
+    padding: .35rem .85rem;
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 5px;
+    transition: background .15s, border-color .15s;
   }
-  .sinav-nav-geri:hover { color: #fff; }
+  .sinav-nav-geri:hover {
+    background: rgba(255,255,255,.15);
+    border-color: rgba(255,255,255,.6);
+    color: #fff;
+  }
   .sinav-badge {
     background: #16a34a;
     color: #fff;
