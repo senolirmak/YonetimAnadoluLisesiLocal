@@ -1,0 +1,87 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<script src="{% static 'js/pages/manuel_dagitim.js' %}"></script>
+
+<div class="container-fluid" style="padding: 20px;">
+    <div class="mb-20">
+        <h2 class="page-title mb-20">{{ title }}</h2>
+        
+        {% if messages %}
+        <div class="mb-20">
+            {% for message in messages %}
+            <div class="msg-box {% if message.tags == 'success' %}msg-success{% elif message.tags == 'error' %}msg-error{% else %}msg-info{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="filter-box" style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="form-label-bold">{{ target_date|date:"d.m.Y" }} ({{ target_date|date:"l" }})</span>
+            <a href="{% url 'nobet_ders_doldurma' %}?tarih={{ target_date|date:'Y-m-d' }}" class="btn btn-info">Otomatik Dağıtıma Git</a>
+        </div>
+    </div>
+
+    <!-- Manuel Dağıtım Tablosu -->
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="target_date_hidden" value="{{ target_date|date:'Y-m-d' }}">
+        
+        <div class="card">
+            <div class="card-header bg-primary" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ target_date|date:"d M Y" }} - Ders Atama Matrisi</span>
+                <button type="submit" name="kaydet" class="btn btn-success btn-sm">Tabloyu Kaydet</button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" style="font-size: 0.9em;">
+                    <thead class="thead-light">
+                        <tr>
+                            <th style="width: 200px; position: sticky; left: 0; background: #6ca2d8; z-index: 1;">Nöbetçi Öğretmen (Yer)</th>
+                            {% for s in saatler %}
+                            <th class="center">{{ s }}. Ders</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for satir in tablo_satirlari %}
+                        <tr>
+                            <td style="position: sticky; left: 0; background: #fff; z-index: 1; font-weight: bold;">
+                                {{ satir.nobetci.ad }}
+                                <br><small class="text-muted">{{ satir.nobetci.yer }}</small>
+                            </td>
+                            {% for hucre in satir.hucreler %}
+                            <td class="center" style="min-width: 120px; padding: 15px;">
+                                {% if hucre.tip == 'dolu' %}
+                                    <span class="badge badge-secondary" style="display: block; width: 65%;">Dersi Var</span>
+                                {% else %}
+                                    {% if hucre.secenekler %}
+                                    <select name="cell_{{ satir.nobetci.id }}_{{ forloop.counter }}" class="form-control lesson-select" data-hour="{{ forloop.counter }}" style="font-size: 0.85em; padding: 2px;">
+                                        <option value="">-- Boş --</option>
+                                        {% for opt in hucre.secenekler %}
+                                            <option value="{{ opt.val }}" {% if opt.val == hucre.secili %}selected{% endif %}>
+                                                {{ opt.label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

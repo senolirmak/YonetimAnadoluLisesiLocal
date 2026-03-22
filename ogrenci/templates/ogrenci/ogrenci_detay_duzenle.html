@@ -1,0 +1,86 @@
+{% extends 'layouts/base.html' %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.telefon-input').forEach(function (input) {
+        input.addEventListener('input', function (e) {
+            var digits = input.value.replace(/\D/g, '').slice(0, 10);
+            var result = '';
+            if (digits.length === 0) {
+                result = '';
+            } else if (digits.length <= 3) {
+                result = '(' + digits;
+            } else if (digits.length <= 6) {
+                result = '(' + digits.slice(0, 3) + ') ' + digits.slice(3);
+            } else if (digits.length <= 8) {
+                result = '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + ' ' + digits.slice(6);
+            } else {
+                result = '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + ' ' + digits.slice(6, 8) + ' ' + digits.slice(8, 10);
+            }
+            input.value = result;
+        });
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Backspace') {
+                var val = input.value;
+                // Parantez/boşluk üzerindeyse bir rakam daha sil
+                if (/[() ]$/.test(val)) {
+                    input.value = val.slice(0, -1);
+                    e.preventDefault();
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
+
+{% block title %}Öğrenci Detay Düzenle{% endblock %}
+
+{% block content %}
+<div class="container-sm">
+    <h2 class="page-title page-title-border">{{ ogrenci }}</h2>
+
+    {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="card mb-20">
+            <div class="card-header bg-primary">Aile / Veli Bilgileri</div>
+            <div class="form-box">
+                {% for field in detay_form %}
+                <div class="form-row">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<span class="error-text">{{ field.errors }}</span>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card mb-20">
+            <div class="card-header bg-primary">Adres Bilgileri</div>
+            <div class="form-box">
+                {% for field in adres_form %}
+                <div class="form-row">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<span class="error-text">{{ field.errors }}</span>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'ogrenci:ogrenci_liste' %}" class="btn-cancel">Vazgeç</a>
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,321 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kayıt Ol - Okul Yönetim Sistemi</title>
+    <link rel="stylesheet" href="{% static 'css/nobet_admin.css' %}">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px 20px;
+            background-color: #f5f5f5;
+            box-sizing: border-box;
+        }
+        .kayit-box {
+            background: #fff;
+            padding: 36px;
+            border-radius: 8px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+            width: 100%;
+            max-width: 440px;
+        }
+        .kayit-title {
+            text-align: center;
+            margin-bottom: 6px;
+            font-size: 1.4em;
+            color: #417690;
+            font-weight: bold;
+        }
+        .kayit-subtitle {
+            text-align: center;
+            margin-bottom: 28px;
+            color: #6c757d;
+            font-size: 0.92em;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 600;
+            color: #444;
+            font-size: 0.92em;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus { border-color: #417690; outline: none; }
+        .form-group input:disabled { background: #f8f9fa; color: #6c757d; }
+        .error-list { color: #721c24; font-size: 0.85em; margin-top: 4px; padding-left: 18px; }
+        .msg-box {
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 0.9em;
+        }
+        .msg-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+        .msg-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+        .msg-info { background:#e2e3e5; color:#383d41; border:1px solid #d6d8db; }
+        .btn-sorgula {
+            padding: 9px 16px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.95em;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-sorgula:hover { background-color: #5a6268; }
+        .btn-kayit {
+            width: 100%;
+            padding: 10px;
+            background-color: #417690;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .btn-kayit:hover { background-color: #356075; }
+        .btn-kayit:disabled { background-color: #aaa; cursor: not-allowed; }
+        .tc-row { display: flex; gap: 8px; align-items: flex-end; }
+        .tc-row .form-group { flex: 1; margin-bottom: 0; }
+        .personel-kart {
+            background: #e8f4f8;
+            border: 1px solid #b8d9e8;
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+        .personel-kart .kart-baslik {
+            font-size: 0.78em;
+            font-weight: 700;
+            color: #417690;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .personel-kart table { width: 100%; font-size: 0.9em; }
+        .personel-kart td { padding: 3px 6px; }
+        .personel-kart td:first-child { color: #555; width: 80px; }
+        .personel-kart td:last-child { font-weight: 600; color: #222; }
+        .not-found-msg {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            border-radius: 6px;
+            padding: 14px 16px;
+            font-size: 0.9em;
+            margin-bottom: 16px;
+        }
+        .has-user-msg {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            border-radius: 6px;
+            padding: 14px 16px;
+            font-size: 0.9em;
+            margin-bottom: 16px;
+        }
+        .divider { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
+        .hidden { display: none; }
+        .giris-link {
+            text-align: center;
+            margin-top: 18px;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .giris-link a { color: #417690; text-decoration: none; font-weight: 600; }
+        .spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div class="kayit-box">
+    <div class="kayit-title">Okul Yönetim Sistemi</div>
+    <div class="kayit-subtitle">Yeni hesap oluşturun</div>
+
+    {# Django form hataları (submit sonrası) #}
+    {% if form.errors %}
+    <div class="msg-box msg-error">
+        {% for field in form %}{% for e in field.errors %}<div>{{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+        {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" id="kayitForm">
+        {% csrf_token %}
+
+        {# ── TC Kimlik No ── #}
+        <div class="tc-row">
+            <div class="form-group">
+                <label for="id_tckimlikno">TC Kimlik No</label>
+                <input type="text" id="id_tckimlikno" name="tckimlikno"
+                       maxlength="11" inputmode="numeric" autocomplete="off"
+                       value="{{ form.tckimlikno.value|default:'' }}"
+                       placeholder="11 haneli TC kimlik no">
+            </div>
+            <button type="button" id="btnSorgula" class="btn-sorgula">Sorgula</button>
+        </div>
+        {% if form.tckimlikno.errors %}
+        <ul class="error-list">{% for e in form.tckimlikno.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+
+        {# ── Sorgu sonuç alanları (JS ile gösterilir) ── #}
+        <div id="notFoundMsg" class="not-found-msg hidden">
+            Girdiğiniz TC kimlik no ile kayıtlı personel bulunamadı.<br>
+            <strong>Yöneticiniz ile iletişime geçin.</strong>
+        </div>
+        <div id="hasUserMsg" class="has-user-msg hidden">
+            Bu TC kimlik no ile zaten bir hesap oluşturulmuş.<br>
+            Giriş yapmak için <a href="{% url 'login' %}" style="color:#721c24;">tıklayın</a>.
+        </div>
+
+        <div id="personelKart" class="personel-kart hidden">
+            <div class="kart-baslik">Personel Bilgileri — Onaylıyor musunuz?</div>
+            <table>
+                <tr><td>Ad Soyad</td><td id="kart_adi_soyadi"></td></tr>
+                <tr><td>Branş</td><td id="kart_brans"></td></tr>
+                <tr><td>Cinsiyet</td><td id="kart_cinsiyet"></td></tr>
+            </table>
+        </div>
+
+        {# ── Kullanıcı adı ve şifre (TC bulunursa aktif olur) ── #}
+        <div id="kalanAlanlar" class="hidden">
+            <hr class="divider">
+
+            <div class="form-group">
+                <label for="id_username">Kullanıcı Adı</label>
+                <input type="text" id="id_username" name="username"
+                       value="{{ form.username.value|default:'' }}"
+                       autocomplete="username">
+                {% if form.username.errors %}
+                <ul class="error-list">{% for e in form.username.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="id_password1">Şifre</label>
+                <input type="password" id="id_password1" name="password1" autocomplete="new-password">
+                {% if form.password1.errors %}
+                <ul class="error-list">{% for e in form.password1.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="id_password2">Şifre (Tekrar)</label>
+                <input type="password" id="id_password2" name="password2" autocomplete="new-password">
+                {% if form.password2.errors %}
+                <ul class="error-list">{% for e in form.password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn-kayit">Kayıt Ol</button>
+        </div>
+    </form>
+
+    <div class="giris-link">
+        Zaten hesabınız var mı? <a href="{% url 'login' %}">Giriş Yapın</a>
+    </div>
+</div>
+
+<script>
+(function () {
+    const tcInput    = document.getElementById('id_tckimlikno');
+    const btnSorgula = document.getElementById('btnSorgula');
+    const notFound   = document.getElementById('notFoundMsg');
+    const hasUser    = document.getElementById('hasUserMsg');
+    const kart       = document.getElementById('personelKart');
+    const kalanlar   = document.getElementById('kalanAlanlar');
+    const usernameIn = document.getElementById('id_username');
+
+    function hideAll() {
+        notFound.classList.add('hidden');
+        hasUser.classList.add('hidden');
+        kart.classList.add('hidden');
+        kalanlar.classList.add('hidden');
+    }
+
+    function sorgula() {
+        const tc = tcInput.value.trim();
+        if (tc.length !== 11 || !/^\d+$/.test(tc)) {
+            hideAll();
+            return;
+        }
+        btnSorgula.disabled = true;
+        btnSorgula.innerHTML = '<span class="spinner"></span>Sorgulanıyor…';
+
+        fetch('{% url "tc_sorgula" %}?tc=' + encodeURIComponent(tc))
+            .then(r => r.json())
+            .then(data => {
+                hideAll();
+                if (data.status === 'ok') {
+                    document.getElementById('kart_adi_soyadi').textContent = data.adi_soyadi;
+                    document.getElementById('kart_brans').textContent       = data.brans;
+                    document.getElementById('kart_cinsiyet').textContent    = data.cinsiyet;
+                    kart.classList.remove('hidden');
+                    kalanlar.classList.remove('hidden');
+                    if (!usernameIn.value) {
+                        usernameIn.value = data.suggested_username;
+                    }
+                } else if (data.status === 'has_user') {
+                    hasUser.classList.remove('hidden');
+                } else {
+                    notFound.classList.remove('hidden');
+                }
+            })
+            .catch(() => {
+                hideAll();
+                notFound.classList.remove('hidden');
+            })
+            .finally(() => {
+                btnSorgula.disabled = false;
+                btnSorgula.textContent = 'Sorgula';
+            });
+    }
+
+    btnSorgula.addEventListener('click', sorgula);
+
+    tcInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); sorgula(); }
+    });
+
+    tcInput.addEventListener('input', function () {
+        if (this.value.trim().length < 11) hideAll();
+    });
+
+    // Sayfa yenilendiğinde (form hatası varsa) mevcut TC için kartı tekrar göster
+    {% if form.tckimlikno.value and not form.tckimlikno.errors %}
+    sorgula();
+    {% elif form.errors %}
+    {# TC doğruydu ama başka hata var, kart ve alanları aç #}
+    kart.classList.remove('hidden');
+    kalanlar.classList.remove('hidden');
+    {% endif %}
+}());
+</script>
+</body>
+</html>

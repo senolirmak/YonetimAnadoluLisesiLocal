@@ -1,0 +1,135 @@
+{% extends "sinav/base.html" %}
+{% block title %}Öğrenci Listesi – Ortak Sınav{% endblock %}
+
+{% block content %}
+
+<!-- ===== NAKİL GELEN ÖĞRENCİ EKLE ===== -->
+<details class="card">
+  <summary style="cursor:pointer; font-weight:600; font-size:1rem;">Nakil Gelen Öğrenci Ekle</summary>
+  <br/>
+  <form method="post" action="{% url 'sinav:ogrenci_ekle' %}">
+    {% csrf_token %}
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Okul No</label>
+        <input type="text" name="okulno" placeholder="İsteğe bağlı">
+      </div>
+      <div class="form-group">
+        <label>Cinsiyet</label>
+        <select name="cinsiyet">
+          <option value="">—</option>
+          <option value="E">Erkek</option>
+          <option value="K">Kız</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Ad <span style="color:red">*</span></label>
+        <input type="text" name="adi" required style="text-transform:uppercase;" placeholder="BÜYÜK HARF">
+      </div>
+      <div class="form-group">
+        <label>Soyad <span style="color:red">*</span></label>
+        <input type="text" name="soyadi" required style="text-transform:uppercase;" placeholder="BÜYÜK HARF">
+      </div>
+      <div class="form-group">
+        <label>Sınıf <span style="color:red">*</span></label>
+        <select name="sinif" required>
+          <option value="">— Seçin —</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Şube <span style="color:red">*</span></label>
+        <input type="text" name="sube" required maxlength="5" placeholder="A" style="text-transform:uppercase;">
+      </div>
+    </div>
+    <br/>
+    <p class="helptext">Öğrenci eklendikten sonra Adım 5 (Oturma Planları) yeniden çalıştırılmalıdır.</p>
+    <br/>
+    <button type="submit" class="btn btn-primary">Ekle</button>
+  </form>
+</details>
+
+<!-- ===== ARAMA & FİLTRE ===== -->
+<div class="card">
+  <form method="get" style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end;">
+    <div class="form-group" style="flex:1; min-width:200px;">
+      <label>Ad / Soyad / Okul No</label>
+      <input type="text" name="q" value="{{ arama }}" placeholder="Ara...">
+    </div>
+    <div class="form-group">
+      <label>Sınıf</label>
+      <select name="sinif">
+        <option value="">Tümü</option>
+        {% for s in siniflar %}
+        <option value="{{ s }}" {% if sinif_filtre == s|stringformat:"s" %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Filtrele</button>
+    {% if arama or sinif_filtre %}
+    <a href="{% url 'sinav:ogrenci_yonetim' %}" class="btn btn-secondary">Temizle</a>
+    {% endif %}
+  </form>
+
+  <p style="font-size:.8rem; color:#6b7280; margin-top:.5rem;">
+    {{ toplam }} öğrenci bulundu{% if toplam > 200 %} (ilk 200 gösteriliyor){% endif %}.
+  </p>
+</div>
+
+<!-- ===== ÖĞRENCİ TABLOSU ===== -->
+{% if ogrenciler %}
+<div class="card" style="padding:0; overflow:hidden;">
+  <table class="ogr-tablo">
+    <thead>
+      <tr>
+        <th>Okul No</th>
+        <th>Ad Soyad</th>
+        <th>Sınıf/Şube</th>
+        <th>Cinsiyet</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ogr in ogrenciler %}
+      <tr>
+        <td>{{ ogr.okulno }}</td>
+        <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+        <td>{{ ogr.sinif_sube.sinifsube }}</td>
+        <td>{{ ogr.cinsiyet }}</td>
+        <td>
+          <form method="post" action="{% url 'sinav:ogrenci_sil' ogr.pk %}" style="display:inline"
+                onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} listeden çıkarılsın mı?')">
+            {% csrf_token %}
+            <button class="btn btn-danger btn-sm" type="submit">Sil</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card">
+  <p style="color:#9ca3af;">
+    {% if arama or sinif_filtre %}Arama kriterine uyan öğrenci bulunamadı.
+    {% else %}Öğrenci listesi boş. Önce Adım 1'i çalıştırın.{% endif %}
+  </p>
+</div>
+{% endif %}
+
+<style>
+.ogr-tablo { width:100%; border-collapse:collapse; font-size:.875rem; }
+.ogr-tablo th {
+  background:#f3f4f6; text-align:left; padding:.6rem .9rem;
+  font-size:.78rem; color:#374151; font-weight:600;
+  border-bottom:2px solid #e5e7eb;
+}
+.ogr-tablo td { padding:.5rem .9rem; border-bottom:1px solid #f3f4f6; }
+.ogr-tablo tbody tr:hover { background:#f9fafb; }
+.btn-danger { background:#dc2626; color:#fff; }
+</style>
+
+{% endblock %}

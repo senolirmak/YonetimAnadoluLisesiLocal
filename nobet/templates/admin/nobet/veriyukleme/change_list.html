@@ -1,0 +1,214 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_list %}
+
+{% block extrahead %}
+{{ block.super }}
+{{ media }}
+{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" type="text/css" href="{% static "admin/css/changelists.css" %}">
+  <link rel="stylesheet" type="text/css" href="{% static "css/nobet_admin.css" %}">
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+<div style="max-width: 860px;">
+
+    {% if messages %}
+    <div style="margin-bottom: 16px;">
+        {% for message in messages %}
+        <div class="{% if message.tags == 'success' %}wizard-summary complete{% else %}wizard-summary incomplete{% endif %}">
+            {% if message.tags == 'success' %}✔{% else %}⚠{% endif %}
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ── Özet banner ── -->
+    {% if tamamlanan == 5 %}
+    <div class="wizard-summary complete">✔ Tüm kurulum adımları tamamlandı. Sistem kullanıma hazır.</div>
+    {% else %}
+    <div class="wizard-summary incomplete">⚙ Kurulum devam ediyor — {{ tamamlanan }}/5 adım tamamlandı. Lütfen açık adımları sırasıyla tamamlayınız.</div>
+    {% endif %}
+
+    <!-- ── İlerleme çubuğu ── -->
+    <div class="wizard-progress">
+        {% with steps="Okul Bilgileri,Personel Listesi,Şube Bilgileri,Ders Programı,Nöbet Listesi" %}
+        <div class="wizard-step-wrap">
+            <div class="wizard-circle {% if adimlar.0 %}done{% elif aktif_adim == 1 %}current{% else %}pending{% endif %}">
+                {% if adimlar.0 %}✓{% else %}1{% endif %}
+            </div>
+            <div class="wizard-step-label {% if adimlar.0 %}done{% elif aktif_adim == 1 %}current{% else %}pending{% endif %}">Okul Bilgileri</div>
+        </div>
+        <div class="wizard-connector {% if adimlar.0 %}done{% endif %}"></div>
+        <div class="wizard-step-wrap">
+            <div class="wizard-circle {% if adimlar.1 %}done{% elif aktif_adim == 2 %}current{% else %}pending{% endif %}">
+                {% if adimlar.1 %}✓{% else %}2{% endif %}
+            </div>
+            <div class="wizard-step-label {% if adimlar.1 %}done{% elif aktif_adim == 2 %}current{% else %}pending{% endif %}">Personel Listesi</div>
+        </div>
+        <div class="wizard-connector {% if adimlar.1 %}done{% endif %}"></div>
+        <div class="wizard-step-wrap">
+            <div class="wizard-circle {% if adimlar.2 %}done{% elif aktif_adim == 3 %}current{% else %}pending{% endif %}">
+                {% if adimlar.2 %}✓{% else %}3{% endif %}
+            </div>
+            <div class="wizard-step-label {% if adimlar.2 %}done{% elif aktif_adim == 3 %}current{% else %}pending{% endif %}">Şube Bilgileri</div>
+        </div>
+        <div class="wizard-connector {% if adimlar.2 %}done{% endif %}"></div>
+        <div class="wizard-step-wrap">
+            <div class="wizard-circle {% if adimlar.3 %}done{% elif aktif_adim == 4 %}current{% else %}pending{% endif %}">
+                {% if adimlar.3 %}✓{% else %}4{% endif %}
+            </div>
+            <div class="wizard-step-label {% if adimlar.3 %}done{% elif aktif_adim == 4 %}current{% else %}pending{% endif %}">Ders Programı</div>
+        </div>
+        <div class="wizard-connector {% if adimlar.3 %}done{% endif %}"></div>
+        <div class="wizard-step-wrap">
+            <div class="wizard-circle {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% else %}pending{% endif %}">
+                {% if adimlar.4 %}✓{% else %}5{% endif %}
+            </div>
+            <div class="wizard-step-label {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% else %}pending{% endif %}">Nöbet Listesi</div>
+        </div>
+        {% endwith %}
+    </div>
+
+    <!-- ════════════════════════════════════════ -->
+    <!-- ADIM 1 — Okul Bilgileri                 -->
+    <!-- ════════════════════════════════════════ -->
+    <details class="wizard-card {% if adimlar.0 %}done{% elif aktif_adim == 1 %}current{% else %}pending{% endif %}"
+             {% if aktif_adim == 1 or adimlar.0 %}open{% endif %}>
+        <summary>
+            <span class="wizard-badge">{% if adimlar.0 %}✓{% else %}1{% endif %}</span>
+            <span class="wizard-card-title">Okul Bilgileri</span>
+            <span class="wizard-tag {% if adimlar.0 %}done{% elif aktif_adim == 1 %}current{% else %}pending{% endif %}">
+                {% if adimlar.0 %}Tamamlandı{% elif aktif_adim == 1 %}Aktif Adım{% else %}Bekliyor{% endif %}
+            </span>
+            <span class="wizard-chevron">▼</span>
+        </summary>
+        <div class="wizard-card-body">
+            <p style="color:#666; margin-top:0;">Okul kodu, okul adı ve müdür bilgilerini giriniz. Bu bilgiler raporlarda kullanılacaktır.</p>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-row">{{ okul_form.as_p }}</div>
+                <div class="submit-row">
+                    <input type="submit" name="okul_bilgi_aktar"
+                           value="{% if adimlar.0 %}Güncelle{% else %}Kaydet ve Devam Et{% endif %}"
+                           class="default">
+                </div>
+            </form>
+        </div>
+    </details>
+
+    <!-- ════════════════════════════════════════ -->
+    <!-- ADIM 2 — Personel Listesi               -->
+    <!-- ════════════════════════════════════════ -->
+    <details class="wizard-card {% if adimlar.1 %}done{% elif aktif_adim == 2 %}current{% else %}pending{% endif %}"
+             {% if aktif_adim == 2 or adimlar.1 %}open{% endif %}>
+        <summary>
+            <span class="wizard-badge">{% if adimlar.1 %}✓{% else %}2{% endif %}</span>
+            <span class="wizard-card-title">Personel Listesi</span>
+            <span class="wizard-tag {% if adimlar.1 %}done{% elif aktif_adim == 2 %}current{% else %}pending{% endif %}">
+                {% if adimlar.1 %}Tamamlandı{% elif aktif_adim == 2 %}Aktif Adım{% else %}Bekliyor{% endif %}
+            </span>
+            <span class="wizard-chevron">▼</span>
+        </summary>
+        <div class="wizard-card-body">
+            <p style="color:#666; margin-top:0;">Personel listesini içeren Excel dosyasını (personel.xlsx) yükleyiniz.</p>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-row">{{ personel_form.as_p }}</div>
+                <div class="submit-row">
+                    <input type="submit" name="personel_aktar"
+                           value="{% if adimlar.1 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}"
+                           class="default">
+                </div>
+            </form>
+        </div>
+    </details>
+
+    <!-- ════════════════════════════════════════ -->
+    <!-- ADIM 3 — Şube Bilgileri                 -->
+    <!-- ════════════════════════════════════════ -->
+    <details class="wizard-card {% if adimlar.2 %}done{% elif aktif_adim == 3 %}current{% else %}pending{% endif %}"
+             {% if aktif_adim == 3 or adimlar.2 %}open{% endif %}>
+        <summary>
+            <span class="wizard-badge">{% if adimlar.2 %}✓{% else %}3{% endif %}</span>
+            <span class="wizard-card-title">Şube Bilgileri</span>
+            <span class="wizard-tag {% if adimlar.2 %}done{% elif aktif_adim == 3 %}current{% else %}pending{% endif %}">
+                {% if adimlar.2 %}Tamamlandı{% elif aktif_adim == 3 %}Aktif Adım{% else %}Bekliyor{% endif %}
+            </span>
+            <span class="wizard-chevron">▼</span>
+        </summary>
+        <div class="wizard-card-body">
+            <p style="color:#666; margin-top:0;">Her sınıf seviyesi için şubeleri virgülle ayırarak giriniz (Örn: A,B,C,D).</p>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-row">{{ sinif_form.as_p }}</div>
+                <div class="submit-row">
+                    <input type="submit" name="sinif_sube_aktar"
+                           value="{% if adimlar.2 %}Güncelle{% else %}Kaydet ve Devam Et{% endif %}"
+                           class="default">
+                </div>
+            </form>
+        </div>
+    </details>
+
+    <!-- ════════════════════════════════════════ -->
+    <!-- ADIM 4 — Ders Programı                  -->
+    <!-- ════════════════════════════════════════ -->
+    <details class="wizard-card {% if adimlar.3 %}done{% elif aktif_adim == 4 %}current{% else %}pending{% endif %}"
+             {% if aktif_adim == 4 or adimlar.3 %}open{% endif %}>
+        <summary>
+            <span class="wizard-badge">{% if adimlar.3 %}✓{% else %}4{% endif %}</span>
+            <span class="wizard-card-title">Ders Programı</span>
+            <span class="wizard-tag {% if adimlar.3 %}done{% elif aktif_adim == 4 %}current{% else %}pending{% endif %}">
+                {% if adimlar.3 %}Tamamlandı{% elif aktif_adim == 4 %}Aktif Adım{% else %}Bekliyor{% endif %}
+            </span>
+            <span class="wizard-chevron">▼</span>
+        </summary>
+        <div class="wizard-card-body">
+            <p style="color:#666; margin-top:0;">e-Okul'dan indirilen ders programı dosyasını (OOK...XLS) yükleyiniz.</p>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-row">{{ ders_form.as_p }}</div>
+                <div class="submit-row">
+                    <input type="submit" name="ders_programi_aktar"
+                           value="{% if adimlar.3 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}"
+                           class="default">
+                </div>
+            </form>
+        </div>
+    </details>
+
+    <!-- ════════════════════════════════════════ -->
+    <!-- ADIM 5 — Nöbet Listesi                  -->
+    <!-- ════════════════════════════════════════ -->
+    <details class="wizard-card {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% else %}pending{% endif %}"
+             {% if aktif_adim == 5 or adimlar.4 %}open{% endif %}>
+        <summary>
+            <span class="wizard-badge">{% if adimlar.4 %}✓{% else %}5{% endif %}</span>
+            <span class="wizard-card-title">Nöbet Listesi</span>
+            <span class="wizard-tag {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% else %}pending{% endif %}">
+                {% if adimlar.4 %}Tamamlandı{% elif aktif_adim == 5 %}Aktif Adım{% else %}Bekliyor{% endif %}
+            </span>
+            <span class="wizard-chevron">▼</span>
+        </summary>
+        <div class="wizard-card-body">
+            <p style="color:#666; margin-top:0;">Haftalık nöbet listesini içeren Excel dosyasını (..ÖğretmenNöbet.xlsx) yükleyiniz.</p>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-row">{{ nobet_form.as_p }}</div>
+                <div class="submit-row">
+                    <input type="submit" name="nobet_aktar"
+                           value="{% if adimlar.4 %}Yeniden Yükle{% else %}Yükle ve Tamamla{% endif %}"
+                           class="default">
+                </div>
+            </form>
+        </div>
+    </details>
+
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Öğretmen Kullanıcıları{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Öğretmen Kullanıcıları</h2>
+        <a href="{% url 'index' %}" class="btn-cancel">← Ana Sayfa</a>
+    </div>
+
+    {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Adı Soyadı</th>
+                    <th>Branş</th>
+                    <th>TC Kimlik No</th>
+                    <th class="center">Kullanıcı Adı</th>
+                    <th class="center">Durum</th>
+                    <th class="center">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for personel in personeller %}
+                <tr>
+                    <td>{{ personel.adi_soyadi }}</td>
+                    <td>{{ personel.brans }}</td>
+                    <td>{{ personel.kimlikno }}</td>
+                    <td class="center">
+                        {% if personel.user %}
+                            {{ personel.user.username }}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="center">
+                        {% if personel.user %}
+                            <span class="badge badge-info">Tanımlı</span>
+                        {% else %}
+                            <span class="badge badge-secondary">Tanımsız</span>
+                        {% endif %}
+                    </td>
+                    <td class="center">
+                        {% if personel.user %}
+                            <a href="{% url 'ogretmen_kullanici_kaldir' personel.pk %}"
+                               class="btn btn-danger"
+                               style="font-size:0.85em; padding: 4px 10px;">Sil</a>
+                        {% else %}
+                            <a href="{% url 'ogretmen_kullanici_olustur' personel.pk %}"
+                               class="btn btn-success"
+                               style="font-size:0.85em; padding: 4px 10px;">Kullanıcı Oluştur</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted">Personel kaydı bulunamadı.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted mt-20">
+        Toplam {{ personeller.count }} personel —
+        {{ personeller|length }} kayıttan
+        {% with bagli=personeller|dictsort:"user" %}{% endwith %}
+        kullanıcı tanımlı olanlar <span class="badge badge-info">Tanımlı</span> olarak gösterilmektedir.
+    </p>
+</div>
+{% endblock %}

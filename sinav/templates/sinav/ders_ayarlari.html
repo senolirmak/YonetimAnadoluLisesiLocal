@@ -1,0 +1,716 @@
+{% extends "sinav/base.html" %}
+{% block title %}Ders Ayarları – Ortak Sınav{% endblock %}
+
+{% block content %}
+
+{% if not aktif_sinav %}
+<div class="card sinav-uyari">
+  <span>⚠ Aktif sınav seçilmedi. Ders ayarları sınava bağlı kaydedilir.</span>
+  <a href="{% url 'sinav:sinav_bilgisi_listesi' %}" class="btn btn-primary btn-sm">Sınav Seç</a>
+</div>
+{% else %}
+
+{% if not dp_dolu %}
+<div class="card" style="border-left:4px solid #f59e0b; background:#fffbeb; color:#92400e; padding:.9rem 1.5rem;">
+  ℹ Ders programı henüz yüklenmedi. Adım 0 çalıştırıldıktan sonra tüm dersler listelenir.
+  Şimdi sadece daha önce seçilmiş dersler görünmektedir.
+</div>
+{% endif %}
+
+<!-- ===== YAPIŞKAN KAYDET BARI ===== -->
+<div class="da-sticky-bar">
+  <span class="da-sticky-sinav">Aktif sınav: <strong>{{ aktif_sinav }}</strong></span>
+  <button type="submit" form="da-form" class="btn btn-primary da-kaydet-btn">Kaydet</button>
+</div>
+
+<form id="da-form" method="post" action="{% url 'sinav:ders_ayarlari_kaydet' %}">
+  {% csrf_token %}
+  <!-- JS tarafından doldurulacak gizli alanlar -->
+  <input type="hidden" id="sabit_json"   name="sabit_json">
+  <input type="hidden" id="catisma_json" name="catisma_json">
+  <input type="hidden" id="esleme_json"  name="esleme_json">
+
+  <div class="da-grids-wrap">
+  <!-- ===== ÜST GRID: YAPILMAYACAK + ÇİFT OTURUMLU ===== -->
+  <div class="da-grid">
+
+    <!-- SINAV YAPILMAYACAK -->
+    <div class="card">
+      <div class="da-card-header">
+        <div>
+          <h2>Sınav Yapılmayacak Dersler</h2>
+          <p class="helptext">
+            İşaretlenen dersler Adım 3'te (SubeDers) filtrelenir.
+            {% if not yapilmayacak_kayitli %}<span class="da-varsayilan-bilgi">Varsayılan öneriler işaretli.</span>{% endif %}
+          </p>
+        </div>
+        <div class="da-header-actions">
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="tumunuSec('yapilmayacak', true)">Tümünü İşaretle</button>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="tumunuSec('yapilmayacak', false)">Temizle</button>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="yukleVarsayilan('yapilmayacak')"
+                  title="Varsayılan listeyi işaretle">Varsayılanları İşaretle</button>
+        </div>
+      </div>
+
+      {% if yap_secili_liste or yap_diger_liste %}
+      <div class="ders-checklist" id="list-yapilmayacak">
+
+        {% for ders in yap_secili_liste %}
+        <label class="ders-item ders-secili">
+          <input type="checkbox" name="yapilmayacak" value="{{ ders }}" checked>
+          <span>{{ ders }}</span>
+          {% if ders in varsayilan_yapilmayacak %}<span class="da-tag">varsayılan</span>{% endif %}
+        </label>
+        {% endfor %}
+
+        {% if yap_secili_liste and yap_diger_liste %}
+        <div class="liste-ayirici"><span>Diğer dersler</span></div>
+        {% endif %}
+
+        {% for ders in yap_diger_liste %}
+        <label class="ders-item">
+          <input type="checkbox" name="yapilmayacak" value="{{ ders }}">
+          <span>{{ ders }}</span>
+          {% if ders in varsayilan_yapilmayacak %}<span class="da-tag">varsayılan</span>{% endif %}
+        </label>
+        {% endfor %}
+
+      </div>
+      <p class="da-secim-bilgi">
+        <span id="count-yapilmayacak">{{ yap_secili_liste|length }}</span> ders seçili
+      </p>
+      {% else %}
+      <p class="bos-mesaj">Ders listesi boş — Adım 0 çalıştırın veya "Varsayılanları İşaretle" ile başlayın.</p>
+      {% endif %}
+    </div>
+
+    <!-- İKİ OTURUMLU -->
+    <div class="card">
+      <div class="da-card-header">
+        <div>
+          <h2>İki Oturumlu Dersler</h2>
+          <p class="helptext">
+            Adım 4'te bu dersler Yazılı + Uygulama olarak iki ayrı slot alır.
+            {% if not cift_kayitli %}<span class="da-varsayilan-bilgi">Varsayılan öneriler işaretli.</span>{% endif %}
+          </p>
+        </div>
+        <div class="da-header-actions">
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="tumunuSec('cift', true)">Tümünü İşaretle</button>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="tumunuSec('cift', false)">Temizle</button>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="yukleVarsayilan('cift')"
+                  title="Varsayılan listeyi işaretle">Varsayılanları İşaretle</button>
+        </div>
+      </div>
+
+      {% if cift_secili_liste or cift_diger_liste %}
+      <div class="ders-checklist" id="list-cift">
+
+        {% for ders in cift_secili_liste %}
+        <label class="ders-item ders-secili">
+          <input type="checkbox" name="cift" value="{{ ders }}" checked>
+          <span>{{ ders }}</span>
+          {% if ders in varsayilan_cift %}<span class="da-tag da-tag-cift">varsayılan</span>{% endif %}
+        </label>
+        {% endfor %}
+
+        {% if cift_secili_liste and cift_diger_liste %}
+        <div class="liste-ayirici"><span>Diğer dersler</span></div>
+        {% endif %}
+
+        {% for ders in cift_diger_liste %}
+        <label class="ders-item">
+          <input type="checkbox" name="cift" value="{{ ders }}">
+          <span>{{ ders }}</span>
+          {% if ders in varsayilan_cift %}<span class="da-tag da-tag-cift">varsayılan</span>{% endif %}
+        </label>
+        {% endfor %}
+
+      </div>
+      <p class="da-secim-bilgi">
+        <span id="count-cift">{{ cift_secili_liste|length }}</span> ders seçili
+      </p>
+      {% else %}
+      <p class="bos-mesaj">Ders listesi boş — Adım 0 çalıştırın veya "Varsayılanları İşaretle" ile başlayın.</p>
+      {% endif %}
+    </div>
+
+  </div><!-- da-grid -->
+
+  <!-- ===== ALT GRID: SABİT + ÇAKIŞMA + ESLEME ===== -->
+  <div class="da-grid-alt">
+
+  <!-- SABİT SINAVLAR -->
+  <div class="card">
+    <div class="da-card-header">
+      <div>
+        <h2>Ülke Geneli Ortak Sınavlar (Sabit Tarih/Saat)</h2>
+        <p class="helptext">
+          Bu sınavların tarihi ve saati önceden belirlenmiştir.
+          ILP çözücü bu sınavları sabit slot olarak alır; optimize etmez.
+        </p>
+      </div>
+    </div>
+
+    <div id="sabit-liste-div"></div>
+
+    <details id="sabit-ekle-panel" style="margin-top:1rem;">
+      <summary style="cursor:pointer; font-weight:600; font-size:.9rem; color:#374151;">
+        + Sabit Sınav Ekle
+      </summary>
+      <br/>
+      <div class="grid-2" style="max-width:700px;">
+
+        <div class="form-group">
+          <label>Ders Adı</label>
+          {% if tum_dersler_sabit %}
+          <select id="sabit-ders-adi">
+            <option value="">— Ders seçin —</option>
+            {% for ders in tum_dersler_sabit %}
+            <option value="{{ ders }}">{{ ders }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="text" id="sabit-ders-adi" placeholder="Ders adını girin">
+          {% endif %}
+          <span class="helptext">Takvime dahil edilecek ders</span>
+        </div>
+
+        <div class="form-group">
+          <label>Tarih</label>
+          <input type="date" id="sabit-tarih">
+        </div>
+
+        <div class="form-group">
+          <label>Saat</label>
+          <input type="time" id="sabit-saat" placeholder="08:50">
+          <span class="helptext">Örnek: 08:50, 10:30</span>
+        </div>
+
+        <div class="form-group">
+          <label>Sınıf Seviyesi</label>
+          <div class="sinif-secim">
+            <label class="sinif-item"><input type="checkbox" class="sabit-seviye" value="9"> 9. Sınıf</label>
+            <label class="sinif-item"><input type="checkbox" class="sabit-seviye" value="10"> 10. Sınıf</label>
+            <label class="sinif-item"><input type="checkbox" class="sabit-seviye" value="11"> 11. Sınıf</label>
+            <label class="sinif-item"><input type="checkbox" class="sabit-seviye" value="12"> 12. Sınıf</label>
+          </div>
+          <span class="helptext">Boş bırakılırsa tüm sınıflar için geçerli sayılır.</span>
+        </div>
+
+      </div>
+      <br/>
+      <button type="button" class="btn btn-primary btn-sm" onclick="sabitEkle()">Ekle / Güncelle</button>
+    </details>
+  </div>
+
+  <!-- SEVİYE ÇAKIŞMA GRUPLARI -->
+  <div class="card">
+    <div class="da-card-header">
+      <div>
+        <h2>Seviye Çakışma Grupları</h2>
+        <p class="helptext">
+          Aynı gruptaki dersler, aynı sınıf seviyesi (9/10/11/12) için
+          aynı oturuma planlanamaz. ILP bu kısıtı çakışma grafiğine kenar
+          olarak ekler.
+        </p>
+      </div>
+      <div class="da-header-actions">
+        <button type="button" class="btn btn-secondary btn-sm"
+                onclick="catismaVarsayilanEkle()"
+                title="Fen-Matematik varsayılan grubunu ekle">Varsayılanı Ekle</button>
+      </div>
+    </div>
+
+    <div id="catisma-liste-div"></div>
+
+    <details id="catisma-ekle-panel" style="margin-top:1rem;">
+      <summary style="cursor:pointer; font-weight:600; font-size:.9rem; color:#374151;">
+        + Yeni Çakışma Grubu Ekle
+      </summary>
+      <br/>
+      <div class="grid-2" style="max-width:700px;">
+        <div class="form-group">
+          <label>Grup Adı</label>
+          <input type="text" id="catisma-grup-adi" placeholder="Örn: Fen-Matematik Grubu">
+        </div>
+        <div class="form-group">
+          <label>Dersler</label>
+          <textarea id="catisma-dersler" rows="5"
+                    placeholder="Her satıra ya da virgülle ayırarak ders girin:&#10;BİYOLOJİ&#10;FİZİK&#10;KİMYA&#10;SEÇMELİ BİYOLOJİ"
+                    style="font-size:.82rem; resize:vertical;"></textarea>
+          <span class="helptext">Her satıra veya virgülle ayrılmış ders adları</span>
+        </div>
+      </div>
+      <br/>
+      <button type="button" class="btn btn-primary btn-sm" onclick="catismaEkle()">Grubu Ekle</button>
+    </details>
+  </div>
+
+  <!-- AYNI SLOT ESLEMELERİ -->
+  <div class="card da-grid-alt-tam">
+    <div class="da-card-header">
+      <div>
+        <h2>Aynı Slot Eşlemeleri</h2>
+        <p class="helptext">
+          Eşlenen ders çiftleri ILP tarafından aynı oturuma yerleştirilmeye çalışılır.
+          Çakışma (aynı şubede olan) dersler için bu kural uygulanamaz.
+          Örn: <strong>MATEMATİK ↔ SEÇMELİ MATEMATİK</strong>
+        </p>
+      </div>
+    </div>
+
+    <div id="esleme-liste-div"></div>
+
+    <details id="esleme-ekle-panel" style="margin-top:1rem;">
+      <summary style="cursor:pointer; font-weight:600; font-size:.9rem; color:#374151;">
+        + Yeni Eşleme Ekle
+      </summary>
+      <br/>
+      <div style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap; max-width:700px;">
+        <div class="form-group" style="flex:1; min-width:200px;">
+          <label>Ders 1</label>
+          <select id="esleme-ders1" class="esleme-select">
+            <option value="">— Seçin —</option>
+            {% for d in tum_dersler_sabit %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="flex:1; min-width:200px;">
+          <label>Ders 2</label>
+          <select id="esleme-ders2" class="esleme-select">
+            <option value="">— Seçin —</option>
+            {% for d in tum_dersler_sabit %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <button type="button" class="btn btn-primary btn-sm" onclick="eslemeEkle()">Eşlemeyi Ekle</button>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  </div><!-- da-grid-alt -->
+  </div><!-- da-grids-wrap -->
+
+</form>
+
+<style>
+/* ── Viewport-fit: sayfanın tamamı ekrana sığsın ── */
+.container {
+  height: calc(100vh - 95px) !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-top: .3rem;
+}
+#da-form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.da-grids-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  overflow: hidden;
+}
+.da-grid {
+  flex: 6;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+  gap: 1rem;
+  align-items: stretch;
+}
+.da-grid-alt {
+  flex: 5;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: auto;
+  gap: .75rem;
+  align-content: start;
+  overflow-y: auto;        /* details açılınca bu alan içinde kayar */
+  margin-top: 0;
+}
+.da-grid-alt-tam { grid-column: 1 / -1; }
+/* Üst grid kartları: sabit yükseklik, içerik kaydırır */
+.da-grid > .card {
+  margin-bottom: 0 !important;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Alt grid kartları: yüksekliği içeriğe göre büyüsün */
+.da-grid-alt > .card {
+  margin-bottom: 0 !important;
+  display: flex;
+  flex-direction: column;
+}
+.da-card-header { flex-shrink: 0; }
+.ders-checklist {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  max-height: none !important;
+}
+.da-secim-bilgi { flex-shrink: 0; }
+#sabit-liste-div,
+#catisma-liste-div,
+#esleme-liste-div {
+  max-height: 9rem;
+  overflow-y: auto;
+}
+@media(max-width:800px){
+  .da-grid { grid-template-columns:1fr; grid-template-rows: auto; }
+}
+@media(max-width:900px){
+  .da-grid-alt { grid-template-columns:1fr; }
+}
+
+/* Kart iç boşluğunu bu sayfada kıs */
+.da-grid > .card,
+.da-grid-alt > .card { padding: .9rem 1rem; }
+
+.sinav-uyari {
+  display:flex; align-items:center; justify-content:space-between;
+  border-left:4px solid #f59e0b; color:#92400e; background:#fffbeb;
+  padding:.9rem 1.5rem;
+}
+.da-sticky-bar {
+  display:flex; align-items:center; justify-content:space-between;
+  background:#f8fafc; border:1px solid #e5e7eb; border-radius:7px;
+  padding:.5rem .9rem; margin-bottom:.5rem;
+  flex-shrink: 0;
+}
+.da-sticky-sinav { font-size:.88rem; color:#6b7280; }
+.da-kaydet-btn { min-width:100px; }
+.da-card-header {
+  display:flex; justify-content:space-between; align-items:flex-start;
+  gap:.6rem; margin-bottom:.6rem; flex-wrap:wrap;
+}
+.da-card-header h2 { margin-bottom:.1rem; font-size:.95rem; }
+.da-header-actions { display:flex; gap:.4rem; flex-wrap:wrap; flex-shrink:0; }
+.ders-checklist {
+  border:1px solid #e5e7eb; border-radius:6px;
+  padding:.4rem;
+}
+.ders-item {
+  display:flex; align-items:center; gap:.5rem;
+  padding:.35rem .5rem; border-radius:4px; cursor:pointer; font-size:.875rem;
+}
+.ders-item:hover { background:#f3f4f6; }
+.ders-item input[type=checkbox] { flex-shrink:0; width:15px; height:15px; cursor:pointer; }
+.ders-item span:first-of-type { flex:1; }
+.ders-secili { background:#f0fdf4; }
+.ders-secili:hover { background:#dcfce7; }
+.liste-ayirici {
+  display:flex; align-items:center; gap:.5rem;
+  margin:.4rem .25rem; color:#9ca3af; font-size:.72rem;
+}
+.liste-ayirici::before,
+.liste-ayirici::after {
+  content:""; flex:1; height:1px; background:#e5e7eb;
+}
+.da-tag {
+  font-size:.68rem; padding:.1rem .4rem; border-radius:99px;
+  background:#d1fae5; color:#065f46; white-space:nowrap; flex-shrink:0;
+}
+.da-tag-cift { background:#e0e7ff; color:#3730a3; }
+.da-secim-bilgi { font-size:.78rem; color:#6b7280; margin-top:.5rem; }
+.da-varsayilan-bilgi { color:#92400e; font-style:italic; margin-left:.3rem; }
+.bos-mesaj { color:#9ca3af; font-size:.85rem; font-style:italic; }
+.sabit-liste { display:flex; flex-direction:column; gap:.4rem; margin-bottom:.5rem; }
+.sabit-satir {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:.5rem .75rem; background:#fafafa;
+  border:1px solid #e5e7eb; border-radius:6px;
+}
+.sabit-bilgi { display:flex; align-items:center; gap:1rem; flex:1; flex-wrap:wrap; }
+.sabit-ders { font-weight:600; font-size:.88rem; color:#1a1a2e; }
+.sabit-meta { font-size:.82rem; color:#6b7280; }
+.sabit-seviye-etiket { display:flex; gap:.3rem; flex-wrap:wrap; }
+.seviye-chip {
+  font-size:.72rem; padding:.1rem .45rem; border-radius:99px;
+  background:#e0e7ff; color:#3730a3; font-weight:600; white-space:nowrap;
+}
+.sinif-secim {
+  display:flex; gap:1.2rem; flex-wrap:wrap;
+  padding:.5rem .6rem; border:1px solid #e5e7eb; border-radius:5px;
+  background:#fafafa;
+}
+.sinif-item {
+  display:flex; align-items:center; gap:.35rem;
+  font-size:.88rem; cursor:pointer;
+}
+.sinif-item input[type=checkbox] { width:15px; height:15px; cursor:pointer; }
+.btn-danger { background:#dc2626; color:#fff; }
+.catisma-liste { display:flex; flex-direction:column; gap:.75rem; margin-bottom:.5rem; }
+.catisma-kart {
+  border:1px solid #e5e7eb; border-radius:7px;
+  background:#fafafa; overflow:hidden;
+}
+.catisma-kart-baslik {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:.5rem .75rem; background:#f3f4f6;
+  border-bottom:1px solid #e5e7eb;
+}
+.catisma-grup-adi { font-weight:600; font-size:.88rem; color:#1a1a2e; }
+.catisma-ders-listesi {
+  padding:.5rem .75rem; display:flex; flex-wrap:wrap; gap:.3rem;
+}
+.esleme-liste { display:flex; flex-direction:column; gap:.5rem; margin-bottom:.5rem; }
+.esleme-kart {
+  display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;
+  border:1px solid #e5e7eb; border-radius:7px; padding:.5rem .75rem;
+  background:#fafafa;
+}
+.esleme-chip {
+  font-size:.82rem; font-weight:600; padding:.2rem .65rem;
+  border-radius:99px; background:#ede9fe; color:#4c1d95;
+}
+.esleme-ok { font-size:1rem; color:#6b7280; }
+.esleme-select {
+  width:100%; padding:.35rem .5rem; border:1px solid #c7d2fe;
+  border-radius:5px; font-size:.85rem; background:#fff; color:#1a1a2e;
+}
+.esleme-select:focus { outline:none; border-color:#6366f1; }
+.catisma-chip {
+  font-size:.75rem; padding:.15rem .5rem; border-radius:99px;
+  background:#fef3c7; color:#92400e; border:1px solid #fcd34d;
+}
+</style>
+
+<script>
+// ──────────────────────────────────────────────
+// Başlangıç verileri (Django'dan)
+// ──────────────────────────────────────────────
+const VARSAYILAN_YAP  = {{ varsayilan_yap_json|safe }};
+const VARSAYILAN_CIFT = {{ varsayilan_cift_json|safe }};
+const VARSAYILAN_CATISMA = {{ varsayilan_catisma_json|safe }};
+
+let sabitState   = {{ sabit_json|safe }};
+let catismaState = {{ catisma_json|safe }};
+let eslemeState  = {{ esleme_json|safe }};
+
+// ──────────────────────────────────────────────
+// Yardımcı: tarih "YYYY-MM-DD" → "DD.MM.YYYY"
+// ──────────────────────────────────────────────
+function tarihGoster(s) {
+  if (!s) return "";
+  const [y, m, d] = s.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+// ──────────────────────────────────────────────
+// Render: Sabit Sınavlar
+// ──────────────────────────────────────────────
+function renderSabit() {
+  const div = document.getElementById("sabit-liste-div");
+  if (!sabitState.length) {
+    div.innerHTML = '<p class="bos-mesaj" style="margin-bottom:.75rem;">Henüz sabit sınav tanımlanmadı.</p>';
+    return;
+  }
+  let html = '<div class="sabit-liste">';
+  sabitState.forEach((ss, i) => {
+    const sevHtml = ss.seviyeler && ss.seviyeler.length
+      ? ss.seviyeler.map(s => `<span class="seviye-chip">${s}. Sınıf</span>`).join("")
+      : '<span class="sabit-meta" style="font-style:italic;">Tüm sınıflar</span>';
+    html += `
+      <div class="sabit-satir">
+        <div class="sabit-bilgi">
+          <span class="sabit-ders">${ss.ders_adi}</span>
+          <span class="sabit-meta">${tarihGoster(ss.tarih)} – ${ss.saat}</span>
+          <span class="sabit-seviye-etiket">${sevHtml}</span>
+        </div>
+        <button type="button" class="btn btn-danger btn-sm"
+                onclick="sabitSil(${i})"
+                title="${ss.ders_adi} sabit sınavdan çıkar">Sil</button>
+      </div>`;
+  });
+  html += "</div>";
+  div.innerHTML = html;
+}
+
+function sabitEkle() {
+  const dersAdi = (document.getElementById("sabit-ders-adi").value || "").trim();
+  const tarih   = (document.getElementById("sabit-tarih").value || "").trim();
+  const saat    = (document.getElementById("sabit-saat").value || "").trim();
+  const seviyeler = [...document.querySelectorAll(".sabit-seviye:checked")]
+                      .map(cb => parseInt(cb.value)).sort((a,b)=>a-b);
+  if (!dersAdi || !tarih || !saat) { alert("Ders adı, tarih ve saat zorunludur."); return; }
+  const idx = sabitState.findIndex(s => s.ders_adi === dersAdi);
+  const yeni = { ders_adi: dersAdi, tarih, saat, seviyeler };
+  if (idx >= 0) sabitState[idx] = yeni;
+  else          sabitState.push(yeni);
+  renderSabit();
+  // formu sıfırla
+  document.getElementById("sabit-ders-adi").value = "";
+  document.getElementById("sabit-tarih").value    = "";
+  document.getElementById("sabit-saat").value     = "";
+  document.querySelectorAll(".sabit-seviye").forEach(cb => cb.checked = false);
+  document.getElementById("sabit-ekle-panel").open = false;
+}
+
+function sabitSil(i) {
+  if (!confirm(`"${sabitState[i].ders_adi}" sabit sınavdan çıkarılsın mı?`)) return;
+  sabitState.splice(i, 1);
+  renderSabit();
+}
+
+// ──────────────────────────────────────────────
+// Render: Çakışma Grupları
+// ──────────────────────────────────────────────
+function renderCatisma() {
+  const div = document.getElementById("catisma-liste-div");
+  if (!catismaState.length) {
+    div.innerHTML = '<p class="bos-mesaj" style="margin-bottom:.75rem;">Henüz çakışma grubu tanımlanmadı. "Varsayılanı Ekle" ile başlayabilirsiniz.</p>';
+    return;
+  }
+  let html = '<div class="catisma-liste">';
+  catismaState.forEach((g, i) => {
+    const chips = (g.dersler || []).map(d => `<span class="catisma-chip">${d}</span>`).join("");
+    html += `
+      <div class="catisma-kart">
+        <div class="catisma-kart-baslik">
+          <span class="catisma-grup-adi">${g.grup_adi}</span>
+          <button type="button" class="btn btn-danger btn-sm"
+                  onclick="catismaSil(${i})">Sil</button>
+        </div>
+        <div class="catisma-ders-listesi">${chips}</div>
+      </div>`;
+  });
+  html += "</div>";
+  div.innerHTML = html;
+}
+
+function catismaEkle() {
+  const ad     = (document.getElementById("catisma-grup-adi").value || "").trim();
+  const metin  = (document.getElementById("catisma-dersler").value || "").trim();
+  if (!ad || !metin) { alert("Grup adı ve en az bir ders zorunludur."); return; }
+  const dersler = metin.replace(/\n/g, ",").split(",").map(d => d.trim()).filter(Boolean);
+  catismaState.push({ grup_adi: ad, dersler });
+  renderCatisma();
+  document.getElementById("catisma-grup-adi").value = "";
+  document.getElementById("catisma-dersler").value  = "";
+  document.getElementById("catisma-ekle-panel").open = false;
+}
+
+function catismaSil(i) {
+  if (!confirm(`"${catismaState[i].grup_adi}" grubu silinsin mi?`)) return;
+  catismaState.splice(i, 1);
+  renderCatisma();
+}
+
+function catismaVarsayilanEkle() {
+  catismaState.push({ grup_adi: VARSAYILAN_CATISMA.grup_adi, dersler: [...VARSAYILAN_CATISMA.dersler] });
+  renderCatisma();
+}
+
+// ──────────────────────────────────────────────
+// Render: Aynı Slot Eşlemeleri
+// ──────────────────────────────────────────────
+function renderEsleme() {
+  const div = document.getElementById("esleme-liste-div");
+  if (!eslemeState.length) {
+    div.innerHTML = '<p class="bos-mesaj" style="margin-bottom:.75rem;">Henüz eşleme tanımlanmadı.</p>';
+    return;
+  }
+  let html = '<div class="esleme-liste">';
+  eslemeState.forEach((e, i) => {
+    html += `
+      <div class="esleme-kart">
+        <span class="esleme-chip">${e.ders1}</span>
+        <span class="esleme-ok">↔</span>
+        <span class="esleme-chip">${e.ders2}</span>
+        <button type="button" class="btn btn-danger btn-sm"
+                style="margin-left:auto;"
+                onclick="eslemeSil(${i})">Sil</button>
+      </div>`;
+  });
+  html += "</div>";
+  div.innerHTML = html;
+}
+
+function eslemeEkle() {
+  const d1 = (document.getElementById("esleme-ders1").value || "").trim().toUpperCase();
+  const d2 = (document.getElementById("esleme-ders2").value || "").trim().toUpperCase();
+  if (!d1 || !d2) { alert("Her iki ders adı da zorunludur."); return; }
+  if (d1 === d2)  { alert("İki ders farklı olmalıdır."); return; }
+  if (eslemeState.some(e => e.ders1 === d1 && e.ders2 === d2)) { alert("Bu eşleme zaten kayıtlı."); return; }
+  eslemeState.push({ ders1: d1, ders2: d2 });
+  renderEsleme();
+  document.getElementById("esleme-ders1").value = "";
+  document.getElementById("esleme-ders2").value = "";
+}
+
+function eslemeSil(i) {
+  if (!confirm("Bu eşleme silinsin mi?")) return;
+  eslemeState.splice(i, 1);
+  renderEsleme();
+}
+
+// ──────────────────────────────────────────────
+// Checkbox yardımcıları
+// ──────────────────────────────────────────────
+function tumunuSec(grup, durum) {
+  document.querySelectorAll(`input[name="${grup}"]`).forEach(cb => cb.checked = durum);
+  guncelSayac(grup);
+}
+
+function yukleVarsayilan(grup) {
+  const liste = grup === "yapilmayacak" ? VARSAYILAN_YAP : VARSAYILAN_CIFT;
+  document.querySelectorAll(`input[name="${grup}"]`).forEach(cb => {
+    if (liste.includes(cb.value)) cb.checked = true;
+  });
+  guncelSayac(grup);
+}
+
+function guncelSayac(grup) {
+  const secili = document.querySelectorAll(`input[name="${grup}"]:checked`).length;
+  const el = document.getElementById(`count-${grup}`);
+  if (el) el.textContent = secili;
+}
+
+["yapilmayacak", "cift"].forEach(grup => {
+  document.querySelectorAll(`input[name="${grup}"]`).forEach(cb => {
+    cb.addEventListener("change", () => guncelSayac(grup));
+  });
+});
+
+// ──────────────────────────────────────────────
+// Form submit: JSON hidden inputs güncelle
+// ──────────────────────────────────────────────
+document.getElementById("da-form").addEventListener("submit", function() {
+  document.getElementById("sabit_json").value   = JSON.stringify(sabitState);
+  document.getElementById("catisma_json").value = JSON.stringify(catismaState);
+  document.getElementById("esleme_json").value  = JSON.stringify(eslemeState);
+});
+
+// ──────────────────────────────────────────────
+// Sayfa yüklenince render
+// ──────────────────────────────────────────────
+renderSabit();
+renderCatisma();
+renderEsleme();
+</script>
+
+{% endif %}
+
+{% endblock %}

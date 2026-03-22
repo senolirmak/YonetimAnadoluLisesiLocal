@@ -1,0 +1,158 @@
+from collections import defaultdict
+from functools import wraps
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect, render
+
+from dersprogrami.models import NobetDersProgrami
+from nobet.models import NobetGorevi, NobetPersonel, OkulBilgi, SinifSube
+
+from .forms import (
+    DersProgramiImportForm,
+    NobetImportForm,
+    OkulBilgiForm,
+    PersonelImportForm,
+    SinifSubeImportForm,
+)
+from .services.default_path_service import DefaultPath
+from .services.ders_programi_import_service import DersProgramiIsleyici
+from .services.nobet_import_service import NobetIsleyici
+from .services.personel_import_service import PersonelIsleyici
+from .services.sinifsube_import_service import sinif_sube_kaydet
+
+
+def mudur_yardimcisi_required(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            from django.contrib.auth.views import redirect_to_login
+
+            return redirect_to_login(request.get_full_path())
+        if not (
+            request.user.is_superuser
+            or request.user.groups.filter(name="mudur_yardimcisi").exists()
+        ):
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+def _save_file(f, dp):
+    file_path = dp.VERI_DIR / f.name
+    with open(file_path, "wb+") as dest:
+        for chunk in f.chunks():
+            dest.write(chunk)
+    return file_path
+
+
+@login_required
+@mudur_yardimcisi_required
+def veriaktar_ana(request):
+    mevcut_okul = OkulBilgi.objects.first()
+    okul_initial = {
+        "okul_kodu": mevcut_okul.okul_kodu if mevcut_okul else "",
+        "okul_adi": mevcut_okul.okul_adi if mevcut_okul else "",
+        "okul_muduru": mevcut_okul.okul_muduru if mevcut_okul else "",
+    }
+
+    mevcut_siniflar = defaultdict(list)
+    if not SinifSube.objects.exists():
+        defaults = {
+            9: ["A", "B", "C", "D", "E", "F"],
+            10: ["A", "B", "C", "D", "E", "F", "G", "H", "İ"],
+            11: ["A", "B", "C", "D", "E", "F", "G", "H"],
+            12: ["A", "B", "C", "D", "E", "F", "G"],
+        }
+        for k, v in defaults.items():
+            mevcut_siniflar[k] = v
+    else:
+        for s in SinifSube.objects.all().order_by("sinif", "sube"):
+            mevcut_siniflar[s.sinif].append(s.sube)
+    sinif_initial = {f"sinif_{k}": ",".join(v) for k, v in mevcut_siniflar.items()}
+
+    okul_form = OkulBilgiForm(request.POST or None, prefix="okul", initial=okul_initial)
+    personel_form = PersonelImportForm(
+        request.POST or None, request.FILES or None, prefix="personel"
+    )
+    sinif_form = SinifSubeImportForm(request.POST or None, prefix="sinif", initial=sinif_initial)
+    ders_form = DersProgramiImportForm(request.POST or None, request.FILES or None, prefix="ders")
+    nobet_form = NobetImportForm(request.POST or None, request.FILES or None, prefix="nobet")
+
+    if request.method == "POST":
+        dp = DefaultPath()
+        try:
+            if "okul_bilgi_aktar" in request.POST and okul_form.is_valid():
+                OkulBilgi.objects.update_or_create(
+                    id=1,
+                    defaults={
+                        "okul_kodu": okul_form.cleaned_data["okul_kodu"],
+                        "okul_adi": okul_form.cleaned_data["okul_adi"],
+                        "okul_muduru": okul_form.cleaned_data["okul_muduru"],
+                    },
+                )
+                messages.success(request, "Okul bilgileri başarıyla kaydedildi.")
+
+            elif "personel_aktar" in request.POST and personel_form.is_valid():
+                f = request.FILES["personel-dosya"]
+                tarih = personel_form.cleaned_data["uygulama_tarihi"]
+                file_path = _save_file(f, dp)
+                PersonelIsleyici(personel_path=str(file_path), uygulama_tarihi=tarih).calistir()
+                messages.success(request, "Personel listesi başarıyla aktarıldı.")
+
+            elif "sinif_sube_aktar" in request.POST and sinif_form.is_valid():
+                sinif_bilgileri = {}
+                for level in [9, 10, 11, 12]:
+                    raw = sinif_form.cleaned_data.get(f"sinif_{level}", "")
+                    sinif_bilgileri[level] = [
+                        s.strip().upper() for s in raw.split(",") if s.strip()
+                    ]
+                sinif_sube_kaydet(sinif_bilgileri)
+                messages.success(request, "Sınıf ve şube bilgileri başarıyla güncellendi.")
+
+            elif "ders_programi_aktar" in request.POST and ders_form.is_valid():
+                f = request.FILES["ders-dosya"]
+                tarih = ders_form.cleaned_data["uygulama_tarihi"]
+                file_path = _save_file(f, dp)
+                DersProgramiIsleyici(file_path=str(file_path), uygulama_tarihi=tarih).calistir()
+                messages.success(request, "Ders programı başarıyla aktarıldı.")
+
+            elif "nobet_aktar" in request.POST and nobet_form.is_valid():
+                f = request.FILES["nobet-dosya"]
+                tarih = nobet_form.cleaned_data["uygulama_tarihi"]
+                file_path = _save_file(f, dp)
+                NobetIsleyici(nobet_path=str(file_path), uygulama_tarihi=tarih).calistir()
+                messages.success(request, "Nöbetçi listesi başarıyla aktarıldı.")
+
+        except Exception as e:
+            messages.error(request, f"Hata oluştu: {str(e)}")
+
+        return redirect(request.path)
+
+    adimlar = [
+        OkulBilgi.objects.exists(),
+        NobetPersonel.objects.exists(),
+        SinifSube.objects.exists(),
+        NobetDersProgrami.objects.exists(),
+        NobetGorevi.objects.exists(),
+    ]
+    tamamlanan = sum(adimlar)
+    aktif_adim = next((i + 1 for i, done in enumerate(adimlar) if not done), 6)
+
+    return render(
+        request,
+        "veriaktar/veriaktar_ana.html",
+        {
+            "title": "Veri Aktarım Merkezi",
+            "okul_form": okul_form,
+            "personel_form": personel_form,
+            "sinif_form": sinif_form,
+            "ders_form": ders_form,
+            "nobet_form": nobet_form,
+            "adimlar": adimlar,
+            "tamamlanan": tamamlanan,
+            "aktif_adim": aktif_adim,
+        },
+    )

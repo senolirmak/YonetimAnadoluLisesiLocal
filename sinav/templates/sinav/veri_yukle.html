@@ -1,0 +1,183 @@
+{% extends "sinav/base.html" %}
+{% block title %}Veri Yükle – Ortak Sınav{% endblock %}
+
+{% block content %}
+
+<!-- ===== MEVCUT DOSYA DURUMU ===== -->
+{% if ogrenci_dosya_adi or program_dosya_adi %}
+<div class="card" style="border-left:4px solid #4a90d9; padding:.9rem 1.5rem;">
+  <div style="display:flex; gap:2rem; flex-wrap:wrap; align-items:center;">
+    <div>
+      <span style="font-size:.72rem; color:#6b7280; display:block;">Mevcut Öğrenci Dosyası</span>
+      <span style="font-weight:600; color:#059669;">{% if ogrenci_dosya_adi %}✓ {{ ogrenci_dosya_adi }}{% else %}—{% endif %}</span>
+    </div>
+    <div>
+      <span style="font-size:.72rem; color:#6b7280; display:block;">Mevcut Ders Programı</span>
+      <span style="font-weight:600; color:#059669;">{% if program_dosya_adi %}✓ {{ program_dosya_adi }}{% else %}—{% endif %}</span>
+    </div>
+    {% if uygulama_tarihi %}
+    <div>
+      <span style="font-size:.72rem; color:#6b7280; display:block;">Veri Tarihi</span>
+      <span style="font-weight:600;">{{ uygulama_tarihi }}</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ===== YÜKLEME FORMU ===== -->
+<div class="card">
+  <h2>e-Okul Dosyalarını Yükle</h2>
+  <p class="helptext" style="margin-bottom:1.25rem;">
+    İki dosyayı ve programın geçerlilik tarihini seçin. Yükleme tamamlandığında
+    Ders Ayarları sayfasına yönlendirilirsiniz.
+  </p>
+
+  <form method="post" action="{% url 'sinav:veri_yukle' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="grid-2">
+
+      <div class="form-group">
+        {{ yukle_form.eokul_ogrenci_dosya.label_tag }}
+        {{ yukle_form.eokul_ogrenci_dosya }}
+        <span class="helptext">{{ yukle_form.eokul_ogrenci_dosya.help_text }}</span>
+        {% for err in yukle_form.eokul_ogrenci_dosya.errors %}
+          <span class="field-error">{{ err }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="form-group">
+        {{ yukle_form.eokul_haftalik_program_dosya.label_tag }}
+        {{ yukle_form.eokul_haftalik_program_dosya }}
+        <span class="helptext">{{ yukle_form.eokul_haftalik_program_dosya.help_text }}</span>
+        {% for err in yukle_form.eokul_haftalik_program_dosya.errors %}
+          <span class="field-error">{{ err }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="form-group">
+        {{ yukle_form.uygulama_tarihi.label_tag }}
+        {{ yukle_form.uygulama_tarihi }}
+        <span class="helptext">Haftalık programın okulda uygulandığı tarih (dönem başlangıcı)</span>
+        {% for err in yukle_form.uygulama_tarihi.errors %}
+          <span class="field-error">{{ err }}</span>
+        {% endfor %}
+      </div>
+
+    </div>
+    <br/>
+    <div style="display:flex; gap:.75rem; align-items:center;">
+      <button type="submit" class="btn btn-primary">Yükle ve Ders Ayarlarına Git</button>
+      <a href="{% url 'sinav:index' %}" class="btn btn-secondary">İptal</a>
+    </div>
+  </form>
+</div>
+
+<!-- ===== VERİ FARKI ONAYI ===== -->
+{% if fark %}
+<div class="card" style="border-left:4px solid #f59e0b; padding:.9rem 1.5rem;">
+  <h3 style="color:#92400e; margin-top:0; margin-bottom:.75rem;">Mevcut Verilerden Farklilik Tespit Edildi</h3>
+  <p style="margin:.25rem 0 .75rem;">
+    Yuklenecek dosyalardaki sinif/sube ve ders bilgileri veritabanindaki kayitlardan farkli.
+    Devam etmek mevcut ogrenci listesi, ders programi ve ders saatlerini sifirlayacak.
+  </p>
+
+  {% if fark.ss_eklenen %}
+  <div style="margin-bottom:.5rem;">
+    <span style="font-size:.78rem; font-weight:600; color:#065f46;">Eklenecek sinif/sube ({{ fark.ss_eklenen|length }}):</span>
+    <span style="font-size:.82rem; color:#374151;">{{ fark.ss_eklenen|join:", " }}</span>
+  </div>
+  {% endif %}
+  {% if fark.ss_silinen %}
+  <div style="margin-bottom:.5rem;">
+    <span style="font-size:.78rem; font-weight:600; color:#991b1b;">Kaldirilacak sinif/sube ({{ fark.ss_silinen|length }}):</span>
+    <span style="font-size:.82rem; color:#374151;">{{ fark.ss_silinen|join:", " }}</span>
+  </div>
+  {% endif %}
+  {% if fark.dh_eklenen %}
+  <div style="margin-bottom:.5rem;">
+    <span style="font-size:.78rem; font-weight:600; color:#065f46;">Eklenecek ders ({{ fark.dh_eklenen|length }}):</span>
+    <span style="font-size:.82rem; color:#374151;">
+      {% for d in fark.dh_eklenen|slice:":10" %}{{ d }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if fark.dh_eklenen|length > 10 %} …{% endif %}
+    </span>
+  </div>
+  {% endif %}
+  {% if fark.dh_silinen %}
+  <div style="margin-bottom:.5rem;">
+    <span style="font-size:.78rem; font-weight:600; color:#991b1b;">Kaldirilacak ders ({{ fark.dh_silinen|length }}):</span>
+    <span style="font-size:.82rem; color:#374151;">
+      {% for d in fark.dh_silinen|slice:":10" %}{{ d }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if fark.dh_silinen|length > 10 %} …{% endif %}
+    </span>
+  </div>
+  {% endif %}
+
+  <div style="display:flex; gap:.75rem; margin-top:1rem; align-items:center;">
+    <form method="post" action="{% url 'sinav:veri_yukle_onayla' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">Onayla ve Devam Et</button>
+    </form>
+    <a href="{% url 'sinav:veri_yukle_sayfasi' %}" class="btn btn-secondary">Iptal</a>
+  </div>
+</div>
+{% endif %}
+
+<!-- ===== YÜKLEME GEÇMİŞİ (DisVeri) ===== -->
+{% if dis_veri_gecmis %}
+<div class="card">
+  <h2>Yükleme Geçmişi</h2>
+  <table class="disveri-tablo">
+    <thead>
+      <tr>
+        <th>Dosya</th>
+        <th>Geçerlilik Tarihi</th>
+        <th>Yükleme Zamanı</th>
+        <th>Tür</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for dv in dis_veri_gecmis %}
+      <tr>
+        <td>{{ dv.get_dosya_etiketi_display }}</td>
+        <td>{{ dv.gecerlilik_tarihi|date:"d.m.Y" }}</td>
+        <td>{{ dv.yukleme_tarihi|date:"d.m.Y H:i" }}</td>
+        <td>
+          {% with tip=dv.yeni_veri_mi %}
+          {% if tip is None %}
+            <span class="dv-badge dv-ilk">İlk Yükleme</span>
+          {% elif tip %}
+            <span class="dv-badge dv-yeni">Yeni Veri</span>
+          {% else %}
+            <span class="dv-badge dv-guncelleme">Güncelleme</span>
+          {% endif %}
+          {% endwith %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<style>
+.disveri-tablo {
+  width: 100%; border-collapse: collapse; font-size: .85rem;
+}
+.disveri-tablo th {
+  text-align: left; padding: .4rem .75rem;
+  background: #f0f4ff; color: #374151;
+  border-bottom: 2px solid #c7d2fe; font-size: .78rem;
+}
+.disveri-tablo td {
+  padding: .4rem .75rem;
+  border-bottom: 1px solid #f3f4f6; color: #374151;
+}
+.dv-badge {
+  display: inline-block; padding: .15rem .55rem;
+  border-radius: 99px; font-size: .72rem; font-weight: 600;
+}
+.dv-ilk        { background: #dbeafe; color: #1d4ed8; }
+.dv-yeni       { background: #d1fae5; color: #065f46; }
+.dv-guncelleme { background: #fef3c7; color: #92400e; }
+</style>
+
+{% endblock %}

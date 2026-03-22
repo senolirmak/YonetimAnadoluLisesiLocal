@@ -1,0 +1,370 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+  .aktar-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .aktar-card summary {
+    padding: 14px 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    list-style: none;
+    user-select: none;
+    background: #f8f9fa;
+  }
+  .aktar-card summary::-webkit-details-marker { display: none; }
+  .aktar-card.done   summary { background: #f0faf0; border-left: 4px solid #28a745; }
+  .aktar-card.active summary { background: #fff8e6; border-left: 4px solid #fd7e14; }
+  .aktar-card.pending summary { background: #f8f9fa; border-left: 4px solid #ced4da; }
+  .aktar-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .done   .aktar-badge { background: #28a745; color: #fff; }
+  .active .aktar-badge { background: #fd7e14; color: #fff; }
+  .pending .aktar-badge { background: #ced4da; color: #666; }
+  .aktar-card-title {
+    font-weight: 600;
+    font-size: 15px;
+    flex: 1;
+  }
+  .aktar-tag {
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+  }
+  .aktar-tag.done    { background: #d4edda; color: #155724; }
+  .aktar-tag.active  { background: #fff3cd; color: #856404; }
+  .aktar-tag.pending { background: #e9ecef; color: #6c757d; }
+  .aktar-chevron { margin-left: 8px; font-size: 12px; transition: transform .2s; }
+  details[open] .aktar-chevron { transform: rotate(180deg); }
+  .aktar-card-body {
+    padding: 20px 24px;
+    border-top: 1px solid #eee;
+  }
+  .aktar-card-body p.hint {
+    color: #6c757d;
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 14px;
+  }
+  .aktar-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 520px;
+  }
+  .aktar-form-row label {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 3px;
+    display: block;
+  }
+  .aktar-form-row input[type="date"],
+  .aktar-form-row input[type="file"],
+  .aktar-form-row input[type="text"] {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    font-size: 14px;
+  }
+  .progress-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 24px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .prog-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 80px;
+  }
+  .prog-circle {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+    border: 2px solid #ced4da;
+    background: #fff;
+    color: #6c757d;
+  }
+  .prog-circle.done    { background: #28a745; border-color: #28a745; color: #fff; }
+  .prog-circle.current { background: #fd7e14; border-color: #fd7e14; color: #fff; }
+  .prog-label {
+    font-size: 11px;
+    margin-top: 5px;
+    text-align: center;
+    color: #6c757d;
+  }
+  .prog-label.done    { color: #28a745; font-weight: 600; }
+  .prog-label.current { color: #fd7e14; font-weight: 600; }
+  .prog-connector {
+    flex: 1;
+    height: 2px;
+    background: #ced4da;
+    min-width: 20px;
+    margin-bottom: 20px;
+  }
+  .prog-connector.done { background: #28a745; }
+  .alert-banner {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  .alert-banner.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+  .alert-banner.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+  .alert-banner.error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  .aktar-submit-row {
+    margin-top: 16px;
+  }
+</style>
+
+<div class="container-sm">
+  <h2 class="page-title page-title-border">{{ title }}</h2>
+
+  {% if messages %}
+  <div style="margin-bottom: 16px;">
+    {% for message in messages %}
+    <div class="alert-banner {% if message.tags == 'success' %}success{% elif message.tags == 'error' %}error{% else %}warning{% endif %}">
+      {% if message.tags == 'success' %}✔{% else %}⚠{% endif %} {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Özet banner -->
+  {% if tamamlanan == 5 %}
+  <div class="alert-banner success">✔ Tüm kurulum adımları tamamlandı. Sistem kullanıma hazır.</div>
+  {% else %}
+  <div class="alert-banner warning">⚙ Kurulum devam ediyor — {{ tamamlanan }}/5 adım tamamlandı.</div>
+  {% endif %}
+
+  <!-- İlerleme çubuğu -->
+  <div class="progress-bar-wrap">
+    {% with labels="Okul Bilgileri|Personel|Şubeler|Ders Programı|Nöbet" %}
+    <div class="prog-step">
+      <div class="prog-circle {% if adimlar.0 %}done{% elif aktif_adim == 1 %}current{% endif %}">
+        {% if adimlar.0 %}✓{% else %}1{% endif %}
+      </div>
+      <div class="prog-label {% if adimlar.0 %}done{% elif aktif_adim == 1 %}current{% endif %}">Okul Bilgileri</div>
+    </div>
+    <div class="prog-connector {% if adimlar.0 %}done{% endif %}"></div>
+    <div class="prog-step">
+      <div class="prog-circle {% if adimlar.1 %}done{% elif aktif_adim == 2 %}current{% endif %}">
+        {% if adimlar.1 %}✓{% else %}2{% endif %}
+      </div>
+      <div class="prog-label {% if adimlar.1 %}done{% elif aktif_adim == 2 %}current{% endif %}">Personel</div>
+    </div>
+    <div class="prog-connector {% if adimlar.1 %}done{% endif %}"></div>
+    <div class="prog-step">
+      <div class="prog-circle {% if adimlar.2 %}done{% elif aktif_adim == 3 %}current{% endif %}">
+        {% if adimlar.2 %}✓{% else %}3{% endif %}
+      </div>
+      <div class="prog-label {% if adimlar.2 %}done{% elif aktif_adim == 3 %}current{% endif %}">Şubeler</div>
+    </div>
+    <div class="prog-connector {% if adimlar.2 %}done{% endif %}"></div>
+    <div class="prog-step">
+      <div class="prog-circle {% if adimlar.3 %}done{% elif aktif_adim == 4 %}current{% endif %}">
+        {% if adimlar.3 %}✓{% else %}4{% endif %}
+      </div>
+      <div class="prog-label {% if adimlar.3 %}done{% elif aktif_adim == 4 %}current{% endif %}">Ders Programı</div>
+    </div>
+    <div class="prog-connector {% if adimlar.3 %}done{% endif %}"></div>
+    <div class="prog-step">
+      <div class="prog-circle {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% endif %}">
+        {% if adimlar.4 %}✓{% else %}5{% endif %}
+      </div>
+      <div class="prog-label {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% endif %}">Nöbet Listesi</div>
+    </div>
+    {% endwith %}
+  </div>
+
+  <!-- ADIM 1 — Okul Bilgileri -->
+  <details class="aktar-card {% if adimlar.0 %}done{% elif aktif_adim == 1 %}active{% else %}pending{% endif %}"
+           {% if aktif_adim == 1 or adimlar.0 %}open{% endif %}>
+    <summary>
+      <span class="aktar-badge">{% if adimlar.0 %}✓{% else %}1{% endif %}</span>
+      <span class="aktar-card-title">Okul Bilgileri</span>
+      <span class="aktar-tag {% if adimlar.0 %}done{% elif aktif_adim == 1 %}active{% else %}pending{% endif %}">
+        {% if adimlar.0 %}Tamamlandı{% elif aktif_adim == 1 %}Aktif Adım{% else %}Bekliyor{% endif %}
+      </span>
+      <span class="aktar-chevron">▼</span>
+    </summary>
+    <div class="aktar-card-body">
+      <p class="hint">Okul kodu, okul adı ve müdür bilgilerini giriniz.</p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="aktar-form-row">
+          {% for field in okul_form %}
+          <div>
+            {{ field.label_tag }}
+            {{ field }}
+            {% for error in field.errors %}<p class="error-text">{{ error }}</p>{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="aktar-submit-row">
+          <button type="submit" name="okul_bilgi_aktar" class="btn btn-primary">
+            {% if adimlar.0 %}Güncelle{% else %}Kaydet ve Devam Et{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <!-- ADIM 2 — Personel Listesi -->
+  <details class="aktar-card {% if adimlar.1 %}done{% elif aktif_adim == 2 %}active{% else %}pending{% endif %}"
+           {% if aktif_adim == 2 or adimlar.1 %}open{% endif %}>
+    <summary>
+      <span class="aktar-badge">{% if adimlar.1 %}✓{% else %}2{% endif %}</span>
+      <span class="aktar-card-title">Personel Listesi</span>
+      <span class="aktar-tag {% if adimlar.1 %}done{% elif aktif_adim == 2 %}active{% else %}pending{% endif %}">
+        {% if adimlar.1 %}Tamamlandı{% elif aktif_adim == 2 %}Aktif Adım{% else %}Bekliyor{% endif %}
+      </span>
+      <span class="aktar-chevron">▼</span>
+    </summary>
+    <div class="aktar-card-body">
+      <p class="hint">Personel listesini içeren Excel dosyasını (personel.xlsx) yükleyiniz.</p>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="aktar-form-row">
+          {% for field in personel_form %}
+          <div>
+            {{ field.label_tag }}
+            {{ field }}
+            {% for error in field.errors %}<p class="error-text">{{ error }}</p>{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="aktar-submit-row">
+          <button type="submit" name="personel_aktar" class="btn btn-primary">
+            {% if adimlar.1 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <!-- ADIM 3 — Şube Bilgileri -->
+  <details class="aktar-card {% if adimlar.2 %}done{% elif aktif_adim == 3 %}active{% else %}pending{% endif %}"
+           {% if aktif_adim == 3 or adimlar.2 %}open{% endif %}>
+    <summary>
+      <span class="aktar-badge">{% if adimlar.2 %}✓{% else %}3{% endif %}</span>
+      <span class="aktar-card-title">Sınıf / Şube Bilgileri</span>
+      <span class="aktar-tag {% if adimlar.2 %}done{% elif aktif_adim == 3 %}active{% else %}pending{% endif %}">
+        {% if adimlar.2 %}Tamamlandı{% elif aktif_adim == 3 %}Aktif Adım{% else %}Bekliyor{% endif %}
+      </span>
+      <span class="aktar-chevron">▼</span>
+    </summary>
+    <div class="aktar-card-body">
+      <p class="hint">Her sınıf seviyesi için şubeleri virgülle ayırarak giriniz (Örn: A,B,C,D).</p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="aktar-form-row">
+          {% for field in sinif_form %}
+          <div>
+            {{ field.label_tag }}
+            {{ field }}
+            {% for error in field.errors %}<p class="error-text">{{ error }}</p>{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="aktar-submit-row">
+          <button type="submit" name="sinif_sube_aktar" class="btn btn-primary">
+            {% if adimlar.2 %}Güncelle{% else %}Kaydet ve Devam Et{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <!-- ADIM 4 — Ders Programı -->
+  <details class="aktar-card {% if adimlar.3 %}done{% elif aktif_adim == 4 %}active{% else %}pending{% endif %}"
+           {% if aktif_adim == 4 or adimlar.3 %}open{% endif %}>
+    <summary>
+      <span class="aktar-badge">{% if adimlar.3 %}✓{% else %}4{% endif %}</span>
+      <span class="aktar-card-title">Okul Ders Programı</span>
+      <span class="aktar-tag {% if adimlar.3 %}done{% elif aktif_adim == 4 %}active{% else %}pending{% endif %}">
+        {% if adimlar.3 %}Tamamlandı{% elif aktif_adim == 4 %}Aktif Adım{% else %}Bekliyor{% endif %}
+      </span>
+      <span class="aktar-chevron">▼</span>
+    </summary>
+    <div class="aktar-card-body">
+      <p class="hint">e-Okul'dan indirilen ders programı dosyasını (OOK...XLS) yükleyiniz.</p>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="aktar-form-row">
+          {% for field in ders_form %}
+          <div>
+            {{ field.label_tag }}
+            {{ field }}
+            {% for error in field.errors %}<p class="error-text">{{ error }}</p>{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="aktar-submit-row">
+          <button type="submit" name="ders_programi_aktar" class="btn btn-primary">
+            {% if adimlar.3 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <!-- ADIM 5 — Nöbet Listesi -->
+  <details class="aktar-card {% if adimlar.4 %}done{% elif aktif_adim == 5 %}active{% else %}pending{% endif %}"
+           {% if aktif_adim == 5 or adimlar.4 %}open{% endif %}>
+    <summary>
+      <span class="aktar-badge">{% if adimlar.4 %}✓{% else %}5{% endif %}</span>
+      <span class="aktar-card-title">Nöbetçi Listesi</span>
+      <span class="aktar-tag {% if adimlar.4 %}done{% elif aktif_adim == 5 %}active{% else %}pending{% endif %}">
+        {% if adimlar.4 %}Tamamlandı{% elif aktif_adim == 5 %}Aktif Adım{% else %}Bekliyor{% endif %}
+      </span>
+      <span class="aktar-chevron">▼</span>
+    </summary>
+    <div class="aktar-card-body">
+      <p class="hint">Haftalık nöbetçi listesini içeren Excel dosyasını (..ÖğretmenNöbet.xlsx) yükleyiniz.</p>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="aktar-form-row">
+          {% for field in nobet_form %}
+          <div>
+            {{ field.label_tag }}
+            {{ field }}
+            {% for error in field.errors %}<p class="error-text">{{ error }}</p>{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="aktar-submit-row">
+          <button type="submit" name="nobet_aktar" class="btn btn-primary">
+            {% if adimlar.4 %}Yeniden Yükle{% else %}Yükle ve Tamamla{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+</div>
+{% endblock %}

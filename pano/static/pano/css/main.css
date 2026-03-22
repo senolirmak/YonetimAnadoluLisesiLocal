@@ -1,0 +1,541 @@
+:root{
+  --bg:#000;
+  --green:#0fffff;
+  --cyan:#00ffd5;
+  --red:#ff3b3b;
+  --yellow:#ffe45c;
+  --glow: rgba(0,255,0,.35);
+
+  /* Responsive Scale Variables */
+  --scale: 1;
+
+  --timeSize: clamp(140px, calc(26vw * var(--scale)), 560px);
+  --dateSize: clamp(36px,  calc(2.5vw * var(--scale)), 160px);
+  --daySize : clamp(32px,  calc(1.6vw * var(--scale)), 140px);
+
+  --panelTitle: clamp(18px, calc(1.8vw * var(--scale)), 72px);
+  --panelText : clamp(18px, calc(1.8vw * var(--scale)), 72px);
+
+  --mediaTitleSize: clamp(16px, calc(1.5vw * var(--scale)), 52px);
+  --mediaDescSize : clamp(14px, calc(1.3vw * var(--scale)), 46px);
+
+  --counterLbl: clamp(16px, calc(2.0vw * var(--scale)), 60px);
+  --counterVal: clamp(22px, calc(3.0vw * var(--scale)), 90px);
+  --counterSub: clamp(14px, calc(1.7vw * var(--scale)), 54px);
+
+  --tickerH   : clamp(44px, calc(5.2vw * var(--scale)), 110px);
+  --tickerTxt : clamp(18px, calc(2.4vw * var(--scale)), 70px);
+
+  --flashDur: 900ms;
+}
+
+/* DSEG fontu zaten ekledin demiştin; yolunu buna göre ayarla */
+@font-face {
+  font-family: "SevenSeg";
+  src: url("../fonts/DSEG7Classic-Regular.woff") format("woff"),
+       url("../fonts/DSEG7Classic-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* ==================== GLOBAL LAYOUT ==================== */
+.stage {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+html,body{
+  width:100vw;
+  height:100vh;
+  margin:0;
+  background:var(--bg);
+  overflow:hidden;
+  user-select:none;
+  font-family: "DejaVu Sans", Arial, sans-serif;
+  color:var(--green);
+}
+
+/* ==================== HEADER ELEMENTS ==================== */
+.logo{
+  width: 5.2vw;
+  height: 5.2vw;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(0,255,0,.25));
+}
+.school{
+  --schoolScale: 1;
+  font-size: clamp(32px, calc(2.6vw * var(--schoolScale)), 64px);
+  letter-spacing: .06em;
+  text-shadow: 0 0 14px rgba(0,255,0,.25);
+  white-space: nowrap;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  max-width: 62vw;
+}
+
+#statusBadge {
+  margin-left:auto;
+  font-size: clamp(18px, calc(2.2vw * var(--scale)), 64px);
+  letter-spacing: .06em;
+  padding: .45vw .9vw;
+  border: 0.09vw solid rgba(0, 110, 255, 0.55);
+  border-radius: 1vw;
+  text-shadow: 0 0 12px rgba(0,255,0,.25);
+  background: #333; /* Varsayılan renk */
+  color: white;
+}
+
+#statusBadge.class { background-color: #007bff; } /* Ders sırasında mavi */
+#statusBadge.break { background-color: #fd7e14; } /* Teneffüste turuncu */
+
+/* ==================== ANIMATIONS & EFFECTS ==================== */
+.flash{
+  position:absolute;
+  inset:0;
+  background: rgba(0,255,213,.22);
+  opacity: 0;
+  z-index: 15;
+  pointer-events:none;
+}
+.flash.on{
+  opacity: 1;
+  animation: flashAnim var(--flashDur) ease-out forwards;
+}
+@keyframes flashAnim{
+  0%{ opacity: 0; }
+  20%{ opacity: 1; }
+  100%{ opacity: 0; }
+}
+
+/* ==================== MAIN VIEW & GRID ==================== */
+.view{
+  position:absolute;
+  inset:0;
+  padding: 7.2vw 2.5vw 7.2vw 2.5vw;
+  padding: calc(5.2vw + 30px) 2.4vw var(--tickerH) 2.5vw;
+  box-sizing:border-box;
+  pointer-events:none;
+}
+
+.split{
+  width:100%; 
+  height:100%;
+  display:grid;
+  grid-template-columns: 40fr 60fr;
+  gap: 3vw;
+  align-items:center;
+}
+
+/* ==================== LEFT: CLOCK ==================== */
+.clock {
+    text-align:center;
+    text-shadow: 0 0 18px var(--glow);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap: 2vh;
+    height:100%;
+}
+
+.time{
+    font-family: "SevenSeg", monospace;
+    font-size: clamp(200px, 12vw, 520px);
+    line-height: 1;
+}
+
+.date{ font-size: var(--dateSize); letter-spacing: 0.08em; opacity: 0.95; }
+.day { font-size: var(--daySize);  letter-spacing: 0.08em; opacity: 0.9; }
+
+/* ==================== RIGHT: PANEL & LIST ==================== */
+.panel{
+  width:100%;
+  border: 0.08vw solid rgba(0, 187, 255, 0.503);
+  border-radius: 1.2vw;
+  padding: 1.2vw;
+  box-sizing:border-box;
+  height: 100%;
+  text-shadow: 0 0 12px rgba(0,255,0,0.25);
+}
+.panel h2{
+  margin:0 0 1.0vw 0;
+  font-size: var(--panelTitle);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align:center;
+}
+.divider{
+  height:0.25vw;
+  background: rgba(0,255,0,0.55);
+  margin: 0 0 1.1vw 0;
+}
+.list{
+  display:grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 0.6vw;
+  column-gap: 1.2vw;
+  letter-spacing: .08em;
+  font-size: var(--panelText);
+  font-family: normal;
+}
+.line{ display: contents; }
+.label{ opacity:0.95; }
+.val{ font-weight:400; letter-spacing:0.05em; }
+.line .label, .line .val{ transition: filter 200ms, color 200ms, opacity 200ms; }
+
+.line.active .label, .line.active .val{
+  color: var(--cyan);
+  filter: drop-shadow(0 0 10px rgba(0,255,213,.35));
+}
+.line.breakNow .label, .line.breakNow .val{
+  color: var(--red);
+  filter: drop-shadow(0 0 10px rgba(255,59,59,.35));
+}
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: .25; }
+}
+.line.blink .label, .line.blink .val{ animation: blink 1s infinite; }
+
+/* ==================== COUNTERS ==================== */
+.counters{ margin-top: 0.8vw; }
+.counterRow{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap: 1vw;
+}
+.counterLabel{
+  font-size: var(--counterLbl);
+  letter-spacing: .10em;
+  opacity: .95;
+  font-family: monospace;
+}
+.counterValue{
+  font-size: clamp(60px, 6vw, 150px);
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: .08em;
+  color: var(--green);
+  filter: drop-shadow(0 0 10px rgba(255,228,92,.25));
+  font-family: "SevenSeg", monospace;
+}
+.counterSub{
+  margin-top: 1vh;
+  font-size: var(--counterSub);
+  letter-spacing: .06em;
+  opacity: .9;
+  font-family: monospace;
+}
+
+/* ==================== TICKER (FOOTER) ==================== */
+.ticker{
+  font-family: "Noto Color Emoji","Noto Emoji",sans-serif;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--tickerH);
+  background: rgba(0,0,0,0.92);
+  border-top: 0.05vw solid rgba(0,255,0,0.55);
+  overflow: hidden;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+.ticker-inner{
+  white-space: nowrap;
+  display: inline-block;
+  padding-left: 100%;
+  animation: tickerMove 35s linear infinite;
+}
+.ticker-inner span{
+  font-size: var(--tickerTxt);
+  letter-spacing: 0.08em;
+  color: var(--green);
+  text-shadow: 0 0 12px rgba(0,255,0,0.35);
+}
+@keyframes tickerMove{
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
+/* ==================== EVENTS PAGE LAYOUT ==================== */
+.eventsView {
+    height: calc(100vh - 28vh);  /* üst + alt bar düşüldü */
+    padding: 2vh 3vw 0 3vw;
+}
+
+.eventsFrame{
+  height: 100%;
+  border: 0px solid rgba(0,255,0,.35);
+  border-radius: 18px;
+  padding: 2vh 2vw;
+  background: rgba(0,0,0,.55);
+}
+
+.eventsGrid{
+  margin-top: 7vh;   /* 🔥 yukarıdan boşluk */
+  height: 82%;              /* 100% değil */
+  display: grid;
+  grid-template-columns: 2fr 2.4fr;
+  gap: 3vw;
+  align-items: start;       /* center değil */
+}
+
+.eventsCol{
+  height: 100%;
+  border: 2px solid rgba(0,255,0,.25);
+  border-radius: 14px;
+  padding: 1.5vh 1.2vw;
+  overflow: hidden;
+}
+
+.eventsColTitle{
+  font-size: clamp(22px, 2.4vw, 54px);
+  font-weight: 500;
+  letter-spacing: .08em;
+  margin-bottom: 1.2vh;
+}
+
+/* Sol kolon listesi kaydırılabilir */
+.eventsList{
+  height: calc(100% - 7vh);
+  overflow-y: auto;
+  padding-right: 1vw;
+}
+.eventsList::-webkit-scrollbar{ width: 10px; }
+.eventsList::-webkit-scrollbar-thumb{
+  background: rgba(0,255,0,.25);
+  border-radius: 10px;
+}
+
+.eventsRight{
+  display: flex;
+  align-items: center;      /* 🔥 dikey ortalama */
+  justify-content: center;  /* 🔥 yatay ortalama */
+}
+
+/* --- Event Row Styling --- */
+
+.eventRowOne{
+  padding: 1.5vh 2vw;
+  margin-bottom: 1vh;
+  border: 2px solid rgba(0,255,0,.25);
+  border-radius: 18px;
+  background: rgba(0,0,0,.35);
+  transition: all .3s ease;
+}
+
+.eventRowOne:hover{
+  border-color: rgba(0,255,213,.8);
+  box-shadow: 0 0 20px rgba(0,255,213,.25);
+}
+
+.eventRowOne.selected{
+  border-color: rgba(0,255,213,.75);
+  box-shadow: 0 0 18px rgba(0,255,213,.18);
+  background: rgba(0,255,213,.06);
+}
+
+.eventsFrame{
+  background: linear-gradient(
+      180deg,
+      rgba(0,0,0,0.85),
+      rgba(0,0,0,0.95)
+  );
+  border-radius: 20px;
+}
+
+/* 1) Başlık */
+.eventName{
+  font-weight: 500;
+  letter-spacing: .06em;
+  font-size: clamp(20px, 2.2vw, 52px);
+}
+
+/* 2) Durum */
+.badgeOngoing,
+.badgeUpcoming{
+  width: fit-content;
+  font-weight: 900;
+  letter-spacing: .08em;
+  padding: .22em .7em;
+  border-radius: 12px;
+  font-size: clamp(16px, 1.6vw, 36px);
+}
+
+.badgeOngoing{
+  color: #ff3b3b;
+  border: 2px solid rgba(255,59,59,.8);
+  text-shadow: 0 0 10px rgba(255,59,59,.35);
+}
+
+.badgeUpcoming{
+  color: #00ffd5;
+  border: 2px solid rgba(0,255,213,.8);
+  text-shadow: 0 0 10px rgba(0,255,213,.30);
+}
+
+/* 3) Açıklama */
+.eventDesc{
+  opacity: .92;
+  font-size: clamp(18px, 1.2vw, 44px);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 4) Yer */
+.eventPlace{
+  opacity: .95;
+  font-size: clamp(18px, 1.2vw, 44px);
+}
+
+/* 5) Saat (en altta) */
+.eventTime{
+  margin-top: .6vh;
+  font-family: monospace;
+  font-weight: 500;
+  letter-spacing: .08em;
+  opacity: .95;
+  color: var(--yellow);
+  font-size: clamp(18px, 1.0vw, 48px);
+}
+
+/* Sol kolon: daha büyük/okunaklı (sadece sol tarafı etkiler) */
+.eventsColLeft .eventsColTitle{
+  font-size: clamp(18px, 3.0vw, 68px);
+}
+
+/* Etkinlik Başlığı: BOLD KALDIR */
+.eventsColLeft .eventName{
+  font-weight: 500;   /* normal / medium */
+  letter-spacing: .08em;  /* görsel güç, bold olmadan */
+}
+.eventsColLeft .eventDesc,
+.eventsColLeft .eventPlace{
+  font-size: clamp(18px, 2.0vw, 46px);
+}
+
+.eventsColLeft .eventTime{
+  font-size: clamp(18px, 2.1vw, 48px);
+}
+
+/* Bölüm başlıkları: DEVAM EDEN / YAKLAŞAN */
+.eventsColLeft .sectionTitle{
+  font-size: clamp(18px, 1.4vw, 48px);   /* 🔥 küçültüldü */
+  font-weight: 800;
+  white-space: nowrap;                  /* 🔥 ALT SATIRA GEÇME */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0 0 1.2vh 0;
+}
+/* Gün başlığı: 📅 08.02.2026 gibi */
+.eventsColLeft .dayTitle{
+  font-size: clamp(18px, 2.0vw, 52px);
+  font-weight: 500;
+  letter-spacing: .08em;
+  margin: 0 0 1.2vh 0;
+}
+/* Seçili kartı daha belirgin yap (ekranda “vurucu” görünür) */
+.eventsColLeft .eventRowOne.selected{
+  border-color: rgba(0,255,213,.95);
+  box-shadow:
+    0 0 26px rgba(0,255,213,.35),
+    inset 0 0 18px rgba(0,255,213,.18);
+  background: rgba(0,255,213,.05);
+}
+
+/* Header Glass Effect */
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5vh 3vw;
+    background: rgba(255, 255, 255, 0.05); /* Çok hafif beyazlık */
+    backdrop-filter: blur(12px); /* Arkadaki içeriği bulanıklaştırır */
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+/* ==================== MEDIA / POSTER FRAME ==================== */
+.posterBigFrame{
+  width: 100%;
+  height: 60vh;
+  margin: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow: hidden;
+}
+
+.posterBigFrame img{
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* ==================== CONNECTION ERROR ==================== */
+.connection-error {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: red;
+  color: white;
+  padding: 15px;
+  border-radius: 10px;
+  z-index: 9999;
+  font-weight: bold;
+  animation: blink 1s infinite;
+}
+
+/* ==================== COUNTER SECTION ==================== */
+.counter-section {
+  margin-top: 4vh;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.counter-title {
+  font-size: var(--panelTitle);
+  opacity: 0.8;
+  margin-bottom: 0.5vh;
+}
+
+/* ==================== PANEL (MEDIA) ==================== */
+.panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.media-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-title {
+  text-align: center;
+  font-size: var(--mediaTitleSize);
+  margin-bottom: 1vh;
+  opacity: 0.9;
+  min-height: 1.2em;
+}
+
+.media-desc {
+  text-align: center;
+  font-size: var(--mediaDescSize);
+  margin-top: 1vh;
+  opacity: 0.9;
+  min-height: 1.2em;
+}

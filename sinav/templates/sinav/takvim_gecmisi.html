@@ -1,0 +1,148 @@
+{% extends "sinav/base.html" %}
+{% block title %}Takvim Geçmişi{% endblock %}
+
+{% block content %}
+
+<div class="card" style="border-left:4px solid #6366f1; padding:1rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem;">
+  <div>
+    <h2 style="margin:0; color:#3730a3;">Üretilen Takvimler</h2>
+    <span style="font-size:.82rem; color:#6b7280;">{{ kayitlar|length }} kayıt</span>
+  </div>
+  <div style="display:flex; gap:.5rem; align-items:center;">
+    <a href="{% url 'sinav:takvim_sayfasi' %}" class="btn btn-secondary btn-sm">← Takvim (ILP)</a>
+    {% if aktif_uretim %}
+    <a href="{% url 'sinav:pdf_rapor' %}" class="btn btn-success btn-sm">
+      PDF Rapor Oluştur →
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if not kayitlar %}
+<div class="card" style="text-align:center; color:#9ca3af; padding:2rem;">
+  Henüz kaydedilmiş takvim üretimi yok. Takvim oluşturduktan sonra buraya yansır.
+</div>
+{% endif %}
+
+{% for k in kayitlar %}
+<div class="card tg-kart" id="kart-{{ k.pk }}">
+
+  <!-- ── Başlık satırı ── -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;
+              flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
+    <div>
+      <div style="font-weight:700; font-size:1rem; color:#1a1a2e;">
+        {{ k.sinav }}
+      </div>
+      <div style="font-size:.8rem; color:#6b7280; margin-top:.2rem;">
+        Üretim tarihi: {{ k.uretim_tarihi|date:"d.m.Y H:i" }}
+      </div>
+    </div>
+    <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+      {% if k.aktif %}
+      <span class="tg-aktif-badge">&#10003; PDF için Kullanılıyor</span>
+      {% else %}
+      <form method="post" action="{% url 'sinav:takvim_uretim_kullan' k.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm tg-kullan-btn">Kullan</button>
+      </form>
+      {% endif %}
+      {% if k.sinav_takvim_sayisi > 0 %}
+      <a href="{% url 'sinav:takvim_onizleme' %}?from=gecmis" class="btn btn-primary btn-sm">Takvim Formu</a>
+      {% endif %}
+      <button class="btn btn-secondary btn-sm"
+              onclick="toggleLog({{ k.pk }})">
+        Log Göster
+      </button>
+      <form method="post" action="{% url 'sinav:takvim_uretim_sil' k.pk %}"
+            onsubmit="return confirm('Bu üretim kaydı silinsin mi?')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm" style="background:#fee2e2; color:#991b1b;">Sil</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Özet istatistikler (logdan parse edilir) ── -->
+  {% with log=k.log_metni %}
+  <div class="tg-ozet">
+    {% if "seviye/oturum" in log %}
+      {% for satir in log.splitlines %}
+        {% if "seviye/oturum" in satir %}
+        <div class="tg-ozet-satir tg-kelebek">
+          <span class="tg-icon">🦋</span> {{ satir|slice:"2:" }}
+        </div>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if "Her sube icin her gunde" in log %}
+      <div class="tg-ozet-satir tg-ok">✓ Her şube için günde ≤ 2 sınav kuralı sağlandı</div>
+    {% endif %}
+    {% if "Catisma grubu gun kisiti saglandi" in log %}
+      <div class="tg-ozet-satir tg-ok">✓ Çatışma grubu gün kısıtı sağlandı</div>
+    {% endif %}
+    {% if "Faz-1 cozum bulunamadi" in log %}
+      <div class="tg-ozet-satir tg-warn">⚠ Faz-1 çözüm bulunamadı, Faz-2 ile devam edildi</div>
+    {% endif %}
+    {% if "Faz-2 cozum bulunamadi" in log %}
+      <div class="tg-ozet-satir tg-warn">⚠ Faz-2 çözüm bulunamadı, Faz-1 sonucu kullanıldı</div>
+    {% endif %}
+  </div>
+  {% endwith %}
+
+  <!-- ── Log kutusu (gizli) ── -->
+  <div id="log-{{ k.pk }}" style="display:none; margin-top:.75rem;">
+    <pre class="tg-log-box">{{ k.log_metni }}</pre>
+  </div>
+
+</div>
+{% endfor %}
+
+<script>
+function toggleLog(pk) {
+  const box = document.getElementById("log-" + pk);
+  const btn = box.previousElementSibling.querySelector("button") ||
+              document.querySelector(`#kart-${pk} button`);
+  if (box.style.display === "none") {
+    box.style.display = "";
+    btn.textContent = "Log Gizle";
+  } else {
+    box.style.display = "none";
+    btn.textContent = "Log Göster";
+  }
+}
+</script>
+
+<style>
+.tg-kullan-btn {
+  background: #d1fae5; color: #065f46;
+  border: 1px solid #6ee7b7; font-weight: 600;
+}
+.tg-kullan-btn:hover { background: #a7f3d0; }
+.tg-aktif-badge {
+  font-size: .78rem; font-weight: 600;
+  background: #d1fae5; color: #065f46;
+  border: 1px solid #6ee7b7;
+  padding: .25rem .7rem; border-radius: 99px;
+  white-space: nowrap;
+}
+.tg-kart       { padding: 1.2rem 1.5rem; }
+.tg-ozet       { display: flex; flex-direction: column; gap: .3rem; }
+.tg-ozet-satir {
+  font-size: .83rem; padding: .3rem .7rem;
+  border-radius: 5px;
+}
+.tg-ok      { background: #d1fae5; color: #065f46; }
+.tg-warn    { background: #fef3c7; color: #92400e; }
+.tg-kelebek { background: #ede9fe; color: #4c1d95; font-weight: 600; }
+.tg-icon    { margin-right: .3rem; }
+.tg-log-box {
+  background: #0f172a; color: #a5f3fc;
+  font-family: "Cascadia Code", "Fira Code", monospace;
+  font-size: .75rem; padding: .75rem 1rem; border-radius: 6px;
+  white-space: pre-wrap; max-height: 360px; overflow-y: auto;
+  margin: 0;
+}
+</style>
+
+{% endblock %}

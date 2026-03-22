@@ -1,0 +1,474 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Yeni Öğrenci Çağrısı{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Öğrenci Çağrısı Oluştur</h2>
+        <a href="{% url 'rehberlik:cagri_liste' %}" class="btn-cancel">← Listeye Dön</a>
+    </div>
+
+    <form method="post" id="cagriForm">
+        {% csrf_token %}
+        <input type="hidden" name="gorusme_id" value="{{ gorusme_id }}">
+        {% if not grup_modu %}
+        <input type="hidden" name="ogrenci_id" id="ogrenciIdInput">
+        {% endif %}
+
+        <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+
+            {# ════ SOL: Öğrenci Seçimi ════ #}
+            <div style="flex:1.3;min-width:320px;">
+                <div class="card" style="height:100%;">
+
+                    {% if grup_modu %}
+                    {# ── GRUP MODU: Sınıfa Göre Gruplu Çoklu Seçim ── #}
+                    <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>Grup Öğrencileri — Çağrılacakları Seçin</span>
+                        <span style="font-size:0.82em;color:#c8dce8;">Birden fazla seçilebilir</span>
+                    </div>
+                    <div style="padding:8px 16px;border-bottom:1px solid #eee;display:flex;gap:8px;align-items:center;">
+                        <button type="button" id="btnHepsiniSec"
+                                style="padding:4px 10px;background:#20c997;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;">
+                            Tümünü Seç
+                        </button>
+                        <button type="button" id="btnHepsiniKaldir"
+                                style="padding:4px 10px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;">
+                            Tümünü Kaldır
+                        </button>
+                        <span id="seciliSayac" style="font-size:0.85em;color:#555;margin-left:4px;"></span>
+                    </div>
+                    <div style="overflow-y:auto;max-height:520px;">
+                        {% for grup in sinif_gruplari %}
+                        {# Sınıf başlığı #}
+                        <div style="background:#f0f4f8;padding:6px 14px;border-bottom:1px solid #dee2e6;
+                                    display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-weight:700;font-size:0.9em;color:#417690;">
+                                {{ grup.label }} Sınıfı
+                            </span>
+                            <span style="font-size:0.8em;color:#888;">{{ grup.ogrenciler|length }} öğrenci</span>
+                        </div>
+                        <table class="table" style="margin:0;box-shadow:none;">
+                            <thead>
+                                <tr>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;width:34px;text-align:center;"></th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;width:70px;">Okul No</th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;">Ad Soyad</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ogr in grup.ogrenciler %}
+                                <tr class="ogr-satir" data-sinif="{{ ogr.sinif }}" data-sube="{{ ogr.sube }}">
+                                    <td style="text-align:center;">
+                                        <input type="checkbox" name="ogrenci_ids" class="ogr-check" value="{{ ogr.pk }}" checked>
+                                    </td>
+                                    <td style="font-size:0.88em;color:#555;">{{ ogr.okulno }}</td>
+                                    <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endfor %}
+                    </div>
+
+                    {% else %}
+                    {# ── TEKLİ MOD: Radio Seçim ── #}
+                    <div class="card-header bg-primary">Öğrenci Seçimi</div>
+                    <div style="padding:12px 16px;border-bottom:1px solid #eee;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                        <label style="font-size:0.9em;font-weight:600;">Sınıf/Şube:</label>
+                        <select id="sinifFilter"
+                                style="padding:5px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                            <option value="">Tümü</option>
+                            {% for ss in sinifsube_secenekleri %}
+                            <option value="{{ ss }}">{{ ss }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" id="ogrenciAra" placeholder="Ad/soyad ara…"
+                               style="flex:1;min-width:120px;padding:5px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                        <button type="button" id="btnTemizle"
+                                style="padding:5px 10px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;">
+                            Seçimi Kaldır
+                        </button>
+                    </div>
+                    <div style="overflow-y:auto;max-height:480px;">
+                        <table class="table" style="margin:0;box-shadow:none;">
+                            <thead>
+                                <tr>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;width:34px;"></th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;width:70px;">Okul No</th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;">Ad Soyad</th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;width:58px;">Sınıf</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ogrenciListesi">
+                                {% for ogr in ogrenciler %}
+                                <tr class="ogr-satir"
+                                    data-sinifsube="{{ ogr.sinif }}/{{ ogr.sube }}"
+                                    data-sinif="{{ ogr.sinif }}"
+                                    data-sube="{{ ogr.sube }}"
+                                    data-ad="{{ ogr.adi|lower }} {{ ogr.soyadi|lower }}"
+                                    data-pk="{{ ogr.pk }}">
+                                    <td style="text-align:center;">
+                                        <input type="radio" name="ogrenci_radio" class="ogr-radio" value="{{ ogr.pk }}"
+                                               {% if secili_ogrenci_id == ogr.pk|stringformat:"s" %}checked{% endif %}>
+                                    </td>
+                                    <td style="font-size:0.88em;color:#555;">{{ ogr.okulno }}</td>
+                                    <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                                    <td style="text-align:center;">{{ ogr.sinif }}/{{ ogr.sube }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {# Seçili öğrenci bilgisi #}
+                    <div id="seciliOgrenciPanel"
+                         style="display:none;padding:10px 16px;background:#e8f5e9;border-top:1px solid #c3e6cb;">
+                        <span style="font-weight:600;color:#155724;" id="seciliOgrenciAdi"></span>
+                        <span style="font-size:0.85em;color:#555;margin-left:8px;" id="seciliOgrenciSinif"></span>
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
+            {# ════ SAĞ: Çağrı Bilgileri ════ #}
+            <div style="flex:1;min-width:280px;">
+                <div class="card mb-20">
+                    <div class="card-header bg-primary">Çağrı Bilgileri</div>
+                    <div style="padding:20px;">
+
+                        <div style="margin-bottom:14px;">
+                            <label for="id_tarih" style="display:block;font-weight:600;margin-bottom:4px;">
+                                Tarih <span style="color:red;">*</span>
+                            </label>
+                            <input type="date" id="id_tarih" name="tarih" required
+                                   value="{{ bugun }}"
+                                   style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;">
+                        </div>
+
+                        {% if grup_modu and not tek_sinif %}
+                        {# ── Çok sınıflı grup: her sınıf için ayrı ders programı ── #}
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block;font-weight:600;margin-bottom:8px;">
+                                Ders Saati
+                                <span style="font-weight:normal;font-size:0.82em;color:#888;">(Tarih seçince her sınıf için ayrı yüklenir)</span>
+                            </label>
+                            {% for grup in sinif_gruplari %}
+                            <div style="margin-bottom:10px;padding:10px 12px;border:1px solid #dee2e6;border-radius:6px;background:#fafafa;">
+                                <div style="font-size:0.85em;font-weight:700;color:#417690;margin-bottom:6px;">
+                                    {{ grup.label }} Sınıfı
+                                </div>
+                                <select name="ders_saati_{{ grup.key }}"
+                                        id="ders_saati_{{ grup.key }}"
+                                        class="ders-saati-sel"
+                                        data-sinif="{{ grup.sinif }}"
+                                        data-sube="{{ grup.sube }}"
+                                        data-key="{{ grup.key }}"
+                                        style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;font-size:0.9em;">
+                                    <option value="">— Tarih seçin —</option>
+                                </select>
+                                <input type="hidden" name="ders_adi_{{ grup.key }}"     id="ders_adi_{{ grup.key }}">
+                                <input type="hidden" name="ogretmen_adi_{{ grup.key }}" id="ogretmen_adi_{{ grup.key }}">
+                                <div id="uyari_{{ grup.key }}" style="display:none;margin-top:4px;font-size:0.8em;color:#856404;padding:3px 8px;background:#fff8e1;border-radius:4px;border:1px solid #ffe082;">
+                                    Bu tarih için ders programı bulunamadı.
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {# ── Tekli mod veya tek sınıflı grup ── #}
+                        {% if grup_modu %}
+                        {# Tek sınıflı grup için gizli per-class alanlar #}
+                        {% for grup in sinif_gruplari %}
+                        <input type="hidden" name="ders_adi_{{ grup.key }}"     id="ders_adi_{{ grup.key }}">
+                        <input type="hidden" name="ogretmen_adi_{{ grup.key }}" id="ogretmen_adi_{{ grup.key }}">
+                        {% endfor %}
+                        {% else %}
+                        <input type="hidden" name="ders_adi"     id="dersAdiInput">
+                        <input type="hidden" name="ogretmen_adi" id="ogretmenAdiInput">
+                        {% endif %}
+                        <div style="margin-bottom:14px;">
+                            <label for="id_ders_saati" style="display:block;font-weight:600;margin-bottom:4px;">
+                                Ders Saati
+                                <span style="font-weight:normal;font-size:0.85em;color:#888;">(Sınıf/Şube ve Tarih seçince yüklenir)</span>
+                            </label>
+                            <select id="id_ders_saati"
+                                    {% if grup_modu %}
+                                    {% for grup in sinif_gruplari %}name="ders_saati_{{ grup.key }}"{% endfor %}
+                                    {% else %}name="ders_saati"{% endif %}
+                                    style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;">
+                                <option value="">— Önce öğrenci seçin —</option>
+                            </select>
+                            <div id="dersProgramiUyari" style="display:none;margin-top:4px;font-size:0.82em;color:#856404;padding:4px 8px;background:#fff8e1;border-radius:4px;border:1px solid #ffe082;">
+                                Bu tarih/sınıf için ders programı bulunamadı.
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div style="margin-bottom:14px;">
+                            <label for="id_cagri_metni" style="display:block;font-weight:600;margin-bottom:4px;">Çağrı Metni</label>
+                            <textarea id="id_cagri_metni" name="cagri_metni" rows="5"
+                                      placeholder="Öğrenciye iletilecek çağrı metni…"
+                                      style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;resize:vertical;"></textarea>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:12px;justify-content:flex-end;">
+                    <a href="{% url 'rehberlik:cagri_liste' %}" class="btn-cancel">Vazgeç</a>
+                    <button type="submit" class="btn btn-success">Kaydet</button>
+                </div>
+            </div>
+
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var API_URL      = "{% url 'rehberlik:ders_programi_api' %}";
+    var GRUP_MODU    = {{ grup_modu|yesno:"true,false" }};
+    var ogrenciListesi  = document.getElementById('ogrenciListesi');
+    var dersAdiInput    = document.getElementById('dersAdiInput');
+    var ogretmenAdiInput = document.getElementById('ogretmenAdiInput');
+    var dersSaatiSel    = document.getElementById('id_ders_saati');
+    var tarihInput      = document.getElementById('id_tarih');
+    var uyari           = document.getElementById('dersProgramiUyari');
+
+    var seciliSinifDegeri = '';
+    var seciliSubeDegeri  = '';
+
+    // ── Ders programı yükle ──
+    function yuklersDersProgrami() {
+        var tarih = tarihInput.value;
+        if (!tarih || !seciliSinifDegeri || !seciliSubeDegeri) {
+            dersSaatiSel.innerHTML = '<option value="">— Sınıf ve tarih gerekli —</option>';
+            uyari.style.display = 'none';
+            return;
+        }
+        var url = API_URL + '?sinif=' + encodeURIComponent(seciliSinifDegeri) +
+                            '&sube='  + encodeURIComponent(seciliSubeDegeri)  +
+                            '&tarih=' + encodeURIComponent(tarih);
+        fetch(url)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                dersSaatiSel.innerHTML = '<option value="">— Ders seçin —</option>';
+                uyari.style.display = 'none';
+                if (data.length === 0) {
+                    dersSaatiSel.innerHTML = '<option value="">— Ders programı bulunamadı —</option>';
+                    uyari.style.display = '';
+                    dersAdiInput.value = '';
+                    ogretmenAdiInput.value = '';
+                    return;
+                }
+                data.forEach(function (d) {
+                    var opt = document.createElement('option');
+                    opt.value = d.ders_saati;
+                    opt.textContent = d.ders_saati + '. Ders  –  ' + d.ders_adi + '  (' + d.ogretmen_adi + ')';
+                    opt.dataset.dersAdi     = d.ders_adi;
+                    opt.dataset.ogretmenAdi = d.ogretmen_adi;
+                    dersSaatiSel.appendChild(opt);
+                });
+            })
+            .catch(function () {
+                dersSaatiSel.innerHTML = '<option value="">— Yüklenemedi —</option>';
+            });
+    }
+
+    dersSaatiSel.addEventListener('change', function () {
+        var opt = this.options[this.selectedIndex];
+        dersAdiInput.value     = opt.dataset.dersAdi     || '';
+        ogretmenAdiInput.value = opt.dataset.ogretmenAdi || '';
+    });
+
+    tarihInput.addEventListener('change', yuklersDersProgrami);
+
+    if (GRUP_MODU) {
+        // ════ GRUP MODU ════
+        var TEK_SINIF       = {{ tek_sinif|yesno:"true,false" }};
+        var btnHepsiniSec   = document.getElementById('btnHepsiniSec');
+        var btnHepsiniKaldir= document.getElementById('btnHepsiniKaldir');
+        var seciliSayac     = document.getElementById('seciliSayac');
+        var tumChecklar     = document.querySelectorAll('.ogr-check');
+
+        function sayacGuncelle() {
+            var n = document.querySelectorAll('.ogr-check:checked').length;
+            seciliSayac.textContent = n + ' öğrenci seçili';
+        }
+
+        document.addEventListener('change', function (e) {
+            if (e.target.classList.contains('ogr-check')) { sayacGuncelle(); }
+        });
+
+        btnHepsiniSec.addEventListener('click', function () {
+            tumChecklar.forEach(function (c) { c.checked = true; });
+            sayacGuncelle();
+        });
+
+        btnHepsiniKaldir.addEventListener('click', function () {
+            tumChecklar.forEach(function (c) { c.checked = false; });
+            sayacGuncelle();
+        });
+
+        if (TEK_SINIF) {
+            // ── Tek sınıf: mevcut tek dropdown'ı kullan ──
+            var tekSel = document.getElementById('id_ders_saati');
+            var ilkSatir = document.querySelector('.ogr-satir');
+            if (ilkSatir) {
+                seciliSinifDegeri = ilkSatir.dataset.sinif;
+                seciliSubeDegeri  = ilkSatir.dataset.sube;
+            }
+            // Tek sınıf için gizli per-class alanları güncelleyen yardımcı
+            var tek_key = seciliSinifDegeri + '_' + seciliSubeDegeri;
+            tekSel.addEventListener('change', function () {
+                var opt = tekSel.options[tekSel.selectedIndex];
+                var daEl = document.getElementById('ders_adi_' + tek_key);
+                var oaEl = document.getElementById('ogretmen_adi_' + tek_key);
+                if (daEl) daEl.value = opt.dataset.dersAdi || '';
+                if (oaEl) oaEl.value = opt.dataset.ogretmenAdi || '';
+                dersAdiInput    = daEl;   // override global refs
+                ogretmenAdiInput = oaEl;
+            });
+            // Override yuklersDersProgrami to target tekSel
+            dersSaatiSel = tekSel;
+            yuklersDersProgrami();
+        } else {
+            // ── Çok sınıf: her sınıf için bağımsız dropdown ──
+            var dersSaatiSeller = document.querySelectorAll('.ders-saati-sel');
+
+            function yuklePerSinif(sel) {
+                var tarih = tarihInput.value;
+                var sinif = sel.dataset.sinif;
+                var sube  = sel.dataset.sube;
+                var key   = sel.dataset.key;
+                var uyariEl = document.getElementById('uyari_' + key);
+
+                if (!tarih) {
+                    sel.innerHTML = '<option value="">— Tarih seçin —</option>';
+                    if (uyariEl) uyariEl.style.display = 'none';
+                    return;
+                }
+                var url = API_URL + '?sinif=' + encodeURIComponent(sinif) +
+                                    '&sube='  + encodeURIComponent(sube)  +
+                                    '&tarih=' + encodeURIComponent(tarih);
+                fetch(url)
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        sel.innerHTML = '<option value="">— Ders seçin —</option>';
+                        if (uyariEl) uyariEl.style.display = 'none';
+                        if (data.length === 0) {
+                            sel.innerHTML = '<option value="">— Ders programı yok —</option>';
+                            if (uyariEl) uyariEl.style.display = '';
+                            return;
+                        }
+                        data.forEach(function (d) {
+                            var opt = document.createElement('option');
+                            opt.value = d.ders_saati;
+                            opt.textContent = d.ders_saati + '. Ders  –  ' + d.ders_adi + '  (' + d.ogretmen_adi + ')';
+                            opt.dataset.dersAdi     = d.ders_adi;
+                            opt.dataset.ogretmenAdi = d.ogretmen_adi;
+                            sel.appendChild(opt);
+                        });
+                    })
+                    .catch(function () {
+                        sel.innerHTML = '<option value="">— Yüklenemedi —</option>';
+                    });
+            }
+
+            dersSaatiSeller.forEach(function (sel) {
+                sel.addEventListener('change', function () {
+                    var opt = sel.options[sel.selectedIndex];
+                    var key = sel.dataset.key;
+                    var daEl = document.getElementById('ders_adi_' + key);
+                    var oaEl = document.getElementById('ogretmen_adi_' + key);
+                    if (daEl) daEl.value = opt.dataset.dersAdi     || '';
+                    if (oaEl) oaEl.value = opt.dataset.ogretmenAdi || '';
+                });
+            });
+
+            tarihInput.addEventListener('change', function () {
+                dersSaatiSeller.forEach(function (sel) { yuklePerSinif(sel); });
+            });
+
+            // Sayfa yüklenince tarihi varsa hemen yükle
+            if (tarihInput.value) {
+                dersSaatiSeller.forEach(function (sel) { yuklePerSinif(sel); });
+            }
+        }
+
+        sayacGuncelle();
+
+    } else {
+        // ════ TEKLİ MOD ════
+        var sinifFilter    = document.getElementById('sinifFilter');
+        var ogrenciAra     = document.getElementById('ogrenciAra');
+        var ogrenciIdInput = document.getElementById('ogrenciIdInput');
+        var btnTemizle     = document.getElementById('btnTemizle');
+        var seciliPanel    = document.getElementById('seciliOgrenciPanel');
+        var seciliAdi      = document.getElementById('seciliOgrenciAdi');
+        var seciliSinif    = document.getElementById('seciliOgrenciSinif');
+
+        function filtreleOgrenci() {
+            var ss  = sinifFilter.value;
+            var ara = ogrenciAra.value.trim().toLowerCase();
+            ogrenciListesi.querySelectorAll('.ogr-satir').forEach(function (tr) {
+                var ssEsles = !ss  || tr.dataset.sinifsube === ss;
+                var adEsles = !ara || tr.dataset.ad.indexOf(ara) !== -1;
+                tr.style.display = (ssEsles && adEsles) ? '' : 'none';
+            });
+        }
+
+        function ogrenciSec(radio) {
+            var satir = radio.closest('tr');
+            ogrenciIdInput.value    = radio.value;
+            seciliSinifDegeri       = satir.dataset.sinif;
+            seciliSubeDegeri        = satir.dataset.sube;
+            seciliAdi.textContent   = satir.cells[2].textContent.trim();
+            seciliSinif.textContent = satir.cells[3].textContent.trim();
+            seciliPanel.style.display = '';
+            yuklersDersProgrami();
+        }
+
+        ogrenciListesi.addEventListener('change', function (e) {
+            if (e.target.classList.contains('ogr-radio')) { ogrenciSec(e.target); }
+        });
+
+        btnTemizle.addEventListener('click', function () {
+            ogrenciListesi.querySelectorAll('.ogr-radio').forEach(function (r) { r.checked = false; });
+            ogrenciIdInput.value  = '';
+            seciliSinifDegeri     = '';
+            seciliSubeDegeri      = '';
+            seciliPanel.style.display = 'none';
+            dersSaatiSel.innerHTML = '<option value="">— Önce öğrenci seçin —</option>';
+            dersAdiInput.value     = '';
+            ogretmenAdiInput.value = '';
+            uyari.style.display    = 'none';
+        });
+
+        sinifFilter.addEventListener('change', filtreleOgrenci);
+        ogrenciAra.addEventListener('input', filtreleOgrenci);
+
+        // Ön-seçili öğrenci
+        var oncekiRadio = ogrenciListesi.querySelector('.ogr-radio:checked');
+        if (oncekiRadio) {
+            var ssVal = oncekiRadio.closest('tr').dataset.sinifsube;
+            var ssOpt = sinifFilter.querySelector('option[value="' + ssVal + '"]');
+            if (ssOpt) { sinifFilter.value = ssVal; filtreleOgrenci(); }
+            oncekiRadio.closest('tr').scrollIntoView({ block: 'center' });
+            ogrenciSec(oncekiRadio);
+        }
+    }
+}());
+</script>
+{% endblock %}

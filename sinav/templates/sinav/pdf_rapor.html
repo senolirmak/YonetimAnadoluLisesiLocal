@@ -1,0 +1,285 @@
+{% extends "sinav/base.html" %}
+{% block title %}PDF Rapor – Ortak Sınav{% endblock %}
+
+{% block content %}
+
+<!-- ===== BAŞLIK ===== -->
+<div class="card" style="border-left:4px solid #16a34a; padding:1rem 1.5rem;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.75rem; margin-bottom:.75rem;">
+    <h2 style="margin:0; color:#15803d;">PDF Rapor Üretimi</h2>
+    <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+      <a href="{% url 'sinav:sinav_takvimi_pdf_view' %}" target="_blank"
+         class="btn btn-primary btn-sm">Sınav Takvimi PDF</a>
+      <a href="{% url 'sinav:takvim_gecmisi' %}" class="btn btn-secondary btn-sm">← Takvim Geçmişi</a>
+    </div>
+  </div>
+  <div class="pr-bilgi-grid">
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">Okul</span>
+      <span class="pr-bilgi-val">{{ okul.okul_adi }}</span>
+    </div>
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">Okul Kodu</span>
+      <span class="pr-bilgi-val">{{ okul.okul_kodu }}</span>
+    </div>
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">Okul Müdürü</span>
+      <span class="pr-bilgi-val">{{ okul.okul_muduru }}</span>
+    </div>
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">Eğitim-Öğretim Yılı</span>
+      <span class="pr-bilgi-val">{{ aktif_sinav.egitim_ogretim_yili }}</span>
+    </div>
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">Dönem</span>
+      <span class="pr-bilgi-val">{{ aktif_sinav.donem }}</span>
+    </div>
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">Sınav Adı</span>
+      <span class="pr-bilgi-val">{{ aktif_sinav.sinav_adi }}</span>
+    </div>
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">Sınav Başlangıç</span>
+      <span class="pr-bilgi-val">{{ aktif_sinav.sinav_baslangic_tarihi|date:"d.m.Y" }}</span>
+    </div>
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">e-Okul Veri Tarihi</span>
+      <span class="pr-bilgi-val">{{ aktif_sinav.eokul_veri_tarihi|date:"d.m.Y" }}</span>
+    </div>
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">Takvim Üretim Tarihi</span>
+      <span class="pr-bilgi-val">{{ aktif_uretim.uretim_tarihi|date:"d.m.Y H:i" }}</span>
+    </div>
+    <div class="pr-bilgi-item">
+      <span class="pr-bilgi-label">Sınav Günü / Oturum</span>
+      <span class="pr-bilgi-val">{{ gun_sayisi }} gün · {{ toplam_oturum }} oturum</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== OTURMA RAPORU KARTI ===== -->
+<div class="card" style="margin-top:1rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:.5rem;">
+    <div>
+      <h2 style="margin:0;">Oturma Raporu Üret</h2>
+      <p class="helptext" style="margin-top:.25rem;">
+        Seçili oturumlar için oturma planı oluşturur ve PDF raporlarını anlık üretir.
+      </p>
+      {% if takvim_degisti %}
+      <p id="takvim-degisti-uyari"
+         style="margin-top:.4rem; font-size:.82rem; font-weight:600;
+                color:#92400e; background:#fef3c7; border:1px solid #fde68a;
+                padding:.3rem .7rem; border-radius:5px; display:inline-block;">
+        ⚠ Takvim değişti — önceki oturma planları sıfırlandı, yeniden üretiniz.
+      </p>
+      {% endif %}
+    </div>
+    <div style="display:flex; gap:.5rem; align-items:center;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="tumunuSec(true)">Tümünü Seç</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="tumunuSec(false)">Temizle</button>
+      <button class="btn btn-success" id="btn-uret" onclick="runTumu()">Üret</button>
+      <button class="btn btn-danger" id="btn-durdur" style="display:none"
+              onclick="iptalAdim('btn-durdur')">Durdur</button>
+      <span class="badge" id="badge-uret" style="align-self:center;">{% if takvim_degisti %}Yeniden Üret{% else %}Bekliyor{% endif %}</span>
+    </div>
+  </div>
+
+  <!-- Oturum seçim listesi -->
+  <div class="oturum-secim-liste">
+    {% for gun in gunler %}
+    <div class="oturum-gun-baslik">{{ gun.tarih|date:"l, d.m.Y" }}</div>
+    {% for ot in gun.oturumlar %}
+    <label class="oturum-satir{% if ot.oturma_mevcut %} done{% endif %}"
+           data-key="{{ ot.tarih_str }}_{{ ot.saat }}_{{ ot.oturum }}">
+      <input type="checkbox" class="oturum-cb"
+             {% if not ot.oturma_mevcut %}checked{% endif %}
+             data-tarih="{{ ot.tarih_str }}"
+             data-saat="{{ ot.saat }}"
+             data-oturum="{{ ot.oturum }}">
+      <span class="oturum-no">Ot. {{ ot.oturum }}</span>
+      <span class="oturum-saat">{{ ot.saat }}</span>
+      <span class="oturum-dersler">{{ ot.dersler|join:", " }}</span>
+      <span class="oturum-links">
+        {% if ot.oturma_mevcut %}
+        <a href="{% url 'sinav:oturma_plani_pdf_view' %}?uretim={{ aktif_uretim.pk }}&tarih={{ ot.tarih_str }}&saat={{ ot.saat }}&oturum={{ ot.oturum }}"
+           class="link-pdf link-pdf-op" target="_blank">Oturma_Plani {{ ot.tarih_str }} {{ ot.saat }}</a>
+        <a href="{% url 'sinav:sinif_listesi_pdf_view' %}?uretim={{ aktif_uretim.pk }}&tarih={{ ot.tarih_str }}&saat={{ ot.saat }}&oturum={{ ot.oturum }}"
+           class="link-pdf link-pdf-sl" target="_blank">Sinif_Listesi {{ ot.tarih_str }} {{ ot.saat }}</a>
+        {% endif %}
+      </span>
+    </label>
+    {% endfor %}
+    {% endfor %}
+  </div>
+
+  <div class="log-box" id="log-uret" style="margin-top:1rem;">{% if aktif_uretim.degisiklik_logu %}{{ aktif_uretim.degisiklik_logu }}{% else %}Henüz bir işlem başlatılmadı.{% endif %}</div>
+</div>
+
+<style>
+.pr-bilgi-grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap:.4rem .75rem;
+}
+.pr-bilgi-item {
+  display:flex; flex-direction:column; gap:.1rem;
+  padding:.35rem .6rem;
+  background:#f0fdf4; border-radius:5px;
+  border:1px solid #bbf7d0;
+}
+.pr-bilgi-label { font-size:.7rem; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
+.pr-bilgi-val   { font-size:.85rem; color:#1a1a2e; font-weight:500; }
+
+.oturum-secim-liste { display:flex; flex-direction:column; gap:.25rem; }
+.oturum-gun-baslik {
+  font-weight:700; font-size:.85rem; color:#1a1a2e;
+  padding:.3rem .75rem; background:#f0fdf4;
+  border-left:3px solid #16a34a; border-radius:4px;
+  margin-top:.5rem;
+}
+.oturum-satir {
+  display:flex; align-items:center; gap:.75rem;
+  padding:.35rem .75rem; border-radius:5px;
+  cursor:pointer; font-size:.85rem;
+  border:1px solid #e5e7eb; background:#fafafa;
+  transition: opacity .2s;
+}
+.oturum-satir:hover { background:#f0fdf4; }
+.oturum-satir.passive {
+  opacity:.45; pointer-events:none; cursor:default;
+}
+.oturum-satir.done {
+  opacity:.55; pointer-events:none; cursor:default;
+  background:#f0fdf4; border-color:#bbf7d0;
+}
+.oturum-satir.done .link-pdf {
+  pointer-events:auto; opacity:1;
+}
+.oturum-satir input[type=checkbox] { flex-shrink:0; width:15px; height:15px; cursor:pointer; }
+.oturum-no     { font-weight:600; color:#374151; min-width:3.5rem; }
+.oturum-saat   { font-weight:600; color:#1a1a2e; min-width:3.5rem; }
+.oturum-dersler { color:#6b7280; font-size:.8rem; flex:1; }
+.oturum-links  { display:flex; flex-wrap:wrap; gap:.3rem; margin-left:auto; }
+.link-pdf {
+  font-size:.75rem; font-weight:600;
+  padding:.15rem .55rem; border-radius:4px;
+  text-decoration:none; white-space:nowrap;
+}
+.link-pdf-op { background:#dbeafe; color:#1e40af; border:1px solid #93c5fd; }
+.link-pdf-op:hover { background:#bfdbfe; }
+.link-pdf-sl { background:#fce7f3; color:#9d174d; border:1px solid #f9a8d4; }
+.link-pdf-sl:hover { background:#fbcfe8; }
+</style>
+
+<script>
+const OP_URL = "{% url 'sinav:oturma_plani_pdf_view' %}";
+const SL_URL = "{% url 'sinav:sinif_listesi_pdf_view' %}";
+const AKTIF_URETIM_PK = {{ aktif_uretim.pk }};
+
+const logUret   = document.getElementById("log-uret");
+const badgeUret = document.getElementById("badge-uret");
+const btnUret   = document.getElementById("btn-uret");
+const btnDurdur = document.getElementById("btn-durdur");
+
+function tumunuSec(durum) {
+  document.querySelectorAll(".oturum-satir:not(.done) .oturum-cb").forEach(cb => cb.checked = durum);
+}
+
+function _getSelectedSessions() {
+  const sessions = [];
+  document.querySelectorAll(".oturum-cb:checked").forEach(cb => {
+    sessions.push({
+      tarih:  cb.dataset.tarih,
+      saat:   cb.dataset.saat,
+      oturum: parseInt(cb.dataset.oturum),
+    });
+  });
+  return sessions;
+}
+
+function _setPassive(on) {
+  document.querySelectorAll(".oturum-satir:not(.done)").forEach(row => {
+    row.classList.toggle("passive", on);
+  });
+}
+
+function _markDone(sessions) {
+  sessions.forEach(s => {
+    const key = `${s.tarih}_${s.saat}_${s.oturum}`;
+    const row = document.querySelector(`[data-key="${key}"]`);
+    if (!row) return;
+    const cb = row.querySelector(".oturum-cb");
+    if (cb) cb.checked = false;
+    row.classList.remove("passive");
+    row.classList.add("done");
+
+    const linksSpan = row.querySelector(".oturum-links");
+    const aOp = document.createElement("a");
+    aOp.href = `${OP_URL}?uretim=${AKTIF_URETIM_PK}&tarih=${s.tarih}&saat=${encodeURIComponent(s.saat)}&oturum=${s.oturum}`;
+    aOp.textContent = `Oturma_Plani ${s.tarih} ${s.saat}`;
+    aOp.className = "link-pdf link-pdf-op";
+    aOp.target = "_blank";
+    linksSpan.appendChild(aOp);
+
+    const aSl = document.createElement("a");
+    aSl.href = `${SL_URL}?uretim=${AKTIF_URETIM_PK}&tarih=${s.tarih}&saat=${encodeURIComponent(s.saat)}&oturum=${s.oturum}`;
+    aSl.textContent = `Sinif_Listesi ${s.tarih} ${s.saat}`;
+    aSl.className = "link-pdf link-pdf-sl";
+    aSl.target = "_blank";
+    linksSpan.appendChild(aSl);
+  });
+}
+
+async function runTumu() {
+  const sessions = _getSelectedSessions();
+  if (!sessions.length) { alert("En az bir oturum seçin."); return; }
+
+  badgeUret.className = "badge badge-running";
+  badgeUret.textContent = "Oturma planı oluşturuluyor...";
+  btnUret.disabled = true;
+  btnDurdur.style.display = "inline-flex";
+  logUret.textContent = "";
+  _setPassive(true);
+  const uyari = document.getElementById("takvim-degisti-uyari");
+  if (uyari) uyari.remove();
+
+  const resp = await fetch("{% url 'sinav:oturma_secili' %}", {
+    method: "POST",
+    headers: { "X-CSRFToken": CSRF, "Content-Type": "application/json" },
+    body: JSON.stringify({ sessions }),
+  });
+  const data = await resp.json();
+  if (!data.task_id) {
+    badgeUret.className = "badge badge-error";
+    badgeUret.textContent = "Hata";
+    btnUret.disabled = false;
+    btnDurdur.style.display = "none";
+    _setPassive(false);
+    logUret.textContent = data.error || "Bilinmeyen hata.";
+    return;
+  }
+
+  _activeTaskId = data.task_id;
+  let ok = false;
+  while (true) {
+    await new Promise(r => setTimeout(r, 1200));
+    const res = await fetch(`/gorev/${data.task_id}/`).then(r => r.json());
+    logUret.textContent = res.logs.join("\n");
+    logUret.scrollTop = logUret.scrollHeight;
+    if (res.done) {
+      ok = !res.error;
+      _activeTaskId = null;
+      break;
+    }
+  }
+
+  if (ok) _markDone(sessions);
+  badgeUret.className = ok ? "badge badge-done" : "badge badge-error";
+  badgeUret.textContent = ok ? "Tamamlandı" : "Hata";
+  btnUret.disabled = false;
+  btnDurdur.style.display = "none";
+  _setPassive(false);
+}
+</script>
+
+{% endblock %}

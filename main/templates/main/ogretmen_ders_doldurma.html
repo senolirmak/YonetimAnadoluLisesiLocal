@@ -1,0 +1,88 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container">
+    <h2 class="page-title mb-20">{{ title }}</h2>
+
+    {% if messages %}
+    <div class="mb-20">
+        {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'success' %}msg-success{% elif message.tags == 'error' %}msg-error{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Tarih Navigasyonu -->
+    <div class="filter-box" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+        <a href="?tarih={{ onceki }}" class="btn btn-secondary">&laquo; Önceki Gün</a>
+        <span style="font-weight:600;font-size:1em;">
+            {{ target_date|date:"d F Y l" }}
+        </span>
+        <a href="?tarih={{ sonraki }}" class="btn btn-secondary">Sonraki Gün &raquo;</a>
+        <a href="?" class="btn btn-primary" style="margin-left:auto;">Bugün</a>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Atanan Dersler -->
+        <div class="col-main">
+            <div class="card">
+                <div class="card-header bg-primary">
+                    Atanan Dersler — {{ target_date|date:"d.m.Y" }}
+                </div>
+                <table class="table" style="box-shadow:none;">
+                    <thead>
+                        <tr class="table-sub-header">
+                            <th class="center">Ders Saati</th>
+                            <th class="center">Sınıf</th>
+                            <th>Devamsız Öğretmen</th>
+                            <th>Görevlendirilen Nöbetçi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in assignments %}
+                        <tr>
+                            <td class="center font-bold td-border-right">{{ item.hour }}. Ders</td>
+                            <td class="center td-border-right">{{ item.sinif }}</td>
+                            <td class="td-border-right">{{ item.devamsiz }}</td>
+                            <td class="text-success-bold">{{ item.atanan }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="empty-cell" style="padding:24px;">Bu tarih için kayıtlı atama bulunmamaktadır.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Atanamayan Dersler -->
+        <div class="col-side">
+            <div class="card">
+                <div class="card-header bg-danger">
+                    Atanamayan Dersler
+                </div>
+                <ul class="list-group">
+                    {% for item in unassigned %}
+                    <li class="list-item" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
+                        <div>
+                            <strong style="display:block;margin-bottom:2px;">{{ item.hour }}. Ders — {{ item.sinif }}</strong>
+                            <small class="text-muted">{{ item.devamsiz }}</small>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li class="empty-cell" style="padding:20px;">Tüm dersler atandı.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

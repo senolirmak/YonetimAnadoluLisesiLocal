@@ -1,0 +1,124 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giriş - Okul Yönetim Sistemi</title>
+    <link rel="stylesheet" href="{% static 'css/nobet_admin.css' %}">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #fff;
+        }
+        .login-box {
+            background: #fff;
+            padding: 40px 36px;
+            border-radius: 8px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+            width: 100%;
+            max-width: 380px;
+        }
+        .login-title {
+            text-align: center;
+            margin-bottom: 8px;
+            font-size: 1.4em;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        .login-subtitle {
+            text-align: center;
+            margin-bottom: 28px;
+            color: #6c757d;
+            font-size: 0.95em;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #444;
+            font-size: 0.92em;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background-color 0.2s;
+        }
+        .btn-login:hover {
+            background-color: #0056b3;
+        }
+        .error-msg {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 10px 14px;
+            margin-bottom: 18px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div class="login-title">Nöbet Yönetim Sistemi</div>
+        <div class="login-subtitle">Sisteme giriş yapın</div>
+
+        {% if form.errors %}
+        <div class="error-msg">
+            Kullanıcı adı veya şifre hatalı. Lütfen tekrar deneyin.
+        </div>
+        {% endif %}
+
+        {% if next %}
+        <div class="error-msg">
+            Bu sayfaya erişmek için giriş yapmanız gerekmektedir.
+        </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="id_username">Kullanıcı Adı</label>
+                <input type="text" id="id_username" name="username" autofocus autocomplete="username" required>
+            </div>
+            <div class="form-group">
+                <label for="id_password">Şifre</label>
+                <input type="password" id="id_password" name="password" autocomplete="current-password" required>
+            </div>
+            <input type="hidden" name="next" value="{{ next }}">
+            <button type="submit" class="btn-login">Giriş Yap</button>
+        </form>
+        <div style="text-align:center; margin-top:18px; font-size:0.9em; color:#6c757d;">
+            Hesabınız yok mu? <a href="{% url 'kayit' %}" style="color:#417690; text-decoration:none; font-weight:600;">Kayıt Olun</a>
+        </div>
+    </div>
+</body>
+</html>

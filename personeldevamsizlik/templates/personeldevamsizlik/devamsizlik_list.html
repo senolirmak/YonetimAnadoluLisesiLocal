@@ -1,0 +1,59 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<script src="{% static 'js/pages/devamsizlik_calculations.js' %}"></script>
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">{{ title }}</h2>
+        <a href="{% url 'devamsizlik_create' %}" class="btn btn-success">Yeni Kayıt Ekle</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Öğretmen</th>
+                    <th>İzin Başlangıç</th>
+                    <th>Göreve Başlama Tarihi</th>
+                    <th>Durum</th>
+                    <th>Tür</th>
+                    <th class="center">Süre (Gün)</th>
+                    <th>Açıklama</th>
+                    <th class="center">İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in devamsizliklar %}
+                <tr>
+                    <td>{{ d.ogretmen.personel.adi_soyadi }}</td>
+                    <td>{{ d.baslangic_tarihi|date:"d M Y" }}</td>
+                    <td>{{ d.goreve_baslama_tarihi|date:"d M Y" }}</td>
+                    <td>
+                        {% if d.durum == 'İzinli' %}
+                            <span style="color: #dc3545; font-weight: bold;">{{ d.durum }}</span>
+                        {% else %}
+                            <span style="color: #28a745; font-weight: bold;">{{ d.durum }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ d.get_devamsiz_tur_display }}</td>
+                    <td class="center">{{ d.sure }}</td>
+                    <td>{{ d.aciklama|default_if_none:"" }}</td>
+                    <td class="center">
+                        <a href="{% url 'devamsizlik_update' d.pk %}" class="btn-link link-blue">Düzenle</a>
+                        <a href="{% url 'devamsizlik_delete' d.pk %}" class="btn-link link-red">Sil</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="empty-cell" style="padding: 20px;">Kayıt bulunamadı.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Faaliyet Devamsızlık Girişi{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:900px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Faaliyet Devamsızlık Girişi</h2>
+        <a href="{% url 'faaliyet:faaliyet_detay' faaliyet.pk %}" class="btn-cancel">← Faaliyete Dön</a>
+    </div>
+
+    <div class="card mb-20">
+        <div class="card-header bg-primary">Faaliyet Bilgisi</div>
+        <div style="padding:14px 16px;display:flex;gap:30px;flex-wrap:wrap;font-size:0.95em;">
+            <div><span style="color:#666;">Konu:</span>&nbsp;<strong>{{ faaliyet.konu }}</strong></div>
+            <div><span style="color:#666;">Tarih:</span>&nbsp;{{ faaliyet.tarih|date:"d.m.Y" }}</div>
+            <div><span style="color:#666;">Yer:</span>&nbsp;{{ faaliyet.yer }}</div>
+        </div>
+    </div>
+
+    <div style="background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:12px 16px;border-radius:4px;margin-bottom:20px;">
+        Faaliyete <strong>katılmayan</strong> öğrencileri devamsız olarak işaretleyin.
+        Kaydedilen devamsızlıklar <strong>Faaliyet: {{ faaliyet.konu }}</strong> etiketiyle eklenir.
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% for grup in ders_gruplari %}
+        {% with ds=grup.ds %}
+        <div class="card mb-20">
+            <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>{{ ds.ders_no }}. Ders &nbsp;—&nbsp; {{ ds.baslangic|time:"H:i" }} – {{ ds.bitis|time:"H:i" }}</span>
+                <label style="font-size:0.85em;font-weight:normal;cursor:pointer;">
+                    <input type="checkbox" class="chk-hepsi" data-ders="{{ ds.ders_no }}">
+                    &nbsp;Tümünü devamsız işaretle
+                </label>
+            </div>
+            <div class="table-responsive">
+                <table class="table" style="margin:0;box-shadow:none;">
+                    <thead>
+                        <tr>
+                            <th class="center" style="width:50px;">Devamsız</th>
+                            <th class="center" style="width:70px;">No</th>
+                            <th>Ad Soyad</th>
+                            <th class="center">Sınıf</th>
+                            <th class="center">Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in grup.ogrenciler %}
+                        <tr id="satir_{{ ds.ders_no }}_{{ item.ogr.pk }}"
+                            {% if item.devamsiz %}style="background:#fff3cd;"{% endif %}>
+                            <td class="center">
+                                <input type="checkbox"
+                                       name="devamsiz_{{ ds.ders_no }}"
+                                       value="{{ item.ogr.pk }}"
+                                       class="ogr-chk-{{ ds.ders_no }}"
+                                       onchange="satirRenk(this, '{{ ds.ders_no }}', '{{ item.ogr.pk }}')"
+                                       {% if item.devamsiz %}checked{% endif %}>
+                            </td>
+                            <td class="center" style="font-size:0.88em;color:#555;">{{ item.ogr.okulno }}</td>
+                            <td>{{ item.ogr.adi }} {{ item.ogr.soyadi }}</td>
+                            <td class="center">{{ item.ogr.sinif }}/{{ item.ogr.sube }}</td>
+                            <td class="center" id="durum_{{ ds.ders_no }}_{{ item.ogr.pk }}" style="font-size:0.85em;font-weight:600;">
+                                {% if item.devamsiz %}
+                                <span style="color:#dc3545;">Devamsız</span>
+                                {% else %}
+                                <span style="color:#28a745;">Katıldı</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center text-muted" style="padding:20px;">Bu faaliyete kayıtlı öğrenci yok.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endwith %}
+        {% empty %}
+        <div class="card mb-20">
+            <div style="padding:20px;color:#6c757d;text-align:center;">Bu faaliyete ders saati tanımlanmamış.</div>
+        </div>
+        {% endfor %}
+
+        {% if ders_gruplari %}
+        <div class="form-actions mt-20">
+            <a href="{% url 'faaliyet:faaliyet_detay' faaliyet.pk %}" class="btn-cancel">Vazgeç</a>
+            <button type="submit" class="btn btn-success">Devamsızlıkları Kaydet</button>
+        </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function satirRenk(chk, dersNo, ogrPk) {
+    const satir = document.getElementById('satir_' + dersNo + '_' + ogrPk);
+    const durum = document.getElementById('durum_' + dersNo + '_' + ogrPk);
+    satir.style.background = chk.checked ? '#fff3cd' : '';
+    durum.innerHTML = chk.checked
+        ? '<span style="color:#dc3545;">Devamsız</span>'
+        : '<span style="color:#28a745;">Katıldı</span>';
+}
+
+document.querySelectorAll('.chk-hepsi').forEach(function(master) {
+    master.addEventListener('change', function() {
+        const dersNo = this.dataset.ders;
+        document.querySelectorAll('.ogr-chk-' + dersNo).forEach(function(chk) {
+            chk.checked = master.checked;
+            satirRenk(chk, dersNo, chk.value);
+        });
+    });
+});
+</script>
+{% endblock %}

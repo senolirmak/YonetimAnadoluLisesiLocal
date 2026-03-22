@@ -1,0 +1,182 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<script src="{% static 'js/pages/slider_values.js' %}"></script>
+
+<div class="container">
+    <div class="mb-20">
+        <h2 class="page-title mb-20">{{ title }}</h2>
+        
+        {% if messages %}
+        <div class="mb-20">
+            {% for message in messages %}
+            <div class="msg-box {% if message.tags == 'success' %}msg-success{% elif message.tags == 'error' %}msg-error{% else %}msg-info{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <hr class="hr-divider">
+
+        <form method="post" class="filter-box filter-form">
+            {% csrf_token %}
+            <label for="id_tarih" class="form-label-bold">Tarih Seçiniz:</label>
+            {{ form.tarih }}
+
+            <div style="display: inline-flex; align-items: center; margin: 0 15px;">
+                <label for="{{ form.max_shifts.id_for_label }}" class="form-label-bold" style="margin-right: 10px;">{{ form.max_shifts.label }}:</label>
+                {{ form.max_shifts }}
+                <span id="slider_value" style="margin-left: 10px; font-weight: bold; min-width: 15px;">{{ form.max_shifts.value|default:2 }}</span>
+            </div>
+
+            <button type="submit" name="hesapla" class="btn btn-primary">Getir</button>
+
+            {% if assignments or unassigned %}
+            <div class="ml-auto" style="display: flex; align-items: center;">
+                {% if not loaded_from_db %}
+                {% if is_mudur_yardimcisi %}
+                <button type="submit" name="kaydet" class="btn btn-success" onclick="return confirm('Bu atamaları veritabanına kaydetmek istediğinize emin misiniz?');">
+                    Kaydet
+                </button>
+                {% endif %}
+                {% endif %}
+                <div style="display: inline-flex; align-items: center; margin-left: 10px;">
+                    <select class="form-control rapor-select" style="width: auto; margin-right: 6px;">
+                        <option value="{% url 'download_ders_doldurma_png' %}">PNG (Resim)</option>
+                        <option value="{% url 'download_ders_doldurma_pdf' %}">PDF</option>
+                        <option value="{% url 'download_ders_doldurma_xlsx' %}">Excel (.xlsx)</option>
+                    </select>
+                    <button type="button" class="btn btn-info"
+                            onclick="var s=this.previousElementSibling; window.open(s.value, '_blank')">
+                        İndir
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="col-main">
+            <div class="card">
+                <div class="card-header bg-primary">
+                    Atanan Dersler ({{ target_date }})
+                </div>
+                <table class="table" style="box-shadow: none;">
+                    <thead>
+                        <tr class="table-sub-header">
+                            <th class="center">Ders Saati</th>
+                            <th class="center">Sınıf</th>
+                            <th>Devamsız Öğretmen</th>
+                            <th>Mazeret</th>
+                            <th style="border-right: none;">Görevlendirilen Nöbetçi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in assignments|dictsort:"hour" %}
+                        <tr>
+                            <td class="center td-border-right font-bold">{{ item.hour }}. Ders</td>
+                            <td class="center td-border-right">{{ item.class }}</td>
+                            <td class="td-border-right">
+                                {% for pid, name in personel_map.items %}
+                                    {% if pid == item.absent_teacher_id %}{{ name }}{% endif %}
+                                {% endfor %}
+                            </td>
+                            <td class="td-border-right">
+                                <span class="badge badge-info">{{ item.devamsiz_tur }}</span>
+                            </td>
+                            <td class="text-success-bold">
+                                {% for pid, name in personel_map.items %}
+                                    {% if pid == item.teacher_id %}{{ name }}{% endif %}
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="empty-cell" style="padding: 20px;">Atama bulunamadı veya devamsız öğretmen yok.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="col-side">
+            <div class="card mb-20">
+                <div class="card-header bg-primary">
+                    Kayıtlar
+                </div>
+                <ul class="list-group">
+                    {% for rec in history_records %}
+                    <li class="list-item" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;">
+                        <a href="?tarih={{ rec|date:'Y-m-d H:i:s' }}&mode=view" style="text-decoration: none; color: inherit;">
+                            {{ rec|date:"d.m.Y H:i:s" }}
+                        </a>
+                        {% if is_mudur_yardimcisi %}
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            {% if forloop.first %}
+                            <a href="{% url 'manuel_dagitim' %}?tarih={{ rec|date:'Y-m-d H:i:s' }}"
+                               class="btn btn-warning btn-sm"
+                               style="padding: 2px 8px; font-size: 0.75em; white-space: nowrap;">
+                                Manuel
+                            </a>
+                            {% endif %}
+                            <form method="post" style="margin: 0; padding: 0; display: inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="delete_datetime" value="{{ rec|date:'Y-m-d H:i:s' }}">
+                                <button type="submit" name="sil" class="btn btn-danger btn-sm"
+                                        style="padding: 2px 8px; font-size: 0.75em; white-space: nowrap;"
+                                        onclick="return confirm('Bu kaydı silmek istediğinize emin misiniz?');">
+                                    Sil
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-danger" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Atanamayan Dersler</span>
+                    {% if unassigned %}
+                    <div style="display: inline-flex; align-items: center;">
+                        <select class="form-control rapor-select" style="width: auto; margin-right: 5px; font-size: 0.8em; padding: 2px 6px; height: auto;">
+                            <option value="{% url 'download_unassigned_ders_png' %}">PNG (Resim)</option>
+                        </select>
+                        <button type="button"
+                                class="btn btn-sm"
+                                style="background-color: white; color: #dc3545; font-weight: bold; padding: 2px 10px; font-size: 0.8em;"
+                                onclick="var s=this.previousElementSibling; window.open(s.value, '_blank')">
+                            İndir
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                <ul class="list-group">
+                    {% for item in unassigned|dictsort:"hour" %}
+                    <li class="list-item">
+                        <div>
+                            <strong style="display: block; margin-bottom: 2px;">{{ item.hour }}. Ders - {{ item.class }}</strong>
+                            <small class="text-muted">
+                                {% for pid, name in personel_map.items %}
+                                    {% if pid == item.absent_teacher_id %}{{ name }}{% endif %}
+                                {% endfor %}
+                            </small>
+                        </div>
+                        <span class="badge badge-secondary">{{ item.devamsiz_tur }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="empty-cell" style="padding: 20px;">Tüm dersler atandı.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

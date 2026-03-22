@@ -1,0 +1,315 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}{% if gorusme %}Disiplin Görüşmesi Düzenle{% else %}Yeni Disiplin Görüşmesi{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1200px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">{% if gorusme %}Disiplin Görüşmesi Düzenle{% else %}Yeni Disiplin Görüşmesi Kaydı{% endif %}</h2>
+        <a href="{% url 'disiplin:gorusme_liste' %}" class="btn-cancel">← Listeye Dön</a>
+    </div>
+
+    <form method="post" id="gorusmeForm">
+        {% csrf_token %}
+        {% if cagri_id %}<input type="hidden" name="cagri_id" value="{{ cagri_id }}">{% endif %}
+
+        <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+
+            {# ════ SOL KOLON: Dinamik Seçim Paneli ════ #}
+            <div id="solKolon" style="flex:1.2;min-width:320px;">
+
+                {# ── Panel: Öğrenci (bireysel / veli / grup) ── #}
+                <div id="panelOgrenci" class="card" style="display:none;height:100%;">
+                    <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span id="panelOgrenciBaslik">Öğrenci Seçimi</span>
+                        <span style="font-size:0.82em;color:#c8dce8;">Zorunlu değilse boş bırakabilirsiniz.</span>
+                    </div>
+                    <div style="padding:12px 16px;border-bottom:1px solid #eee;">
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                            <label style="font-size:0.9em;font-weight:600;color:#444;">Sınıf/Şube:</label>
+                            <select id="sinifFilter"
+                                    style="padding:5px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                                <option value="">Tümü</option>
+                                {% for ss in sinifsube_secenekleri %}
+                                <option value="{{ ss }}">{{ ss }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" id="ogrenciAra" placeholder="Ad/soyad ara…"
+                                   style="padding:5px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;flex:1;min-width:120px;">
+                            <button type="button" id="btnOgrenciTemizle"
+                                    style="padding:5px 10px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;">
+                                Seçimi Kaldır
+                            </button>
+                        </div>
+                    </div>
+                    <div style="overflow-y:auto;max-height:420px;">
+                        <table id="ogrenciTable" class="table mode-radio" style="margin:0;box-shadow:none;">
+                            <thead>
+                                <tr>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;width:34px;text-align:center;"></th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;width:70px;">Okul No</th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;">Ad Soyad</th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;width:58px;">Sınıf</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ogrenciListesi">
+                                {% for ogr in ogrenciler %}
+                                <tr class="ogr-satir"
+                                    data-sinifsube="{{ ogr.sinif }}/{{ ogr.sube }}"
+                                    data-ad="{{ ogr.adi|lower }} {{ ogr.soyadi|lower }}"
+                                    data-pk="{{ ogr.pk }}"
+                                    data-veli="{{ ogr.detay.veli|default:'' }}"
+                                    data-velitelefon="{{ ogr.detay.velitelefon|default:'' }}">
+                                    <td style="text-align:center;">
+                                        <input type="radio" name="ogrenci_id" class="ogr-radio"
+                                               value="{{ ogr.pk }}"
+                                               {% if secili_ogrenci_id == ogr.pk|stringformat:"s" %}checked{% endif %}>
+                                        <input type="checkbox" name="grup_ogrenci_ids" class="ogr-check"
+                                               value="{{ ogr.pk }}"
+                                               {% if ogr.pk in secili_grup_ids %}checked{% endif %}>
+                                    </td>
+                                    <td style="font-size:0.88em;color:#555;">{{ ogr.okulno }}</td>
+                                    <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                                    <td style="text-align:center;">{{ ogr.sinif }}/{{ ogr.sube }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {# Gizli input: tekli seçim (bireysel/veli) için #}
+                    <input type="hidden" name="ogrenci_id" id="ogrenciIdInput"
+                           value="{{ secili_ogrenci_id|default:'' }}">
+
+                    {# Veli bilgileri — sadece veli türünde görünür #}
+                    <div id="veliBilgiPanel" style="display:none;padding:14px 16px;border-top:1px solid #eee;background:#fffdf5;">
+                        <div style="font-weight:600;font-size:0.9em;color:#856404;margin-bottom:10px;">Veli Bilgileri</div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                            <div style="flex:1;min-width:160px;">
+                                <label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:3px;">Veli Adı Soyadı</label>
+                                <input type="text" name="veli" id="id_veli_adi"
+                                       value="{{ gorusme.veli_adi|default:'' }}"
+                                       placeholder="Öğrenci seçince otomatik gelir…"
+                                       style="width:100%;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;box-sizing:border-box;">
+                            </div>
+                            <div style="flex:1;min-width:130px;">
+                                <label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:3px;">Veli Telefonu</label>
+                                <input type="text" name="velitelefon" id="id_veli_telefon"
+                                       value="{{ gorusme.veli_telefon|default:'' }}"
+                                       placeholder="Öğrenci seçince otomatik gelir…"
+                                       style="width:100%;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;box-sizing:border-box;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>{# /sol kolon #}
+
+            {# ════ SAĞ KOLON: Görüşme Bilgileri ════ #}
+            <div style="flex:1;min-width:280px;">
+
+                <div class="card mb-20">
+                    <div class="card-header bg-primary">Disiplin Görüşmesi Bilgileri</div>
+                    <div style="padding:20px;">
+
+                        {# Görüşme Türü — en üstte, formu belirler #}
+                        <div class="form-row" style="margin-bottom:16px;padding-bottom:14px;border-bottom:2px solid #e9ecef;">
+                            <label for="id_tur" style="display:block;font-weight:700;margin-bottom:6px;font-size:1em;">
+                                Görüşme Türü <span style="color:red;">*</span>
+                            </label>
+                            <select id="id_tur" name="tur" required
+                                    style="width:100%;padding:9px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;font-size:1em;font-weight:600;">
+                                <option value="">— Tür Seçin —</option>
+                                {% for val, label in tur_secenekleri %}
+                                <option value="{{ val }}" {% if gorusme.tur == val or secili_tur == val %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-row" style="display:flex;gap:12px;flex-wrap:wrap;">
+                            <div style="flex:1;min-width:140px;">
+                                <label for="id_tarih" style="display:block;font-weight:600;margin-bottom:4px;">
+                                    Tarih <span style="color:red;">*</span>
+                                </label>
+                                <input type="date" id="id_tarih" name="tarih" required
+                                       value="{{ gorusme.tarih|date:'Y-m-d'|default:bugun }}"
+                                       style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;">
+                            </div>
+                        </div>
+
+                        <div class="form-row" style="margin-top:12px;">
+                            <label for="id_konu" style="display:block;font-weight:600;margin-bottom:4px;">
+                                Konu <span style="color:red;">*</span>
+                            </label>
+                            <input type="text" id="id_konu" name="konu" required
+                                   value="{{ gorusme.konu|default:'' }}"
+                                   maxlength="300"
+                                   placeholder="Görüşme konusunu kısaca belirtin…"
+                                   style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;">
+                        </div>
+
+                        <div class="form-row" style="margin-top:12px;">
+                            <label for="id_aciklama" style="display:block;font-weight:600;margin-bottom:4px;">Açıklama</label>
+                            <textarea id="id_aciklama" name="aciklama" rows="3"
+                                      placeholder="Görüşme hakkında detaylı açıklama…"
+                                      style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;resize:vertical;">{{ gorusme.aciklama|default:'' }}</textarea>
+                        </div>
+
+                        <div class="form-row" style="margin-top:12px;">
+                            <label for="id_sonuc" style="display:block;font-weight:600;margin-bottom:4px;">Alınan Karar / Sonuç</label>
+                            <textarea id="id_sonuc" name="sonuc" rows="3"
+                                      placeholder="Görüşme sonucunda alınan kararlar…"
+                                      style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;resize:vertical;">{{ gorusme.sonuc|default:'' }}</textarea>
+                        </div>
+
+                        <div class="form-row" style="margin-top:12px;">
+                            <label for="id_takip_tarihi" style="display:block;font-weight:600;margin-bottom:4px;">
+                                Takip Tarihi
+                                <span style="font-weight:normal;color:#888;font-size:0.85em;">(isteğe bağlı)</span>
+                            </label>
+                            <input type="date" id="id_takip_tarihi" name="takip_tarihi"
+                                   value="{{ gorusme.takip_tarihi|date:'Y-m-d'|default:'' }}"
+                                   style="width:100%;padding:7px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;">
+                        </div>
+
+                        <div style="margin-top:16px;padding:12px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+                                <input type="checkbox" name="gizli" id="id_gizli"
+                                       {% if gorusme.gizli %}checked{% endif %}
+                                       style="width:16px;height:16px;">
+                                <span style="font-weight:600;color:#856404;">Gizli Kayıt</span>
+                            </label>
+                            <p style="margin:6px 0 0 24px;font-size:0.85em;color:#856404;">
+                                Gizli kayıt yalnızca siz görebilirsiniz.
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="form-actions" style="display:flex;gap:12px;justify-content:flex-end;">
+                    <a href="{% url 'disiplin:gorusme_liste' %}" class="btn-cancel">Vazgeç</a>
+                    <button type="submit" class="btn btn-success">
+                        {% if gorusme %}Güncelle{% else %}Kaydet{% endif %}
+                    </button>
+                </div>
+
+            </div>{# /sağ kolon #}
+
+        </div>{# /flex wrapper #}
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    .mode-radio .ogr-check  { display: none; }
+    .mode-radio .ogr-radio  { display: inline-block; }
+    .mode-check .ogr-radio  { display: none; }
+    .mode-check .ogr-check  { display: inline-block; }
+</style>
+<script>
+(function () {
+    var turSelect       = document.getElementById('id_tur');
+    var sinifFilter     = document.getElementById('sinifFilter');
+    var ogrenciAra      = document.getElementById('ogrenciAra');
+    var ogrenciTable    = document.getElementById('ogrenciTable');
+    var ogrenciListesi  = document.getElementById('ogrenciListesi');
+    var ogrenciIdInput  = document.getElementById('ogrenciIdInput');
+    var veliAdiInput    = document.getElementById('id_veli_adi');
+    var veliTelInput    = document.getElementById('id_veli_telefon');
+    var btnTemizle      = document.getElementById('btnOgrenciTemizle');
+    var panelOgrenci    = document.getElementById('panelOgrenci');
+    var veliBilgiPanel  = document.getElementById('veliBilgiPanel');
+    var panelBaslik     = document.getElementById('panelOgrenciBaslik');
+
+    // ── Öğrenci filtrele ──
+    function filtreleOgrenci() {
+        var ss  = sinifFilter.value;
+        var ara = ogrenciAra.value.trim().toLowerCase();
+        ogrenciListesi.querySelectorAll('.ogr-satir').forEach(function (tr) {
+            var ssEsles = !ss  || tr.dataset.sinifsube === ss;
+            var adEsles = !ara || tr.dataset.ad.indexOf(ara) !== -1;
+            tr.style.display = (ssEsles && adEsles) ? '' : 'none';
+        });
+    }
+
+    // ── Tur değişince paneli güncelle (only bireysel, veli, grup) ──
+    function turGuncelle() {
+        var tur = turSelect.value;
+
+        // Hepsini gizle
+        panelOgrenci.style.display = 'none';
+
+        if (tur === 'bireysel') {
+            panelOgrenci.style.display   = '';
+            veliBilgiPanel.style.display = 'none';
+            ogrenciTable.className = 'table mode-radio';
+            panelBaslik.textContent = 'Öğrenci Seçimi';
+        } else if (tur === 'veli') {
+            panelOgrenci.style.display   = '';
+            veliBilgiPanel.style.display = '';
+            ogrenciTable.className = 'table mode-radio';
+            panelBaslik.textContent = 'Öğrenci Seçimi';
+        } else if (tur === 'grup') {
+            panelOgrenci.style.display   = '';
+            veliBilgiPanel.style.display = 'none';
+            ogrenciTable.className = 'table mode-check';
+            panelBaslik.textContent = 'Öğrenci Seçimi (Çoklu)';
+        }
+        // diğer türler için sol panel gizli kalır
+    }
+
+    // ── Radio seçimi → gizli input + veli bilgileri güncelle ──
+    ogrenciListesi.addEventListener('change', function (e) {
+        if (e.target.classList.contains('ogr-radio')) {
+            ogrenciIdInput.value = e.target.value;
+            // Veli görüşmesinde öğrencinin veli bilgilerini otomatik doldur
+            if (turSelect.value === 'veli') {
+                var satir = e.target.closest('tr');
+                if (satir) {
+                    veliAdiInput.value = satir.dataset.veli || '';
+                    veliTelInput.value = satir.dataset.velitelefon || '';
+                }
+            }
+        }
+    });
+
+    // ── Seçimi kaldır ──
+    btnTemizle.addEventListener('click', function () {
+        ogrenciListesi.querySelectorAll('.ogr-radio, .ogr-check').forEach(function (i) { i.checked = false; });
+        ogrenciIdInput.value = '';
+        veliAdiInput.value   = '';
+        veliTelInput.value   = '';
+    });
+
+    sinifFilter.addEventListener('change', filtreleOgrenci);
+    ogrenciAra.addEventListener('input', filtreleOgrenci);
+    turSelect.addEventListener('change', turGuncelle);
+
+    // ── Sayfa yüklendiğinde: mevcut tür ve seçimle başlat ──
+    turGuncelle();
+
+    // Mevcut bireysel/veli öğrenci seçimini senkronize et
+    var mevcutId = ogrenciIdInput.value;
+    if (mevcutId) {
+        var radio = ogrenciListesi.querySelector('.ogr-radio[value="' + mevcutId + '"]');
+        if (radio) {
+            radio.checked = true;
+            var satir = radio.closest('tr');
+            if (satir && satir.dataset.sinifsube) {
+                var opt = sinifFilter.querySelector('option[value="' + satir.dataset.sinifsube + '"]');
+                if (opt) { sinifFilter.value = satir.dataset.sinifsube; filtreleOgrenci(); }
+                satir.scrollIntoView({ block: 'center' });
+            }
+        }
+    }
+}());
+</script>
+{% endblock %}

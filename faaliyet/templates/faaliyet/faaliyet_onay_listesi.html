@@ -1,0 +1,70 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Faaliyet Onay Listesi{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Onay Bekleyen Faaliyetler</h2>
+        <span style="background:#ffc107;color:#212529;padding:4px 14px;border-radius:10px;font-weight:bold;">
+            {{ bekleyenler|length }} bekliyor
+        </span>
+    </div>
+
+    {% if bekleyenler %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Konu</th>
+                    <th>Yer</th>
+                    <th>Öğretmen</th>
+                    <th class="center">Ders Saatleri</th>
+                    <th class="center">Öğrenci</th>
+                    <th class="center">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in bekleyenler %}
+                <tr>
+                    <td>{{ f.tarih|date:"d.m.Y" }}</td>
+                    <td><a href="{% url 'faaliyet:faaliyet_detay' f.pk %}" style="color:#417690;text-decoration:none;">{{ f.konu }}</a></td>
+                    <td>{{ f.yer }}</td>
+                    <td>{{ f.ogretmen.adi_soyadi }}</td>
+                    <td class="center">
+                        {% for ds in f.ders_saatleri.all %}
+                        <div style="font-size:0.85em;white-space:nowrap;">
+                            {{ ds.ders_no }}. ders &nbsp; {{ ds.baslangic|time:"H:i" }}–{{ ds.bitis|time:"H:i" }}
+                        </div>
+                        {% empty %}—{% endfor %}
+                    </td>
+                    <td class="center">{{ f.ogrenci_sayisi }}</td>
+                    <td class="center" style="white-space:nowrap;">
+                        <a href="{% url 'faaliyet:faaliyet_onayla' f.pk %}"
+                           class="btn btn-success" style="padding:4px 12px;font-size:0.85em;">Onayla</a>
+                        <a href="{% url 'faaliyet:faaliyet_reddet' f.pk %}"
+                           class="btn btn-danger" style="padding:4px 12px;font-size:0.85em;">Reddet</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card">
+        <div style="padding:40px;text-align:center;color:#6c757d;">
+            Bekleyen faaliyet onayı bulunmuyor.
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

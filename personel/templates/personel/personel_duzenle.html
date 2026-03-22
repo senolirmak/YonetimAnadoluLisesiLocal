@@ -1,0 +1,40 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Personel Düzenle — {{ personel.adi_soyadi }}{% endblock %}
+
+{% block content %}
+<div class="container-sm">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Personel Düzenle</h2>
+        <a href="{% url 'personel_listesi' %}" class="btn-cancel">← Listeye Dön</a>
+    </div>
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="card">
+        <div class="card-header bg-primary">Personel Bilgileri</div>
+        <div class="form-box">
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="form-row">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                    <span class="error-text">{{ field.errors }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="form-actions">
+                    <a href="{% url 'personel_listesi' %}" class="btn-cancel">Vazgeç</a>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

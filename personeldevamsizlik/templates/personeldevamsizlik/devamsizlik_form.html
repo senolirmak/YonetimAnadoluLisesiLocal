@@ -1,0 +1,79 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<script src="{% static 'js/pages/devamsizlik_calculations.js' %}"></script>
+<div class="container-sm">
+    <h2 class="page-title page-title-border">{{ title }}</h2>
+
+    <form method="post" class="form-box">
+        {% csrf_token %}
+
+        {% for field in form %}
+        {% if field.name == 'secilen_saatler' %}
+        <div class="form-row">
+            <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+            <div class="table-responsive">
+                <table class="table table-bordered" style="background-color: #fff; margin-top: 5px; text-align: center;">
+                    <thead>
+                        <tr>
+                            {% for cb in field %}
+                            <th style="padding: 8px; font-weight: 600;">{{ cb.choice_label }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            {% for cb in field %}
+                            <td style="padding: 8px;">
+                                {{ cb.tag }}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            {% if field.help_text %}
+            <small class="help-text">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+            <p class="error-text">{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% elif field.name == 'tum_gun' or field.name == 'gorevlendirme_yapilsin' %}
+        <div class="d-flex align-items-center gap-2">
+            <div style="display: flex; align-items: center;">
+                <label for="{{ field.id_for_label }}" style="margin-right: 10px; margin-bottom: 0;font-weight: bold;">{{ field.label }}:</label>
+                {{ field }}
+            </div>
+            {% if field.help_text %}
+            <small class="help-text" style="font-style: italic; display: block; margin-top: 5px;">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+            <p class="error-text">{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="form-row">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}
+            <small class="help-text">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+            <p class="error-text">{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <div class="form-actions">
+            <a href="{% url 'devamsizlik_list' %}" class="btn-cancel">Vazgeç</a>
+            <button type="submit" class="btn btn-primary btn-lg">Kaydet</button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}

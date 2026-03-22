@@ -1,0 +1,224 @@
+{% extends "sinav/base.html" %}
+{% block title %}Sınav Bilgileri – Ortak Sınav{% endblock %}
+
+{% block content %}
+
+<!-- ===== OKUL BİLGİLERİ ===== -->
+<div class="card {% if not okul_tamam %}okul-eksik{% endif %}">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem;">
+    <h2 style="margin:0;">
+      🏫 Okul Bilgileri
+      {% if okul_tamam %}
+        <span class="badge badge-done" style="font-size:.7rem; vertical-align:middle;">✓ Tamam</span>
+      {% else %}
+        <span class="badge badge-warn" style="font-size:.7rem; vertical-align:middle;">Doldurulması Gerekiyor</span>
+      {% endif %}
+    </h2>
+    <button class="btn btn-secondary btn-sm" type="button"
+            onclick="toggleOkul()" id="okul-toggle-btn">Düzenle</button>
+  </div>
+
+  <!-- Özet satır (form kapalıyken) -->
+  <div id="okul-ozet" {% if not okul_tamam %}style="display:none"{% endif %}>
+    <span style="color:#374151;">{{ okul.okul_adi }}</span>
+    <span style="color:#9ca3af; margin:0 .4rem;">|</span>
+    <span style="color:#6b7280; font-size:.88rem;">Kod: {{ okul.okul_kodu }}</span>
+    <span style="color:#9ca3af; margin:0 .4rem;">|</span>
+    <span style="color:#6b7280; font-size:.88rem;">Müdür: {{ okul.okul_muduru }}</span>
+  </div>
+
+  <!-- Düzenleme formu -->
+  <div id="okul-form-panel" {% if okul_tamam %}style="display:none"{% endif %}>
+    <form method="post" action="{% url 'sinav:okul_bilgileri_kaydet' %}">
+      {% csrf_token %}
+      <div class="grid-2" style="margin-top:.5rem;">
+        {% for field in okul_form %}
+        <div class="form-group">
+          {{ field.label_tag }}
+          {{ field }}
+          {% for err in field.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm" style="margin-top:.75rem;">Kaydet</button>
+    </form>
+  </div>
+</div>
+
+{% if not okul_tamam %}
+<div class="card" style="border-left:4px solid #dc2626; background:#fef2f2; color:#991b1b; padding:.9rem 1.5rem;">
+  Sınav bilgisi ekleyebilmek için önce <strong>Okul Bilgilerini</strong> doldurun.
+</div>
+{% elif not veri_tamam %}
+<div class="card" style="border-left:4px solid #f59e0b; background:#fffbeb; color:#92400e; padding:.9rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center;">
+  <span>Sınav oluşturmadan önce <strong>e-Okul verilerini</strong> yükleyin (öğrenci listesi ve haftalık ders programı).</span>
+  <a href="{% url 'sinav:veri_yukle_sayfasi' %}" class="btn btn-primary btn-sm">Veri Yükle</a>
+</div>
+{% endif %}
+
+<!-- ===== YENİ SINAV BİLGİSİ EKLE ===== -->
+<details class="card" id="yeni-sinav-panel" {% if not okul_tamam or not veri_tamam %}style="opacity:.45; pointer-events:none;"{% endif %}>
+  <summary style="cursor:pointer; font-weight:600; font-size:1rem;">
+    + Yeni Sınav Bilgisi Ekle
+  </summary>
+  <br/>
+  <form method="post">
+    {% csrf_token %}
+    <div class="grid-2">
+      {% for field in form %}
+      <div class="form-group">
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+        {% for err in field.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <br/>
+    <button type="submit" class="btn btn-primary">Ekle</button>
+  </form>
+</details>
+
+<!-- ===== KAYITLI SINAVLAR ===== -->
+<div class="card">
+  <h2>Kayıtlı Sınavlar</h2>
+
+  {% if liste_formlar %}
+  <div class="sinav-liste">
+    {% for sinav, duzenle_form in liste_formlar %}
+
+    <div class="sinav-blok {% if sinav.aktif %}sinav-aktif{% endif %}">
+
+      <!-- Özet satır -->
+      <div class="sinav-satir">
+        <div class="sinav-satir-bilgi">
+          {% if sinav.aktif %}<span class="badge badge-done">Aktif</span>{% endif %}
+          <span class="sinav-yil">{{ sinav.egitim_ogretim_yili }}</span>
+          <span class="sinav-sep">|</span>
+          <span class="sinav-donem">{{ sinav.get_donem_display }}</span>
+          <span class="sinav-sep">|</span>
+          <span class="sinav-ad">{{ sinav.get_sinav_adi_display }}</span>
+          <span class="sinav-tarih">Başlangıç: {{ sinav.sinav_baslangic_tarihi|date:"d.m.Y" }}</span>
+          <span class="sinav-tarih">Veri: {{ sinav.eokul_veri_tarihi|date:"d.m.Y" }}</span>
+        </div>
+        <div class="sinav-satir-butonlar">
+          {% if not sinav.aktif %}
+          <form method="post" action="{% url 'sinav:sinav_bilgisi_aktif_yap' sinav.pk %}" style="display:inline">
+            {% csrf_token %}
+            <button class="btn btn-success btn-sm" type="submit">Aktif Yap</button>
+          </form>
+          {% endif %}
+          <button class="btn btn-secondary btn-sm"
+                  onclick="toggleEdit({{ sinav.pk }})" type="button">Düzenle</button>
+          {% if not sinav.aktif %}
+          <form method="post" action="{% url 'sinav:sinav_bilgisi_sil' sinav.pk %}" style="display:inline"
+                onsubmit="return confirm('{{ sinav }} silinsin mi?')">
+            {% csrf_token %}
+            <button class="btn btn-danger btn-sm" type="submit">Sil</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Inline düzenleme paneli -->
+      <div id="edit-panel-{{ sinav.pk }}" class="sinav-edit-panel" style="display:none;">
+        <form method="post" action="{% url 'sinav:sinav_bilgisi_duzenle' sinav.pk %}">
+          {% csrf_token %}
+          <div class="grid-2" style="margin-top:.75rem;">
+            {% for field in duzenle_form %}
+            <div class="form-group">
+              {{ field.label_tag }}
+              {{ field }}
+              {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+              {% for err in field.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+          <div style="display:flex; gap:.5rem; margin-top:.75rem;">
+            <button type="submit" class="btn btn-primary btn-sm">Kaydet</button>
+            <button type="button" class="btn btn-secondary btn-sm"
+                    onclick="toggleEdit({{ sinav.pk }})">İptal</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <p style="color:#6b7280; font-size:.9rem;">
+    Henüz sınav bilgisi eklenmedi.
+    <a href="#yeni-sinav-panel" onclick="document.getElementById('yeni-sinav-panel').open=true">
+      İlk sınavı ekleyin.
+    </a>
+  </p>
+  {% endif %}
+</div>
+
+<!-- ===== VERİ YÜKLEME HATIRLATMASI ===== -->
+{% if liste_formlar and not ogrenci_dosya_adi %}
+<div class="card" style="border-left:4px solid #f59e0b; background:#fffbeb; color:#92400e; padding:.9rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center;">
+  <span>e-Okul dosyaları henüz yüklenmedi.</span>
+  <a href="{% url 'sinav:veri_yukle_sayfasi' %}" class="btn btn-primary btn-sm">Dosya Yükle</a>
+</div>
+{% endif %}
+
+<style>
+.sinav-liste { display:flex; flex-direction:column; gap:.5rem; }
+.sinav-blok {
+  border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;
+  background:#fafafa;
+}
+.sinav-blok.sinav-aktif { border-color:#16a34a; background:#f0fdf4; }
+.sinav-satir {
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:.5rem; padding:.75rem 1rem;
+}
+.sinav-satir-bilgi { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+.sinav-sep { color:#d1d5db; }
+.sinav-yil  { font-weight:700; color:#1a1a2e; font-size:.9rem; }
+.sinav-donem, .sinav-ad { font-size:.88rem; color:#374151; }
+.sinav-tarih { font-size:.75rem; color:#6b7280; }
+.sinav-satir-butonlar { display:flex; gap:.4rem; flex-shrink:0; }
+.sinav-edit-panel {
+  border-top:1px solid #e5e7eb; padding:.75rem 1rem 1rem;
+  background:#fff;
+}
+.btn-danger { background:#dc2626; color:#fff; }
+.okul-eksik { border-left:4px solid #dc2626; }
+.badge-warn  { background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:999px; }
+</style>
+
+<script>
+function toggleEdit(pk) {
+  const panel = document.getElementById("edit-panel-" + pk);
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+}
+
+// Form hatasi varsa ilgili paneli ac
+{% for sinav, duzenle_form in liste_formlar %}
+{% if duzenle_form.errors %}
+document.getElementById("edit-panel-{{ sinav.pk }}").style.display = "block";
+{% endif %}
+{% endfor %}
+
+// URL'de #yeni gelirse yeni ekle panelini ac
+if (window.location.hash === "#yeni-sinav-panel") {
+  document.getElementById("yeni-sinav-panel").open = true;
+}
+
+function toggleOkul() {
+  const ozet = document.getElementById("okul-ozet");
+  const panel = document.getElementById("okul-form-panel");
+  const btn   = document.getElementById("okul-toggle-btn");
+  const gizli = panel.style.display === "none";
+  panel.style.display = gizli ? "block" : "none";
+  ozet.style.display  = gizli ? "none"  : "block";
+  btn.textContent     = gizli ? "İptal" : "Düzenle";
+}
+</script>
+
+{% endblock %}

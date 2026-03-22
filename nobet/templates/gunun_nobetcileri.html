@@ -1,0 +1,95 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<script src="{% static 'js/pages/gunun_nobetcileri.js' %}"></script>
+
+<div class="container-sm" style="max-width: 900px;">
+    <div class="mb-20">
+        <h2 class="page-title mb-20">{{ title }}</h2>
+        
+        {% if messages %}
+        <div class="mb-20">
+            {% for message in messages %}
+            <div class="msg-box {% if message.tags == 'success' %}msg-success{% elif message.tags == 'error' %}msg-error{% else %}msg-info{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Tarih Seçimi Formu -->
+        <form method="get" class="filter-box filter-form">
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <div style="display: flex; align-items: center;">
+                    <label for="id_tarih" class="form-label-bold" style="margin-right: 10px;">Tarih Seçiniz:</label>
+                    {{ form.tarih }}
+                    <button type="submit" class="btn btn-primary" style="margin-left: 10px;">Getir</button>
+                    <div style="display: inline-flex; align-items: center; margin-left: 10px;">
+                        <select class="form-control rapor-select" style="width: auto; margin-right: 6px;">
+                            <option value="{% url 'download_gunun_nobetcileri_png' %}?tarih={{ target_date|date:'Y-m-d' }}">PNG (Resim)</option>
+                        </select>
+                        <button type="button" class="btn btn-info"
+                                onclick="var s=this.previousElementSibling; window.open(s.value, '_blank')">
+                            İndir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Nöbetçi Listesi Tablosu -->
+    {% if is_mudur_yardimcisi %}<form method="post">{% csrf_token %}{% endif %}
+        <div class="card">
+            <div class="card-header bg-primary" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ target_date|date:"d F Y l" }} - Nöbetçi Listesi</span>
+                {% if is_mudur_yardimcisi and gorevler %}
+                <div style="display: flex; align-items: center;">
+                    <button type="submit" name="sifirla" class="btn btn-danger btn-sm" onclick="return confirm('Bu tarih için yapılan tüm manuel değişiklikler silinecek ve varsayılan listeye dönülecek. Emin misiniz?');" style="margin-right: 10px;">Sıfırla</button>
+                    <button type="submit" name="kaydet" class="btn btn-success btn-sm">Kaydet</button>
+                </div>
+                {% endif %}
+            </div>
+
+            <table class="table table-bordered table-hover">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;" class="center">#</th>
+                        <th>Nöbetçi Öğretmen</th>
+                        <th style="width: 40%;">Nöbet Yeri</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gorev in gorevler %}
+                    <tr>
+                        <td class="center font-bold">{{ forloop.counter }}</td>
+                        <td>{{ gorev.ogretmen.personel.adi_soyadi }}</td>
+                        <td>
+                            {% if is_mudur_yardimcisi %}
+                            <select name="place_{{ gorev.id }}" class="form-control smart-select">
+                                <option value="">-- Yer Seçiniz --</option>
+                                {% for yer in tum_yerler %}
+                                <option value="{{ yer }}" {% if yer == gorev.nobet_yeri %}selected{% endif %}>{{ yer }}</option>
+                                {% endfor %}
+                            </select>
+                            {% else %}
+                            {{ gorev.nobet_yeri|default:"-" }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="center" style="padding: 20px;">Seçilen tarih için nöbetçi kaydı bulunamadı.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% if is_mudur_yardimcisi %}</form>{% endif %}
+</div>
+
+{% endblock %}

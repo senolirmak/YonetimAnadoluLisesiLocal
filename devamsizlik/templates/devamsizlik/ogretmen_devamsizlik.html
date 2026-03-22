@@ -1,0 +1,247 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Yoklama{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container" style="max-width:900px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% elif message.tags == 'warning' %}msg-warning{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    {# ── Hafta Navigasyonu ─────────────────────────────────────── #}
+    <div class="card mb-20">
+        <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Yoklama</span>
+            <span style="font-size:0.9em;color:#c8dce8;">
+                {{ secili_tarih|date:"d F Y" }}
+                {% if secili_tarih == bugun %}
+                <span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.82em;margin-left:6px;">Bugün</span>
+                {% endif %}
+            </span>
+        </div>
+        {% if not is_ogretmen %}
+        <div style="padding:14px 16px;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                {% for gun in gun_navigasyon %}
+                <a href="?tarih={{ gun.tarih|date:'Y-m-d' }}"
+                   class="btn btn-sm {% if gun.tarih == secili_tarih %}btn-primary{% else %}btn-secondary{% endif %}"
+                   style="min-width:48px;text-align:center;">
+                    <span style="display:block;font-size:0.75em;opacity:0.8;">{{ gun.ad }}</span>
+                    <span style="font-weight:600;">{{ gun.tarih|date:"d" }}</span>
+                </a>
+                {% endfor %}
+                <form method="get" style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+                    <input type="date" name="tarih" value="{{ secili_tarih|date:'Y-m-d' }}"
+                           style="padding:5px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                    <button type="submit" class="btn btn-sm btn-info">Git</button>
+                </form>
+                <a href="?" class="btn btn-sm btn-warning">Bugün</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if durum == 'ders_yok' %}
+    {# ── Bu günde ders yok ──────────────────────────────────────── #}
+    <div class="card">
+        <div style="padding:40px;text-align:center;">
+            <p style="font-size:1.1em;color:#555;">
+                <strong>{{ secili_tarih|date:"d F Y l" }}</strong> tarihinde programda ders bulunamadı.
+            </p>
+            <a href="?" class="btn btn-primary" style="margin-top:16px;">Bugüne Dön</a>
+        </div>
+    </div>
+
+    {% elif durum == 'ders_sec' %}
+    {# ── Ders seçim listesi ──────────────────────────────────────── #}
+
+    {# Bildirim: bugün açık ders var mı? #}
+    {% if secili_tarih == bugun %}
+        {% if aktif_ders %}
+        <div class="msg-box msg-success" style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.2em;">✓</span>
+            <span>
+                Şu an <strong>{{ aktif_ders.ders_saati }}. ders</strong> aktif
+                ({{ aktif_ders.giris_saat|time:"H:i" }}–{{ aktif_ders.cikis_saat|time:"H:i" }},
+                {{ aktif_ders.sinif_sube }}).
+                Yoklamayı açmak için aşağıdaki butonu kullanın.
+            </span>
+        </div>
+        {% else %}
+        <div class="msg-box msg-info" style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.2em;">ℹ</span>
+            <span>
+                Şu anda aktif ders bulunmamaktadır.
+                Yoklama yalnızca <strong>ders saati içinde</strong> açılabilir.
+            </span>
+        </div>
+        {% endif %}
+    {% endif %}
+
+    <div class="flex-between mb-20" style="margin-top:16px;">
+        <h2 class="page-title">{{ secili_tarih|date:"d F Y l" }} — Dersler</h2>
+    </div>
+    <div class="card">
+        <div class="card-header bg-primary">Ders Programı</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Saat</th>
+                        <th class="center">Ders Saati</th>
+                        <th>Ders</th>
+                        <th>Sınıf / Şube</th>
+                        <th class="center">Durum</th>
+                        <th class="center">Yoklama</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in ders_listesi %}
+                    {% with ders=item.ders %}
+                    <tr {% if item.aktif_mi and secili_tarih == bugun %}style="background:#f0fff4;"{% elif not item.aktif_mi and secili_tarih == bugun %}style="background:#f8f9fa;color:#999;"{% endif %}>
+                        <td style="white-space:nowrap;">{{ ders.giris_saat|time:"H:i" }} – {{ ders.cikis_saat|time:"H:i" }}</td>
+                        <td class="center">{{ ders.ders_saati }}. ders</td>
+                        <td>{{ ders.ders_adi }}</td>
+                        <td>
+                            {% if ders.ders_adi == "REHBERLİK VE YÖNLENDİRME" %}
+                            Sınıf Rehber Öğretmenliği: {{ ders.sinif_sube }}
+                            {% else %}
+                            {{ ders.sinif_sube }}
+                            {% endif %}
+                        </td>
+                        <td class="center">
+                            {% if secili_tarih == bugun %}
+                                {% if item.aktif_mi %}
+                                <span style="background:#28a745;color:#fff;padding:2px 10px;border-radius:10px;font-size:0.82em;font-weight:600;">Aktif</span>
+                                {% else %}
+                                <span style="background:#e9ecef;color:#6c757d;padding:2px 10px;border-radius:10px;font-size:0.82em;">Ders saati dışı</span>
+                                {% endif %}
+                            {% else %}
+                            <span style="background:#17a2b8;color:#fff;padding:2px 10px;border-radius:10px;font-size:0.82em;">Geçmiş gün</span>
+                            {% endif %}
+                        </td>
+                        <td class="center">
+                            {% if item.aktif_mi %}
+                            <a href="{% url 'devamsizlik:ogretmen_devamsizlik_ders' ders.ders_saati %}?tarih={{ secili_tarih|date:'Y-m-d' }}"
+                               class="btn btn-info btn-sm">Yoklamayı Aç</a>
+                            {% else %}
+                            <button type="button" class="btn btn-sm"
+                                    style="background:#dee2e6;color:#6c757d;cursor:not-allowed;border:none;"
+                                    disabled
+                                    title="Yoklama yalnızca {{ ders.giris_saat|time:'H:i' }}–{{ ders.cikis_saat|time:'H:i' }} arasında açılabilir.">
+                                Ders Saati Dışı
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% elif durum == 'form' %}
+    {# ── Yoklama formu ───────────────────────────────────────────── #}
+    <div class="flex-between mb-20">
+        <h2 class="page-title">
+            {{ secili_ders.ders_saati }}. Ders — {{ secili_ders.ders_adi }}
+            &nbsp;<span class="badge badge-info">
+                {% if secili_ders.ders_adi == "REHBERLİK VE YÖNLENDİRME" %}
+                Sınıf Rehber Öğretmenliği: {{ sinif_sube }}
+                {% else %}
+                {{ sinif_sube }}
+                {% endif %}
+            </span>
+        </h2>
+        <a href="{% url 'devamsizlik:ogretmen_devamsizlik' %}?tarih={{ secili_tarih|date:'Y-m-d' }}" class="btn-cancel">← Ders Listesi</a>
+    </div>
+
+    {# Aynı günün diğer dersleri — hızlı geçiş (yalnızca aktif olanlar) #}
+    {% if ders_listesi|length > 1 %}
+    <div class="filter-box filter-form mb-20" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <span class="form-label-bold">Diğer Dersler:</span>
+        {% for item in ders_listesi %}
+            {% if item.ders.ders_saati != secili_ders.ders_saati %}
+                {% if item.aktif_mi %}
+                <a href="{% url 'devamsizlik:ogretmen_devamsizlik_ders' item.ders.ders_saati %}?tarih={{ secili_tarih|date:'Y-m-d' }}"
+                   class="btn btn-primary btn-sm">
+                    {{ item.ders.ders_saati }}. ders —
+                    {% if item.ders.ders_adi == "REHBERLİK VE YÖNLENDİRME" %}Sınıf Rehber Öğretmenliği: {% endif %}{{ item.ders.sinif_sube }}
+                </a>
+                {% else %}
+                <button type="button" class="btn btn-sm"
+                        style="background:#dee2e6;color:#6c757d;cursor:not-allowed;border:none;"
+                        disabled
+                        title="{{ item.ders.giris_saat|time:'H:i' }}–{{ item.ders.cikis_saat|time:'H:i' }} saatleri arasında açılabilir.">
+                    {{ item.ders.ders_saati }}. ders —
+                    {% if item.ders.ders_adi == "REHBERLİK VE YÖNLENDİRME" %}Sınıf Rehber Öğretmenliği: {% endif %}{{ item.ders.sinif_sube }}
+                </button>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="tarih" value="{{ secili_tarih|date:'Y-m-d' }}">
+
+        <div class="card">
+            <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Öğrenci Listesi — Devamsız olanları işaretleyin</span>
+                <span style="font-size:0.85em;color:#c8dce8;">
+                    {{ sinif_sube }} &nbsp;|&nbsp; {{ secili_tarih|date:"d.m.Y" }}
+                    {% if kayitli_devamsiz_ids %}
+                    &nbsp;<span style="background:#ffc107;color:#212529;padding:1px 7px;border-radius:10px;">{{ kayitli_devamsiz_ids|length }} kayıtlı devamsız</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="center" style="width:50px;">Devamsız</th>
+                            <th>Okul No</th>
+                            <th>Adı Soyadı</th>
+                            <th>Cinsiyet</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ogr in ogrenciler %}
+                        <tr {% if ogr.pk in kayitli_devamsiz_ids %}style="background:#fff3cd;"{% endif %}>
+                            <td class="center">
+                                <input type="checkbox" name="devamsiz" value="{{ ogr.pk }}"
+                                    {% if ogr.pk in kayitli_devamsiz_ids %}checked{% endif %}>
+                            </td>
+                            <td>{{ ogr.okulno }}</td>
+                            <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                            <td>{{ ogr.get_cinsiyet_display }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="center text-muted" style="padding:20px;">
+                                Bu sınıfta kayıtlı öğrenci bulunamadı.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-actions mt-20">
+            <a href="{% url 'devamsizlik:ogretmen_devamsizlik' %}?tarih={{ secili_tarih|date:'Y-m-d' }}" class="btn-cancel">Vazgeç</a>
+            <button type="submit" class="btn btn-success">Kaydet</button>
+        </div>
+    </form>
+    {% endif %}
+
+</div>
+{% endblock %}

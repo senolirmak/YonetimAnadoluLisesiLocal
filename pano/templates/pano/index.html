@@ -1,0 +1,43 @@
+{% extends "pano/layouts/base.html" %}
+{% load static %}
+
+{% block content %}
+<!-- ANA GÖRÜNÜM -->
+    <div class="view">
+        <div class="split">
+
+            <!-- SOL: SAAT -->
+            <div class="clock">
+                <div id="time" class="time">00:00</div>
+                <div id="date" class="date">01.01.2026</div>
+                <div id="day" class="day">PAZARTESİ</div>
+
+                <!-- SAYAÇ ALANI -->
+                <div class="counter-section">
+                    <div id="counterTitle" class="counter-title">KALAN SÜRE</div>
+                    <div id="counterValue" class="counterValue">--:--</div>
+                    <div id="counterSub" class="counterSub">Sonraki ders: --</div>
+                </div>
+            </div>
+
+            <!-- SAĞ PANEL -->
+            <div class="panel">
+                <!-- MEDYA BAŞLIK -->
+                <div id="mediaTitle" class="media-title"></div>
+
+                <!-- MEDYA ALANI -->
+                <div class="media-frame">
+                    <div class="posterBigFrame">
+                        <img id="mediaImage" style="display:none;">
+                        <video id="mediaVideo" muted playsinline style="display:none;"></video>
+                    </div>
+                </div>
+
+                <!-- MEDYA AÇIKLAMA -->
+                <div id="mediaDesc" class="media-desc"></div>
+            </div>
+
+        </div>
+    </div>
+
+{% endblock %}

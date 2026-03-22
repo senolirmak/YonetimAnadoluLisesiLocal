@@ -1,0 +1,159 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Profilim{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 760px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <h2 class="page-title mb-20">Profilim</h2>
+
+    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+
+        {# ── Sol kolon: Kullanıcı & Personel bilgisi ── #}
+        <div style="flex:1; min-width:280px;">
+
+            {# Hesap özeti #}
+            <div class="card mb-20">
+                <div class="card-header bg-primary">Hesap Bilgileri</div>
+                <div style="padding:16px;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr>
+                            <td style="padding:6px 10px; color:#666; width:130px;">Kullanıcı Adı</td>
+                            <td style="padding:6px 10px; font-weight:600;">{{ user.username }}</td>
+                        </tr>
+                        <tr style="background:#f9f9f9;">
+                            <td style="padding:6px 10px; color:#666;">Adı Soyadı</td>
+                            <td style="padding:6px 10px;">{{ user.get_full_name|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 10px; color:#666;">E-posta</td>
+                            <td style="padding:6px 10px;">{{ user.email|default:"—" }}</td>
+                        </tr>
+                        <tr style="background:#f9f9f9;">
+                            <td style="padding:6px 10px; color:#666;">Grup</td>
+                            <td style="padding:6px 10px;">
+                                {% if user.is_superuser %}
+                                    Süper Kullanıcı
+                                {% else %}
+                                    {% with grp=user.groups.first %}
+                                    {% if grp %}
+                                        {% if grp.name == 'mudur_yardimcisi' %}Müdür Yardımcısı
+                                        {% elif grp.name == 'okul_muduru' %}Okul Müdürü
+                                        {% elif grp.name == 'rehber_ogretmen' %}Rehber Öğretmen
+                                        {% elif grp.name == 'disiplin_kurulu' %}Disiplin Kurulu
+                                        {% elif grp.name == 'ogretmen' %}Öğretmen
+                                        {% else %}{{ grp.name }}
+                                        {% endif %}
+                                    {% else %}—{% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 10px; color:#666;">Son Giriş</td>
+                            <td style="padding:6px 10px;">{{ user.last_login|date:"d.m.Y H:i"|default:"—" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            {# Personel bilgisi #}
+            <div class="card">
+                <div class="card-header bg-primary">Personel Kaydı</div>
+                <div style="padding:16px;">
+                    {% if personel %}
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr>
+                            <td style="padding:6px 10px; color:#666; width:130px;">Ad Soyad</td>
+                            <td style="padding:6px 10px; font-weight:600;">{{ personel.adi_soyadi }}</td>
+                        </tr>
+                        <tr style="background:#f9f9f9;">
+                            <td style="padding:6px 10px; color:#666;">Branş</td>
+                            <td style="padding:6px 10px;">{{ personel.brans }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 10px; color:#666;">TC Kimlik No</td>
+                            <td style="padding:6px 10px;">{{ personel.kimlikno }}</td>
+                        </tr>
+                        <tr style="background:#f9f9f9;">
+                            <td style="padding:6px 10px; color:#666;">Cinsiyet</td>
+                            <td style="padding:6px 10px;">{{ personel.get_cinsiyet_display }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 10px; color:#666;">Nöbet</td>
+                            <td style="padding:6px 10px;">
+                                {% if personel.nobeti_var %}
+                                <span style="color:#28a745; font-weight:600;">Var</span>
+                                {% else %}
+                                <span style="color:#dc3545;">Yok</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                    {% else %}
+                    <p style="color:#6c757d; margin:0; font-size:0.9em;">
+                        Bu hesaba bağlı personel kaydı bulunmuyor.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+
+        {# ── Sağ kolon: Formlar ── #}
+        <div style="flex:1; min-width:280px;">
+
+            {# Profil düzenleme formu #}
+            <div class="card mb-20">
+                <div class="card-header bg-primary">Bilgileri Güncelle</div>
+                <div style="padding:20px;">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% for field in profil_form %}
+                        <div class="form-row">
+                            <label>{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}
+                            {% for e in field.errors %}<div class="error-text">{{ e }}</div>{% endfor %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        <div class="form-actions">
+                            <button type="submit" name="profil_kaydet" class="btn btn-primary">Kaydet</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {# Şifre değiştirme formu #}
+            <div class="card">
+                <div class="card-header bg-primary">Şifre Değiştir</div>
+                <div style="padding:20px;">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% for field in sifre_form %}
+                        <div class="form-row">
+                            <label>{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}
+                            {% for e in field.errors %}<div class="error-text">{{ e }}</div>{% endfor %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        <div class="form-actions">
+                            <button type="submit" name="sifre_degistir" class="btn btn-success">Şifreyi Değiştir</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Öğrenci Yoklama Kayıtları{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Öğrenci Yoklama Kayıtları</h2>
+        <span style="background:#417690;color:#fff;padding:5px 16px;border-radius:12px;font-size:0.9em;font-weight:600;">
+            {{ toplam }} kayıt
+        </span>
+    </div>
+
+    {# ── Filtre Formu ── #}
+    <form method="get" class="filter-box" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:20px;background:#f8f9fa;padding:14px 16px;border-radius:6px;border:1px solid #e0e0e0;">
+        <div>
+            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Başlangıç Tarihi</label>
+            <input type="date" name="tarih_bas" value="{{ secili_tarih_bas }}"
+                   style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+        </div>
+        <div>
+            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Bitiş Tarihi</label>
+            <input type="date" name="tarih_bit" value="{{ secili_tarih_bit }}"
+                   style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+        </div>
+        <div>
+            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Sınıf / Şube</label>
+            <select name="sinifsube" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                <option value="">Tümü</option>
+                {% for ss in sinifsube_secenekleri %}
+                <option value="{{ ss }}" {% if secili_sinifsube == ss %}selected{% endif %}>{{ ss }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Öğrenci (Ad / Soyad / No)</label>
+            <input type="text" name="ogrenci" value="{{ ogrenci_q }}" placeholder="Ara…"
+                   style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;width:160px;">
+        </div>
+        <div>
+            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Kaynak</label>
+            <select name="kaynak" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                <option value="" {% if secili_kaynak == '' %}selected{% endif %}>Tümü</option>
+                <option value="normal" {% if secili_kaynak == 'normal' %}selected{% endif %}>Normal Yoklama</option>
+                <option value="faaliyet" {% if secili_kaynak == 'faaliyet' %}selected{% endif %}>Faaliyet</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:6px;align-items:flex-end;">
+            <button type="submit" class="btn btn-primary">Filtrele</button>
+            <a href="{% url 'devamsizlik:ogrenci_devamsizlik_listesi' %}" class="btn-cancel">Temizle</a>
+        </div>
+    </form>
+
+    {# ── Liste ── #}
+    {% if devamsizliklar %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th class="center">Ders</th>
+                    <th class="center">Okul No</th>
+                    <th>Ad Soyad</th>
+                    <th class="center">Sınıf</th>
+                    <th>Ders Adı</th>
+                    <th>Öğretmen</th>
+                    <th>Durum / Açıklama</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in devamsizliklar %}
+                <tr>
+                    <td style="white-space:nowrap;">{{ d.tarih|date:"d.m.Y" }}</td>
+                    <td class="center">
+                        <span class="badge badge-info">{{ d.ders_saati }}. ders</span>
+                    </td>
+                    <td class="center" style="font-size:0.88em;color:#555;">{{ d.ogrenci.okulno }}</td>
+                    <td>{{ d.ogrenci.adi }} {{ d.ogrenci.soyadi }}</td>
+                    <td class="center">{{ d.ogrenci.sinif }}/{{ d.ogrenci.sube }}</td>
+                    <td style="font-size:0.9em;">{{ d.ders_adi|default:"—" }}</td>
+                    <td style="font-size:0.9em;">{{ d.ogretmen_adi|default:"—" }}</td>
+                    <td>
+                        {% if d.aciklama == 'Faaliyet: Katıldı' %}
+                        <span class="badge" style="background:#28a745;color:#fff;">Faaliyet – Katıldı</span>
+                        {% elif d.aciklama and d.aciklama|slice:":9" == 'Faaliyet:' %}
+                        <span class="badge" style="background:#dc3545;color:#fff;">Faaliyet – Devamsız</span>
+                        {% else %}
+                        <span class="badge" style="background:#e83e8c;color:#fff;">Devamsız</span>
+                        {% if d.aciklama %}
+                        <span style="font-size:0.85em;color:#555;margin-left:4px;">{{ d.aciklama }}</span>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card">
+        <div style="padding:40px;text-align:center;color:#6c757d;">
+            Seçilen kriterlere uygun yoklama kaydı bulunamadı.
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

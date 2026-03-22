@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kiosk</title>
+  <style>
+    html,body{width:100%;height:100%;margin:0;background:#000;overflow:hidden;}
+    .wrap{position:fixed;inset:0;background:#000;}
+    iframe{
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      border:0;
+      opacity:0;
+      transition: opacity 800ms ease, transform 800ms ease;
+      background:#000;
+    }
+    iframe.show{ opacity:1; }
+
+    /* fade default */
+    .fadeOut{ opacity:0 !important; }
+    .fadeIn { opacity:1 !important; }
+
+    /* slide (çok hafif) */
+    .slideOut{ opacity:0 !important; transform: translateX(-2.5%); }
+    .slideIn { opacity:1 !important; transform: translateX(0); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <iframe id="f1" class="show"></iframe>
+    <iframe id="f2"></iframe>
+  </div>
+
+  <script>
+    const PAGES = {{ pages|safe }}.map(p => ({ url: p.url, dwell: p.duration * 1000 }));
+    const EFFECT = "{{ effect|default:'fade' }}";
+    const RELOAD_EACH_TIME = true;
+
+    const f1 = document.getElementById("f1");
+    const f2 = document.getElementById("f2");
+
+    let idx = 0;
+    let showing = 1;
+    let timer = null;
+
+    function setSrc(frame, url){
+      if (!RELOAD_EACH_TIME && frame.getAttribute("src") === url) return;
+      const bust = Date.now();
+      frame.src = url + (url.includes("?") ? "&" : "?") + "v=" + bust;
+    }
+
+    function applyTransition(current, next){
+      if (EFFECT === "slide"){
+        current.classList.remove("show");
+        next.classList.add("show");
+      } else {
+        current.classList.remove("show");
+        next.classList.add("show");
+      }
+    }
+
+    function scheduleNext(){
+      clearTimeout(timer);
+      const dwell = PAGES[idx].dwell || 15000;
+      timer = setTimeout(swap, dwell);
+    }
+
+    function swap(){
+      const current = showing === 1 ? f1 : f2;
+      const next    = showing === 1 ? f2 : f1;
+
+      idx = (idx + 1) % PAGES.length;
+      const nextPage = PAGES[idx];
+
+      setSrc(next, nextPage.url);
+
+      next.onload = () => {
+        applyTransition(current, next);
+        showing = (showing === 1) ? 2 : 1;
+        scheduleNext();
+      };
+    }
+
+    // İlk yükleme
+    setSrc(f1, PAGES[0].url);
+    if (PAGES.length > 1) {
+      setSrc(f2, PAGES[1].url);
+    }
+    scheduleNext();
+  </script>
+</body>
+</html>

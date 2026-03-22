@@ -1,0 +1,60 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Görüşme Sil{% endblock %}
+
+{% block content %}
+<div class="container container-sm">
+
+    <div class="card">
+        <div class="card-header bg-danger">Görüşme Silme Onayı</div>
+        <div style="padding:24px;">
+            <p style="margin-bottom:16px;">Aşağıdaki görüşme kaydını silmek istediğinizden emin misiniz?</p>
+
+            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+                <tr>
+                    <td style="padding:8px 12px;color:#666;width:120px;border-bottom:1px solid #eee;">Tarih</td>
+                    <td style="padding:8px 12px;font-weight:600;border-bottom:1px solid #eee;">{{ gorusme.tarih|date:"d.m.Y" }}</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;">Tür</td>
+                    <td style="padding:8px 12px;border-bottom:1px solid #eee;">{{ gorusme.get_tur_display }}</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;">Konu</td>
+                    <td style="padding:8px 12px;font-weight:600;border-bottom:1px solid #eee;">{{ gorusme.konu }}</td>
+                </tr>
+                {% if gorusme.ogrenci %}
+                <tr>
+                    <td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;">Öğrenci</td>
+                    <td style="padding:8px 12px;border-bottom:1px solid #eee;">
+                        {{ gorusme.ogrenci.adi }} {{ gorusme.ogrenci.soyadi }}
+                        ({{ gorusme.ogrenci.sinif }}/{{ gorusme.ogrenci.sube }})
+                    </td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td style="padding:8px 12px;color:#666;">Gizlilik</td>
+                    <td style="padding:8px 12px;">
+                        {% if gorusme.gizli %}
+                        <span class="badge" style="background:#dc3545;">Gizli</span>
+                        {% else %}
+                        <span>Gizli Değil</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+
+            <div class="msg-box msg-error" style="margin-bottom:20px;">
+                Bu işlem geri alınamaz. Görüşme kaydı kalıcı olarak silinecektir.
+            </div>
+
+            <form method="post" style="display:flex;gap:12px;justify-content:flex-end;">
+                {% csrf_token %}
+                <a href="{% url 'rehberlik:gorusme_detay' gorusme.pk %}" class="btn-cancel">Vazgeç</a>
+                <button type="submit" class="btn btn-danger">Evet, Sil</button>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

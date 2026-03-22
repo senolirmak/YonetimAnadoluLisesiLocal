@@ -1,0 +1,224 @@
+{% extends "sinav/base.html" %}
+{% block title %}Sınav Takvimi – Ortak Sınav{% endblock %}
+
+{% block content %}
+
+<!-- ===== AKTİF SINAV BİLGİSİ ===== -->
+{% if aktif_sinav %}
+<div class="card sinav-info-card">
+  <div class="sinav-info-grid">
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">Eğitim-Öğretim Yılı</span>
+      <span class="sinav-info-val">{{ aktif_sinav.egitim_ogretim_yili }}</span>
+    </div>
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">Dönem</span>
+      <span class="sinav-info-val">{{ aktif_sinav.get_donem_display }}</span>
+    </div>
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">Sınav Adı</span>
+      <span class="sinav-info-val">{{ aktif_sinav.get_sinav_adi_display }}</span>
+    </div>
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">Başlangıç Tarihi</span>
+      <span class="sinav-info-val">{{ aktif_sinav.sinav_baslangic_tarihi|date:"d.m.Y" }}</span>
+    </div>
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">e-Okul Veri Tarihi</span>
+      <span class="sinav-info-val">{{ aktif_sinav.eokul_veri_tarihi|date:"d.m.Y" }}</span>
+    </div>
+    <div class="sinav-info-item sinav-info-action">
+      <a href="{% url 'sinav:sinav_bilgisi_listesi' %}" class="btn btn-secondary btn-sm">Sınavları Yönet</a>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card sinav-uyari">
+  <span>Aktif sınav bilgisi seçilmedi.</span>
+  <a href="{% url 'sinav:sinav_bilgisi_listesi' %}" class="btn btn-primary btn-sm">Sınav Bilgisi Ekle / Seç</a>
+</div>
+{% endif %}
+
+<!-- ===== VERİTABANI DURUMU ===== -->
+<div class="card">
+  <div class="takvim-durum-satir">
+    <div class="takvim-durum-item">
+      <span class="takvim-durum-lbl">Şube Ders Kayıtları</span>
+      <span class="takvim-durum-val {% if sube_ders_sayisi > 0 %}val-ok{% else %}val-bos{% endif %}">
+        {{ sube_ders_sayisi }}
+      </span>
+    </div>
+    <div class="takvim-durum-item">
+      <span class="takvim-durum-lbl">Takvim Kayıtları</span>
+      <span class="takvim-durum-val {% if takvim_sayisi > 0 %}val-ok{% else %}val-bos{% endif %}">
+        {{ takvim_sayisi }}
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ALGORİTMA PARAMETRELERİ ===== -->
+<details class="card" {% if alg_acik %}open{% endif %}>
+  <summary style="cursor:pointer; font-weight:600;">Algoritma Parametreleri</summary>
+  <br/>
+  <form method="post" action="{% url 'sinav:parametre_kaydet' %}">
+    {% csrf_token %}
+    <div class="grid-2">
+
+      <div class="form-group">
+        {{ alg_form.baslangic_tarih.label_tag }}
+        {{ alg_form.baslangic_tarih }}
+        {% for err in alg_form.baslangic_tarih.errors %}
+          <span class="field-error">{{ err }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="form-group">
+        {{ alg_form.oturum_saatleri.label_tag }}
+        {{ alg_form.oturum_saatleri }}
+        <span class="helptext">{{ alg_form.oturum_saatleri.help_text }}</span>
+        {% for err in alg_form.oturum_saatleri.errors %}
+          <span class="field-error">{{ err }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="form-group">
+        {{ alg_form.tatil_gunleri.label_tag }}
+        {{ alg_form.tatil_gunleri }}
+        {% for err in alg_form.tatil_gunleri.errors %}
+          <span class="field-error">{{ err }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="form-group">
+        {{ alg_form.time_limit_phase1.label_tag }}
+        {{ alg_form.time_limit_phase1 }}
+        {% for err in alg_form.time_limit_phase1.errors %}
+          <span class="field-error">{{ err }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="form-group">
+        {{ alg_form.time_limit_phase2.label_tag }}
+        {{ alg_form.time_limit_phase2 }}
+        {% for err in alg_form.time_limit_phase2.errors %}
+          <span class="field-error">{{ err }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="form-group">
+        {{ alg_form.max_extra_days.label_tag }}
+        {{ alg_form.max_extra_days }}
+        {% for err in alg_form.max_extra_days.errors %}
+          <span class="field-error">{{ err }}</span>
+        {% endfor %}
+      </div>
+
+    </div>
+    <br/>
+    <button type="submit" class="btn btn-secondary">Kaydet</button>
+  </form>
+</details>
+
+<!-- ===== ILP ÇALIŞTIR ===== -->
+{% if sube_ders_sayisi == 0 %}
+<div class="card" style="border-left:4px solid #f59e0b; background:#fffbeb; color:#92400e;
+     padding:.9rem 1.5rem; display:flex; justify-content:space-between; align-items:center;">
+  <span>Takvim oluşturmak için önce <strong>Ders Ayarları</strong> sayfasını kaydedin (Adım 3).</span>
+  <a href="{% url 'sinav:ders_ayarlari' %}" class="btn btn-primary btn-sm">Ders Ayarlarına Git</a>
+</div>
+{% endif %}
+
+{% if onizleme_mevcut %}
+<div class="card" style="border-left:4px solid #6366f1; background:#eef2ff; padding:.9rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center;">
+  <span>Onaylanmayı bekleyen bir takvim önizlemesi mevcut.</span>
+  <a href="{% url 'sinav:takvim_onizleme' %}" class="btn btn-primary btn-sm">Önizlemeye Git →</a>
+</div>
+{% endif %}
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <h2>Sınav Takvimi Oluştur (ILP)</h2>
+    <div style="display:flex; gap:.5rem;">
+      <button class="btn btn-success" id="btn-adim4"
+        {% if sube_ders_sayisi == 0 %}disabled title="Önce Ders Ayarlarını kaydedin"{% endif %}
+        onclick="runAdim4()">
+        Çalıştır
+      </button>
+      <button class="btn btn-danger" id="durdur-adim4" style="display:none"
+        onclick="iptalAdim('durdur-adim4')">
+        Durdur
+      </button>
+      <span class="badge" id="badge-adim4" style="align-self:center;">Bekliyor</span>
+    </div>
+  </div>
+  <div class="log-box" id="log-box">Henüz bir işlem başlatılmadı.</div>
+  <!-- Görev başarıyla tamamlanınca gösterilir -->
+  <div id="onizleme-cta" style="display:none; margin-top:1rem; text-align:center;">
+    <a href="{% url 'sinav:takvim_onizleme' %}" class="btn btn-primary">
+      Takvimi Önizle ve Onayla →
+    </a>
+  </div>
+</div>
+
+
+<script>
+const logBox   = document.getElementById("log-box");
+const onizCta  = document.getElementById("onizleme-cta");
+const badgeEl  = document.getElementById("badge-adim4");
+const btnEl    = document.getElementById("btn-adim4");
+
+async function runAdim4() {
+  const data = await postJSON("{% url 'sinav:takvim' %}");
+  if (!data.task_id) return;
+  _activeTaskId = data.task_id;
+  const durdurBtn = document.getElementById("durdur-adim4");
+  durdurBtn.style.display = "inline-flex";
+  badgeEl.className = "badge badge-running";
+  badgeEl.textContent = "Calisiyor...";
+  btnEl.disabled = true;
+  logBox.textContent = "";
+  onizCta.style.display = "none";
+
+  while (true) {
+    await new Promise(r => setTimeout(r, 1200));
+    const res = await fetch(`/gorev/${data.task_id}/`).then(r => r.json());
+    logBox.textContent = res.logs.join("\n");
+    logBox.scrollTop = logBox.scrollHeight;
+    if (res.done) {
+      badgeEl.className = res.error ? "badge badge-error" : "badge badge-done";
+      badgeEl.textContent = res.error ? "Hata" : "Tamamlandi";
+      btnEl.disabled = false;
+      durdurBtn.style.display = "none";
+      if (!res.error) onizCta.style.display = "block";
+      break;
+    }
+  }
+  _activeTaskId = null;
+}
+</script>
+
+<style>
+.takvim-durum-satir {
+  display: flex; gap: 2rem; flex-wrap: wrap; align-items: center;
+}
+.takvim-durum-item { display: flex; flex-direction: column; gap: .2rem; }
+.takvim-durum-lbl { font-size: .72rem; color: #6b7280; }
+.takvim-durum-val { font-size: 1.4rem; font-weight: 700; }
+.val-ok  { color: #3730a3; }
+.val-bos { color: #9ca3af; }
+.sinav-info-card { border-left: 4px solid #16a34a; }
+.sinav-info-grid { display: flex; flex-wrap: wrap; gap: .75rem 2rem; align-items: center; }
+.sinav-info-item { display: flex; flex-direction: column; gap: .1rem; }
+.sinav-info-lbl { font-size: .72rem; color: #6b7280; }
+.sinav-info-val { font-size: .95rem; font-weight: 600; color: #1a1a2e; }
+.sinav-info-action { margin-left: auto; }
+.sinav-uyari {
+  display: flex; align-items: center; justify-content: space-between;
+  border-left: 4px solid #f59e0b; color: #92400e; background: #fffbeb;
+  padding: .9rem 1.5rem;
+}
+</style>
+
+{% endblock %}

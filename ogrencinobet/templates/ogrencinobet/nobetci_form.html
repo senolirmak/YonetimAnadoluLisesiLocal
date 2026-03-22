@@ -1,0 +1,123 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Nöbetçi Öğrenci Formu{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container" style="max-width:900px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% elif message.tags == 'warning' %}msg-warning{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Nöbetçi Öğrenci Formu</h2>
+    </div>
+
+    {# ── Filtre ─────────────────────────────────────────────────── #}
+    <div class="card mb-20">
+        <div class="card-header bg-primary">Tarih ve Sınıf Seçimi</div>
+        <div style="padding:14px 16px;">
+            <form method="get" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+                <div>
+                    <label class="form-label-bold" style="display:block;margin-bottom:4px;">Tarih</label>
+                    <input type="date" name="tarih" value="{{ secili_tarih|date:'Y-m-d' }}"
+                           style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.95em;">
+                </div>
+                <div>
+                    <label class="form-label-bold" style="display:block;margin-bottom:4px;">Sınıf / Şube</label>
+                    <select name="sinifsube" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.95em;min-width:120px;">
+                        <option value="">-- Seçin --</option>
+                        {% for ss in sinifsube_secenekleri %}
+                        <option value="{{ ss }}" {% if secili_sinifsube == ss %}selected{% endif %}>{{ ss }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Listele</button>
+                {% if secili_tarih == bugun %}
+                <span style="background:#28a745;color:#fff;padding:4px 10px;border-radius:10px;font-size:0.82em;align-self:center;">Bugün</span>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    {# ── Nöbetçi Formu ──────────────────────────────────────────── #}
+    {% if secili_sinifsube %}
+        {% if ogrenciler %}
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="tarih" value="{{ secili_tarih|date:'Y-m-d' }}">
+            <input type="hidden" name="sinifsube" value="{{ secili_sinifsube }}">
+
+            <div class="card mb-20">
+                <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span>{{ secili_sinifsube }} — {{ secili_tarih|date:"d F Y" }}</span>
+                    {% if kayitli_ids %}
+                    <span style="background:#ffc107;color:#212529;padding:2px 10px;border-radius:10px;font-size:0.82em;">
+                        {{ kayitli_ids|length }} nöbetçi kayıtlı
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th class="center" style="width:50px;">Nöbetçi</th>
+                                <th>Okul No</th>
+                                <th>Adı Soyadı</th>
+                                <th>Cinsiyet</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ogr in ogrenciler %}
+                            {% if ogr.pk in onceki_nobet_ids %}
+                            <tr style="background:#f8f9fa;color:#adb5bd;">
+                                <td class="center">
+                                    <input type="checkbox" name="nobetci" value="{{ ogr.pk }}"
+                                           disabled title="Bu öğrenci daha önce nöbet görevini tamamladı.">
+                                </td>
+                                <td>{{ ogr.okulno }}</td>
+                                <td>
+                                    {{ ogr.adi }} {{ ogr.soyadi }}
+                                    <span style="font-size:0.78em;background:#6c757d;color:#fff;padding:1px 6px;border-radius:8px;margin-left:4px;">Görev Tamamlandı</span>
+                                </td>
+                                <td>{{ ogr.get_cinsiyet_display }}</td>
+                            </tr>
+                            {% else %}
+                            <tr {% if ogr.pk in kayitli_ids %}style="background:#fff3cd;"{% endif %}>
+                                <td class="center">
+                                    <input type="checkbox" name="nobetci" value="{{ ogr.pk }}"
+                                        {% if ogr.pk in kayitli_ids %}checked{% endif %}>
+                                </td>
+                                <td>{{ ogr.okulno }}</td>
+                                <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                                <td>{{ ogr.get_cinsiyet_display }}</td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="form-actions mt-20">
+                <a href="?tarih={{ secili_tarih|date:'Y-m-d' }}&sinifsube={{ secili_sinifsube }}" class="btn-cancel">Vazgeç</a>
+                <button type="submit" class="btn btn-success">Kaydet</button>
+            </div>
+        </form>
+        {% else %}
+        <div class="card mb-20">
+            <div style="padding:30px;text-align:center;color:#6c757d;">
+                <strong>{{ secili_sinifsube }}</strong> sınıfında kayıtlı öğrenci bulunamadı.
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+
+
+</div>
+{% endblock %}

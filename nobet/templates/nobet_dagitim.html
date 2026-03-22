@@ -1,0 +1,99 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container">
+    <div class="mb-20">
+        <h2 class="page-title mb-20">{{ title }}</h2>
+
+        {% if messages %}
+        <div class="mb-20">
+            {% for message in messages %}
+            <div class="msg-box {% if message.tags == 'success' %}msg-success{% elif message.tags == 'error' %}msg-error{% elif message.tags == 'warning' %}msg-warning{% else %}msg-info{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <hr class="hr-divider">
+
+        <!-- Filtre ve İşlem Formu -->
+        <form method="post" class="filter-box filter-form" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+            {% csrf_token %}
+            
+            <div style="display: flex; align-items: center;">
+                <label for="{{ form.baslangic_tarihi.id_for_label }}" class="form-label-bold" style="margin-right: 10px;">{{ form.baslangic_tarihi.label }}:</label>
+                {{ form.baslangic_tarihi }}
+                <button type="submit" class="btn btn-primary" style="margin-left: 10px;">Getir</button>
+                <a href="{% url 'gunun_nobetcileri' %}" class="btn btn-warning" style="margin-left: 10px;">Günün Nöbetçileri</a>
+            </div>
+
+            {% if is_mudur_yardimcisi %}
+            <div style="display: flex; align-items: center; gap: 10px;">
+                {% if is_preview %}
+                    <div style="background-color: #fff3cd; color: #856404; padding: 5px 10px; border: 1px solid #ffeeba; border-radius: 4px; margin-right: 10px;">
+                        <strong>Dikkat:</strong> Rotasyon önizleme modundasınız.
+                    </div>
+                    <button type="submit" name="rotasyon_kaydet" class="btn btn-success" onclick="return confirm('Rotasyon değişikliğini kalıcı olarak kaydetmek istiyor musunuz?');">
+                        Değişiklikleri Kaydet
+                    </button>
+                    <button type="submit" name="rotasyon_iptal" class="btn btn-danger">
+                        İptal
+                    </button>
+                {% else %}
+                    <button type="submit" name="rotasyon_onizle" class="btn btn-info">
+                        Nöbet Yerlerini Rotasyon Yap (Önizle)
+                    </button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Nöbet Çizelgesi Tablosu -->
+    <div class="card">
+        <div class="card-header bg-primary">
+            {{ baslangic|date:"d.m.Y" }} - {{ bitis|date:"d.m.Y" }} Haftalık Nöbet Listesi
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Nöbet Yeri</th>
+                        {% for gun in gunler %}
+                            <th class="center">{{ gun }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for satir in tablo_satirlari %}
+                    <tr>
+                        <td class="font-bold">{{ satir.yer }}</td>
+                        {% for hucre in satir.hucreler %}
+                        <td class="center" style="vertical-align: middle;">
+                            {% if hucre %}
+                                {% for ogretmen in hucre %}
+                                    <div style="margin-bottom: 2px; white-space: nowrap;">
+                                        {{ ogretmen }}
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="center" style="padding: 20px;">Bu tarih aralığı için nöbet kaydı bulunamadı.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

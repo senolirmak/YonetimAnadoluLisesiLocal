@@ -1,0 +1,30 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Faaliyeti Onayla{% endblock %}
+{% block content %}
+<div class="container container-sm">
+    <div class="card">
+        <div class="card-header bg-primary">Faaliyet Onaylama</div>
+        <div style="padding:24px;">
+            <p class="mb-20">Aşağıdaki faaliyeti onaylamak istiyor musunuz?</p>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+                <tr><td style="padding:8px 12px;color:#666;width:120px;border-bottom:1px solid #eee;">Konu</td><td style="padding:8px 12px;font-weight:600;border-bottom:1px solid #eee;">{{ faaliyet.konu }}</td></tr>
+                <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;">Tarih</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">{{ faaliyet.tarih|date:"d.m.Y" }}</td></tr>
+                <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;">Yer</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">{{ faaliyet.yer }}</td></tr>
+                <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;">Öğretmen</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">{{ faaliyet.ogretmen.adi_soyadi }}</td></tr>
+                <tr><td style="padding:8px 12px;color:#666;">Ders Saatleri</td>
+                    <td style="padding:8px 12px;">
+                        {% for ds in faaliyet.ders_saatleri.all %}
+                        {{ ds.ders_no }}. ders ({{ ds.baslangic|time:"H:i" }}–{{ ds.bitis|time:"H:i" }}){% if not forloop.last %}, {% endif %}
+                        {% empty %}—{% endfor %}
+                    </td>
+                </tr>
+            </table>
+            <form method="post" style="display:flex;gap:12px;justify-content:flex-end;">
+                {% csrf_token %}
+                <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" class="btn-cancel">Vazgeç</a>
+                <button type="submit" class="btn btn-success">Evet, Onayla</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Sanal ortam
+.venv/
+venv/
+env/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+mediafiles/
+media/
+
+# Ortam değişkenleri (GİZLİ)
+.env
+.env.*
+!.env.example
+
+# Veritabanı yedekleri
+backups/
+*.dump
+*.sql
+
+# Geçici ve önbellek dosyaları
+*.cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE ve editör
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Coverage
+.coverage
+htmlcov/
+
+# Node (pano/kiosk gibi frontend varsa)
+node_modules/
+npm-debug.log
+
+# PDF / Excel geçici çıktılar
+*.pdf
+*.xlsx
+*.xls

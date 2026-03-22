@@ -1,0 +1,118 @@
+{% extends "sinav/base.html" %}
+
+{% block title %}Sınıf Listesi – {{ sinifsube }} / {{ tarih|date:"d.m.Y" }}{% endblock %}
+
+{% block content %}
+<style>
+  .detay-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.2rem;
+  }
+  .detay-header h2 { font-size: 1.1rem; font-weight: 700; color: #1a1a2e; margin: 0; }
+  .detay-header .ders-badge {
+    background: #4a90d9;
+    color: #fff;
+    font-size: .8rem;
+    font-weight: 600;
+    padding: .25rem .8rem;
+    border-radius: 99px;
+  }
+  .meta-bar {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 7px;
+    padding: .65rem 1rem;
+    font-size: .88rem;
+    color: #0369a1;
+    margin-bottom: 1.2rem;
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .meta-bar span strong { color: #075985; }
+  .sinif-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .9rem;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,.07);
+  }
+  .sinif-table th {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-weight: 600;
+    padding: .55rem .9rem;
+    text-align: left;
+  }
+  .sinif-table td {
+    padding: .45rem .9rem;
+    border-bottom: 1px solid #f1f1f1;
+    color: #1a1a2e;
+  }
+  .sinif-table tr:last-child td { border-bottom: none; }
+  .sinif-table tr:hover td { background: #f8fafc; }
+  .sira { color: #9ca3af; font-size: .8rem; }
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6b7280;
+  }
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    color: #6366f1;
+    font-size: .85rem;
+    text-decoration: none;
+    margin-bottom: 1rem;
+  }
+  .back-btn:hover { color: #4338ca; }
+</style>
+
+<a href="{% url 'sinav:ogretmen_sinav_gozetim' %}" class="back-btn">← Gözetim Listime Dön</a>
+
+<div class="detay-header">
+  <h2>Sınıf Listesi — {{ sinifsube }}</h2>
+  {% if ders_adi %}<span class="ders-badge">{{ ders_adi }}</span>{% endif %}
+</div>
+
+<div class="meta-bar">
+  {% if tarih %}<span><strong>Tarih:</strong> {{ tarih|date:"d.m.Y l" }}</span>{% endif %}
+  <span><strong>Sınav Saati:</strong> {{ saat }}</span>
+  {% if onceki_saat %}<span><strong>Önceki Ders ({{ onceki_saat }}):</strong>
+    {% if ogretmen_adi %}{{ ogretmen_adi }}{% else %}<em>bulunamadı</em>{% endif %}
+  </span>{% endif %}
+  {% if aktif_sinav %}<span><strong>Sınav:</strong> {{ aktif_sinav }}</span>{% endif %}
+</div>
+
+{% if ogrenciler %}
+<table class="sinif-table">
+  <thead>
+    <tr>
+      <th>Okul No</th>
+      <th>Adı Soyadı</th>
+      <th style="width:60px">Sıra</th>
+      <th>Salon</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for o in ogrenciler %}
+    <tr>
+      <td>{{ o.okulno }}</td>
+      <td>{{ o.adi_soyadi }}</td>
+      <td class="sira">{{ o.sira_no }}</td>
+      <td>{{ o.salon }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty-state">Bu parametreler için öğrenci kaydı bulunamadı.</div>
+{% endif %}
+
+{% endblock %}

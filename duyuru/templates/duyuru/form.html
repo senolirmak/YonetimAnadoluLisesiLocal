@@ -1,0 +1,32 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container-sm">
+    <h2 class="page-title page-title-border">{{ title }}</h2>
+
+    <form method="post" class="form-box" novalidate>
+        {% csrf_token %}
+
+        {% for field in form %}
+        <div class="form-row">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}
+            <small class="help-text">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+            <p class="error-text">{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endfor %}
+
+        <div class="form-actions">
+            <a href="{% url 'duyuru_listesi' %}" class="btn-cancel">Vazgeç</a>
+            <button type="submit" class="btn btn-primary btn-lg">Kaydet</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

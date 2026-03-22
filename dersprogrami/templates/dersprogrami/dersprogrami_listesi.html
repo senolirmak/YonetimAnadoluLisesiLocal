@@ -1,0 +1,145 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .filtre-form {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+    .filtre-form label { font-weight: 600; font-size: 0.88em; color: #495057; }
+    .filtre-form select {
+        padding: 5px 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.92em;
+        min-width: 160px;
+    }
+    .btn-filtre {
+        padding: 6px 16px;
+        background-color: #17a2b8;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        font-weight: bold;
+    }
+    .btn-filtre:hover { background-color: #117a8b; }
+    .btn-sifirla {
+        padding: 6px 12px;
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.88em;
+        text-decoration: none;
+    }
+    .btn-sifirla:hover { background-color: #545b62; color: white; }
+    .badge-gun {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.78em;
+        font-weight: 600;
+        background: #e9ecef;
+        color: #495057;
+    }
+</style>
+
+<div class="container">
+    <div class="page-header">
+        <h2 class="page-title">{{ title }}</h2>
+    </div>
+
+    <form method="get" class="filtre-form">
+        <div>
+            <label>Öğretmen:</label>
+            <select name="ogretmen">
+                <option value="">-- Tümü --</option>
+                {% for o in tum_ogretmenler %}
+                <option value="{{ o.id }}" {% if secilen_ogretmen == o.id|stringformat:"s" %}selected{% endif %}>
+                    {{ o.adi_soyadi }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>Sınıf/Şube:</label>
+            <select name="sinif_sube">
+                <option value="">-- Tümü --</option>
+                {% for s in tum_siniflar %}
+                <option value="{{ s.id }}" {% if secilen_sinif == s.id|stringformat:"s" %}selected{% endif %}>
+                    {{ s }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>Gün:</label>
+            <select name="gun">
+                <option value="">-- Tümü --</option>
+                {% for val, label in gunler %}
+                <option value="{{ val }}" {% if secilen_gun == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn-filtre">Filtrele</button>
+        <a href="{% url 'dersprogrami_listesi' %}" class="btn-sifirla">Sıfırla</a>
+    </form>
+
+    <div class="card">
+        <div class="card-header">
+            Toplam {{ kayitlar|length }} kayıt
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Öğretmen</th>
+                        <th>Branş</th>
+                        <th>Gün</th>
+                        <th>Ders Saati</th>
+                        <th>Giriş</th>
+                        <th>Çıkış</th>
+                        <th>Ders Adı</th>
+                        <th>Sınıf/Şube</th>
+                        <th>Uygulama Tarihi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for k in kayitlar %}
+                    <tr>
+                        <td>{{ k.ogretmen.adi_soyadi }}</td>
+                        <td>{{ k.ogretmen.brans }}</td>
+                        <td><span class="badge-gun">{{ k.get_gun_display }}</span></td>
+                        <td style="text-align:center;">{{ k.ders_saati_adi }}</td>
+                        <td>{{ k.giris_saat|time:"H:i" }}</td>
+                        <td>{{ k.cikis_saat|time:"H:i" }}</td>
+                        <td>{{ k.ders_adi }}</td>
+                        <td>{{ k.sinif_sube|default:"—" }}</td>
+                        <td>{{ k.uygulama_tarihi|date:"d.m.Y" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" style="text-align:center; padding:24px; color:#999;">
+                            Kayıt bulunamadı.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

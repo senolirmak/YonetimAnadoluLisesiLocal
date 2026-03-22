@@ -1,0 +1,115 @@
+{% extends "pano/layouts/base.html" %}
+{% load static %}
+
+{% block title %}Etkinlikler{% endblock %}
+
+{% block content %}
+<div class="view">
+  <div class="eventsFrame">
+
+    <div class="eventsGrid">
+      <!-- SOL: Etkinlik Detayları -->
+      <section class="eventsCol eventsColLeft">
+        <!-- div class="eventsColTitle">Etkinlik Detayları</div-->
+
+        <div class="eventsList" id="eventsList">
+          {% if ongoing_events %}
+            <div class="sectionTitle red">🔴 DEVAM EDEN ETKİNLİKLER</div>
+
+            {% for gun, items in ongoing_grouped.items %}
+              <div class="dayBlock">
+                <div class="dayTitle">📅 {{ gun|date:"d.m.Y" }}</div>
+
+                {% for e in items %}
+                  <article class="eventRowOne"
+                      data-poster="{% if e.afis %}{{ e.afis.url }}{% endif %}">
+
+                      <!-- 1️⃣ BAŞLIK -->
+                      <div class="eventName">
+                         {{ e.baslik }}
+                  </div>
+
+                <!-- 2️⃣ DURUM -->
+                 {% if e.devam_ediyor %}
+                      <div class="badgeOngoing">DEVAM EDİYOR</div>
+                {% else %}
+                     <div class="badgeUpcoming">YAKLAŞAN</div>
+                {% endif %}
+
+                <!-- 3️⃣ AÇIKLAMA -->
+                {% if e.aciklama %}
+                  <div class="eventDesc">
+                    {{ e.aciklama }}
+                  </div>
+                {% endif %}
+
+                <!-- 4️⃣ YER -->
+                {% if e.yer %}
+                  <div class="eventPlace">
+                    📍 {{ e.yer }}
+                  </div>
+                {% endif %}
+
+                <!-- 5️⃣ SAAT -->
+                <div class="eventTime">
+                  🕒 {{ e.sure_metni }}
+                </div>
+
+              </article>
+
+                {% endfor %}
+              </div>
+            {% endfor %}
+
+            <div class="sepLine"></div>
+          {% endif %}
+
+          {% if upcoming_events %}
+            <div class="sectionTitle cyan">🟢 YAKLAŞAN ETKİNLİKLER (1 HAFTA)</div>
+
+            {% for gun, items in upcoming_grouped.items %}
+              <div class="dayBlock">
+                <div class="dayTitle">📅 {{ gun|date:"d.m.Y" }}</div>
+
+                {% for e in items %}
+                  <article class="eventRowOne"
+                           data-poster="{% if e.afis %}{{ e.afis.url }}{% endif %}">
+                    <div class="eventTime">{{ e.sure_metni }}</div>
+
+                    <div class="eventInfo">
+                      <div class="eventHead">
+                        <div class="eventName">{{ e.baslik }}</div>
+                      </div>
+
+                      {% if e.yer %}<div class="eventPlace">📍 {{ e.yer }}</div>{% endif %}
+                      {% if e.aciklama %}<div class="eventDesc">{{ e.aciklama }}</div>{% endif %}
+                    </div>
+                  </article>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          {% if not ongoing_events and not upcoming_events %}
+            <div style="opacity:.9; font-size:1.1em;">
+              Bu hafta için planlı etkinlik bulunmuyor.
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- SAĞ: Poster -->
+      <section class="eventsCol eventsColRight">
+        <!--div class="eventsColTitle">Etkinlik Afişi</div-->
+
+        <div class="posterBigFrame">
+          <img id="posterImg" alt="afiş" style="display:none;">
+          <div id="posterEmpty" class="posterBigEmpty">AFİŞ YOK</div>
+        </div>
+      </section>
+    </div>
+
+  </div>
+</div>
+<script src="{% static 'pano/js/etkinlikler.js' %}"></script>
+{% endblock %}

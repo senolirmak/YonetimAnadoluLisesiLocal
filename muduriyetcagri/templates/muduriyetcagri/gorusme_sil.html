@@ -1,0 +1,33 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Müdüriyet Görüşmesi Sil{% endblock %}
+{% block content %}
+<div class="container" style="max-width:600px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">{{ message }}</div>
+    {% endfor %}
+
+    <h2 class="page-title mb-20">Görüşme Kaydını Sil</h2>
+
+    <div class="card">
+        <div class="card-header" style="background:#dc3545;color:#fff;">Silme Onayı</div>
+        <div style="padding:24px;">
+            <p>Aşağıdaki görüşme kaydını <strong>kalıcı olarak silmek</strong> istediğinizden emin misiniz?</p>
+            <div style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:6px;padding:14px;margin:16px 0;">
+                <div><strong>Tarih:</strong> {{ gorusme.tarih|date:"d.m.Y" }}</div>
+                <div><strong>Tür:</strong> {{ gorusme.get_tur_display }}</div>
+                <div><strong>Konu:</strong> {{ gorusme.konu }}</div>
+                {% if gorusme.ogrenci %}
+                <div><strong>Öğrenci:</strong> {{ gorusme.ogrenci.adi }} {{ gorusme.ogrenci.soyadi }}</div>
+                {% endif %}
+            </div>
+            <form method="post" style="display:flex;gap:12px;justify-content:flex-end;">
+                {% csrf_token %}
+                <a href="{% url 'muduriyetcagri:gorusme_detay' gorusme.pk %}" class="btn-cancel">Vazgeç</a>
+                <button type="submit" class="btn btn-danger">Evet, Sil</button>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

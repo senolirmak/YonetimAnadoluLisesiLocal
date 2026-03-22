@@ -1,0 +1,73 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Öğrenci Excel Yükle{% endblock %}
+
+{% block content %}
+<div class="container-sm">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Öğrenci Listesi Excel Yükle</h2>
+        <a href="{% url 'ogrenci:ogrenci_liste' %}" class="btn-cancel">← Listeye Dön</a>
+    </div>
+
+    {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    <div class="card mb-20">
+        <div class="card-header bg-primary">Dosya Seç</div>
+        <div class="form-box">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-row">
+                    <label for="excel_dosya">Excel Dosyası (.xlsx / .xls)</label>
+                    <input type="file" name="excel_dosya" id="excel_dosya" accept=".xlsx,.xls" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-success">Yükle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-primary">Beklenen Sütun Sırası</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Sütun Adı</th>
+                        <th>Zorunlu</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>okulno</td><td><span class="badge badge-info">Evet</span></td></tr>
+                    <tr><td>2</td><td>sinif</td><td><span class="badge badge-info">Evet</span></td></tr>
+                    <tr><td>3</td><td>sube</td><td><span class="badge badge-info">Evet</span></td></tr>
+                    <tr><td>4</td><td>tckimlikno</td><td><span class="badge badge-info">Evet</span></td></tr>
+                    <tr><td>5</td><td>adi</td><td><span class="badge badge-info">Evet</span></td></tr>
+                    <tr><td>6</td><td>soyadi</td><td><span class="badge badge-info">Evet</span></td></tr>
+                    <tr><td>7</td><td>dogumtarihi</td><td><span class="badge badge-info">Evet</span></td></tr>
+                    <tr><td>8</td><td>cinsiyet</td><td><span class="badge badge-info">Evet (E / K)</span></td></tr>
+                    <tr><td>9</td><td>babaadi</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>10</td><td>anneadi</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>11</td><td>veli</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>12</td><td>velitelefon</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>13</td><td>annetelefon</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>14</td><td>babatelefon</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>15</td><td>il</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>16</td><td>ilce</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>17</td><td>mahalle</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>18</td><td>postakodu</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                    <tr><td>19</td><td>adres</td><td><span class="badge badge-secondary">Hayır</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted" style="padding: 10px 15px;">
+            Sütun başlıkları büyük/küçük harf duyarsızdır. Aynı TC kimlik no'ya sahip kayıtlar güncellenir.
+        </p>
+    </div>
+</div>
+{% endblock %}

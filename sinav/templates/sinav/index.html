@@ -1,0 +1,264 @@
+{% extends "sinav/base.html" %}
+{% block title %}Ortak Sınav – Ana Sayfa{% endblock %}
+
+{% block content %}
+
+<!-- ===== KURULUM SİHİRBAZI ===== -->
+<div class="card">
+  <h2>Kurulum Adımları</h2>
+  <div class="kurulum-adimlar">
+
+    <!-- Adım 1: Okul Bilgileri -->
+    <div class="kurulum-adim {% if okul_tamam %}adim-tamam{% else %}adim-bekliyor{% endif %}">
+      <div class="kurulum-adim-no">{% if okul_tamam %}✓{% else %}1{% endif %}</div>
+      <div class="kurulum-adim-icerik">
+        <div class="kurulum-adim-baslik">Okul Bilgileri</div>
+        <div class="kurulum-adim-aciklama">
+          {% if okul_tamam %}Okul bilgileri girildi.
+          {% else %}Okul adı, kodu ve müdür bilgilerini girin.{% endif %}
+        </div>
+      </div>
+      {% if not okul_tamam %}
+      <a href="{% url 'sinav:sinav_bilgisi_listesi' %}" class="btn btn-primary btn-sm">Doldur</a>
+      {% endif %}
+    </div>
+
+    <!-- Adım 2: e-Okul Veri Yükleme -->
+    <div class="kurulum-adim {% if veri_tamam %}adim-tamam{% elif okul_tamam %}adim-bekliyor{% else %}adim-pasif{% endif %}">
+      <div class="kurulum-adim-no">{% if veri_tamam %}✓{% else %}2{% endif %}</div>
+      <div class="kurulum-adim-icerik">
+        <div class="kurulum-adim-baslik">e-Okul Verisi</div>
+        <div class="kurulum-adim-aciklama">
+          {% if veri_tamam %}
+            {{ db_ozeti.ogrenci }} öğrenci · {{ db_ozeti.ders_program }} ders programı kaydı yüklendi.
+          {% elif okul_tamam %}
+            e-Okul öğrenci listesi ve haftalık ders programı dosyalarını yükleyin.
+          {% else %}
+            Önce Okul Bilgilerini doldurun.
+          {% endif %}
+        </div>
+      </div>
+      {% if okul_tamam and not veri_tamam %}
+      <a href="{% url 'sinav:veri_yukle_sayfasi' %}" class="btn btn-primary btn-sm">Veri Yükle</a>
+      {% elif veri_tamam %}
+      <a href="{% url 'sinav:veri_yukle_sayfasi' %}" class="btn btn-secondary btn-sm">Güncelle</a>
+      {% endif %}
+    </div>
+
+    <!-- Adım 3: Sınav Oluşturma -->
+    <div class="kurulum-adim {% if aktif_sinav %}adim-tamam{% elif kurulum_tamam %}adim-bekliyor{% else %}adim-pasif{% endif %}">
+      <div class="kurulum-adim-no">{% if aktif_sinav %}✓{% else %}3{% endif %}</div>
+      <div class="kurulum-adim-icerik">
+        <div class="kurulum-adim-baslik">Sınav Oluşturma</div>
+        <div class="kurulum-adim-aciklama">
+          {% if aktif_sinav %}
+            Aktif: {{ aktif_sinav.egitim_ogretim_yili }} {{ aktif_sinav.get_donem_display }} – {{ aktif_sinav.get_sinav_adi_display }}
+          {% elif kurulum_tamam %}
+            Sınav bilgisi oluşturun ve aktif sınav seçin.
+          {% else %}
+            Önce e-Okul verilerini yükleyin.
+          {% endif %}
+        </div>
+      </div>
+      {% if kurulum_tamam %}
+      <a href="{% url 'sinav:sinav_bilgisi_listesi' %}" class="btn {% if aktif_sinav %}btn-secondary{% else %}btn-primary{% endif %} btn-sm">
+        {% if aktif_sinav %}Yeni Sınav Oluştur / Düzenle{% else %}Sınav Oluştur{% endif %}
+      </a>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== AKTİF SINAV VE İŞLEM ADIMLARI (kurulum tamamlandıktan sonra) ===== -->
+{% if aktif_sinav %}
+
+<!-- Aktif sınav bilgisi + sınav değiştirme -->
+<div class="card sinav-info-card">
+  <div class="sinav-info-grid">
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">Eğitim-Öğretim Yılı</span>
+      <span class="sinav-info-val">{{ aktif_sinav.egitim_ogretim_yili }}</span>
+    </div>
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">Dönem</span>
+      <span class="sinav-info-val">{{ aktif_sinav.get_donem_display }}</span>
+    </div>
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">Sınav Adı</span>
+      <span class="sinav-info-val">{{ aktif_sinav.get_sinav_adi_display }}</span>
+    </div>
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">Başlangıç Tarihi</span>
+      <span class="sinav-info-val">{{ aktif_sinav.sinav_baslangic_tarihi|date:"d.m.Y" }}</span>
+    </div>
+    <div class="sinav-info-item">
+      <span class="sinav-info-lbl">e-Okul Veri Tarihi</span>
+      <span class="sinav-info-val">{{ aktif_sinav.eokul_veri_tarihi|date:"d.m.Y" }}</span>
+    </div>
+  </div>
+
+  {% if sinav_listesi|length > 1 %}
+  <div class="sinav-secim-liste">
+    <span class="sinav-secim-baslik">Kayıtlı Sınavlar:</span>
+    {% for s in sinav_listesi %}
+    {% if s.aktif %}
+    <span class="sinav-secim-chip sinav-secim-aktif">
+      ✓ {{ s.egitim_ogretim_yili }} {{ s.get_donem_display }} – {{ s.get_sinav_adi_display }}
+    </span>
+    {% else %}
+    <form method="post" action="{% url 'sinav:sinav_bilgisi_aktif_yap' s.pk %}" style="display:inline">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="index">
+      <button type="submit" class="sinav-secim-chip sinav-secim-pasif">
+        {{ s.egitim_ogretim_yili }} {{ s.get_donem_display }} – {{ s.get_sinav_adi_display }}
+      </button>
+    </form>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Veritabanı durumu -->
+<div class="card">
+  <h2>Veritabanı Durumu</h2>
+  <div class="db-grid">
+    <div class="db-item"><span class="db-num">{{ db_ozeti.ogrenci }}</span><span class="db-lbl">Öğrenci</span></div>
+    <div class="db-item"><span class="db-num">{{ db_ozeti.ders_program }}</span><span class="db-lbl">Ders Program</span></div>
+    <div class="db-item"><span class="db-num">{{ db_ozeti.sube_ders }}</span><span class="db-lbl">Şube Ders</span></div>
+    <div class="db-item"><span class="db-num">{{ db_ozeti.takvim }}</span><span class="db-lbl">Takvim</span></div>
+    <div class="db-item"><span class="db-num">{{ db_ozeti.oturma_plani }}</span><span class="db-lbl">Oturma Planı</span></div>
+  </div>
+</div>
+
+<!-- ===== İŞ AKIŞI ADIMLARI ===== -->
+<div class="card">
+  <h2>İşlem Adımları</h2>
+  <div class="akis-grid">
+
+    <a href="{% url 'sinav:ders_ayarlari' %}" class="akis-kart">
+      <span class="akis-num">Adım 3</span>
+      <span class="akis-baslik">Ders Ayarları</span>
+      <span class="akis-aciklama">Sınav yapılmayacak ve iki oturumlu dersleri belirle, filtrele</span>
+      <span class="akis-durum {% if db_ozeti.sube_ders > 0 %}durum-ok{% else %}durum-bos{% endif %}">
+        {% if db_ozeti.sube_ders > 0 %}✓ {{ db_ozeti.sube_ders }} ders{% else %}Yapılmadı{% endif %}
+      </span>
+    </a>
+
+    <a href="{% url 'sinav:takvim_sayfasi' %}" class="akis-kart">
+      <span class="akis-num">Adım 4</span>
+      <span class="akis-baslik">Sınav Takvimi (ILP)</span>
+      <span class="akis-aciklama">Çakışmasız sınav takvimini ILP ile oluştur</span>
+      <span class="akis-durum {% if db_ozeti.takvim > 0 %}durum-ok{% else %}durum-bos{% endif %}">
+        {% if db_ozeti.takvim > 0 %}✓ {{ db_ozeti.takvim }} ders planlandı{% else %}Yapılmadı{% endif %}
+      </span>
+    </a>
+
+
+
+  </div>
+</div>
+
+{% endif %}{# aktif_sinav #}
+
+<style>
+/* Kurulum adımları */
+.kurulum-adimlar { display: flex; flex-direction: column; gap: .5rem; }
+.kurulum-adim {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .75rem 1rem; border-radius: 8px; border: 1px solid #e5e7eb;
+}
+.adim-tamam  { background: #f0fdf4; border-color: #86efac; }
+.adim-bekliyor { background: #fffbeb; border-color: #fcd34d; }
+.adim-pasif  { background: #f9fafb; border-color: #e5e7eb; opacity: .6; }
+.kurulum-adim-no {
+  width: 2rem; height: 2rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .9rem; flex-shrink: 0;
+}
+.adim-tamam  .kurulum-adim-no { background: #16a34a; color: #fff; }
+.adim-bekliyor .kurulum-adim-no { background: #f59e0b; color: #fff; }
+.adim-pasif  .kurulum-adim-no { background: #d1d5db; color: #6b7280; }
+.kurulum-adim-icerik { flex: 1; }
+.kurulum-adim-baslik { font-weight: 600; font-size: .9rem; color: #1a1a2e; }
+.kurulum-adim-aciklama { font-size: .78rem; color: #6b7280; margin-top: .1rem; }
+
+.db-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: .75rem;
+}
+.db-item {
+  background: #f0f4ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 7px;
+  padding: .75rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+}
+.db-num { font-size: 1.6rem; font-weight: 700; color: #3730a3; }
+.db-lbl { font-size: .72rem; color: #6b7280; }
+
+.akis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.akis-kart {
+  display: flex; flex-direction: column; gap: .4rem;
+  border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 1rem 1.1rem;
+  background: #fafafa;
+  text-decoration: none; color: inherit;
+  transition: box-shadow .15s, border-color .15s;
+}
+.akis-kart:hover {
+  border-color: #6366f1;
+  box-shadow: 0 3px 12px rgba(99,102,241,.12);
+}
+.akis-num { font-size: .72rem; color: #9ca3af; font-weight: 500; }
+.akis-baslik { font-size: .95rem; font-weight: 700; color: #1a1a2e; }
+.akis-aciklama { font-size: .78rem; color: #6b7280; line-height: 1.4; flex: 1; }
+.akis-durum { font-size: .75rem; font-weight: 600; margin-top: .3rem; }
+.durum-ok  { color: #16a34a; }
+.durum-bos { color: #9ca3af; }
+
+.sinav-info-card { border-left: 4px solid #16a34a; }
+.sinav-info-grid { display: flex; flex-wrap: wrap; gap: .75rem 2rem; align-items: center; }
+.sinav-info-item { display: flex; flex-direction: column; gap: .1rem; }
+.sinav-info-lbl { font-size: .72rem; color: #6b7280; }
+.sinav-info-val { font-size: .95rem; font-weight: 600; color: #1a1a2e; }
+.sinav-info-action { margin-left: auto; }
+.sinav-uyari {
+  display: flex; align-items: center; justify-content: space-between;
+  border-left: 4px solid #f59e0b; color: #92400e; background: #fffbeb;
+  padding: .9rem 1.5rem;
+}
+.sinav-secim-liste {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
+  margin-top: .75rem; padding-top: .75rem;
+  border-top: 1px solid #d1fae5;
+}
+.sinav-secim-baslik { font-size: .75rem; color: #6b7280; margin-right: .2rem; }
+.sinav-secim-chip {
+  display: inline-block;
+  padding: .25rem .7rem;
+  border-radius: 99px;
+  font-size: .78rem; font-weight: 500;
+  border: none; cursor: pointer;
+}
+.sinav-secim-aktif {
+  background: #d1fae5; color: #065f46;
+  font-weight: 700;
+}
+.sinav-secim-pasif {
+  background: #f3f4f6; color: #374151;
+  transition: background .15s;
+}
+.sinav-secim-pasif:hover { background: #e0e7ff; color: #3730a3; }
+</style>
+
+{% endblock %}

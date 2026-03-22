@@ -1,0 +1,25 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Kullanıcıyı Sil — {{ personel.adi_soyadi }}{% endblock %}
+
+{% block content %}
+<div class="container-sm">
+    <div class="card">
+        <div class="card-header bg-danger">Kullanıcıyı Sil</div>
+        <div class="form-box">
+            <p>
+                <strong>{{ personel.adi_soyadi }}</strong> personeline bağlı
+                <strong>{{ personel.user.username }}</strong> kullanıcısı kalıcı olarak silinecek.
+            </p>
+            <p class="text-danger font-bold">Bu işlem geri alınamaz.</p>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-actions">
+                    <a href="{% url 'ogretmen_kullanici_listesi' %}" class="btn-cancel">Vazgeç</a>
+                    <button type="submit" class="btn btn-danger">Evet, Sil</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

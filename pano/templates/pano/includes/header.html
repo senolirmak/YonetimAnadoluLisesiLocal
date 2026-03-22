@@ -1,0 +1,6 @@
+{% load static %}
+<header class="topbar">
+  <img id="logo" class="logo" src="{% static 'pano/img/logo.png' %}" alt="logo" onerror="this.style.display='none'">
+  <div id="schoolName" class="school">{{ SCHOOL_NAME|default:"Abdurrahim Karakoç Anadolu Lisesi" }}</div>
+  <div id="statusBadge" class="status">—</div>
+</header>

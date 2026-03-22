@@ -1,0 +1,489 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}{% if faaliyet %}Faaliyet Düzenle{% else %}Yeni Faaliyet{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">{% if faaliyet %}Faaliyet Düzenle{% else %}Yeni Faaliyet{% endif %}</h2>
+        <a href="{% url 'faaliyet:faaliyet_liste' %}" class="btn-cancel">← Listeye Dön</a>
+    </div>
+
+    <form method="post" id="faaliyetForm">
+        {% csrf_token %}
+
+        <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+
+            {# ════════════════════════════════════════════ #}
+            {# SOL KOLON — Faaliyet bilgileri + Ders saatleri #}
+            {# ════════════════════════════════════════════ #}
+            <div style="flex:1; min-width:320px;">
+
+                {# — Temel Bilgiler — #}
+                <div class="card mb-20">
+                    <div class="card-header bg-primary">Faaliyet Bilgileri</div>
+                    <div style="padding:20px;">
+
+                        <div class="form-row">
+                            <label for="id_konu">Faaliyet Konusu <span style="color:red;">*</span></label>
+                            <input type="text" id="id_konu" name="konu" required
+                                   value="{{ faaliyet.konu|default:'' }}"
+                                   placeholder="Örn: Çevre Temizliği Etkinliği">
+                        </div>
+
+                        <div style="display:flex; gap:12px;">
+                            <div class="form-row" style="flex:1;">
+                                <label for="id_tarih">Tarih <span style="color:red;">*</span></label>
+                                <input type="date" id="id_tarih" name="tarih" required
+                                       value="{{ faaliyet.tarih|date:'Y-m-d'|default:'' }}">
+                            </div>
+                            <div class="form-row" style="flex:1;">
+                                <label for="id_yer">Yapıldığı Yer <span style="color:red;">*</span></label>
+                                <input type="text" id="id_yer" name="yer" required
+                                       value="{{ faaliyet.yer|default:'' }}"
+                                       placeholder="Örn: Spor Salonu, Okul Bahçesi">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="id_aciklama">Açıklama</label>
+                            <textarea id="id_aciklama" name="aciklama" rows="3"
+                                      style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;resize:vertical;"
+                                      placeholder="Faaliyet hakkında kısa açıklama…">{{ faaliyet.aciklama|default:'' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                {# — Ders Programından Seç — #}
+                <div class="card mb-20">
+                    <div class="card-header" style="background:#5a8fa8;color:#fff;font-weight:bold;padding:10px 15px;">
+                        Ders Programından Ekle
+                    </div>
+                    <div style="padding:12px 16px;">
+                        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+                            <div>
+                                <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Gün</label>
+                                <select id="dpGun" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                                    <option value="">— Gün —</option>
+                                    <option value="Monday">Pazartesi</option>
+                                    <option value="Tuesday">Salı</option>
+                                    <option value="Wednesday">Çarşamba</option>
+                                    <option value="Thursday">Perşembe</option>
+                                    <option value="Friday">Cuma</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Sınıf / Şube</label>
+                                <select id="dpSinifSube" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                                    <option value="">— Sınıf/Şube —</option>
+                                    {% for ss in dp_sinifsube %}
+                                    <option value="{{ ss.sinif }}|{{ ss.sube }}">{{ ss.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="button" id="btnDpGetir"
+                                    style="padding:6px 14px;background:#417690;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em;white-space:nowrap;">
+                                Dersleri Getir
+                            </button>
+                        </div>
+
+                        {# Ders programı sonuç tablosu — JS ile doldurulur #}
+                        <div id="dpSonuc" style="margin-top:12px;display:none;">
+                            <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+                                <thead>
+                                    <tr style="background:#e8f4f8;">
+                                        <th style="padding:7px 10px;border:1px solid #c8dce8;text-align:center;width:60px;">Ders</th>
+                                        <th style="padding:7px 10px;border:1px solid #c8dce8;">Ders Adı</th>
+                                        <th style="padding:7px 10px;border:1px solid #c8dce8;text-align:center;">Başlangıç</th>
+                                        <th style="padding:7px 10px;border:1px solid #c8dce8;text-align:center;">Bitiş</th>
+                                        <th style="padding:7px 10px;border:1px solid #c8dce8;text-align:center;width:60px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dpBody"></tbody>
+                            </table>
+                            <p id="dpBos" style="color:#6c757d;font-size:0.88em;margin:8px 0 0;display:none;">
+                                Bu gün ve sınıf için ders programı bulunamadı.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {# — Seçilen Ders Saatleri — #}
+                <div class="card">
+                    <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>Faaliyet Ders Saatleri</span>
+                        <button type="button" id="btnDersEkle"
+                                style="background:#28a745;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:0.85em;">
+                            + Manuel Ekle
+                        </button>
+                    </div>
+                    <div style="padding:16px;">
+                        <table style="width:100%;border-collapse:collapse;" id="dersSaatleriTable">
+                            <thead>
+                                <tr style="background:#f0f0f0;">
+                                    <th style="padding:8px;text-align:center;width:70px;border:1px solid #ddd;">Ders No</th>
+                                    <th style="padding:8px;border:1px solid #ddd;">Ders Adı</th>
+                                    <th style="padding:8px;text-align:center;border:1px solid #ddd;">Başlangıç</th>
+                                    <th style="padding:8px;text-align:center;border:1px solid #ddd;">Bitiş</th>
+                                    <th style="padding:8px;text-align:center;width:44px;border:1px solid #ddd;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="dersSaatleriBody">
+                                {% if faaliyet %}
+                                    {% for ds in faaliyet.ders_saatleri.all %}
+                                    <tr class="ders-satir">
+                                        <td style="padding:6px;border:1px solid #ddd;text-align:center;">
+                                            <input type="number" name="ders_no[]" value="{{ ds.ders_no }}"
+                                                   min="1" max="10" required
+                                                   style="width:50px;padding:5px;border:1px solid #ccc;border-radius:3px;text-align:center;">
+                                        </td>
+                                        <td style="padding:6px;border:1px solid #ddd;">
+                                            <input type="text" name="ders_adi[]" value=""
+                                                   placeholder="—"
+                                                   style="width:100%;padding:5px;border:1px solid #ccc;border-radius:3px;box-sizing:border-box;">
+                                        </td>
+                                        <td style="padding:6px;border:1px solid #ddd;text-align:center;">
+                                            <input type="time" name="baslangic[]" value="{{ ds.baslangic|time:'H:i' }}" required
+                                                   style="padding:5px;border:1px solid #ccc;border-radius:3px;">
+                                        </td>
+                                        <td style="padding:6px;border:1px solid #ddd;text-align:center;">
+                                            <input type="time" name="bitis[]" value="{{ ds.bitis|time:'H:i' }}" required
+                                                   style="padding:5px;border:1px solid #ccc;border-radius:3px;">
+                                        </td>
+                                        <td style="padding:6px;border:1px solid #ddd;text-align:center;">
+                                            <button type="button" class="btn-sil-ders"
+                                                    style="background:#dc3545;color:#fff;border:none;border-radius:3px;padding:3px 7px;cursor:pointer;">✕</button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                            </tbody>
+                        </table>
+                        <p id="dersSaatleriEmpty" style="color:#6c757d;font-size:0.9em;margin:10px 0 0;
+                            {% if faaliyet and faaliyet.ders_saatleri.all %}display:none;{% endif %}">
+                            Henüz ders saati eklenmedi. Ders programından seçin veya manuel ekleyin.
+                        </p>
+                    </div>
+                </div>
+
+            </div>{# /sol kolon #}
+
+            {# ════════════════════════════════════════════ #}
+            {# SAĞ KOLON — Öğrenci Seçimi #}
+            {# ════════════════════════════════════════════ #}
+            <div style="flex:1.2; min-width:340px;">
+                <div class="card" style="height:100%;">
+                    <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>Öğrenci Seçimi</span>
+                        <span id="seciliSayi" style="background:#28a745;color:#fff;padding:2px 10px;border-radius:10px;font-size:0.85em;">
+                            0 seçili
+                        </span>
+                    </div>
+                    <div style="padding:12px 16px;border-bottom:1px solid #eee;">
+                        {# Sınıf/Şube filtre #}
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                            <label style="font-size:0.9em;font-weight:600;color:#444;">Sınıf/Şube:</label>
+                            <select id="sinifFilter" style="padding:5px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                                <option value="">Tümü</option>
+                                {% for ss in sinifsube_secenekleri %}
+                                <option value="{{ ss }}">{{ ss }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" id="ogrenciAra" placeholder="Ad/soyad ara…"
+                                   style="padding:5px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;flex:1;min-width:120px;">
+                            <button type="button" id="btnTumunuSec"
+                                    style="padding:5px 10px;background:#417690;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;">
+                                Tümünü Seç
+                            </button>
+                            <button type="button" id="btnTemizle"
+                                    style="padding:5px 10px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;">
+                                Temizle
+                            </button>
+                        </div>
+                    </div>
+                    <div style="overflow-y:auto;max-height:480px;">
+                        <table class="table" style="margin:0;box-shadow:none;">
+                            <thead>
+                                <tr>
+                                    <th class="center" style="width:40px;position:sticky;top:0;z-index:1;background:#417690;">
+                                        <input type="checkbox" id="chkHepsi" title="Görünenleri seç/kaldır">
+                                    </th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;width:72px;">No</th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;">Ad Soyad</th>
+                                    <th style="position:sticky;top:0;z-index:1;background:#417690;">Sınıf</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ogrenciListesi">
+                                {% for ogr in ogrenciler %}
+                                <tr class="ogr-satir"
+                                    data-sinifsube="{{ ogr.sinif }}/{{ ogr.sube }}"
+                                    data-ad="{{ ogr.adi|lower }} {{ ogr.soyadi|lower }}">
+                                    <td class="center">
+                                        <input type="checkbox" name="ogrenciler" value="{{ ogr.pk }}"
+                                               class="ogr-chk"
+                                               {% if secili_ids and ogr.pk in secili_ids %}checked{% endif %}>
+                                    </td>
+                                    <td style="font-size:0.88em;color:#555;">{{ ogr.okulno }}</td>
+                                    <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                                    <td>{{ ogr.sinif }}/{{ ogr.sube }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>{# /sağ kolon #}
+
+        </div>{# /flex wrapper #}
+
+        <div class="form-actions mt-20">
+            <a href="{% url 'faaliyet:faaliyet_liste' %}" class="btn-cancel">Vazgeç</a>
+            <button type="submit" class="btn btn-success">
+                {% if faaliyet %}Güncelle{% else %}Kaydet{% endif %}
+            </button>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+
+    /* ─────────────────────────────────────────────────────
+       Yardımcı: faaliyet ders saatleri tablosuna satır ekle
+    ───────────────────────────────────────────────────── */
+    const tbody    = document.getElementById('dersSaatleriBody');
+    const emptyMsg = document.getElementById('dersSaatleriEmpty');
+
+    function satirGuncelle() {
+        emptyMsg.style.display = tbody.rows.length === 0 ? '' : 'none';
+    }
+
+    function dersNoZatenVar(dersNo) {
+        return Array.from(tbody.querySelectorAll('input[name="ders_no[]"]'))
+            .some(function(inp) { return parseInt(inp.value) === parseInt(dersNo); });
+    }
+
+    function satirEkle(dersNo, dersAdi, baslangic, bitis) {
+        if (dersNoZatenVar(dersNo)) {
+            alert(dersNo + '. ders zaten tabloda var.');
+            return;
+        }
+        const tr = document.createElement('tr');
+        tr.className = 'ders-satir';
+        tr.innerHTML =
+            '<td style="padding:6px;border:1px solid #ddd;text-align:center;">' +
+                '<input type="number" name="ders_no[]" value="' + dersNo + '" min="1" max="10" required' +
+                '       style="width:50px;padding:5px;border:1px solid #ccc;border-radius:3px;text-align:center;">' +
+            '</td>' +
+            '<td style="padding:6px;border:1px solid #ddd;">' +
+                '<input type="text" name="ders_adi[]" value="' + (dersAdi || '') + '" placeholder="—"' +
+                '       style="width:100%;padding:5px;border:1px solid #ccc;border-radius:3px;box-sizing:border-box;">' +
+            '</td>' +
+            '<td style="padding:6px;border:1px solid #ddd;text-align:center;">' +
+                '<input type="time" name="baslangic[]" value="' + (baslangic || '') + '" required' +
+                '       style="padding:5px;border:1px solid #ccc;border-radius:3px;">' +
+            '</td>' +
+            '<td style="padding:6px;border:1px solid #ddd;text-align:center;">' +
+                '<input type="time" name="bitis[]" value="' + (bitis || '') + '" required' +
+                '       style="padding:5px;border:1px solid #ccc;border-radius:3px;">' +
+            '</td>' +
+            '<td style="padding:6px;border:1px solid #ddd;text-align:center;">' +
+                '<button type="button" class="btn-sil-ders"' +
+                '        style="background:#dc3545;color:#fff;border:none;border-radius:3px;padding:3px 7px;cursor:pointer;">✕</button>' +
+            '</td>';
+        tbody.appendChild(tr);
+        satirGuncelle();
+    }
+
+    /* Manuel ekle butonu */
+    document.getElementById('btnDersEkle').addEventListener('click', function () {
+        const sonDersNo = tbody.rows.length > 0
+            ? Math.max(...Array.from(tbody.querySelectorAll('input[name="ders_no[]"]'))
+                .map(function(i) { return parseInt(i.value) || 0; })) + 1
+            : 1;
+        satirEkle(sonDersNo, '', '', '');
+    });
+
+    /* Sil butonu (delegasyon) */
+    tbody.addEventListener('click', function (e) {
+        if (e.target.classList.contains('btn-sil-ders')) {
+            e.target.closest('tr').remove();
+            satirGuncelle();
+        }
+    });
+
+    satirGuncelle();
+
+    /* ─────────────────────────────────────────────────────
+       Öğrenci listesi elemanları — filtrele'den önce tanımla
+    ───────────────────────────────────────────────────── */
+    const sinifFilter  = document.getElementById('sinifFilter');
+    const ogrenciAra   = document.getElementById('ogrenciAra');
+    const satirlar     = document.querySelectorAll('.ogr-satir');
+
+    function filtrele() {
+        const ss  = sinifFilter.value;
+        const ara = ogrenciAra.value.trim().toLowerCase();
+        satirlar.forEach(function (tr) {
+            const ssEsles = !ss || tr.dataset.sinifsube === ss;
+            const adEsles = !ara || tr.dataset.ad.includes(ara);
+            tr.style.display = ssEsles && adEsles ? '' : 'none';
+        });
+    }
+
+    /* ─────────────────────────────────────────────────────
+       Ders programı lookup
+    ───────────────────────────────────────────────────── */
+    const dpGun      = document.getElementById('dpGun');
+    const dpSS       = document.getElementById('dpSinifSube');
+    const dpSonuc    = document.getElementById('dpSonuc');
+    const dpBody     = document.getElementById('dpBody');
+    const dpBos      = document.getElementById('dpBos');
+    const btnGetir   = document.getElementById('btnDpGetir');
+
+    /* Tarih alanından gün otomatik doldur */
+    const tarihInput = document.getElementById('id_tarih');
+    function tarihdenGunDoldur() {
+        const val = tarihInput.value;
+        if (!val) return;
+        const gunlar = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        const gun = gunlar[new Date(val).getDay()];
+        dpGun.value = gun;
+    }
+    tarihInput.addEventListener('change', tarihdenGunDoldur);
+    tarihdenGunDoldur(); // sayfa yüklendiğinde
+
+    btnGetir.addEventListener('click', function () {
+        const gun = dpGun.value;
+        const ssVal = dpSS.value;   // "9|A"
+        if (!gun || !ssVal) { alert('Lütfen gün ve sınıf/şube seçin.'); return; }
+
+        const [sinif, sube] = ssVal.split('|');
+        const url = '{% url "faaliyet:ders_programi_getir" %}?gun=' + encodeURIComponent(gun)
+                  + '&sinif=' + encodeURIComponent(sinif)
+                  + '&sube=' + encodeURIComponent(sube);
+
+        btnGetir.disabled = true;
+        btnGetir.textContent = 'Getiriliyor…';
+
+        fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                dpBody.innerHTML = '';
+                dpBos.style.display = 'none';
+                dpSonuc.style.display = '';
+
+                // Öğrenci listesini aynı sınıf/şubeye otomatik filtrele
+                const sinifSubeLabel = sinif + '/' + sube.toUpperCase();
+                if (sinifFilter.querySelector('option[value="' + sinifSubeLabel + '"]')) {
+                    sinifFilter.value = sinifSubeLabel;
+                } else {
+                    // Şube büyük/küçük harf farkı varsa bul
+                    const opts = Array.from(sinifFilter.options);
+                    const eslesOpt = opts.find(function(o) {
+                        return o.value.toLowerCase() === sinifSubeLabel.toLowerCase();
+                    });
+                    sinifFilter.value = eslesOpt ? eslesOpt.value : '';
+                }
+                filtrele();
+
+                if (!data.dersler || data.dersler.length === 0) {
+                    dpBos.style.display = '';
+                    return;
+                }
+
+                data.dersler.forEach(function(d) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td style="padding:6px 10px;border:1px solid #dce8ed;text-align:center;">' +
+                            '<span style="background:#417690;color:#fff;padding:2px 7px;border-radius:3px;font-size:0.85em;">' +
+                            d.ders_no + '. ders</span>' +
+                        '</td>' +
+                        '<td style="padding:6px 10px;border:1px solid #dce8ed;">' + d.ders_adi + '</td>' +
+                        '<td style="padding:6px 10px;border:1px solid #dce8ed;text-align:center;">' + d.baslangic + '</td>' +
+                        '<td style="padding:6px 10px;border:1px solid #dce8ed;text-align:center;">' + d.bitis + '</td>' +
+                        '<td style="padding:6px 10px;border:1px solid #dce8ed;text-align:center;">' +
+                            '<button type="button" class="btn-dp-ekle"' +
+                            '        data-no="' + d.ders_no + '"' +
+                            '        data-ad="' + d.ders_adi.replace(/"/g, '&quot;') + '"' +
+                            '        data-bas="' + d.baslangic + '"' +
+                            '        data-bit="' + d.bitis + '"' +
+                            '        style="background:#28a745;color:#fff;border:none;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:0.85em;">' +
+                            'Ekle</button>' +
+                        '</td>';
+                    dpBody.appendChild(tr);
+                });
+            })
+            .catch(function() { alert('Ders programı alınamadı.'); })
+            .finally(function() {
+                btnGetir.disabled = false;
+                btnGetir.textContent = 'Dersleri Getir';
+            });
+    });
+
+    /* Ders programı tablosundaki Ekle butonları */
+    dpBody.addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-dp-ekle');
+        if (!btn) return;
+        satirEkle(btn.dataset.no, btn.dataset.ad, btn.dataset.bas, btn.dataset.bit);
+        btn.textContent = '✓ Eklendi';
+        btn.disabled = true;
+        btn.style.background = '#6c757d';
+    });
+
+    /* ── Öğrenci listesi: seçim sayacı ── */
+    const chkHepsi     = document.getElementById('chkHepsi');
+    const seciliSayi   = document.getElementById('seciliSayi');
+
+    function sayacGuncelle() {
+        const n = document.querySelectorAll('.ogr-chk:checked').length;
+        seciliSayi.textContent = n + ' seçili';
+        seciliSayi.style.background = n > 0 ? '#28a745' : '#6c757d';
+    }
+
+    sinifFilter.addEventListener('change', filtrele);
+    ogrenciAra.addEventListener('input', filtrele);
+
+    document.querySelectorAll('.ogr-chk').forEach(function (chk) {
+        chk.addEventListener('change', sayacGuncelle);
+    });
+
+    chkHepsi.addEventListener('change', function () {
+        satirlar.forEach(function (tr) {
+            if (tr.style.display !== 'none') {
+                tr.querySelector('.ogr-chk').checked = chkHepsi.checked;
+            }
+        });
+        sayacGuncelle();
+    });
+
+    document.getElementById('btnTumunuSec').addEventListener('click', function () {
+        satirlar.forEach(function (tr) {
+            if (tr.style.display !== 'none') {
+                tr.querySelector('.ogr-chk').checked = true;
+            }
+        });
+        sayacGuncelle();
+    });
+
+    document.getElementById('btnTemizle').addEventListener('click', function () {
+        document.querySelectorAll('.ogr-chk').forEach(function (c) { c.checked = false; });
+        chkHepsi.checked = false;
+        sayacGuncelle();
+    });
+
+    sayacGuncelle();
+
+}());
+</script>
+{% endblock %}

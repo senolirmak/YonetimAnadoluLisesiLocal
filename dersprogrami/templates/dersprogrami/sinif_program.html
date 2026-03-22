@@ -1,0 +1,283 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .filtre-form {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+    .filtre-form label { font-weight: 600; font-size: 0.88em; color: #495057; margin-right: 4px; }
+    .filtre-form input[type="date"],
+    .filtre-form select {
+        padding: 5px 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.92em;
+    }
+    .btn-filtre {
+        padding: 6px 16px;
+        background-color: #17a2b8;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        font-weight: bold;
+    }
+    .btn-filtre:hover { background-color: #117a8b; }
+    .btn-sifirla {
+        padding: 6px 12px;
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.88em;
+        text-decoration: none;
+    }
+    .btn-sifirla:hover { background-color: #545b62; color: white; }
+    .zaman-bilgisi {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 10px 18px;
+        display: inline-flex;
+        align-items: center;
+        gap: 20px;
+        font-size: 0.95em;
+        margin-bottom: 16px;
+    }
+    .aktif-ders-badge {
+        background: #17a2b8;
+        color: white;
+        padding: 3px 12px;
+        border-radius: 12px;
+        font-size: 0.88em;
+        font-weight: bold;
+    }
+    .bos-ders-badge {
+        background: #6c757d;
+        color: white;
+        padding: 3px 12px;
+        border-radius: 12px;
+        font-size: 0.88em;
+    }
+    .sinif-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(620px, 1fr));
+        gap: 18px;
+    }
+    @media (max-width: 600px) {
+        .sinif-grid { grid-template-columns: 1fr; }
+    }
+    .sinif-card {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.09);
+        border: 1px solid #dee2e6;
+    }
+    .sinif-card-header {
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-weight: bold;
+        font-size: 1em;
+        color: white;
+    }
+    .sinif-card-header.has-lesson  { background-color: #17a2b8; }
+    .sinif-card-header.no-lesson   { background-color: #6c757d; }
+    .aktif-ders-info {
+        font-size: 0.88em;
+        font-weight: normal;
+        background: rgba(255,255,255,0.2);
+        border-radius: 10px;
+        padding: 2px 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 60%;
+    }
+    .program-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82em;
+        background: #fff;
+    }
+    .program-table th {
+        background: #e9ecef;
+        color: #495057;
+        padding: 5px 6px;
+        text-align: center;
+        border: 1px solid #dee2e6;
+        font-weight: 600;
+    }
+    .program-table td {
+        padding: 4px 6px;
+        border: 1px solid #dee2e6;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .program-table tr.aktif-satir td { background-color: #d1ecf1; }
+    .program-table tr.aktif-satir td.ds-label {
+        background-color: #17a2b8;
+        color: white;
+        font-weight: bold;
+    }
+    .program-table td.ds-label {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #495057;
+        white-space: nowrap;
+        width: 52px;
+    }
+    .ders-adi   { display: block; font-weight: 600; color: #212529; line-height: 1.3; }
+    .ogr-adi    { display: block; font-size: 0.88em; color: #6c757d; line-height: 1.2; }
+    .bos-hucre  { color: #ced4da; font-size: 0.85em; }
+    .devamsiz-hucre { background-color: #fff0f0 !important; }
+</style>
+
+<div class="container">
+    <div class="mb-20">
+        <h2 class="page-title mb-20">{{ title }}</h2>
+
+        <form method="get" class="filtre-form">
+            <div>
+                <label for="id_tarih">Tarih:</label>
+                <input type="date" id="id_tarih" name="tarih" value="{{ secilen_tarih_str }}">
+            </div>
+            <div>
+                <label for="id_ders_saati">Ders Saati:</label>
+                <select id="id_ders_saati" name="ders_saati">
+                    <option value="">-- Otomatik --</option>
+                    {% for ds in gun_saatleri %}
+                    <option value="{{ ds.ders_saati }}"
+                        {% if ds.ders_saati == secilen_ders_saati %}selected{% endif %}>
+                        {{ ds.ders_saati }}. Ders
+                        {% if ds.giris_saat and ds.cikis_saat %}
+                        ({{ ds.giris_saat|time:"H:i" }}–{{ ds.cikis_saat|time:"H:i" }})
+                        {% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="id_sinif_sube">Sınıf:</label>
+                <select id="id_sinif_sube" name="sinif_sube">
+                    <option value="">-- Tümü --</option>
+                    {% for s in tum_siniflar %}
+                    <option value="{{ s.id }}"
+                        {% if s.id == secilen_sinif_id %}selected{% endif %}>
+                        {{ s }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn-filtre">Göster</button>
+            <a href="{% url 'sinif_program' %}" class="btn-sifirla">Şu An</a>
+        </form>
+
+        <div class="zaman-bilgisi">
+            <span><strong>Tarih:</strong> {{ gosterilen_tarih|date:"d.m.Y l" }}</span>
+            {% if current_ders_saati %}
+            <span class="aktif-ders-badge">
+                {{ current_ders_saati }}. Ders
+                {% if ders_saati_giris and ders_saati_cikis %}
+                &nbsp;({{ ders_saati_giris|time:"H:i" }}–{{ ders_saati_cikis|time:"H:i" }})
+                {% endif %}
+            </span>
+            {% else %}
+            <span class="bos-ders-badge">Ders Saati Dışı</span>
+            {% endif %}
+            <span style="color:#6c757d; font-size:0.88em;">Güncel saat: {{ simdi|time:"H:i" }}</span>
+        </div>
+    </div>
+
+    {% if sinif_data %}
+    <div class="sinif-grid">
+        {% for item in sinif_data %}
+        <div class="sinif-card">
+            <div class="sinif-card-header {% if item.aktif_ders %}has-lesson{% else %}no-lesson{% endif %}">
+                <span>{{ item.sinif_sube }}</span>
+                {% if item.aktif_ders %}
+                <span class="aktif-ders-info">
+                    {{ item.aktif_ders.ders_adi }}
+                    {% for ogr in item.aktif_ders.ogretmen_detay %}
+                        – {{ ogr.adi_soyadi }}
+                        {% if ogr.devamsiz_nedeni %}
+                            <span style="color: #ffcccc;">({{ ogr.devamsiz_nedeni }})</span>
+                        {% endif %}
+                    {% endfor %}
+                    {% if item.aktif_ders.nobetci_ogretmen %}
+                        <span style="color: #ffcccc; font-weight: bold;"> [↳ {{ item.aktif_ders.nobetci_ogretmen }} (Nöbetçi)]</span>
+                    {% elif item.aktif_ders.atanamayan %}
+                        <span style="color: #e2e3e5; font-style: italic;"> [↳ Görevli Müdür Yardımcısı]</span>
+                    {% endif %}
+                </span>
+                {% else %}
+                <span style="font-size:0.82em; font-weight:normal; opacity:0.8;">
+                    {% if current_ders_saati %}Ders Yok{% else %}Ders saati seçilmedi{% endif %}
+                </span>
+                {% endif %}
+            </div>
+
+            <table class="program-table">
+                <thead>
+                    <tr>
+                        <th style="width:52px;">Ders</th>
+                        {% for gun in gun_tr_list %}
+                        <th>{{ gun }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in item.program_rows %}
+                    <tr {% if row.aktif %}class="aktif-satir"{% endif %}>
+                        <td class="ds-label">{{ row.ders_saati }}. D</td>
+                        {% for cell in row.cells %}
+                        <td {% if cell and cell.has_devamsiz %}class="devamsiz-hucre"{% endif %}>
+                            {% if cell %}
+                            <span class="ders-adi">{{ cell.ders_adi }}</span>
+                            {% for ogr in cell.ogretmen_detay %}
+                            <span class="ogr-adi">
+                                {{ ogr.adi_soyadi }}
+                                {% if ogr.devamsiz_nedeni %}
+                                <span style="color: #dc3545; font-weight: 500;">({{ ogr.devamsiz_nedeni }})</span>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if cell.nobetci_ogretmen %}
+                            <span class="ogr-adi" style="color: #dc3545; font-weight: bold; margin-top: 3px;">↳ {{ cell.nobetci_ogretmen }} (Nöbetçi)</span>
+                            {% elif cell.atanamayan %}
+                            <span class="ogr-adi" style="color: #6c757d; font-style: italic; margin-top: 3px;">↳ Görevli Müdür Yardımcısı</span>
+                            {% endif %}
+                            {% else %}
+                            <span class="bos-hucre">–</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:40px; color:#6c757d;">
+        Ders programı kaydı bulunamadı.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

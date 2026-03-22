@@ -1,0 +1,176 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Müdüriyet Görüşmesi Detayı{% endblock %}
+{% block content %}
+<div class="container" style="max-width:900px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">{{ message }}</div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Müdüriyet Görüşmesi</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            {% if sahip %}
+            <a href="{% url 'muduriyetcagri:gorusme_duzenle' gorusme.pk %}" class="btn btn-warning">Düzenle</a>
+            <a href="{% url 'muduriyetcagri:gorusme_sil' gorusme.pk %}" class="btn btn-danger">Sil</a>
+            {% endif %}
+            <a href="{% url 'muduriyetcagri:gorusme_liste' %}" class="btn-cancel">← Listeye Dön</a>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+
+        {# Sol: Görüşme Bilgileri #}
+        <div style="flex:1;min-width:260px;">
+            <div class="card mb-20">
+                <div class="card-header bg-primary">Görüşme Bilgileri</div>
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;width:130px;border-bottom:1px solid #eee;">Tarih</td>
+                        <td style="padding:10px 15px;font-weight:600;border-bottom:1px solid #eee;">{{ gorusme.tarih|date:"d.m.Y" }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Tür</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">
+                            <span class="badge"
+                                  style="background:{% if gorusme.tur == 'bireysel' %}#17a2b8{% elif gorusme.tur == 'veli' %}#6f42c1{% elif gorusme.tur == 'grup' %}#20c997{% else %}#6c757d{% endif %};">
+                                {{ gorusme.get_tur_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Konu</td>
+                        <td style="padding:10px 15px;font-weight:600;border-bottom:1px solid #eee;">{{ gorusme.konu }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Kaydeden</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">
+                            {{ gorusme.kayit_eden_kullanici.get_full_name|default:gorusme.kayit_eden_kullanici.username|default:"—" }}
+                        </td>
+                    </tr>
+                    {% if gorusme.takip_tarihi %}
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Takip Tarihi</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">{{ gorusme.takip_tarihi|date:"d.m.Y" }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Oluşturulma</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;font-size:0.9em;color:#555;">{{ gorusme.olusturma_zamani|date:"d.m.Y H:i" }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;">Son Güncelleme</td>
+                        <td style="padding:10px 15px;font-size:0.9em;color:#555;">{{ gorusme.guncelleme_zamani|date:"d.m.Y H:i" }}</td>
+                    </tr>
+                </table>
+            </div>
+
+            {% if gorusme.tur == 'bireysel' or gorusme.tur == 'veli' %}
+            <div class="card mb-20">
+                <div class="card-header" style="background:#6f42c1;color:#fff;font-weight:bold;padding:10px 15px;">Öğrenci Bilgisi</div>
+                {% if gorusme.ogrenci %}
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;width:100px;border-bottom:1px solid #eee;">Okul No</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">{{ gorusme.ogrenci.okulno }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Ad Soyad</td>
+                        <td style="padding:10px 15px;font-weight:600;border-bottom:1px solid #eee;">{{ gorusme.ogrenci.adi }} {{ gorusme.ogrenci.soyadi }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Sınıf/Şube</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">{{ gorusme.ogrenci.sinif }}/{{ gorusme.ogrenci.sube }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;">Cinsiyet</td>
+                        <td style="padding:10px 15px;">{{ gorusme.ogrenci.get_cinsiyet_display }}</td>
+                    </tr>
+                </table>
+                {% else %}
+                <div style="padding:16px;color:#6c757d;font-size:0.9em;">Bu görüşmeye öğrenci bağlanmamış.</div>
+                {% endif %}
+            </div>
+
+            {% if gorusme.tur == 'veli' and gorusme.veli_adi %}
+            <div class="card mb-20">
+                <div class="card-header" style="background:#856404;color:#fff;font-weight:bold;padding:10px 15px;">Veli Bilgisi</div>
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;width:100px;border-bottom:1px solid #eee;">Adı Soyadı</td>
+                        <td style="padding:10px 15px;font-weight:600;border-bottom:1px solid #eee;">{{ gorusme.veli_adi }}</td>
+                    </tr>
+                    {% if gorusme.veli_telefon %}
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;">Telefon</td>
+                        <td style="padding:10px 15px;">{{ gorusme.veli_telefon }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+            {% endif %}
+
+            {% elif gorusme.tur == 'grup' %}
+            <div class="card mb-20">
+                <div class="card-header" style="background:#20c997;color:#fff;font-weight:bold;padding:10px 15px;">
+                    Grup Öğrencileri
+                    <span style="font-size:0.85em;font-weight:normal;margin-left:8px;">({{ gorusme.grup_ogrencileri.count }} kişi)</span>
+                </div>
+                {% with grup=gorusme.grup_ogrencileri.all|dictsort:"okulno" %}
+                {% if grup %}
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:#f8f9fa;">
+                            <th style="padding:8px 12px;font-size:0.85em;color:#555;text-align:center;width:40px;">#</th>
+                            <th style="padding:8px 12px;font-size:0.85em;color:#555;">Okul No</th>
+                            <th style="padding:8px 12px;font-size:0.85em;color:#555;">Ad Soyad</th>
+                            <th style="padding:8px 12px;font-size:0.85em;color:#555;text-align:center;">Sınıf</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ogr in grup %}
+                        <tr style="border-bottom:1px solid #eee;">
+                            <td style="padding:8px 12px;text-align:center;color:#888;font-size:0.85em;">{{ forloop.counter }}</td>
+                            <td style="padding:8px 12px;font-size:0.88em;color:#555;">{{ ogr.okulno }}</td>
+                            <td style="padding:8px 12px;font-weight:600;">{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                            <td style="padding:8px 12px;text-align:center;">{{ ogr.sinif }}/{{ ogr.sube }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div style="padding:16px;color:#6c757d;font-size:0.9em;">Grup öğrencisi seçilmemiş.</div>
+                {% endif %}
+                {% endwith %}
+            </div>
+            {% endif %}
+        </div>
+
+        {# Sağ: Açıklama ve Sonuç #}
+        <div style="flex:1.2;min-width:260px;">
+            <div class="card mb-20">
+                <div class="card-header" style="background:#5a8fa8;color:#fff;font-weight:bold;padding:10px 15px;">Açıklama</div>
+                <div style="padding:16px;">
+                    {% if gorusme.aciklama %}
+                    <p style="margin:0;white-space:pre-line;line-height:1.6;">{{ gorusme.aciklama }}</p>
+                    {% else %}
+                    <p style="margin:0;color:#6c757d;font-style:italic;">Açıklama girilmemiş.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header" style="background:#343a40;color:#fff;font-weight:bold;padding:10px 15px;">Alınan Karar / Sonuç</div>
+                <div style="padding:16px;">
+                    {% if gorusme.sonuc %}
+                    <p style="margin:0;white-space:pre-line;line-height:1.6;">{{ gorusme.sonuc }}</p>
+                    {% else %}
+                    <p style="margin:0;color:#6c757d;font-style:italic;">Henüz karar/sonuç girilmemiş.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

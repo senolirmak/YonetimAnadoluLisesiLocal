@@ -1,0 +1,72 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Öğrenci Listesi{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Öğrenci Listesi</h2>
+        {% if is_mudur_yardimcisi %}
+        <a href="{% url 'ogrenci:excel_yukle' %}" class="btn btn-success">Excel Yükle</a>
+        {% endif %}
+    </div>
+
+    {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    {% if not sinif_filtre_gizli %}
+    <form method="get" class="filter-box filter-form">
+        <label>Sınıf/Şube:</label>
+        <select name="sinifsube">
+            <option value="">Tümü</option>
+            {% for ss in sinifsube_secenekleri %}
+                <option value="{{ ss }}" {% if secili_sinifsube == ss %}selected{% endif %}>{{ ss }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Filtrele</button>
+        <a href="{% url 'ogrenci:ogrenci_liste' %}" class="btn-cancel">Temizle</a>
+    </form>
+    {% else %}
+    <div class="filter-box" style="font-size:0.95em;color:#495057;">
+        Sınıf: <strong>{{ secili_sinifsube }}</strong>
+    </div>
+    {% endif %}
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Okul No</th>
+                    <th>Sınıf/Şube</th>
+                    <th>Adı Soyadı</th>
+                    <th>Cinsiyet</th>
+                    <th>Veli</th>
+                    <th>Veli Telefon</th>
+                    <th class="center">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ogr in ogrenciler %}
+                <tr>
+                    <td>{{ ogr.okulno }}</td>
+                    <td>{{ ogr.sinifsube }}</td>
+                    <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                    <td>{{ ogr.get_cinsiyet_display }}</td>
+                    <td>{{ ogr.detay.veli|default:"-" }}</td>
+                    <td>{{ ogr.detay.velitelefon|default:"-" }}</td>
+                    <td class="center">
+                        <a href="{% url 'ogrenci:ogrenci_detay_duzenle' ogr.pk %}" class="btn btn-info">Düzenle</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted">Kayıt bulunamadı.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted mt-20">Toplam: {{ ogrenciler.count }} öğrenci</p>
+</div>
+{% endblock %}

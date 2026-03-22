@@ -1,0 +1,126 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Yoklama PDF Raporu{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% elif message.tags == 'warning' %}msg-warning{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Yoklama PDF Raporu</h2>
+    </div>
+
+    <div class="card" style="max-width:520px;">
+        <div class="card-header bg-primary">Rapor Filtresi</div>
+        <div style="padding:20px;">
+            <form method="post">
+                {% csrf_token %}
+
+                {# ── Tarih Aralığı ── #}
+                <div class="filter-box" style="margin-bottom:20px;">
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+                        <div>
+                            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Başlangıç Tarihi</label>
+                            <input type="date" id="tarih_bas" name="tarih_bas"
+                                   value="{{ tarih_bas_default }}" required
+                                   style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Bitiş Tarihi</label>
+                            <input type="date" id="tarih_bit" name="tarih_bit"
+                                   value="{{ tarih_bit_default }}" required
+                                   style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                        </div>
+                        <div>
+                            <button type="button" onclick="bugunSec()"
+                                    class="btn btn-warning"
+                                    style="padding:6px 12px;font-size:0.9em;">
+                                Bugün
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {# ── Sınıf Seçimi ── #}
+                <div class="form-row">
+                    <div class="flex-between" style="margin-bottom:8px;">
+                        <label class="form-label-bold" style="margin:0;">
+                            Sınıf
+                            <span class="text-muted" style="font-weight:400;font-size:0.88em;">(boş = tümü)</span>
+                        </label>
+                        <div style="display:flex;gap:6px;">
+                            <button type="button" onclick="tumunuSec(true)" class="btn btn-secondary" style="padding:3px 10px;font-size:0.78em;">Tümünü Seç</button>
+                            <button type="button" onclick="tumunuSec(false)" class="btn-cancel" style="font-size:0.78em;">Temizle</button>
+                        </div>
+                    </div>
+
+                    <div id="sinif-listesi" style="display:flex;flex-wrap:wrap;gap:8px;">
+                        {% for sinif in sinif_secenekleri %}
+                        <label id="lbl-{{ sinif }}"
+                               style="display:flex;align-items:center;gap:6px;cursor:pointer;
+                                      padding:7px 16px;font-weight:600;font-size:0.9em;
+                                      background:#fff;border:2px solid #ddd;border-radius:4px;
+                                      user-select:none;">
+                            <input type="checkbox" name="sinif" value="{{ sinif }}"
+                                   {% if secili_sinifler and sinif|stringformat:"s" in secili_sinifler %}checked{% endif %}
+                                   onchange="etiketGuncelle(this)"
+                                   style="display:none;">
+                            {{ sinif }}. Sınıf
+                        </label>
+                        {% empty %}
+                        <span class="text-muted">Öğrenci kaydı bulunamadı.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {# ── Butonlar ── #}
+                <div class="form-actions">
+                    <a href="{% url 'devamsizlik:ogrenci_devamsizlik_listesi' %}" class="btn-cancel">Geri Dön</a>
+                    <button type="submit" class="btn btn-danger">PDF İndir</button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function bugunSec() {
+    var bugun = new Date().toISOString().slice(0, 10);
+    document.getElementById('tarih_bas').value = bugun;
+    document.getElementById('tarih_bit').value = bugun;
+}
+
+function tumunuSec(durum) {
+    document.querySelectorAll('#sinif-listesi input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = durum;
+        etiketGuncelle(cb);
+    });
+}
+
+function etiketGuncelle(cb) {
+    var lbl = document.getElementById('lbl-' + cb.value);
+    if (!lbl) return;
+    if (cb.checked) {
+        lbl.style.background = '#417690';
+        lbl.style.color = '#fff';
+        lbl.style.borderColor = '#417690';
+    } else {
+        lbl.style.background = '#fff';
+        lbl.style.color = '';
+        lbl.style.borderColor = '#ddd';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#sinif-listesi input[type="checkbox"]').forEach(function(cb) {
+        if (cb.checked) etiketGuncelle(cb);
+    });
+});
+</script>
+{% endblock %}

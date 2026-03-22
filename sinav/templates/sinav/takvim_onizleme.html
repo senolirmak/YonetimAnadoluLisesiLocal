@@ -1,0 +1,159 @@
+{% extends "sinav/base.html" %}
+{% block title %}Takvim Önizleme – Ortak Sınav{% endblock %}
+
+{% block content %}
+
+<!-- ===== BAŞLIK ===== -->
+<div class="card" style="border-left:4px solid #6366f1; padding:1rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem;">
+  <div>
+    <h2 style="margin:0; color:#3730a3;">Takvim Önizleme</h2>
+    <span style="font-size:.82rem; color:#6b7280;">
+      {{ gun_sayisi }} gün · {{ toplam }} oturum
+      {% if aktif_sinav %} · {{ aktif_sinav }}{% endif %}
+    </span>
+  </div>
+  <div style="display:flex; gap:.5rem; align-items:center;">
+    {% if request.GET.from == "gecmis" %}
+    <a href="{% url 'sinav:takvim_gecmisi' %}" class="btn btn-secondary btn-sm">← Geri Dön</a>
+    {% else %}
+    <a href="{% url 'sinav:takvim_sayfasi' %}" class="btn btn-secondary btn-sm">← Geri Dön</a>
+    {% endif %}
+    {% if onaylandi %}
+      <span class="badge badge-done">✓ Onaylandı</span>
+      <button type="submit" form="takvim-guncelle-form" class="btn btn-primary btn-sm">Değişiklikleri Kaydet</button>
+    {% else %}
+      <form method="post" action="{% url 'sinav:takvim_onizleme_iptal' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm"
+                style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;">İptal</button>
+      </form>
+      <form method="post" action="{% url 'sinav:takvim_onayla' %}">
+        {% csrf_token %}
+        <input type="hidden" name="from" value="{{ request.GET.from }}">
+        <button type="submit" class="btn btn-primary">Onayla ve Kaydet</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===== TAKVİM TABLOSU ===== -->
+{% if onaylandi %}
+<form method="post" action="{% url 'sinav:takvim_guncelle' %}" id="takvim-guncelle-form">
+{% csrf_token %}
+<input type="hidden" name="from" value="{{ request.GET.from }}">
+{% endif %}
+
+{% for gun in gunler %}
+<div class="card oniz-gun-kart">
+  <div class="oniz-gun-baslik">
+    <span class="oniz-tarih">
+      {% if onaylandi and gun.satirlar %}
+        <input type="date" name="tarih_gün_{{ forloop.counter }}" class="oniz-tarih-input"
+               value="{{ gun.tarih }}"
+               onchange="gunTarihGuncelle(this, '{{ gun.tarih }}')"
+               title="Bu günün tüm kayıtlarının tarihini değiştir">
+      {% else %}
+        {{ gun.tarih }}
+      {% endif %}
+    </span>
+    <span class="oniz-gun-ozet">{{ gun.satirlar|length }} oturum</span>
+  </div>
+  <table class="oniz-tablo">
+    <thead>
+      <tr>
+        <th>Oturum</th>
+        <th>Saat</th>
+        <th>Ders</th>
+        <th>Şubeler</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in gun.satirlar %}
+      <tr>
+        <td class="oniz-oturum">{{ s.Oturum }}</td>
+        <td class="oniz-saat">
+          {% if onaylandi %}
+            <input type="time" name="saat_{{ s.pk }}" value="{{ s.Saat }}"
+                   class="oniz-input oniz-input-saat">
+          {% else %}
+            {{ s.Saat }}
+          {% endif %}
+        </td>
+        <td class="oniz-ders">{{ s.Ders }}</td>
+        <td class="oniz-subeler">
+          {{ s.Subeler }}
+          {% if onaylandi %}
+            <input type="hidden" name="tarih_{{ s.pk }}" value="{{ s.Tarih }}" class="tarih-hidden" data-gun="{{ gun.tarih }}">
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+
+<!-- ===== ALT ONAY BUTONU ===== -->
+<div class="card" style="display:flex; justify-content:flex-end; gap:.75rem; padding:1rem 1.5rem;">
+  {% if onaylandi %}
+    <a href="{% url 'sinav:takvim_sayfasi' %}" class="btn btn-secondary">Yeniden Hesapla</a>
+    <button type="submit" form="takvim-guncelle-form" class="btn btn-primary">Değişiklikleri Kaydet</button>
+  {% else %}
+    <form method="post" action="{% url 'sinav:takvim_onizleme_iptal' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn"
+              style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;">İptal</button>
+    </form>
+    <form method="post" action="{% url 'sinav:takvim_onayla' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">Onayla ve Kaydet</button>
+    </form>
+  {% endif %}
+</div>
+
+{% if onaylandi %}
+</form>
+{% endif %}
+
+<script>
+function gunTarihGuncelle(inputEl, eskiGun) {
+  const yeniDeger = inputEl.value;
+  document.querySelectorAll(`.tarih-hidden[data-gun="${eskiGun}"]`).forEach(el => {
+    el.value = yeniDeger;
+  });
+}
+</script>
+
+<style>
+.oniz-gun-kart { padding: 1rem 1.5rem; margin-bottom: 1rem; }
+.oniz-gun-baslik {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: .6rem; border-bottom: 2px solid #e0e7ff; padding-bottom: .4rem;
+}
+.oniz-tarih { font-weight: 700; font-size: 1rem; color: #1a1a2e; }
+.oniz-gun-ozet { font-size: .75rem; color: #9ca3af; }
+.oniz-tablo { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.oniz-tablo th {
+  text-align: left; padding: .35rem .6rem;
+  background: #f0f4ff; color: #374151;
+  font-size: .75rem; border-bottom: 1px solid #c7d2fe;
+}
+.oniz-tablo td { padding: .35rem .6rem; border-bottom: 1px solid #f3f4f6; }
+.oniz-tablo tr:last-child td { border-bottom: none; }
+.oniz-oturum { width: 60px; color: #6b7280; font-weight: 600; }
+.oniz-saat   { width: 80px; font-weight: 600; color: #3730a3; white-space: nowrap; }
+.oniz-ders   { min-width: 180px; color: #1a1a2e; }
+.oniz-subeler{ font-size: .78rem; color: #6b7280; }
+.oniz-input  { border: 1px solid #c7d2fe; border-radius: 4px; padding: .2rem .4rem;
+               font-size: .85rem; background: #f8f9ff; }
+.oniz-input:focus { outline: none; border-color: #6366f1; background: #fff; }
+.oniz-input-oturum { width: 52px; }
+.oniz-input-saat   { width: 90px; color: #3730a3; font-weight: 600; }
+.oniz-tarih-input  { font-weight: 700; font-size: .95rem; color: #1a1a2e;
+                     border: 1px solid #c7d2fe; border-radius: 4px; padding: .15rem .4rem;
+                     background: #f8f9ff; cursor: pointer; }
+.oniz-tarih-input:focus { outline: none; border-color: #6366f1; background: #fff; }
+</style>
+
+{% endblock %}

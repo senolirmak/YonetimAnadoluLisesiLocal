@@ -1,0 +1,13 @@
+<footer class="ticker">
+  <div class="ticker-inner">
+    <span id="tickerText">
+      {% if DUYURULAR and DUYURULAR|length %}
+        {% for d in DUYURULAR %}
+          {{ d }}{% if not forloop.last %}   |   {% endif %}
+        {% endfor %}
+      {% else %}
+        📢 Hoş geldiniz   |   🔔 Dersler zamanında başlar
+      {% endif %}
+    </span>
+  </div>
+</footer>

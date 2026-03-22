@@ -1,0 +1,61 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container-sm" style="max-width:800px;">
+    <h2 class="page-title mb-20">{{ title }}</h2>
+
+    {% if messages %}
+    <div class="mb-20">
+        {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'success' %}msg-success{% elif message.tags == 'error' %}msg-error{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Tarih Navigasyonu -->
+    <div class="filter-box" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+        <a href="?tarih={{ onceki }}" class="btn btn-secondary">&laquo; Önceki Gün</a>
+        <span style="font-weight:600;font-size:1em;">
+            {{ target_date|date:"d F Y l" }}
+        </span>
+        <a href="?tarih={{ sonraki }}" class="btn btn-secondary">Sonraki Gün &raquo;</a>
+        <a href="?" class="btn btn-primary" style="margin-left:auto;">Bugün</a>
+    </div>
+
+    <!-- Nöbetçi Tablosu -->
+    <div class="card">
+        <div class="card-header bg-primary">
+            {{ target_date|date:"d F Y l" }} — Nöbetçi Listesi
+        </div>
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width:50px;" class="center">#</th>
+                    <th>Nöbetçi Öğretmen</th>
+                    <th>Nöbet Yeri</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gorev in gorevler %}
+                <tr>
+                    <td class="center font-bold">{{ forloop.counter }}</td>
+                    <td>{{ gorev.ogretmen.personel.adi_soyadi }}</td>
+                    <td>{{ gorev.nobet_yeri|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="center" style="padding:24px;">Seçilen tarih için nöbetçi kaydı bulunamadı.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

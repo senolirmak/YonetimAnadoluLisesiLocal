@@ -1,0 +1,61 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Çağrı Fişi{% endblock %}
+{% block content %}
+<div style="max-width:600px;margin:30px auto;font-family:Arial,sans-serif;">
+    <div style="border:2px solid #417690;border-radius:8px;padding:30px;">
+        <div style="text-align:center;border-bottom:2px solid #417690;padding-bottom:16px;margin-bottom:20px;">
+            <h2 style="margin:0;color:#417690;font-size:1.3em;">REHBERLİK SERVİSİ</h2>
+            <h3 style="margin:8px 0 0;font-size:1.1em;">ÖĞRENCİ ÇAĞRI FİŞİ</h3>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+            <tr>
+                <td style="padding:8px 0;color:#555;width:140px;font-weight:600;">Tarih:</td>
+                <td style="padding:8px 0;font-weight:bold;font-size:1.05em;">{{ cagri.tarih|date:"d.m.Y" }}</td>
+            </tr>
+            {% if cagri.ders_saati %}
+            <tr>
+                <td style="padding:8px 0;color:#555;font-weight:600;">Ders Saati:</td>
+                <td style="padding:8px 0;"><strong>{{ cagri.ders_saati }}. Ders</strong>{% if cagri.ders_adi %} – {{ cagri.ders_adi }}{% endif %}</td>
+            </tr>
+            {% endif %}
+            {% if cagri.ogretmen_adi %}
+            <tr>
+                <td style="padding:8px 0;color:#555;font-weight:600;">Dersin Öğretmeni:</td>
+                <td style="padding:8px 0;">{{ cagri.ogretmen_adi }}</td>
+            </tr>
+            {% endif %}
+            <tr style="border-top:1px solid #dee2e6;">
+                <td style="padding:10px 0;color:#555;font-weight:600;">Öğrenci:</td>
+                <td style="padding:10px 0;font-weight:bold;font-size:1.05em;">
+                    {% if cagri.ogrenci %}
+                    {{ cagri.ogrenci.adi }} {{ cagri.ogrenci.soyadi }}
+                    <span style="font-weight:normal;font-size:0.9em;color:#666;"> – {{ cagri.ogrenci.sinif }}/{{ cagri.ogrenci.sube }} – No: {{ cagri.ogrenci.okulno }}</span>
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+        </table>
+        {% if cagri.cagri_metni %}
+        <div style="background:#f8f9fa;padding:16px;border-radius:6px;border:1px solid #dee2e6;margin-bottom:20px;">
+            <div style="font-weight:600;color:#555;margin-bottom:8px;">Açıklama / Çağrı Metni:</div>
+            <div style="white-space:pre-line;line-height:1.6;">{{ cagri.cagri_metni }}</div>
+        </div>
+        {% endif %}
+        <div style="border-top:1px solid #dee2e6;padding-top:16px;display:flex;justify-content:space-between;">
+            <div style="font-size:0.9em;color:#555;">
+                Rehber Öğretmen: <strong>{{ cagri.rehber.adi_soyadi|default:"—" }}</strong>
+            </div>
+            <div style="font-size:0.85em;color:#888;">{{ cagri.olusturma_zamani|date:"d.m.Y H:i" }}</div>
+        </div>
+    </div>
+    <div style="text-align:center;margin-top:16px;display:flex;gap:12px;justify-content:center;">
+        <button onclick="window.print()" style="padding:8px 24px;background:#417690;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:1em;">Yazdır</button>
+        <a href="{% url 'rehberlik:cagri_liste' %}" style="padding:8px 24px;background:#6c757d;color:#fff;border-radius:4px;text-decoration:none;font-size:1em;">Listeye Dön</a>
+    </div>
+</div>
+<style>
+@media print {
+    nav, header, .btn-cancel, button { display: none !important; }
+    body { background: white; }
+}
+</style>
+{% endblock %}

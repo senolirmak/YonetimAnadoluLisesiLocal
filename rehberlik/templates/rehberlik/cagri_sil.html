@@ -1,0 +1,25 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Çağrı Sil{% endblock %}
+{% block content %}
+<div class="container" style="max-width:600px;">
+    <div class="card">
+        <div class="card-header" style="background:#dc3545;color:#fff;font-weight:bold;padding:12px 16px;">
+            Çağrıyı Sil
+        </div>
+        <div style="padding:24px;">
+            <p>Aşağıdaki çağrı kaydını silmek istediğinizden emin misiniz?</p>
+            <div style="background:#f8d7da;padding:12px 16px;border-radius:4px;margin:16px 0;border:1px solid #f5c6cb;">
+                <strong>Öğrenci:</strong>
+                {% if cagri.ogrenci %}{{ cagri.ogrenci.adi }} {{ cagri.ogrenci.soyadi }}{% else %}—{% endif %}<br>
+                <strong>Tarih:</strong> {{ cagri.tarih|date:"d.m.Y" }}<br>
+                {% if cagri.ders_saati %}<strong>Ders:</strong> {{ cagri.ders_saati }}. Ders – {{ cagri.ders_adi }}<br>{% endif %}
+            </div>
+            <form method="post" style="display:flex;gap:12px;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Evet, Sil</button>
+                <a href="{% url 'rehberlik:cagri_liste' %}" class="btn-cancel">Vazgeç</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Yoklama{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    {% if durum == 'ders_yok' %}
+    {# ── Bugün ders yok ─────────────────────────────────────── #}
+    <div class="card">
+        <div class="card-header bg-primary">Yoklama</div>
+        <div class="form-box text-center" style="padding: 40px;">
+            <p class="page-subtitle">{{ bugun }} tarihinde programda ders bulunamadı.</p>
+            <a href="{% url 'index' %}" class="btn btn-primary mt-20">Ana Sayfa</a>
+        </div>
+    </div>
+
+    {% elif durum == 'ders_sec' %}
+    {# ── Aktif ders yok, ders seçimi ────────────────────────── #}
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Yoklama — Ders Seçin</h2>
+        <span class="text-muted">{{ bugun }}</span>
+    </div>
+    <div class="card">
+        <div class="card-header bg-primary">Bugünkü Dersler</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Saat</th>
+                        <th>Ders Saati</th>
+                        <th>Ders</th>
+                        <th>Sınıf</th>
+                        <th class="center">Yoklama</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ders in bugun_dersleri %}
+                    <tr>
+                        <td>{{ ders.giris_saat|time:"H:i" }} - {{ ders.cikis_saat|time:"H:i" }}</td>
+                        <td class="center">{{ ders.ders_saati }}. ders</td>
+                        <td>{{ ders.ders_adi }}</td>
+                        <td>{{ ders.sinif_sube }}</td>
+                        <td class="center">
+                            <a href="{% url 'ogrenci:ogretmen_devamsizlik_ders' ders.ders_saati %}" class="btn btn-info">Yoklamayı Aç</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% elif durum == 'form' %}
+    {# ── Yoklama formu ───────────────────────────────────────── #}
+    <div class="flex-between mb-20">
+        <h2 class="page-title">
+            {{ secili_ders.ders_saati }}. Ders — {{ secili_ders.ders_adi }}
+            &nbsp;<span class="badge badge-info">{{ sinif_sube }}</span>
+        </h2>
+        <span class="text-muted">{{ bugun }}</span>
+    </div>
+
+    {# Diğer dersler ─ hızlı geçiş #}
+    {% if bugun_dersleri.count > 1 %}
+    <div class="filter-box filter-form mb-20">
+        <span class="form-label-bold">Diğer Dersler:</span>
+        {% for ders in bugun_dersleri %}
+            {% if ders.ders_saati != secili_ders.ders_saati %}
+            <a href="{% url 'ogrenci:ogretmen_devamsizlik_ders' ders.ders_saati %}" class="btn btn-primary">
+                {{ ders.ders_saati }}. ders — {{ ders.sinif_sube }}
+            </a>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="card">
+            <div class="card-header bg-primary">
+                Öğrenci Listesi — Devamsız olanları işaretleyin
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="center" style="width:50px;">Devamsız</th>
+                            <th>Okul No</th>
+                            <th>Adı Soyadı</th>
+                            <th>Cinsiyet</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ogr in ogrenciler %}
+                        <tr {% if ogr.pk in kayitli_devamsiz_ids %}style="background:#fff3cd;"{% endif %}>
+                            <td class="center">
+                                <input type="checkbox" name="devamsiz" value="{{ ogr.pk }}"
+                                    {% if ogr.pk in kayitli_devamsiz_ids %}checked{% endif %}>
+                            </td>
+                            <td>{{ ogr.okulno }}</td>
+                            <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                            <td>{{ ogr.get_cinsiyet_display }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted">Bu sınıfta kayıtlı öğrenci bulunamadı.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-actions mt-20">
+            <a href="{% url 'index' %}" class="btn-cancel">Vazgeç</a>
+            <button type="submit" class="btn btn-success">Kaydet</button>
+        </div>
+    </form>
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Faaliyeti Reddet{% endblock %}
+{% block content %}
+<div class="container container-sm">
+    <div class="card">
+        <div class="card-header bg-danger">Faaliyet Reddetme</div>
+        <div style="padding:24px;">
+            <p class="mb-20">Aşağıdaki faaliyeti reddetmek istiyorsunuz:</p>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+                <tr><td style="padding:8px 12px;color:#666;width:120px;border-bottom:1px solid #eee;">Konu</td><td style="padding:8px 12px;font-weight:600;border-bottom:1px solid #eee;">{{ faaliyet.konu }}</td></tr>
+                <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;">Öğretmen</td><td style="padding:8px 12px;border-bottom:1px solid #eee;">{{ faaliyet.ogretmen.adi_soyadi }}</td></tr>
+                <tr><td style="padding:8px 12px;color:#666;">Tarih</td><td style="padding:8px 12px;">{{ faaliyet.tarih|date:"d.m.Y" }}</td></tr>
+            </table>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-row">
+                    <label for="id_ret">Red Açıklaması <span style="color:#aaa;font-weight:400;">(isteğe bağlı)</span></label>
+                    <textarea id="id_ret" name="ret_aciklamasi" rows="3"
+                              style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;"
+                              placeholder="Öğretmene iletilecek açıklama…"></textarea>
+                </div>
+                <div class="form-actions">
+                    <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" class="btn-cancel">Vazgeç</a>
+                    <button type="submit" class="btn btn-danger">Reddet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

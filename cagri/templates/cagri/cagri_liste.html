@@ -1,0 +1,147 @@
+{% extends 'layouts/base.html' %}
+{% block title %}{{ servis_config.display_name }}{% endblock %}
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">{{ message }}</div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">{{ servis_config.display_name }}</h2>
+        <div style="display:flex;gap:8px;">
+            {% if servis_config.gorusme_liste_url %}
+            <a href="{% url servis_config.gorusme_liste_url %}" class="btn btn-secondary">← Görüşmeler</a>
+            {% endif %}
+            {% if kullanici_olusturabilir %}
+            <a href="{% url servis_config.olustur_url %}" class="btn btn-success">+ Yeni Çağrı</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mb-20">
+        <div class="card-header bg-primary">Filtrele</div>
+        <div style="padding:16px;">
+            <form method="get" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+                <div>
+                    <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Başlangıç Tarihi</label>
+                    <input type="date" name="tarih_bas" value="{{ filters.tarih_bas }}" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Bitiş Tarihi</label>
+                    <input type="date" name="tarih_bit" value="{{ filters.tarih_bit }}" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Sınıf/Şube</label>
+                    <select name="sinifsube" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                        <option value="">Tümü</option>
+                        {% for ss in sinifsube_secenekleri %}
+                        <option value="{{ ss }}" {% if filters.sinifsube == ss %}selected{% endif %}>{{ ss }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Öğrenci Ara</label>
+                    <input type="text" name="ogrenci_q" value="{{ filters.ogrenci_q }}" placeholder="Ad, soyad veya okul no…"
+                           style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;min-width:180px;">
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button type="submit" class="btn btn-primary">Filtrele</button>
+                    <a href="{% url servis_config.liste_url %}" class="btn-cancel">Temizle</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="mb-20" style="color:#6c757d;font-size:0.9em;">
+        Toplam <strong>{{ toplam }}</strong> çağrı kaydı.
+    </div>
+
+    {% if cagrilar %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th class="center">Ders</th>
+                    <th>Öğrenci</th>
+                    <th>Ders Adı</th>
+                    <th>Öğretmen</th>
+                    <th>Çağrı Metni</th>
+                    <th>Kaydeden</th>
+                    <th class="center">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in cagrilar %}
+            <tr>
+                <td style="white-space:nowrap;">{{ c.tarih|date:"d.m.Y" }}</td>
+                <td class="center">
+                    {% if c.ders_saati %}<span class="badge badge-info">{{ c.ders_saati }}. ders</span>{% else %}—{% endif %}
+                </td>
+                <td>
+                    {% if c.ogrenci %}
+                    <span style="font-size:0.82em;color:#555;display:block;">{{ c.ogrenci.sinif }}/{{ c.ogrenci.sube }} – {{ c.ogrenci.okulno }}</span>
+                    {{ c.ogrenci.adi }} {{ c.ogrenci.soyadi }}
+                    {% else %}—{% endif %}
+                </td>
+                <td style="font-size:0.9em;">{{ c.ders_adi|default:"—" }}</td>
+                <td style="font-size:0.9em;">{{ c.ogretmen_adi|default:"—" }}</td>
+                <td style="font-size:0.9em;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                    title="{{ c.cagri_metni }}">{{ c.cagri_metni|truncatechars:60|default:"—" }}</td>
+                <td style="font-size:0.85em;color:#555;">{{ c.kayit_eden_adi }}</td>
+                <td class="center" style="white-space:nowrap;">
+                    <a href="{% url 'cagri:cagri_yazdir' c.pk %}" target="_blank"
+                       class="btn btn-info" style="padding:3px 9px;font-size:0.82em;">Yazdır</a>
+
+                    {# Görüşme durumu / butonu #}
+                    {% if servis == 'rehberlik' %}
+                        {% if c.gorusme_rehberlik %}
+                        <a href="{% url 'rehberlik:gorusme_detay' c.gorusme_rehberlik.pk %}"
+                           class="btn" style="padding:3px 9px;font-size:0.82em;background:#28a745;color:#fff;">Görüşme ✓</a>
+                        {% elif kullanici_olusturabilir and c.ogrenci %}
+                        <a href="{% url 'rehberlik:gorusme_olustur' %}?ogrenci_id={{ c.ogrenci.pk }}&tur=bireysel&cagri_id={{ c.pk }}"
+                           class="btn btn-success" style="padding:3px 9px;font-size:0.82em;">Görüşme Oluştur</a>
+                        {% endif %}
+                    {% elif servis == 'disiplin' %}
+                        {% if c.gorusme_disiplin %}
+                        <a href="{% url 'disiplin:gorusme_detay' c.gorusme_disiplin.pk %}"
+                           class="btn" style="padding:3px 9px;font-size:0.82em;background:#28a745;color:#fff;">Görüşme ✓</a>
+                        {% elif kullanici_olusturabilir and c.ogrenci %}
+                        <a href="{% url 'disiplin:gorusme_olustur' %}?ogrenci_id={{ c.ogrenci.pk }}&tur=bireysel&cagri_id={{ c.pk }}"
+                           class="btn btn-success" style="padding:3px 9px;font-size:0.82em;">Görüşme Oluştur</a>
+                        {% endif %}
+                    {% elif servis == 'muduriyetcagri' %}
+                        {% if c.gorusme_muduriyetcagri %}
+                        <a href="{% url 'muduriyetcagri:gorusme_detay' c.gorusme_muduriyetcagri.pk %}"
+                           class="btn" style="padding:3px 9px;font-size:0.82em;background:#28a745;color:#fff;">Görüşme ✓</a>
+                        {% elif kullanici_olusturabilir and c.ogrenci %}
+                        <a href="{% url 'muduriyetcagri:gorusme_olustur' %}?ogrenci_id={{ c.ogrenci.pk }}&tur=bireysel&cagri_id={{ c.pk }}"
+                           class="btn btn-success" style="padding:3px 9px;font-size:0.82em;">Görüşme Oluştur</a>
+                        {% endif %}
+                    {% endif %}
+
+                    {# Sil butonu #}
+                    {% if c.kayit_eden_kullanici == request.user or request.user.is_superuser %}
+                    <a href="{% url 'cagri:cagri_sil' c.pk %}"
+                       class="btn btn-danger" style="padding:3px 9px;font-size:0.82em;">Sil</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card">
+        <div style="padding:40px;text-align:center;color:#6c757d;">
+            Belirtilen kriterlere uygun çağrı kaydı bulunamadı.
+            {% if kullanici_olusturabilir %}
+            <br><br>
+            <a href="{% url servis_config.olustur_url %}" class="btn btn-primary">İlk Çağrıyı Oluştur</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

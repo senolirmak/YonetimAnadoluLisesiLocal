@@ -1,0 +1,91 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Faaliyetlerim{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Faaliyetlerim</h2>
+        <a href="{% url 'faaliyet:faaliyet_olustur' %}" class="btn btn-success">+ Yeni Faaliyet</a>
+    </div>
+
+    {% if faaliyetler %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Konu</th>
+                    <th>Yer</th>
+                    <th class="center">Ders</th>
+                    <th class="center">Öğrenci</th>
+                    <th class="center">Durum</th>
+                    <th class="center">İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in faaliyetler %}
+                <tr>
+                    <td>{{ f.tarih|date:"d.m.Y" }}</td>
+                    <td><a href="{% url 'faaliyet:faaliyet_detay' f.pk %}" style="color:#417690;text-decoration:none;">{{ f.konu }}</a></td>
+                    <td>{{ f.yer }}</td>
+                    <td class="center">
+                        {% for ds in f.ders_saatleri.all %}
+                        <span class="badge badge-info">{{ ds.ders_no }}.</span>
+                        {% empty %}—{% endfor %}
+                    </td>
+                    <td class="center">{{ f.ogrenci_sayisi }}</td>
+                    <td class="center">
+                        {% if f.durum == 'beklemede' %}
+                        <span class="badge" style="background:#ffc107;color:#212529;">Onay Bekliyor</span>
+                        {% elif f.durum == 'onaylandi' %}
+                            {% if f.devamsizlik_girildi %}
+                            <span class="badge" style="background:#28a745;">Tamamlandı</span>
+                            {% else %}
+                            <span class="badge" style="background:#17a2b8;">Onaylandı</span>
+                            {% endif %}
+                        {% elif f.durum == 'reddedildi' %}
+                        <span class="badge" style="background:#dc3545;">Reddedildi</span>
+                        {% endif %}
+                    </td>
+                    <td class="center" style="white-space:nowrap;">
+                        <a href="{% url 'faaliyet:faaliyet_detay' f.pk %}" class="btn btn-info" style="padding:4px 10px;font-size:0.85em;">Detay</a>
+                        {% if f.durum == 'onaylandi' and not f.devamsizlik_girildi %}
+                        <a href="{% url 'faaliyet:faaliyet_devamsizlik' f.pk %}" class="btn btn-success" style="padding:4px 10px;font-size:0.85em;">Devamsızlık Gir</a>
+                        {% endif %}
+                        {% if f.devamsizlik_girildi %}
+                        <a href="{% url 'faaliyet:faaliyet_rapor' f.pk %}" class="btn btn-primary" style="padding:4px 10px;font-size:0.85em;">Rapor</a>
+                        {% endif %}
+                        {% if f.durum != 'onaylandi' and not f.devamsizlik_girildi %}
+                        <a href="{% url 'faaliyet:faaliyet_duzenle' f.pk %}" class="btn btn-warning" style="padding:4px 10px;font-size:0.85em;">Düzenle</a>
+                        {% endif %}
+                        {% if is_mudur_yardimcisi or f.durum == 'beklemede' or f.durum == 'reddedildi' %}
+                        {% if not f.devamsizlik_girildi or is_mudur_yardimcisi %}
+                        <a href="{% url 'faaliyet:faaliyet_sil' f.pk %}" class="btn btn-danger" style="padding:4px 10px;font-size:0.85em;">Sil</a>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card">
+        <div style="padding:40px;text-align:center;color:#6c757d;">
+            Henüz faaliyet kaydınız bulunmuyor.
+            <br><br>
+            <a href="{% url 'faaliyet:faaliyet_olustur' %}" class="btn btn-primary">İlk Faaliyeti Oluştur</a>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

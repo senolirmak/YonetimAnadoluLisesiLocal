@@ -1,0 +1,71 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">{{ title }}</h2>
+        <a href="{% url 'duyuru_ekle' %}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Yeni Duyuru Ekle
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Sınıf / Şube</th>
+                    <th>Tarih</th>
+                    <th>Ders Saati</th>
+                    <th>Ders Bilgisi</th>
+                    <th>Mesaj</th>
+                    <th>Oluşturan</th>
+                    <th>Zaman</th>
+                    <th class="center">İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for duyuru in duyurular %}
+                <tr>
+                    <td>{{ duyuru.sinif }}</td>
+                    <td>{{ duyuru.tarih|date:"d.m.Y" }}</td>
+                    <td>{{ duyuru.ders_saati }}. Ders</td>
+                    <td style="min-width: 180px;">
+                        {% with ders=duyuru.ders_bilgisi %}
+                            {% if ders.ders_adi or ders.ogretmen_adi %}
+                                <div style="font-weight: 600;">
+                                    {{ ders.ders_adi|default_if_none:"-" }}
+                                </div>
+                                <div style="font-size: 0.9em; color: #555;">
+                                    {{ ders.ogretmen_adi|default_if_none:"-" }}
+                                </div>
+                                {% if ders.nobetci_adi %}
+                                <div style="font-size: 0.85em; color: #dc3545; font-weight: bold; margin-top: 2px;">
+                                    ↳ {{ ders.nobetci_adi }} (Nöbetçi)
+                                </div>
+                                {% endif %}
+                            {% else %}
+                                <span style="color: #aaa;">-</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td>{{ duyuru.mesaj|truncatechars:50 }}</td>
+                    <td>{{ duyuru.olusturan.get_full_name|default:duyuru.olusturan.username }}</td>
+                    <td>{{ duyuru.olusturulma_zaman|date:"d.m.Y H:i" }}</td>
+                    <td class="center">
+                        {% if duyuru.olusturan == user or user.is_superuser %}
+                        <a href="{% url 'duyuru_duzenle' duyuru.pk %}" class="btn-link link-blue">Düzenle</a>
+                        <a href="{% url 'duyuru_sil' duyuru.pk %}" class="btn-link link-red">Sil</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="empty-cell" style="padding: 20px;">Henüz oluşturulmuş bir duyuru bulunmamaktadır.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

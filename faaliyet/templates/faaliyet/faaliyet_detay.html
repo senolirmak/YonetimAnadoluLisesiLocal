@@ -1,0 +1,161 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Faaliyet Detayı{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:900px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Faaliyet Detayı</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+            {# Durum badge #}
+            {% if faaliyet.durum == 'beklemede' %}
+            <span class="badge" style="background:#ffc107;color:#212529;font-size:0.9em;padding:5px 12px;">Onay Bekliyor</span>
+            {% elif faaliyet.durum == 'onaylandi' %}
+                {% if faaliyet.devamsizlik_girildi %}
+                <span class="badge" style="background:#28a745;font-size:0.9em;padding:5px 12px;">Tamamlandı</span>
+                {% else %}
+                <span class="badge" style="background:#17a2b8;font-size:0.9em;padding:5px 12px;">Onaylandı</span>
+                {% endif %}
+            {% elif faaliyet.durum == 'reddedildi' %}
+            <span class="badge" style="background:#dc3545;font-size:0.9em;padding:5px 12px;">Reddedildi</span>
+            {% endif %}
+
+            {# Devamsızlık girişi butonu #}
+            {% if faaliyet.durum == 'onaylandi' and not faaliyet.devamsizlik_girildi %}
+            <a href="{% url 'faaliyet:faaliyet_devamsizlik' faaliyet.pk %}" class="btn btn-success">Devamsızlık Gir</a>
+            {% endif %}
+
+            {# Rapor butonu #}
+            {% if faaliyet.devamsizlik_girildi %}
+            <a href="{% url 'faaliyet:faaliyet_rapor' faaliyet.pk %}" class="btn btn-primary">Raporu Görüntüle</a>
+            {% endif %}
+
+            {# Düzenle: öğretmen onaylanmış ya da tamamlanmışı düzenleyemez #}
+            {% if faaliyet.durum != 'onaylandi' and not faaliyet.devamsizlik_girildi %}
+            <a href="{% url 'faaliyet:faaliyet_duzenle' faaliyet.pk %}" class="btn btn-warning">Düzenle</a>
+            {% endif %}
+
+            {# Sil: öğretmen onaylanmış ya da tamamlanmışı silemez #}
+            {% if is_mudur_yardimcisi or faaliyet.durum == 'beklemede' or faaliyet.durum == 'reddedildi' %}
+            {% if not faaliyet.devamsizlik_girildi or is_mudur_yardimcisi %}
+            <a href="{% url 'faaliyet:faaliyet_sil' faaliyet.pk %}" class="btn btn-danger">Sil</a>
+            {% endif %}
+            {% endif %}
+
+            <a href="{% url 'faaliyet:faaliyet_liste' %}" class="btn-cancel">← Listeye Dön</a>
+        </div>
+    </div>
+
+    {# Red açıklaması varsa göster #}
+    {% if faaliyet.durum == 'reddedildi' and faaliyet.ret_aciklamasi %}
+    <div class="msg-box msg-error mb-20">
+        <strong>Red Gerekçesi:</strong> {{ faaliyet.ret_aciklamasi }}
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+
+        {# Sol: bilgiler + ders saatleri #}
+        <div style="flex:1;min-width:280px;">
+            <div class="card mb-20">
+                <div class="card-header bg-primary">Faaliyet Bilgileri</div>
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr><td style="padding:10px 15px;color:#666;width:120px;border-bottom:1px solid #eee;">Konu</td>
+                        <td style="padding:10px 15px;font-weight:600;border-bottom:1px solid #eee;">{{ faaliyet.konu }}</td></tr>
+                    <tr><td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Tarih</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">{{ faaliyet.tarih|date:"d.m.Y" }}</td></tr>
+                    <tr><td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Yer</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">{{ faaliyet.yer }}</td></tr>
+                    <tr><td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Öğretmen</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">{{ faaliyet.ogretmen.adi_soyadi }}</td></tr>
+                    {% if faaliyet.onaylayan_adi %}
+                    <tr><td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Onaylayan</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">
+                            {{ faaliyet.onaylayan_adi }}
+                            {% if faaliyet.onay_zamani %}
+                            <span style="color:#6c757d;font-size:0.85em;">
+                                &nbsp;({{ faaliyet.onay_zamani|date:"d.m.Y H:i" }})
+                            </span>
+                            {% endif %}
+                        </td></tr>
+                    {% endif %}
+                    {% if faaliyet.aciklama %}
+                    <tr><td style="padding:10px 15px;color:#666;">Açıklama</td>
+                        <td style="padding:10px 15px;">{{ faaliyet.aciklama }}</td></tr>
+                    {% endif %}
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-primary">Ders Saatleri</div>
+                {% if ders_saatleri %}
+                <table class="table" style="margin:0;box-shadow:none;">
+                    <thead>
+                        <tr>
+                            <th class="center">Ders No</th>
+                            <th class="center">Başlangıç</th>
+                            <th class="center">Bitiş</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ds in ders_saatleri %}
+                        <tr>
+                            <td class="center"><span class="badge badge-info">{{ ds.ders_no }}. Ders</span></td>
+                            <td class="center">{{ ds.baslangic|time:"H:i" }}</td>
+                            <td class="center">{{ ds.bitis|time:"H:i" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div style="padding:15px;color:#6c757d;font-size:0.9em;">Ders saati eklenmemiş.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Sağ: öğrenciler #}
+        <div style="flex:1.2;min-width:280px;">
+            <div class="card">
+                <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span>Katılan Öğrenciler</span>
+                    <span style="background:#28a745;color:#fff;padding:2px 10px;border-radius:10px;font-size:0.85em;">
+                        {{ faaliyet.ogrenci_sayisi }} öğrenci
+                    </span>
+                </div>
+                {% if ogrenciler %}
+                <div style="max-height:520px;overflow-y:auto;">
+                    <table class="table" style="margin:0;box-shadow:none;">
+                        <thead>
+                            <tr>
+                                <th class="center">No</th>
+                                <th>Ad Soyad</th>
+                                <th class="center">Sınıf</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ogr in ogrenciler %}
+                            <tr>
+                                <td class="center" style="font-size:0.88em;color:#555;">{{ ogr.okulno }}</td>
+                                <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                                <td class="center">{{ ogr.sinif }}/{{ ogr.sube }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div style="padding:15px;color:#6c757d;font-size:0.9em;">Bu faaliyete öğrenci eklenmemiş.</div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+<header style="background:#417690; padding:10px 20px; display:flex; justify-content:space-between; align-items:center;">
+    <div id="site-name">
+        <a href="{% url 'index' %}" style="color:#fff; font-size:1.25rem; font-weight:bold; text-decoration:none; letter-spacing:0.5px;">
+            Okul Yönetim Sistemi
+        </a>
+    </div>
+    {% if user.is_authenticated %}
+    <div style="display:flex; align-items:center; gap:15px; font-size:0.9em; color:#c8dce8;">
+        <span>
+            Hoş geldiniz,&nbsp;
+            <strong style="color:#fff;">{{ user.get_full_name|default:user.username }}</strong>
+            {% if is_mudur_yardimcisi %}
+                &nbsp;<span style="color:#c8dce8;">/ Müdür Yardımcısı</span>
+            {% else %}
+                {% with grp=user.groups.first %}
+                {% if grp %}
+                &nbsp;<span style="color:#c8dce8;">/
+                    {% if grp.name == 'okul_muduru' %}Okul Müdürü
+                    {% elif grp.name == 'rehber_ogretmen' %}Rehber Öğretmen
+                    {% elif grp.name == 'disiplin_kurulu' %}Disiplin Kurulu
+                    {% elif grp.name == 'ogretmen' %}Öğretmen
+                    {% endif %}
+                </span>
+                {% endif %}
+                {% endwith %}
+            {% endif %}
+        </span>
+        {% if request.resolver_match.url_name != 'index' %}
+        <a href="{% url 'index' %}" style="color:#c8dce8; text-decoration:none;">Ana Sayfa</a>
+        <span style="color:#6a9ab0;">|</span>
+        {% endif %}
+        <a href="{% url 'profil' %}" style="color:#c8dce8; text-decoration:none;">Profil</a>
+        <span style="color:#6a9ab0;">|</span>
+        <form method="post" action="{% url 'logout' %}" style="margin:0;">
+            {% csrf_token %}
+            <button type="submit" style="background:none; border:none; color:#c8dce8; cursor:pointer; font-size:0.9em; padding:0;">Çıkış Yap</button>
+        </form>
+    </div>
+    {% endif %}
+</header>

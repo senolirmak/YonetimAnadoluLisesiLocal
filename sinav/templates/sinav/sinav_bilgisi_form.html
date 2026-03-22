@@ -1,0 +1,27 @@
+{% extends "sinav/base.html" %}
+{% block title %}Sınav Bilgisi Düzenle – Ortak Sınav{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h2>Sınav Bilgisi Düzenle</h2>
+  <p style="color:#6b7280; font-size:.88rem; margin-bottom:1rem;">{{ obj }}</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="grid-2">
+      {% for field in form %}
+      <div class="form-group">
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+        {% for err in field.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <br/>
+    <div style="display:flex; gap:.75rem;">
+      <button type="submit" class="btn btn-primary">Kaydet</button>
+      <a href="{% url 'sinav:sinav_bilgisi_listesi' %}" class="btn btn-secondary">İptal</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

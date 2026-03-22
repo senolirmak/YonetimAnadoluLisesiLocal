@@ -1,0 +1,39 @@
+{% load static %}
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Okul Saat Ekranı{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'pano/css/main.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+  <div id="flash" class="flash"></div>
+
+  {% include "pano/includes/header.html" %}
+
+  <div class="stage">
+    {% block content %}{% endblock %}
+  </div>
+  <div id="connectionError" class="connection-error">
+    ⚠️ SUNUCU BAĞLANTISI KESİLDİ!
+  </div>
+
+  {% include "pano/includes/footer.html" %}
+<script>
+  window.PANO_CONFIG = {
+    "SCHOOL_NAME": "{{ SCHOOL_NAME|default:'Okul'|escapejs }}",
+    "LESSON_STARTS": {{ DERSLER|default:"[]"|safe }},
+    "ANNOUNCEMENTS": {{ DUYURULAR_JSON|default:"[]"|safe }},
+    "LESSON_MIN": {{ LESSON_MIN|default:40 }},
+    "FLASH_MS": {{ FLASH_MS|default:900 }},
+    "BLINK_ACTIVE_LESSON": {{ BLINK_ACTIVE_LESSON|default:"true" }},
+    "MEDIA_PLAYLIST": {{ MEDIA_PLAYLIST|default:"[]"|safe }}
+  };
+</script>
+
+<script src="{% static 'pano/js/pano.js' %}"></script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Faaliyet Raporu - {{ faaliyet.konu }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:960px;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Faaliyet Raporu</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge" style="background:#28a745;font-size:0.9em;padding:5px 12px;">Tamamlandı</span>
+            <a href="{% url 'faaliyet:faaliyet_rapor_pdf' faaliyet.pk %}"
+               class="btn btn-danger"
+               style="display:flex;align-items:center;gap:5px;">
+                &#128462; PDF İndir
+            </a>
+            <a href="{% url 'faaliyet:faaliyet_detay' faaliyet.pk %}" class="btn-cancel">← Detaya Dön</a>
+        </div>
+    </div>
+
+    {# Faaliyet Özet Bilgileri #}
+    <div class="card mb-20">
+        <div class="card-header bg-primary">Faaliyet Bilgileri</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0;">
+            <div style="flex:1;min-width:260px;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;width:110px;border-bottom:1px solid #eee;">Konu</td>
+                        <td style="padding:10px 15px;font-weight:600;border-bottom:1px solid #eee;">{{ faaliyet.konu }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Tarih</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">{{ faaliyet.tarih|date:"d.m.Y l" }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Yer</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">{{ faaliyet.yer }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Öğretmen</td>
+                        <td style="padding:10px 15px;border-bottom:1px solid #eee;">{{ faaliyet.ogretmen.adi_soyadi }}</td>
+                    </tr>
+                </table>
+            </div>
+            <div style="flex:1;min-width:220px;border-left:1px solid #eee;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;width:140px;border-bottom:1px solid #eee;">Toplam Öğrenci</td>
+                        <td style="padding:10px 15px;font-weight:700;font-size:1.2em;border-bottom:1px solid #eee;">
+                            <span style="color:#17a2b8;">{{ toplam_ogrenci }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;border-bottom:1px solid #eee;">Toplam Devamsız</td>
+                        <td style="padding:10px 15px;font-weight:700;font-size:1.2em;border-bottom:1px solid #eee;">
+                            <span style="color:#dc3545;">{{ toplam_devamsizlik }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px 15px;color:#666;">Ders Saati Sayısı</td>
+                        <td style="padding:10px 15px;font-weight:700;font-size:1.2em;">
+                            <span style="color:#6f42c1;">{{ ders_gruplari|length }}</span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        {% if faaliyet.aciklama or faaliyet.onaylayan_adi %}
+        <div style="padding:10px 15px;border-top:1px solid #eee;color:#555;display:flex;flex-wrap:wrap;gap:20px;align-items:baseline;">
+            {% if faaliyet.aciklama %}
+            <span><strong>Açıklama:</strong> {{ faaliyet.aciklama }}</span>
+            {% endif %}
+            {% if faaliyet.onaylayan_adi %}
+            <span style="color:#417690;font-size:0.9em;">
+                <strong>Onaylayan:</strong> {{ faaliyet.onaylayan_adi }}
+                {% if faaliyet.onay_zamani %}
+                <span style="color:#6c757d;">({{ faaliyet.onay_zamani|date:"d.m.Y H:i" }})</span>
+                {% endif %}
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    {# Ders Saati Bazında Katılım Raporu #}
+    {% for grup in ders_gruplari %}
+    <div class="card mb-20">
+        <div class="card-header" style="background:#417690;color:#fff;display:flex;justify-content:space-between;align-items:center;">
+            <span>{{ grup.ds.ders_no }}. Ders Saati &nbsp;|&nbsp; {{ grup.ds.baslangic|time:"H:i" }} – {{ grup.ds.bitis|time:"H:i" }}</span>
+            <span style="font-size:0.88em;opacity:0.9;">
+                Katılımcı: <strong>{{ grup.katilimcilar|length }}</strong> &nbsp;|&nbsp;
+                Devamsız: <strong>{{ grup.devamsizlar|length }}</strong>
+            </span>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:0;">
+
+            {# Katılımcılar #}
+            <div style="flex:1;min-width:240px;border-right:1px solid #eee;">
+                <div style="padding:8px 15px;background:#f8f9fa;font-size:0.85em;font-weight:600;color:#28a745;border-bottom:1px solid #eee;">
+                    ✓ Katılanlar ({{ grup.katilimcilar|length }})
+                </div>
+                {% if grup.katilimcilar %}
+                <table style="width:100%;border-collapse:collapse;">
+                    {% for ogr in grup.katilimcilar %}
+                    <tr style="border-bottom:1px solid #f9f9f9;">
+                        <td style="padding:6px 10px;font-size:0.82em;color:#888;width:70px;">{{ ogr.okulno }}</td>
+                        <td style="padding:6px 5px;font-size:0.9em;">{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                        <td style="padding:6px 10px;font-size:0.85em;color:#6c757d;text-align:right;">{{ ogr.sinif }}/{{ ogr.sube }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div style="padding:12px 15px;color:#6c757d;font-size:0.9em;">Bu derste katılımcı bulunmuyor.</div>
+                {% endif %}
+            </div>
+
+            {# Devamsızlar #}
+            <div style="flex:1;min-width:240px;">
+                <div style="padding:8px 15px;background:#f8f9fa;font-size:0.85em;font-weight:600;color:#dc3545;border-bottom:1px solid #eee;">
+                    ✗ Devamsızlar ({{ grup.devamsizlar|length }})
+                </div>
+                {% if grup.devamsizlar %}
+                <table style="width:100%;border-collapse:collapse;">
+                    {% for ogr in grup.devamsizlar %}
+                    <tr style="border-bottom:1px solid #f9f9f9;">
+                        <td style="padding:6px 10px;font-size:0.82em;color:#888;width:70px;">{{ ogr.okulno }}</td>
+                        <td style="padding:6px 5px;font-size:0.9em;">{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                        <td style="padding:6px 10px;font-size:0.85em;color:#6c757d;text-align:right;">{{ ogr.sinif }}/{{ ogr.sube }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div style="padding:12px 15px;color:#6c757d;font-size:0.9em;">Bu derste devamsız öğrenci yok.</div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+    {% empty %}
+    <div class="card">
+        <div style="padding:30px;text-align:center;color:#6c757d;">Bu faaliyet için ders saati bulunmuyor.</div>
+    </div>
+    {% endfor %}
+
+    <div style="margin-top:10px;text-align:right;">
+        <a href="{% url 'faaliyet:faaliyet_liste' %}" class="btn-cancel">← Faaliyetlerime Dön</a>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,203 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Disiplin Görüşme Listesi{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Disiplin Görüşme Listesi</h2>
+        {% if kullanici_disiplin %}
+        <a href="{% url 'disiplin:gorusme_olustur' %}" class="btn btn-success">+ Yeni Görüşme</a>
+        {% endif %}
+    </div>
+
+    {# Filtre Formu #}
+    <div class="card mb-20">
+        <div class="card-header bg-primary">Filtrele</div>
+        <div style="padding:16px;">
+            <form method="get" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+
+                <div>
+                    <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Başlangıç Tarihi</label>
+                    <input type="date" name="tarih_bas" value="{{ filters.tarih_bas }}"
+                           style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Bitiş Tarihi</label>
+                    <input type="date" name="tarih_bit" value="{{ filters.tarih_bit }}"
+                           style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Sınıf/Şube</label>
+                    <select name="sinifsube" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                        <option value="">Tümü</option>
+                        {% for ss in sinifsube_secenekleri %}
+                        <option value="{{ ss }}" {% if filters.sinifsube == ss %}selected{% endif %}>{{ ss }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Görüşme Türü</label>
+                    <select name="tur" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                        <option value="">Tümü</option>
+                        {% for val, label in tur_secenekleri %}
+                        <option value="{{ val }}" {% if filters.tur == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:0.85em;font-weight:600;color:#555;margin-bottom:3px;">Öğrenci Ara</label>
+                    <input type="text" name="ogrenci_q" value="{{ filters.ogrenci_q }}"
+                           placeholder="Ad, soyad veya okul no…"
+                           style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;min-width:180px;">
+                </div>
+
+                {% if kullanici_disiplin %}
+                <div style="display:flex;align-items:center;gap:6px;padding-bottom:4px;">
+                    <label style="font-size:0.85em;font-weight:600;color:#555;">Gizli Kayıtlar:</label>
+                    <select name="gizli" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                        <option value="">Tümü</option>
+                        <option value="0" {% if filters.gizli == '0' %}selected{% endif %}>Gizli Değil</option>
+                        <option value="1" {% if filters.gizli == '1' %}selected{% endif %}>Yalnızca Gizli</option>
+                    </select>
+                </div>
+                {% endif %}
+
+                <div style="display:flex;gap:8px;">
+                    <button type="submit" class="btn btn-primary" style="white-space:nowrap;">Filtrele</button>
+                    <a href="{% url 'disiplin:gorusme_liste' %}" class="btn-cancel" style="white-space:nowrap;">Temizle</a>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    {# Sonuç özeti #}
+    <div class="flex-between mb-20" style="align-items:center;">
+        <span style="color:#6c757d;font-size:0.9em;">Toplam <strong>{{ toplam }}</strong> görüşme kaydı bulundu.</span>
+    </div>
+
+    {% if gorusmeler %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Tür</th>
+                    <th>Öğrenci</th>
+                    <th>Konu</th>
+                    <th class="center">Takip Tarihi</th>
+                    <th class="center">Gizli</th>
+                    <th class="center">Kayıt Eden</th>
+                    <th class="center">İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for g in gorusmeler %}
+                <tr>
+                    <td style="white-space:nowrap;">{{ g.tarih|date:"d.m.Y" }}</td>
+                    <td>
+                        <span class="badge"
+                              style="background:{% if g.tur == 'bireysel' %}#17a2b8{% elif g.tur == 'veli' %}#6f42c1{% elif g.tur == 'grup' %}#20c997{% else %}#6c757d{% endif %};">
+                            {{ g.get_tur_display }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if g.tur == 'bireysel' or g.tur == 'veli' %}
+                            {% if g.ogrenci %}
+                            <span style="font-size:0.85em;color:#555;display:block;">{{ g.ogrenci.sinif }}/{{ g.ogrenci.sube }} Sınıfı - {{ g.ogrenci.okulno }}</span>
+                            {{ g.ogrenci.adi }} {{ g.ogrenci.soyadi }}
+                            {% if g.tur == 'veli' and g.veli_adi %}
+                            <span style="font-size:0.82em;color:#856404;display:block;">Veli: {{ g.veli_adi }}</span>
+                            {% endif %}
+                            {% else %}<span style="color:#aaa;">—</span>{% endif %}
+                        {% elif g.tur == 'grup' %}
+                            <span style="font-size:0.85em;color:#20c997;font-weight:600;">
+                                {{ g.grup_ogrencileri.count }} öğrenci
+                            </span>
+                        {% else %}
+                            <span style="color:#aaa;">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'disiplin:gorusme_detay' g.pk %}"
+                           style="color:#417690;text-decoration:none;">{{ g.konu }}</a>
+                    </td>
+                    <td class="center">
+                        {% if g.takip_tarihi %}
+                        <span style="{% if g.takip_tarihi < bugun %}color:#dc3545;font-weight:600;{% endif %}">
+                            {{ g.takip_tarihi|date:"d.m.Y" }}
+                        </span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="center">
+                        {% if g.gizli %}
+                        <span class="badge" style="background:#dc3545;">Gizli</span>
+                        {% else %}
+                        <span style="color:#aaa;font-size:0.85em;">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="center" style="font-size:0.85em;color:#555;">
+                        {{ g.kayit_eden.adi_soyadi|default:"—" }}
+                    </td>
+                    <td class="center" style="white-space:nowrap;">
+                        <a href="{% url 'disiplin:gorusme_detay' g.pk %}"
+                           class="btn btn-info" style="padding:3px 9px;font-size:0.82em;">Detay</a>
+                        {% if personel and g.kayit_eden == personel %}
+                        <a href="{% url 'disiplin:gorusme_duzenle' g.pk %}"
+                           class="btn btn-warning" style="padding:3px 9px;font-size:0.82em;">Düzenle</a>
+                        <a href="{% url 'disiplin:gorusme_sil' g.pk %}"
+                           class="btn btn-danger" style="padding:3px 9px;font-size:0.82em;">Sil</a>
+                        {% endif %}
+                        {% if kullanici_disiplin %}
+                            {% if g.tur == 'bireysel' or g.tur == 'veli' %}
+                                {% if g.ogrenci %}
+                                <a href="{% url 'disiplin:cagri_olustur' %}?ogrenci_id={{ g.ogrenci.pk }}"
+                                   class="btn btn-success" style="padding:3px 9px;font-size:0.82em;">Çağrı</a>
+                                {% endif %}
+                            {% elif g.tur == 'grup' %}
+                                <a href="{% url 'disiplin:cagri_olustur' %}?gorusme_id={{ g.pk }}"
+                                   class="btn btn-success" style="padding:3px 9px;font-size:0.82em;">Çağrı</a>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card">
+        <div style="padding:40px;text-align:center;color:#6c757d;">
+            Belirtilen kriterlere uygun görüşme kaydı bulunamadı.
+            {% if kullanici_disiplin %}
+            <br><br>
+            <a href="{% url 'disiplin:gorusme_olustur' %}" class="btn btn-primary">İlk Görüşmeyi Oluştur</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var bugun = new Date();
+    bugun.setHours(0, 0, 0, 0);
+    // Takip tarihlerinin renklendirmesi CSS ile halledildi
+})();
+</script>
+{% endblock %}

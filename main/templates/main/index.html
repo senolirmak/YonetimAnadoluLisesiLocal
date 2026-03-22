@@ -1,0 +1,413 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .menu-group {
+        margin-bottom: 25px;
+        text-align: left;
+        background: #fdfdfd;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .menu-group-title {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 8px;
+    }
+    .menu-section .menu-group-title {
+        border-bottom: none;
+        margin-bottom: 12px;
+        padding-bottom: 0;
+    }
+    .menu-divider {
+        border: 0;
+        border-top: 1px solid #dee2e6;
+        margin: 20px 0;
+    }
+    .menu-button-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: flex-start;
+    }
+    .menu-button-group .btn {
+        flex: 1 1 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+    /* Mobil Cihazlar İçin Görünüm */
+    @media (max-width: 768px) {
+        .menu-group {
+            padding: 15px;
+        }
+        .menu-button-group {
+            flex-direction: column;
+        }
+        .menu-button-group .btn {
+            width: 100%;
+            flex: none;
+        }
+        .index-grid {
+            flex-direction: column;
+        }
+    }
+    .index-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 50px;
+        text-align: left;
+    }
+    .index-col-main {
+        flex: 1;
+        min-width: 100px;
+    }
+    .index-col-side {
+        flex: 1;
+        min-width: 250px;
+    }
+    .info-item {
+        padding: 5px 0;
+        font-size: 1em;
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #f1f1f1;
+    }
+</style>
+
+<div class="welcome-container">
+    <h2 class="page-title page-title-mb">Okul Yönetim Sistemine Hoşgeldiniz</h2>
+    <p class="welcome-text">
+        Aşağıdaki menüden istediğiniz işlemi seçebilirsiniz.
+    </p>
+
+    <div class="index-grid">
+        <!-- 1. Kolon: Menüler -->
+        <div class="index-col-main">
+            <div class="menu-group">
+                {% if is_mudur_yardimcisi %}
+                <div class="menu-section">
+                    <div class="menu-group-title">Yönetim Paneli</div>
+                    <div class="menu-button-group">
+                        <a href="/admin/" class="btn btn-primary btn-lg">Yönetici Paneline Git</a>
+                        <a href="{% url 'sinav:index' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Ortak Sınav Yönetimi</a>
+                        <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" class="btn btn-lg"
+                           style="background-color:#fd7e14;color:#fff;position:relative;">
+                            Faaliyet Onayları
+                            {% if bekleyen_faaliyet_sayisi > 0 %}
+                            <span style="position:absolute;top:-6px;right:-6px;background:#dc3545;color:#fff;
+                                         border-radius:50%;width:20px;height:20px;font-size:0.75em;
+                                         display:flex;align-items:center;justify-content:center;font-weight:bold;">
+                                {{ bekleyen_faaliyet_sayisi }}
+                            </span>
+                            {% endif %}
+                        </a>
+                    </div>
+                </div>
+                <hr class="menu-divider">
+                {% endif %}
+
+                <div class="menu-section">
+                    <div class="menu-group-title">Devamsızlık ve Nöbet İşlemleri</div>
+                    <div class="menu-button-group">
+                        {% if is_mudur_yardimcisi %}
+                        <a href="{% url 'devamsizlik_list' %}" class="btn btn-secondary btn-lg" style="background-color: #17a2b8; color: white;">Devamsızlık İşlemleri</a>
+                        {% endif %}
+                        {% if is_ogretmen_menu %}
+                        <a href="{% url 'ogretmen_haftalik_nobet' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Haftalık Nöbet Listesi</a>
+                        <a href="{% url 'ogretmen_gunun_nobetcileri' %}" class="btn btn-warning btn-lg">Günün Nöbetçileri</a>
+                        <a href="{% url 'ogretmen_ders_doldurma' %}" class="btn btn-info btn-lg" style="color: white;">Atanan / Atanamayan Dersler</a>
+                        {% else %}
+                        <a href="{% url 'nobet_dagitim' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Haftalık Nöbet Listesi</a>
+                        <a href="{% url 'gunun_nobetcileri' %}" class="btn btn-warning btn-lg">Günün Nöbetçileri</a>
+                        <a href="{% url 'nobet_ders_doldurma' %}" class="btn btn-info btn-lg" style="color: white;">Ders Doldurma Listesi</a>
+                        {% endif %}
+                    </div>
+                    {% if ogretmen_nobetleri %}
+                    <div style="margin-top:10px;padding:8px 10px;background:#e8f4fd;border:1px solid #bee5eb;border-radius:6px;font-size:0.9em;color:#0c5460;">
+                        <strong>Nöbet Görevlerim:</strong>
+                        <ul style="margin:4px 0 0 0;padding-left:18px;">
+                            {% for n in ogretmen_nobetleri %}
+                            <li>{{ n.gun }} — {{ n.yer }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    {% if atanan_dersler %}
+                    <div style="margin-top:8px;padding:8px 10px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;font-size:0.9em;color:#856404;">
+                        <strong>Bugün Atanan Dersler:</strong>
+                        <ul style="margin:4px 0 0 0;padding-left:18px;">
+                            {% for d in atanan_dersler %}
+                            <li>{{ d.saat }}. ders — {{ d.sinif }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if is_yonetici %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Ders Programı İşlemleri</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'ogretmen_program' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Öğretmen Durum Bilgisi</a>
+                        {% if is_tarih_degistirebilir %}
+                        <a href="{% url 'sinif_program' %}" class="btn btn-lg" style="background-color: #17a2b8; color: white;">Sınıf Durum Bilgisi</a>
+                        {% endif %}
+                        <a href="{% url 'sinif_ogretmenleri' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Sınıfta Ders Listesi</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if is_mudur_yardimcisi %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Kullanıcı Yönetimi</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'ogretmen_kullanici_listesi' %}" class="btn btn-lg" style="background-color: #343a40; color: white;">Öğretmen Kullanıcıları</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if is_mudur_yardimcisi %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Duyuru Yönetimi</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'duyuru_listesi' %}" class="btn btn-lg" style="background-color: #fd7e14; color: white;">Duyuru İşlemleri</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if is_tarih_degistirebilir %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Bilgi Panosu</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'pano:index' %}" class="btn btn-lg" style="background-color: #343a40; color: white;">Pano Görünümü</a>
+                        <a href="{% url 'pano:kiosk' %}" class="btn btn-lg" style="background-color: #6c757d; color: white;">Kiosk Modu</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if is_tarih_degistirebilir %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Müdüriyet Çağrısı</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'muduriyetcagri:cagri_olustur' %}" class="btn btn-lg" style="background-color: #343a40; color: white;">Öğrenci Çağır</a>
+                        <a href="{% url 'muduriyetcagri:cagri_liste' %}" class="btn btn-lg" style="background-color: #6c757d; color: white;">Çağrı Listesi</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if is_ogretmen and personel_bagli %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Yoklama</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'devamsizlik:ogretmen_devamsizlik' %}" class="btn btn-lg" style="background-color: #e83e8c; color: white;">Yoklama Gir</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if sinav_gozetim_var %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Sınav İşlemleri</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'ogretmen_sinav_gozetim' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Sınav Kelebek Yerleşim Listeleri</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Öğrenci İşleri</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'ogrenci:ogrenci_liste' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Öğrenci Listesi</a>
+                        {% if is_tarih_degistirebilir %}
+                        <a href="{% url 'ogrencinobet:nobetci_form' %}" class="btn btn-lg" style="background-color: #e83e8c; color: white;">Nöbetçi Öğrenci</a>
+                        {% endif %}
+                        {% if is_tarih_degistirebilir %}
+                        <a href="{% url 'devamsizlik:ogrenci_devamsizlik_listesi' %}" class="btn btn-lg" style="background-color: #6610f2; color: white;">Öğrenci Yoklama Kayıtları</a>
+                        <a href="{% url 'devamsizlik:ogrenci_devamsizlik_pdf' %}" class="btn btn-lg" style="background-color: #dc3545; color: white;">Yoklama PDF Raporu</a>
+                        {% endif %}
+                        {% if is_mudur_yardimcisi %}
+                        <a href="{% url 'ogrenci:excel_yukle' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Excel Yükle</a>
+                        {% endif %}
+                    </div>
+                    {% if rehberlik_sinif_sube %}
+                    <div style="margin-top:10px;padding:8px 10px;background:#f0fff4;border:1px solid #c3e6cb;border-radius:6px;font-size:0.9em;color:#155724;">
+                        <strong>Sınıf Rehber Öğretmenliği:</strong> {{ rehberlik_sinif_sube }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Faaliyetler</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'faaliyet:faaliyet_liste' %}" class="btn btn-lg" style="background-color: #fd7e14; color: white;">Faaliyetlerim</a>
+                        <a href="{% url 'faaliyet:faaliyet_olustur' %}" class="btn btn-lg" style="background-color: #e83e8c; color: white;">Yeni Faaliyet</a>
+                    </div>
+                </div>
+
+                {% if is_rehber_ogretmen %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Rehberlik Servisi</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'rehberlik:cagri_olustur' %}" class="btn btn-lg" style="background-color: #17a2b8; color: white;">Öğrenci Çağrısı</a>
+                        <a href="{% url 'rehberlik:cagri_liste' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Çağrı Listesi</a>
+                        <a href="{% url 'rehberlik:gorusme_liste' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Görüşme Listesi</a>
+                    </div>
+                </div>
+                {% elif is_mudur_yardimcisi %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Rehberlik Servisi</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'rehberlik:gorusme_liste' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Görüşme Listesi</a>
+                        <a href="{% url 'rehberlik:cagri_liste' %}" class="btn btn-lg" style="background-color: #17a2b8; color: white;">Çağrı Listesi</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if is_disiplin_kurulu %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Disiplin Kurulu</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'disiplin:cagri_olustur' %}" class="btn btn-lg" style="background-color: #dc3545; color: white;">Öğrenci Çağrısı</a>
+                        <a href="{% url 'disiplin:cagri_liste' %}" class="btn btn-lg" style="background-color: #c82333; color: white;">Çağrı Listesi</a>
+                        <a href="{% url 'disiplin:gorusme_liste' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Görüşme Listesi</a>
+                    </div>
+                </div>
+                {% elif is_mudur_yardimcisi %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Disiplin Kurulu</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'disiplin:gorusme_liste' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Görüşme Listesi</a>
+                        <a href="{% url 'disiplin:cagri_liste' %}" class="btn btn-lg" style="background-color: #dc3545; color: white;">Çağrı Listesi</a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 2. Kolon: Günün Öğrenci İstatistikleri (yöneticilere görünür) -->
+        {% if is_yonetici %}
+        <div class="index-col-side">
+            <div class="menu-group">
+                <div class="menu-group-title">Günün Öğrenci Durumu</div>
+
+                <div class="menu-group-title" style="font-size:0.9rem;color:#6c757d;margin-top:8px;margin-bottom:6px;">Devamsızlık</div>
+                <div class="info-item">
+                    <span>Devamsız Kız</span>
+                    <span class="badge" style="background-color:#e83e8c;color:#fff;">{{ ogrenci_istatistik.devamsiz_kiz }}</span>
+                </div>
+                <div class="info-item">
+                    <span>Devamsız Erkek</span>
+                    <span class="badge" style="background-color:#007bff;color:#fff;">{{ ogrenci_istatistik.devamsiz_erkek }}</span>
+                </div>
+
+                <div class="hr-divider" style="margin:10px 0;"></div>
+                <div class="menu-group-title" style="font-size:0.9rem;color:#6c757d;margin-bottom:6px;">Servis Çağrıları</div>
+                <div class="info-item">
+                    <span>Faaliyet Öğrencisi</span>
+                    <span class="badge" style="background-color:#fd7e14;color:#fff;">{{ ogrenci_istatistik.faaliyet }}</span>
+                </div>
+                <div class="info-item">
+                    <span>Rehberlik Çağrısı</span>
+                    <span class="badge" style="background-color:#20c997;color:#fff;">{{ ogrenci_istatistik.rehberlik_cagri }}</span>
+                </div>
+                <div class="info-item">
+                    <span>Disiplin Çağrısı</span>
+                    <span class="badge" style="background-color:#dc3545;color:#fff;">{{ ogrenci_istatistik.disiplin_cagri }}</span>
+                </div>
+
+                {% if is_mudur_yardimcisi %}
+                <div style="margin-top:14px;">
+                    <a href="{% url 'devamsizlik:ogrenci_devamsizlik_listesi' %}" class="btn btn-sm btn-outline-secondary" style="width:100%;">Detaylı Görünüm</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 2. Kolon: Okul Bilgileri + Günün Nöbetçi Öğrencileri -->
+        <div class="index-col-side">
+            <div class="menu-group">
+                <div class="menu-group-title">Okul Bilgileri</div>
+                {% if okul_bilgi %}
+                    <div class="info-item"><strong>Okul Adı:</strong> <span>{{ okul_bilgi.okul_adi|default:"-" }}</span></div>
+                    <div class="info-item"><strong>Okul Kodu:</strong> <span>{{ okul_bilgi.okul_kodu|default:"-" }}</span></div>
+                    <div class="info-item"><strong>Okul Müdürü:</strong> <span>{{ okul_bilgi.okul_muduru|default:"-" }}</span></div>
+                {% else %}
+                    <p class="text-muted">Okul bilgileri henüz girilmemiş.</p>
+                {% endif %}
+            </div>
+
+            <div class="menu-group">
+                <div class="menu-group-title">
+                    Günün Nöbetçi Öğrencileri
+                    {% if gunun_nobetci_ogrencileri %}
+                    <span class="badge badge-info" style="font-size:0.8em;margin-left:6px;">{{ gunun_nobetci_ogrencileri|length }}</span>
+                    {% endif %}
+                </div>
+                {% if gunun_nobetci_ogrencileri %}
+                <ul class="list-group">
+                    {% for g in gunun_nobetci_ogrencileri %}
+                    <li class="list-item" style="padding:5px 0;border-bottom:1px solid #f1f1f1;display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-size:0.9em;">{{ g.ogrenci.adi }} {{ g.ogrenci.soyadi }}</span>
+                        <span class="badge badge-secondary" style="font-size:0.78em;">{{ g.ogrenci.sinifsube }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted" style="font-size:0.9em;">Bugün nöbetçi öğrenci bulunmamaktadır.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 3. Kolon: Personel Bilgileri ve İstatistikler -->
+        <div class="index-col-side">
+            <div class="menu-group">
+                <div class="menu-group-title">Personel Bilgileri</div>
+                <div class="info-item"><strong>Toplam Öğretmen:</strong> <span class="badge bg-primary">{{ personel_istatistik.toplam }}</span></div>
+                <div class="info-item"><strong>Ücretli Öğretmen:</strong> <span class="badge badge-secondary">{{ personel_istatistik.ucretli }}</span></div>
+                <div class="info-item"><strong>Bugün Devamsız:</strong> <span class="text-danger font-bold">{{ personel_istatistik.devamsiz }}</span></div>
+                <div class="info-item mb-20"><strong>Bugün Nöbetçi:</strong> <span class="text-success-bold">{{ personel_istatistik.nobetci }}</span></div>
+                
+                <div class="hr-divider" style="margin: 10px 0;"></div>
+                <div class="menu-group-title" style="font-size: 1rem; margin-bottom: 10px;">Branş Dağılımı</div>
+                
+                <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                    <ul class="list-group">
+                        {% for brans in personel_istatistik.brans_dagilimi %}
+                        <li class="list-item" style="padding: 6px 0; border-bottom: 1px solid #f9f9f9; display: flex; justify-content: space-between;">
+                            <span style="font-size: 0.9em;">{{ brans.brans|default:"Belirtilmemiş"|truncatechars:25 }}</span>
+                            <span class="badge badge-info">{{ brans.sayi }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}
+

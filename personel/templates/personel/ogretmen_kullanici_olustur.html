@@ -1,0 +1,58 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Kullanıcı Oluştur — {{ personel.adi_soyadi }}{% endblock %}
+
+{% block content %}
+<div class="container-sm">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Kullanıcı Oluştur</h2>
+        <a href="{% url 'ogretmen_kullanici_listesi' %}" class="btn-cancel">← Listeye Dön</a>
+    </div>
+
+    <div class="card mb-20">
+        <div class="card-header bg-primary">Personel Bilgisi</div>
+        <div class="form-box">
+            <div class="form-row">
+                <label>Adı Soyadı</label>
+                <input type="text" value="{{ personel.adi_soyadi }}" class="vTextField" disabled>
+            </div>
+            <div class="form-row">
+                <label>Branş</label>
+                <input type="text" value="{{ personel.brans }}" class="vTextField" disabled>
+            </div>
+            <div class="form-row">
+                <label>TC Kimlik No</label>
+                <input type="text" value="{{ personel.kimlikno }}" class="vTextField" disabled>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-primary">Yeni Kullanıcı Bilgileri</div>
+        <div class="form-box">
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="form-row">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                        <span class="error-text">{{ field.errors }}</span>
+                    {% endif %}
+                    {% if field.help_text %}
+                        <span class="help-text">{{ field.help_text }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="form-actions">
+                    <a href="{% url 'ogretmen_kullanici_listesi' %}" class="btn-cancel">Vazgeç</a>
+                    <button type="submit" class="btn btn-success">Oluştur ve Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <p class="text-muted mt-20">
+        <small>Oluşturulan kullanıcı otomatik olarak <strong>öğretmen</strong> grubuna eklenir.</small>
+    </p>
+</div>
+{% endblock %}

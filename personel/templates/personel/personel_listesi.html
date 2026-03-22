@@ -1,0 +1,105 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Personel Listesi{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Personel Listesi</h2>
+        <span style="background:#417690;color:#fff;padding:5px 16px;border-radius:12px;font-size:0.9em;font-weight:600;">
+            {{ toplam }} kayıt
+        </span>
+    </div>
+
+    <form method="get" class="filter-box" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:20px;background:#f8f9fa;padding:14px 16px;border-radius:6px;border:1px solid #e0e0e0;">
+        <div>
+            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Ad Soyad Ara</label>
+            <input type="text" name="q" value="{{ q }}" placeholder="Ara…"
+                   style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;width:180px;">
+        </div>
+        <div>
+            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Branş</label>
+            <select name="brans" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                <option value="">Tümü</option>
+                {% for b in brans_listesi %}
+                <option value="{{ b }}" {% if secili_brans == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="display:block;font-size:0.82em;color:#555;margin-bottom:3px;">Görev Tipi</label>
+            <select name="gorev_tipi" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                <option value="">Tümü</option>
+                {% for g in gorev_tipi_listesi %}
+                <option value="{{ g }}" {% if secili_gorev_tipi == g %}selected{% endif %}>{{ g }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display:flex;gap:6px;align-items:flex-end;">
+            <button type="submit" class="btn btn-primary">Filtrele</button>
+            <a href="{% url 'personel_listesi' %}" class="btn-cancel">Temizle</a>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Adı Soyadı</th>
+                    <th>Branş</th>
+                    <th>Görev Tipi</th>
+                    <th class="center">Cinsiyet</th>
+                    <th class="center">Nöbet</th>
+                    <th class="center">Sabit Nöbet</th>
+                    <th class="center">Kullanıcı</th>
+                    <th class="center">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in personeller %}
+                <tr>
+                    <td>{{ p.adi_soyadi }}</td>
+                    <td>{{ p.brans }}</td>
+                    <td>{{ p.gorev_tipi|default:"—" }}</td>
+                    <td class="center">{{ p.get_cinsiyet_display }}</td>
+                    <td class="center">
+                        {% if p.nobeti_var %}
+                        <span class="badge" style="background:#28a745;color:#fff;">Var</span>
+                        {% else %}
+                        <span class="badge" style="background:#6c757d;color:#fff;">Yok</span>
+                        {% endif %}
+                    </td>
+                    <td class="center">
+                        {% if p.sabit_nobet %}
+                        <span class="badge badge-info">Evet</span>
+                        {% else %}
+                        <span style="color:#aaa;">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="center">
+                        {% if p.user %}
+                        <span class="badge badge-info">{{ p.user.username }}</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Yok</span>
+                        {% endif %}
+                    </td>
+                    <td class="center" style="white-space:nowrap;">
+                        <a href="{% url 'personel_duzenle' p.pk %}" class="btn btn-primary" style="font-size:0.82em;padding:3px 10px;">Düzenle</a>
+                        <a href="{% url 'personel_sil' p.pk %}" class="btn btn-danger" style="font-size:0.82em;padding:3px 10px;">Sil</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-center text-muted">Personel kaydı bulunamadı.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
