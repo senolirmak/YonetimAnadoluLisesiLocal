@@ -7,10 +7,12 @@
     <title>{% block title %}Nöbet Sistemi{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/nobet_admin.css' %}">
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
     {% include 'includes/header.html' %}
-    
+    {% block nav %}{% endblock %}
+
     <main class="content">
         {% block content %}{% endblock %}
     </main>

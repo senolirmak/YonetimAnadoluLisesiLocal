@@ -1,169 +1,172 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Ortak Sınav Sistemi{% endblock %}</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: "Segoe UI", system-ui, sans-serif;
-      background: #f0f2f5;
-      color: #1a1a2e;
-    }
-    header {
-      background: #1a1a2e;
-      color: #e0e0e0;
-      padding: 1rem 2rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-    header h1 { font-size: 1.4rem; font-weight: 600; }
-    header span { font-size: 0.85rem; color: #8899aa; }
-    header .aktif-sinav-badge {
-      margin-left: auto;
-      background: #16a34a;
-      color: #fff;
-      font-size: 0.8rem;
-      font-weight: 600;
-      padding: .3rem .9rem;
-      border-radius: 99px;
-      white-space: nowrap;
-    }
-    header .aktif-sinav-badge.yok {
-      background: #374151;
-      color: #9ca3af;
-    }
-    nav {
-      background: #16213e;
-      padding: .45rem 2rem;
-      display: flex;
-      gap: 1.5rem;
-    }
-    nav a {
-      color: #a5b4fc;
-      text-decoration: none;
-      font-size: .85rem;
-      font-weight: 500;
-      padding: .2rem 0;
-      border-bottom: 2px solid transparent;
-    }
-    nav a:hover, nav a.active { color: #fff; border-bottom-color: #6366f1; }
-    .container { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
-    .card {
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.08);
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-    }
-    .card h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 1rem; color: #1a1a2e; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
-    .form-group { display: flex; flex-direction: column; gap: .3rem; }
-    label { font-size: .85rem; font-weight: 500; color: #444; }
-    input[type=text], input[type=date], input[type=number], input[type=file],
-    textarea, select {
-      padding: .45rem .65rem;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      font-size: .9rem;
-      width: 100%;
-    }
-    input:focus, textarea:focus { outline: 2px solid #4a90d9; border-color: transparent; }
-    .helptext { font-size: .75rem; color: #888; }
-    .btn {
-      display: inline-flex; align-items: center; gap: .4rem;
-      padding: .5rem 1.1rem;
-      border: none; border-radius: 5px;
-      font-size: .9rem; font-weight: 500;
-      cursor: pointer; transition: filter .15s;
-    }
-    .btn:hover { filter: brightness(.92); }
-    .btn-primary { background: #4a90d9; color: #fff; }
-    .btn-success { background: #27ae60; color: #fff; }
-    .btn-secondary { background: #6c757d; color: #fff; }
-    .btn-sm { padding: .3rem .7rem; font-size: .8rem; }
-    .steps-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 1rem;
-    }
-    .step-card {
-      border: 1px solid #e0e0e0;
-      border-radius: 7px;
-      padding: 1rem;
-      display: flex; flex-direction: column; gap: .5rem;
-      background: #fafafa;
-    }
-    .step-card .step-num { font-size: .75rem; color: #999; }
-    .step-card .step-title { font-size: .9rem; font-weight: 600; }
-    .step-card button { margin-top: auto; }
-    .log-box {
-      background: #111827; color: #d1fae5;
-      font-family: "Cascadia Code", "Fira Code", monospace;
-      font-size: .82rem;
-      padding: 1rem; border-radius: 6px;
-      height: 280px; overflow-y: auto;
-      white-space: pre-wrap;
-    }
-    .log-box .err { color: #f87171; }
-    .log-box .ok  { color: #86efac; }
-    .badge {
-      display: inline-block; padding: .15rem .5rem;
-      border-radius: 99px; font-size: .72rem; font-weight: 600;
-    }
-    .badge-running { background: #fef3c7; color: #92400e; }
-    .badge-done    { background: #d1fae5; color: #065f46; }
-    .badge-error   { background: #fee2e2; color: #991b1b; }
-    .download-list { display: flex; flex-direction: column; gap: .4rem; }
-    .download-item {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: .35rem .6rem; border: 1px solid #e8e8e8; border-radius: 5px;
-      background: #fafafa; font-size: .85rem;
-    }
-    .messages { list-style: none; margin-bottom: 1rem; }
-    .messages li {
-      padding: .6rem 1rem; border-radius: 6px;
-      font-size: .9rem; margin-bottom: .4rem;
-    }
-    .messages .success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
-    .messages .error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-    .messages .warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
-    .field-error { font-size: .78rem; color: #dc2626; margin-top: .2rem; }
-    .input-error { border-color: #dc2626 !important; }
-    .file-info   { font-size: .78rem; color: #059669; margin-top: .25rem; }
-  </style>
-</head>
-<body>
-<header>
-  <h1>Ortak Sınav Sistemi</h1>
-  <span>Sinav takvimi, oturma plani ve sinif raporlari</span>
-  {% if aktif_sinav %}
-    <span class="aktif-sinav-badge">
-      {{ aktif_sinav.egitim_ogretim_yili }} &nbsp;|&nbsp;
-      {{ aktif_sinav.get_donem_display }} &nbsp;|&nbsp;
-      {{ aktif_sinav.get_sinav_adi_display }}
-    </span>
-  {% else %}
-    <span class="aktif-sinav-badge yok">Aktif sınav seçilmedi</span>
-  {% endif %}
-</header>
-<nav>
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{% block sinav_title %}Ortak Sınav Sistemi{% endblock %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ===== Sinav Navigasyon ===== */
+  .sinav-nav {
+    background: #16213e;
+    padding: .45rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .sinav-nav a {
+    color: #a5b4fc;
+    text-decoration: none;
+    font-size: .85rem;
+    font-weight: 500;
+    padding: .2rem 0;
+    border-bottom: 2px solid transparent;
+  }
+  .sinav-nav a:hover, .sinav-nav a.active { color: #fff; border-bottom-color: #6366f1; }
+  .sinav-nav .sinav-badge {
+    margin-left: auto;
+    background: #16a34a;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: .3rem .9rem;
+    border-radius: 99px;
+    white-space: nowrap;
+  }
+  .sinav-nav .sinav-badge.yok {
+    background: #374151;
+    color: #9ca3af;
+  }
+
+  /* ===== Layout ===== */
+  .sinav-container { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+  .card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .card h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 1rem; color: #1a1a2e; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  /* ===== Form Elemanları ===== */
+  .form-group { display: flex; flex-direction: column; gap: .3rem; }
+  label { font-size: .85rem; font-weight: 500; color: #444; }
+  input[type=text], input[type=date], input[type=number], input[type=file],
+  textarea, select {
+    padding: .45rem .65rem;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: .9rem;
+    width: 100%;
+  }
+  input:focus, textarea:focus { outline: 2px solid #4a90d9; border-color: transparent; }
+  .helptext { font-size: .75rem; color: #888; }
+
+  /* ===== Butonlar ===== */
+  .btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .5rem 1.1rem;
+    border: none; border-radius: 5px;
+    font-size: .9rem; font-weight: 500;
+    cursor: pointer; transition: filter .15s;
+    text-decoration: none;
+  }
+  .btn:hover { filter: brightness(.92); }
+  .btn-primary   { background: #4a90d9; color: #fff; }
+  .btn-success   { background: #27ae60; color: #fff; }
+  .btn-secondary { background: #6c757d; color: #fff; }
+  .btn-danger    { background: #dc2626; color: #fff; }
+  .btn-sm { padding: .3rem .7rem; font-size: .8rem; }
+
+  /* ===== Adım Kartları ===== */
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+  }
+  .step-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 7px;
+    padding: 1rem;
+    display: flex; flex-direction: column; gap: .5rem;
+    background: #fafafa;
+  }
+  .step-card .step-num   { font-size: .75rem; color: #999; }
+  .step-card .step-title { font-size: .9rem; font-weight: 600; }
+  .step-card button { margin-top: auto; }
+
+  /* ===== Log Kutusu ===== */
+  .log-box {
+    background: #111827; color: #d1fae5;
+    font-family: "Cascadia Code", "Fira Code", monospace;
+    font-size: .82rem;
+    padding: 1rem; border-radius: 6px;
+    height: 280px; overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .log-box .err { color: #f87171; }
+  .log-box .ok  { color: #86efac; }
+
+  /* ===== Rozetler ===== */
+  .badge {
+    display: inline-block; padding: .15rem .5rem;
+    border-radius: 99px; font-size: .72rem; font-weight: 600;
+  }
+  .badge-running { background: #fef3c7; color: #92400e; }
+  .badge-done    { background: #d1fae5; color: #065f46; }
+  .badge-error   { background: #fee2e2; color: #991b1b; }
+
+  /* ===== İndirme Listesi ===== */
+  .download-list { display: flex; flex-direction: column; gap: .4rem; }
+  .download-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: .35rem .6rem; border: 1px solid #e8e8e8; border-radius: 5px;
+    background: #fafafa; font-size: .85rem;
+  }
+
+  /* ===== Mesajlar ===== */
+  .messages { list-style: none; margin-bottom: 1rem; }
+  .messages li {
+    padding: .6rem 1rem; border-radius: 6px;
+    font-size: .9rem; margin-bottom: .4rem;
+  }
+  .messages .success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+  .messages .error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  .messages .warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+
+  /* ===== Form Hataları ===== */
+  .field-error { font-size: .78rem; color: #dc2626; margin-top: .2rem; }
+  .input-error { border-color: #dc2626 !important; }
+  .file-info   { font-size: .78rem; color: #059669; margin-top: .25rem; }
+</style>
+{% endblock %}
+
+{% block nav %}
+<nav class="sinav-nav">
   <a href="{% url 'sinav:index' %}">Ana Sayfa</a>
   <a href="{% url 'sinav:sinav_bilgisi_listesi' %}">Sınav Bilgileri</a>
   <a href="{% url 'sinav:ders_ayarlari' %}">Ders Ayarları</a>
   <a href="{% url 'sinav:takvim_sayfasi' %}">Takvim (ILP)</a>
   <a href="{% url 'sinav:takvim_gecmisi' %}">Takvim Geçmişi</a>
-
-
   <a href="{% url 'sinav:ogrenci_yonetim' %}">Öğrenci Listesi</a>
   <a href="{% url 'sinav:veri_yukle_sayfasi' %}">Veri Yükle</a>
-  <a href="{% url 'index' %}" style="margin-left:auto; color:#f87171;">← Okul Yönetimine Dön</a>
+  {% if aktif_sinav %}
+    <span class="sinav-badge">
+      {{ aktif_sinav.egitim_ogretim_yili }} &nbsp;|&nbsp;
+      {{ aktif_sinav.get_donem_display }} &nbsp;|&nbsp;
+      {{ aktif_sinav.get_sinav_adi_display }}
+    </span>
+  {% else %}
+    <span class="sinav-badge yok">Aktif sınav seçilmedi</span>
+  {% endif %}
 </nav>
-<div class="container">
+{% endblock %}
+
+{% block content %}
+<div class="sinav-container">
   {% if messages %}
   <ul class="messages">
     {% for m in messages %}
@@ -171,8 +174,11 @@
     {% endfor %}
   </ul>
   {% endif %}
-  {% block content %}{% endblock %}
+  {% block sinav_content %}{% endblock %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
 <script>
 const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? "";
 
@@ -229,5 +235,4 @@ async function iptalAdim(durdurBtnId) {
   });
 }
 </script>
-</body>
-</html>
+{% endblock %}
