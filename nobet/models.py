@@ -186,14 +186,40 @@ class OkulDonem(models.Model):
 
     class Meta:
         db_table = "okul_donem"
-        unique_together = ("kurum", "donem")
+        unique_together = ("kurum", "baslangic", "bitis")
         verbose_name = "Okul Dönemi"
         verbose_name_plural = "Okul Dönemleri"
-        ordering = ["donem"]
+        ordering = ["baslangic"]
 
     def __str__(self):
         donem_adi = dict(self.DONEM_CHOICES).get(self.donem, str(self.donem))
         return f"{self.kurum.okul_kodu} – {donem_adi} ({self.baslangic} / {self.bitis})"
+
+
+class EgitimOgretimYili(models.Model):
+    kurum = models.ForeignKey(
+        OkulBilgi,
+        on_delete=models.CASCADE,
+        related_name="egitim_yillari",
+        verbose_name="Kurum",
+    )
+    egitim_yili = models.CharField(
+        max_length=9,
+        verbose_name="Eğitim-Öğretim Yılı",
+        help_text="Örnek: 2025-2026",
+    )
+    egitim_baslangic = models.DateField(verbose_name="Yıl Başlangıç Tarihi")
+    egitim_bitis = models.DateField(verbose_name="Yıl Bitiş Tarihi")
+
+    class Meta:
+        db_table = "egitim_ogretim_yili"
+        unique_together = ("kurum", "egitim_yili")
+        verbose_name = "Eğitim-Öğretim Yılı"
+        verbose_name_plural = "Eğitim-Öğretim Yılları"
+        ordering = ["-egitim_yili"]
+
+    def __str__(self):
+        return f"{self.kurum.okul_kodu} – {self.egitim_yili}"
 
 
 class VeriYukleme(models.Model):
