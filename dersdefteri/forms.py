@@ -1,4 +1,6 @@
 from django import forms
+from django.db.models import IntegerField
+from django.db.models.functions import Cast
 
 from ogrenci.models import Ogrenci
 
@@ -28,5 +30,6 @@ class DersDefterForm(forms.ModelForm):
         if sinif_sube:
             self.fields["devamsiz_ogrenciler"].queryset = (
                 Ogrenci.objects.filter(sinif=sinif_sube.sinif, sube=sinif_sube.sube)
-                .order_by("soyadi", "adi")
+                .annotate(okulno_int=Cast("okulno", IntegerField()))
+                .order_by("okulno_int")
             )
