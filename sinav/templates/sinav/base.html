@@ -12,20 +12,71 @@
     display: flex;
     align-items: center;
     gap: 1.5rem;
-    flex-wrap: wrap;
   }
-  .sinav-nav a {
+
+  /* Dropdown */
+  .sinav-dropdown { position: relative; }
+  .sinav-dropdown-trigger {
+    color: #a5b4fc;
+    font-size: .85rem;
+    font-weight: 600;
+    padding: .35rem .75rem;
+    background: rgba(255,255,255,.07);
+    border-radius: 5px;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .sinav-dropdown:hover .sinav-dropdown-trigger {
+    background: rgba(255,255,255,.14);
+    color: #fff;
+  }
+  .sinav-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + .4rem);
+    left: 0;
+    background: #1e2d50;
+    border: 1px solid #2d3f6a;
+    border-radius: 7px;
+    min-width: 200px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    z-index: 999;
+    overflow: hidden;
+  }
+  .sinav-dropdown:hover .sinav-dropdown-menu { display: block; }
+  .sinav-dropdown-menu a {
+    display: block;
     color: #a5b4fc;
     text-decoration: none;
     font-size: .85rem;
     font-weight: 500;
-    padding: .2rem 0;
-    border-bottom: 2px solid transparent;
+    padding: .55rem 1.1rem;
+    border-left: 3px solid transparent;
+    transition: background .12s, color .12s;
   }
-  .sinav-nav a:hover, .sinav-nav a.active { color: #fff; border-bottom-color: #6366f1; }
-  .sinav-nav .sinav-nav-geri { color: #f87171; margin-left: auto; }
-  .sinav-nav .sinav-nav-geri:hover { color: #fca5a5; border-bottom-color: #f87171; }
-  .sinav-nav .sinav-badge {
+  .sinav-dropdown-menu a:hover {
+    background: rgba(255,255,255,.07);
+    color: #fff;
+    border-left-color: #6366f1;
+  }
+  .sinav-dropdown-menu hr {
+    border: none;
+    border-top: 1px solid #2d3f6a;
+    margin: .25rem 0;
+  }
+
+  /* Sağ taraf */
+  .sinav-nav-sag { margin-left: auto; display: flex; align-items: center; gap: .9rem; }
+  .sinav-nav-geri {
+    color: #f87171;
+    text-decoration: none;
+    font-size: .85rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .sinav-nav-geri:hover { color: #fca5a5; }
+  .sinav-badge {
     background: #16a34a;
     color: #fff;
     font-size: 0.8rem;
@@ -34,10 +85,7 @@
     border-radius: 99px;
     white-space: nowrap;
   }
-  .sinav-nav .sinav-badge.yok {
-    background: #374151;
-    color: #9ca3af;
-  }
+  .sinav-badge.yok { background: #374151; color: #9ca3af; }
 
   /* ===== Layout ===== */
   .sinav-container { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
@@ -147,23 +195,35 @@
 
 {% block nav %}
 <nav class="sinav-nav">
-  <a href="{% url 'sinav:index' %}">Ana Sayfa</a>
-  <a href="{% url 'sinav:sinav_bilgisi_listesi' %}">Sınav Bilgileri</a>
-  <a href="{% url 'sinav:ders_ayarlari' %}">Ders Ayarları</a>
-  <a href="{% url 'sinav:takvim_sayfasi' %}">Takvim (ILP)</a>
-  <a href="{% url 'sinav:takvim_gecmisi' %}">Takvim Geçmişi</a>
-  <a href="{% url 'sinav:ogrenci_yonetim' %}">Öğrenci Listesi</a>
-  <a href="{% url 'sinav:veri_yukle_sayfasi' %}">Veri Yükle</a>
-  <a href="{% url 'index' %}" class="sinav-nav-geri">&#8592; Okul Yönetimine Dön</a>
-  {% if aktif_sinav %}
-    <span class="sinav-badge">
-      {{ aktif_sinav.egitim_ogretim_yili }} &nbsp;|&nbsp;
-      {{ aktif_sinav.get_donem_display }} &nbsp;|&nbsp;
-      {{ aktif_sinav.get_sinav_adi_display }}
-    </span>
-  {% else %}
-    <span class="sinav-badge yok">Aktif sınav seçilmedi</span>
-  {% endif %}
+
+  <div class="sinav-dropdown">
+    <span class="sinav-dropdown-trigger">Ortak Sınav ▾</span>
+    <div class="sinav-dropdown-menu">
+      <a href="{% url 'sinav:index' %}">Ana Sayfa</a>
+      <a href="{% url 'sinav:sinav_bilgisi_listesi' %}">Sınav Bilgileri</a>
+      <hr>
+      <a href="{% url 'sinav:veri_yukle_sayfasi' %}">Veri Yükle</a>
+      <a href="{% url 'sinav:ders_ayarlari' %}">Ders Ayarları</a>
+      <a href="{% url 'sinav:takvim_sayfasi' %}">Takvim (ILP)</a>
+      <a href="{% url 'sinav:takvim_gecmisi' %}">Takvim Geçmişi</a>
+      <hr>
+      <a href="{% url 'sinav:ogrenci_yonetim' %}">Öğrenci Listesi</a>
+    </div>
+  </div>
+
+  <div class="sinav-nav-sag">
+    <a href="{% url 'index' %}" class="sinav-nav-geri">&#8592; Okul Yönetimine Dön</a>
+    {% if aktif_sinav %}
+      <span class="sinav-badge">
+        {{ aktif_sinav.egitim_ogretim_yili }} &nbsp;|&nbsp;
+        {{ aktif_sinav.get_donem_display }} &nbsp;|&nbsp;
+        {{ aktif_sinav.get_sinav_adi_display }}
+      </span>
+    {% else %}
+      <span class="sinav-badge yok">Aktif sınav seçilmedi</span>
+    {% endif %}
+  </div>
+
 </nav>
 {% endblock %}
 
