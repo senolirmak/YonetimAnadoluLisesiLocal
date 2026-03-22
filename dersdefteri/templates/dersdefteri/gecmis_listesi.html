@@ -1,0 +1,127 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} – Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+  .dd-kart {
+    background: #fff; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;
+  }
+  .dd-filtre {
+    display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  }
+  .dd-filtre label { font-size: .88rem; font-weight: 600; color: #495057; }
+  .dd-filtre select, .dd-filtre input[type=date] {
+    padding: .4rem .65rem; border: 1px solid #ced4da;
+    border-radius: 5px; font-size: .9rem;
+  }
+  .dd-filtre select { min-width: 220px; }
+  .dd-filtre button {
+    padding: .4rem 1rem; background: #417690; color: #fff;
+    border: none; border-radius: 5px; font-size: .88rem; font-weight: 600; cursor: pointer;
+  }
+  .dd-filtre button:hover { background: #345f75; }
+
+  .dd-tablo { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .dd-tablo th {
+    background: #417690; color: #fff; padding: .55rem .9rem;
+    text-align: left; font-weight: 600; white-space: nowrap;
+  }
+  .dd-tablo td { border-bottom: 1px solid #e5e7eb; padding: .55rem .9rem; vertical-align: top; }
+  .dd-tablo tr:hover td { background: #f0f4ff; }
+  .dd-tablo tr:last-child td { border-bottom: none; }
+
+  .icerik-ozet { color: #374151; font-size: .85rem; max-width: 300px; }
+  .devamsiz-chip {
+    display: inline-block; background: #fee2e2; color: #991b1b;
+    border: 1px solid #fca5a5; border-radius: 99px;
+    font-size: .75rem; font-weight: 600; padding: .1rem .5rem; margin: .1rem;
+  }
+  .dd-bos { text-align: center; color: #9ca3af; padding: 2rem; font-size: .95rem; }
+  .btn-duzenle {
+    padding: .25rem .65rem; background: #417690; color: #fff;
+    border: none; border-radius: 4px; font-size: .78rem;
+    text-decoration: none; white-space: nowrap;
+  }
+  .btn-duzenle:hover { background: #345f75; }
+</style>
+
+<div class="container">
+  <h2 class="page-title mb-20">{{ title }}</h2>
+
+  <div class="dd-kart">
+    <form method="get" class="dd-filtre">
+      {% if is_yonetici %}
+      <label>Öğretmen:</label>
+      <select name="ogretmen">
+        <option value="">-- Tümü --</option>
+        {% for ogr in tum_ogretmenler %}
+        <option value="{{ ogr.pk }}" {% if ogr.pk|stringformat:"s" == secilen_ogretmen_id %}selected{% endif %}>
+          {{ ogr.adi_soyadi }}
+        </option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <label>Tarih:</label>
+      <input type="date" name="tarih" value="{{ secilen_tarih_str }}">
+      <button type="submit">Filtrele</button>
+      <a href="{% url 'dersdefteri:ders_listesi' %}" style="font-size:.85rem; color:#417690; text-decoration:none; font-weight:500; margin-left:.5rem;">← Bugüne Dön</a>
+    </form>
+  </div>
+
+  <div class="dd-kart">
+    {% if kayitlar %}
+    <table class="dd-tablo">
+      <thead>
+        <tr>
+          <th>Tarih</th>
+          {% if is_yonetici %}<th>Öğretmen</th>{% endif %}
+          <th>Saat</th>
+          <th>Sınıf</th>
+          <th>Ders</th>
+          <th>İşlenen Konu</th>
+          <th>Devamsız</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in kayitlar %}
+        <tr>
+          <td style="white-space:nowrap; font-weight:600;">{{ k.tarih|date:"d.m.Y" }}</td>
+          {% if is_yonetici %}
+          <td style="white-space:nowrap;">{{ k.ogretmen.adi_soyadi }}</td>
+          {% endif %}
+          <td style="white-space:nowrap; color:#6b7280; font-size:.82rem;">
+            {{ k.giris_saat|time:"H:i" }}–{{ k.cikis_saat|time:"H:i" }}
+          </td>
+          <td>{{ k.sinif_sube|default:"–" }}</td>
+          <td>{{ k.ders_adi }}</td>
+          <td class="icerik-ozet">
+            {{ k.icerik|truncatechars:80|default:"–" }}
+          </td>
+          <td>
+            {% for ogr in k.devamsiz_ogrenciler.all %}
+            <span class="devamsiz-chip">{{ ogr.soyadi }} {{ ogr.adi }}</span>
+            {% empty %}
+            <span style="color:#9ca3af; font-size:.8rem;">–</span>
+            {% endfor %}
+          </td>
+          <td>
+            {% with dp=k.sinif_sube %}
+            {% comment %}Güncelle linki: dp_pk bulmak için ders_adi + sinif_sube + ders_saati eşleşmesi gerekir{% endcomment %}
+            {% endwith %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="dd-bos">Kayıt bulunamadı.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} – Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+  .dd-kart {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .dd-filtre {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+  }
+  .dd-filtre label { font-size: .88rem; font-weight: 600; color: #495057; }
+  .dd-filtre select, .dd-filtre input[type=date] {
+    padding: .4rem .65rem;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    font-size: .9rem;
+  }
+  .dd-filtre select { min-width: 220px; }
+  .dd-filtre button {
+    padding: .4rem 1rem;
+    background: #417690;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: .88rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .dd-filtre button:hover { background: #345f75; }
+
+  .dd-tablo {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .9rem;
+  }
+  .dd-tablo th {
+    background: #417690;
+    color: #fff;
+    padding: .55rem .9rem;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .dd-tablo td {
+    border-bottom: 1px solid #e5e7eb;
+    padding: .6rem .9rem;
+    vertical-align: middle;
+  }
+  .dd-tablo tr:hover td { background: #f0f4ff; }
+  .dd-tablo tr:last-child td { border-bottom: none; }
+
+  .chip-tamam {
+    display: inline-block;
+    background: #d1fae5; color: #065f46;
+    border: 1px solid #6ee7b7;
+    border-radius: 99px; font-size: .78rem; font-weight: 600;
+    padding: .15rem .6rem;
+  }
+  .chip-bos {
+    display: inline-block;
+    background: #fef3c7; color: #92400e;
+    border: 1px solid #fcd34d;
+    border-radius: 99px; font-size: .78rem; font-weight: 600;
+    padding: .15rem .6rem;
+  }
+  .btn-kayit {
+    padding: .3rem .8rem;
+    background: #417690; color: #fff;
+    border: none; border-radius: 5px;
+    font-size: .82rem; font-weight: 600;
+    text-decoration: none; cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-kayit.guncelle { background: #16a34a; }
+  .btn-kayit:hover { filter: brightness(.9); }
+
+  .dd-bos {
+    text-align: center; color: #9ca3af;
+    padding: 2rem; font-size: .95rem;
+  }
+  .dd-tarih-baslik {
+    font-size: .95rem; color: #495057;
+    margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  }
+  .dd-tarih-baslik strong { color: #1a1a2e; }
+  .dd-gecmis-link {
+    margin-left: auto;
+    font-size: .85rem;
+    color: #417690;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .dd-gecmis-link:hover { text-decoration: underline; }
+</style>
+
+<div class="container">
+  <h2 class="page-title mb-20">{{ title }}</h2>
+
+  <!-- Filtre -->
+  <div class="dd-kart">
+    <form method="get" class="dd-filtre">
+      {% if is_yonetici %}
+      <label for="id_ogr">Öğretmen:</label>
+      <select id="id_ogr" name="ogretmen">
+        <option value="">-- Öğretmen seçin --</option>
+        {% for ogr in tum_ogretmenler %}
+        <option value="{{ ogr.pk }}" {% if ogr.pk|stringformat:"s" == secilen_ogretmen_id %}selected{% endif %}>
+          {{ ogr.adi_soyadi }}
+        </option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <label for="id_tarih">Tarih:</label>
+      <input type="date" id="id_tarih" name="tarih" value="{{ today_str }}">
+      <button type="submit">Göster</button>
+      <a href="{% url 'dersdefteri:gecmis_listesi' %}" class="dd-gecmis-link">Geçmiş Kayıtlar →</a>
+    </form>
+  </div>
+
+  <!-- Ders Listesi -->
+  <div class="dd-kart">
+    <div class="dd-tarih-baslik">
+      <span><strong>{{ today|date:"d.m.Y l" }}</strong></span>
+      {% if personel %}
+      <span style="color:#6b7280;">{{ personel.adi_soyadi }}{% if personel.brans %} — {{ personel.brans }}{% endif %}</span>
+      {% endif %}
+    </div>
+
+    {% if ders_durumu %}
+    <table class="dd-tablo">
+      <thead>
+        <tr>
+          <th>Saat</th>
+          <th>Ders Saati</th>
+          <th>Sınıf</th>
+          <th>Ders</th>
+          <th>Durum</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for satir in ders_durumu %}
+        {% with d=satir.ders k=satir.kayit %}
+        <tr>
+          <td style="white-space:nowrap; color:#6b7280; font-size:.85rem;">
+            {{ d.giris_saat|time:"H:i" }}–{{ d.cikis_saat|time:"H:i" }}
+          </td>
+          <td style="font-weight:600;">{{ d.ders_saati_adi|default:d.ders_saati }}</td>
+          <td>{{ d.sinif_sube|default:"–" }}</td>
+          <td>{{ d.ders_adi }}</td>
+          <td>
+            {% if k %}
+            <span class="chip-tamam">✓ Dolduruldu</span>
+            {% else %}
+            <span class="chip-bos">Boş</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'dersdefteri:kayit_form' d.pk %}?tarih={{ today_str }}"
+               class="btn-kayit {% if k %}guncelle{% endif %}">
+              {% if k %}Güncelle{% else %}Doldur{% endif %}
+            </a>
+          </td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% elif personel %}
+    <div class="dd-bos">{{ today|date:"l" }} günü için ders programı bulunamadı.</div>
+    {% else %}
+    <div class="dd-bos">Ders programını görüntülemek için {% if is_yonetici %}bir öğretmen seçin{% else %}hesabınıza bağlı öğretmen kaydı bulunamadı{% endif %}.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
