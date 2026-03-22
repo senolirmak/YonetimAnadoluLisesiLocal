@@ -23,8 +23,9 @@
     border-bottom: 2px solid transparent;
   }
   .sinav-nav a:hover, .sinav-nav a.active { color: #fff; border-bottom-color: #6366f1; }
+  .sinav-nav .sinav-nav-geri { color: #f87171; margin-left: auto; }
+  .sinav-nav .sinav-nav-geri:hover { color: #fca5a5; border-bottom-color: #f87171; }
   .sinav-nav .sinav-badge {
-    margin-left: auto;
     background: #16a34a;
     color: #fff;
     font-size: 0.8rem;
@@ -153,6 +154,7 @@
   <a href="{% url 'sinav:takvim_gecmisi' %}">Takvim Geçmişi</a>
   <a href="{% url 'sinav:ogrenci_yonetim' %}">Öğrenci Listesi</a>
   <a href="{% url 'sinav:veri_yukle_sayfasi' %}">Veri Yükle</a>
+  <a href="{% url 'index' %}" class="sinav-nav-geri">&#8592; Okul Yönetimine Dön</a>
   {% if aktif_sinav %}
     <span class="sinav-badge">
       {{ aktif_sinav.egitim_ogretim_yili }} &nbsp;|&nbsp;
