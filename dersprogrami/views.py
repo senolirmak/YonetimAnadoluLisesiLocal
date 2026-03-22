@@ -645,6 +645,9 @@ def haftalik_ders_programi(request):
             secilen_personel = None
 
     program_tablo = []
+    nobet_gorevleri = []
+    rehberlik_siniflari = []
+
     if secilen_personel:
         dersler = (
             NobetDersProgrami.objects.filter(ogretmen=secilen_personel)
@@ -675,6 +678,27 @@ def haftalik_ders_programi(request):
                 "cells": cells,
             })
 
+        # Nöbet görevleri
+        try:
+            nobet_ogretmen = secilen_personel.ogretmen
+            nobet_gorevleri = list(
+                nobet_ogretmen.nobetler.order_by("nobet_gun")
+            )
+        except Exception:
+            nobet_gorevleri = []
+
+        # Rehberlik ve Yönlendirme dersi verdiği sınıflar
+        rehberlik_siniflari = list(
+            NobetDersProgrami.objects.filter(
+                ogretmen=secilen_personel,
+                ders_adi__icontains="rehberlik",
+                sinif_sube__isnull=False,
+            )
+            .values_list("sinif_sube__sinif", "sinif_sube__sube")
+            .distinct()
+            .order_by("sinif_sube__sinif", "sinif_sube__sube")
+        )
+
     context = {
         "title": "Haftalık Ders Programı",
         "is_yonetici": is_yonetici,
@@ -683,6 +707,8 @@ def haftalik_ders_programi(request):
         "secilen_ogretmen_id": str(secilen_personel.pk) if secilen_personel else "",
         "gun_tr_list": GUN_TR,
         "program_tablo": program_tablo,
+        "nobet_gorevleri": nobet_gorevleri,
+        "rehberlik_siniflari": rehberlik_siniflari,
     }
     return render(request, "dersprogrami/haftalik_program.html", context)
 

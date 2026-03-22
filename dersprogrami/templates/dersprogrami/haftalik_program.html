@@ -73,6 +73,23 @@
     border-radius: 99px;
     padding: .15rem .6rem;
   }
+  .hp-meta-chip {
+    font-size: .82rem;
+    font-weight: 500;
+    border-radius: 99px;
+    padding: .15rem .7rem;
+    white-space: nowrap;
+  }
+  .hp-chip-nobet {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+  }
+  .hp-chip-rehber {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+  }
 
   /* Program tablosu */
   .hp-tablo-wrap {
@@ -169,6 +186,22 @@
       <span class="hp-ogretmen-adi">{{ secilen_personel.adi_soyadi }}</span>
       {% if secilen_personel.brans %}
       <span class="hp-ogretmen-brans">{{ secilen_personel.brans }}</span>
+      {% endif %}
+      {% if nobet_gorevleri %}
+      <span class="hp-meta-chip hp-chip-nobet">
+        Nöbet:
+        {% for g in nobet_gorevleri %}
+          {{ g.get_nobet_gun_display }}{% if g.nobet_yeri %} / {{ g.nobet_yeri }}{% endif %}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+      </span>
+      {% endif %}
+      {% if rehberlik_siniflari %}
+      <span class="hp-meta-chip hp-chip-rehber">
+        Rehber Öğretmen:
+        {% for sinif, sube in rehberlik_siniflari %}
+          {{ sinif }}/{{ sube }}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+      </span>
       {% endif %}
     </div>
 
