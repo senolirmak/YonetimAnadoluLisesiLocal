@@ -12,7 +12,7 @@ class DuyuruForm(forms.ModelForm):
         model = Duyuru
         fields = ["sinif", "tarih", "ders_saati", "mesaj"]
         widgets = {
-            "tarih": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "tarih": forms.DateInput(attrs={"type": "date", "class": "form-control"}, format="%Y-%m-%d"),
             "ders_saati": forms.NumberInput(attrs={"min": 1, "max": 20, "class": "form-control"}),
             "mesaj": forms.Textarea(attrs={"rows": 4, "class": "form-control"}),
             "sinif": forms.Select(attrs={"class": "form-select"}),

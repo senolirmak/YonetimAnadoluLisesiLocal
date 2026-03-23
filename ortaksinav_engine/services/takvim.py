@@ -14,7 +14,6 @@ Ozel metodlar:
   _phase2            – Faz-2 ILP (Kelebek amac fonksiyonlu optimizasyon)
 """
 
-import os
 import itertools
 from datetime import datetime, timedelta
 from math import ceil
@@ -333,21 +332,13 @@ class TakvimService(BaseService):
         maks = slot_seviye.max()
         self.log(f"Kelebek karisimi: ortalama {ort:.1f} seviye/oturum, max {maks} seviye/oturum.")
 
-        # DB'ye kaydetme YOK – önizleme için JSON'a yaz, kullanıcı onayı beklenir
-        import json
-        cikti_klasor = self.config.get("cikti_klasor", "")
-        if cikti_klasor:
-            os.makedirs(cikti_klasor, exist_ok=True)
-            kayitlar = df_out.drop(columns=["GunIdx"]).to_dict(orient="records")
-            for r in kayitlar:
-                r["Tarih"] = str(r["Tarih"])  # date → str
-            onizleme_path = os.path.join(cikti_klasor, "takvim_onizleme.json")
-            with open(onizleme_path, "w", encoding="utf-8") as f:
-                json.dump(kayitlar, f, ensure_ascii=False, indent=2)
-            self.log(f"{len(kayitlar)} kayitlik onizleme dosyasi kaydedildi.")
-            self.log("Takvimi kontrol edip onaylayabilirsiniz.")
-        else:
-            self.log("UYARI: cikti_klasor ayarlanmamis, onizleme kaydedilemedi.")
+        # DB'ye kaydetme YOK – önizleme için instance değişkenine yaz, view kaydeder
+        kayitlar = df_out.drop(columns=["GunIdx"]).to_dict(orient="records")
+        for r in kayitlar:
+            r["Tarih"] = str(r["Tarih"])  # date → str
+        self._onizleme_kayitlar = kayitlar
+        self.log(f"{len(kayitlar)} kayitlik onizleme hazırlandi.")
+        self.log("Takvimi kontrol edip onaylayabilirsiniz.")
 
     # ------------------------------------------------------------------
     # Ozel yardimci metodlar

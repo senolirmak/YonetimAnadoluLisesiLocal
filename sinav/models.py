@@ -55,6 +55,13 @@ class SinavBilgisi(models.Model):
     def __str__(self):
         return f"{self.egitim_ogretim_yili} – {self.get_donem_display()} – {self.get_sinav_adi_display()}"
 
+    def save(self, *args, **kwargs):
+        if self.egitim_yili_fk_id:
+            self.egitim_ogretim_yili = self.egitim_yili_fk.egitim_yili
+        if self.donem_fk_id:
+            self.donem = f"{self.donem_fk.donem}. Donem"
+        super().save(*args, **kwargs)
+
     def aktif_yap(self):
         SinavBilgisi.objects.all().update(aktif=False)
         self.aktif = True
@@ -298,6 +305,7 @@ class TakvimUretim(models.Model):
     aktif = models.BooleanField(default=False, verbose_name="PDF Raporunda Kullan")
     oturma_sifirla = models.BooleanField(default=False)
     degisiklik_logu = models.TextField(blank=True, default="")
+    onizleme_verisi = models.JSONField(null=True, blank=True, default=None)
 
     class Meta:
         ordering = ["-uretim_tarihi"]

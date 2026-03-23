@@ -1,5 +1,6 @@
 import warnings
 from collections import defaultdict
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
@@ -49,13 +50,14 @@ class DersProgramiIsleyici:
         return dict(sinif_bilgileri)
 
     def program_temizle(self, file_path: Path):
-        out_file = self.Default_Path.VERI_DIR / "program_temiz.xlsx"
         df = pd.read_excel(file_path, header=None, skiprows=6)
         kontrol_araligi = df.iloc[:, 0:24]
         mask_dolu = kontrol_araligi.notna().any(axis=1)
         df_temiz = df.loc[mask_dolu].reset_index(drop=True)
-        df_temiz.to_excel(out_file, index=False, header=False)
-        return pd.read_excel(out_file)
+        buf = BytesIO()
+        df_temiz.to_excel(buf, index=False, header=False)
+        buf.seek(0)
+        return pd.read_excel(buf)
 
     def split_and_replace(self, row):
         if pd.isna(row):

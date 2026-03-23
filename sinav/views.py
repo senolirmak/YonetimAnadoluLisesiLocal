@@ -371,20 +371,19 @@ def sinav_bilgisi_aktif_yap(request, pk: int):
 # Takvim sayfasi context + view
 # ---------------------------------------------------------------
 def _takvim_ctx(request, alg_form=None):
-    from sinav.models import SubeDers, Takvim
+    from sinav.models import SubeDers, Takvim, TakvimUretim
     if alg_form is None:
         alg_form = _alg_form_initial(request)
     aktif = _aktif_sinav()
-    sinav_dir       = _sinav_cikti_dir(aktif)
-    onizleme_path   = sinav_dir / "takvim_onizleme.json"
-    takvim_sayisi   = Takvim.objects.filter(sinav=aktif).count()
+    son_uretim = TakvimUretim.objects.filter(sinav=aktif).first() if aktif else None
+    takvim_sayisi = Takvim.objects.filter(sinav=aktif).count()
     return {
         "aktif_sinav":       aktif,
         "alg_form":          alg_form,
         "alg_acik":          bool(alg_form.errors),
         "sube_ders_sayisi":  SubeDers.objects.count(),
         "takvim_sayisi":     takvim_sayisi,
-        "onizleme_mevcut":   onizleme_path.exists(),
+        "onizleme_mevcut":   bool(son_uretim and son_uretim.onizleme_verisi is not None),
     }
 
 
@@ -393,22 +392,28 @@ def takvim_sayfasi(request):
 
 
 def takvim_onizleme(request):
-    import json
     from collections import defaultdict
-    from sinav.models import Takvim
+    from sinav.models import Takvim, TakvimUretim
     aktif = _aktif_sinav()
-    onizleme_path = _sinav_cikti_dir(aktif) / "takvim_onizleme.json"
+    son_uretim = TakvimUretim.objects.filter(sinav=aktif).first() if aktif else None
 
-    if onizleme_path.exists():
-        with open(onizleme_path, encoding="utf-8") as f:
-            kayitlar = json.load(f)
+    # Geçmiş sayfasından belirli bir üretim seçildiyse onu kullan
+    uretim_pk = request.GET.get("uretim_pk")
+    if uretim_pk:
+        try:
+            son_uretim = TakvimUretim.objects.get(pk=uretim_pk)
+        except TakvimUretim.DoesNotExist:
+            pass
+
+    if son_uretim and son_uretim.onizleme_verisi is not None:
+        kayitlar = son_uretim.onizleme_verisi
         onaylandi = False
     elif aktif:
-        # Takvim onaylanmış: aktif TakvimUretim'e ait DB kayıtlarını oku
-        from sinav.models import TakvimUretim
+        # Takvim onaylanmış: önce aktif=True üretimi dene, yoksa en son üretimi kullan
         aktif_uretim = TakvimUretim.objects.filter(sinav=aktif, aktif=True).first()
-        qs = (Takvim.objects.filter(uretim=aktif_uretim).select_related("ders")
-              if aktif_uretim else Takvim.objects.none())
+        uretim_goster = aktif_uretim or son_uretim
+        qs = (Takvim.objects.filter(uretim=uretim_goster).select_related("ders")
+              if uretim_goster else Takvim.objects.none())
         if not qs.exists():
             messages.error(request, "Önizleme verisi bulunamadı. Önce takvimi oluşturun.")
             return redirect("sinav:takvim_sayfasi")
@@ -444,18 +449,14 @@ def takvim_onizleme(request):
 
 @require_POST
 def takvim_onayla(request):
-    import json
     from datetime import datetime as dt
-    from sinav.models import Takvim as TakvimModel
+    from sinav.models import Takvim as TakvimModel, TakvimUretim, DersHavuzu
     aktif_sinav = _aktif_sinav()
-    sinav_dir = _sinav_cikti_dir(aktif_sinav)
-    onizleme_path = sinav_dir / "takvim_onizleme.json"
-    if not onizleme_path.exists():
+    uretim = TakvimUretim.objects.filter(sinav=aktif_sinav).order_by("-uretim_tarihi").first()
+    if not uretim or uretim.onizleme_verisi is None:
         messages.error(request, "Önizleme verisi bulunamadı.")
         return redirect("sinav:takvim_sayfasi")
-    from sinav.models import DersHavuzu
-    with open(onizleme_path, encoding="utf-8") as f:
-        kayitlar = json.load(f)
+    kayitlar = uretim.onizleme_verisi
     # Takvim.ders FK için ders adı → DersHavuzu eşlemesi
     # Çift oturumlu dersler " (Yazili)"/" (Uygulama)" ekiyle gelir; base adı dene.
     ders_map = {d.ders_adi: d for d in DersHavuzu.objects.all()}
@@ -467,9 +468,6 @@ def takvim_onayla(request):
             obj = ders_map.get(base)
         return obj
 
-    # En son TakvimUretim'i bul (bu ILP çalıştırmasının kaydı)
-    from sinav.models import TakvimUretim
-    uretim = TakvimUretim.objects.filter(sinav=aktif_sinav).order_by("-uretim_tarihi").first()
     # Yalnızca bu uretim'e ait eski Takvim kayıtlarını temizle (yeniden onaylama durumu)
     TakvimModel.objects.filter(uretim=uretim).delete()
     TakvimModel.objects.bulk_create([
@@ -485,8 +483,9 @@ def takvim_onayla(request):
         )
         for r in kayitlar
     ])
-    # Önizleme dosyasını sil
-    onizleme_path.unlink(missing_ok=True)
+    # Önizleme verisini temizle
+    uretim.onizleme_verisi = None
+    uretim.save(update_fields=["onizleme_verisi"])
     messages.success(request, f"Takvim onaylandı: {len(kayitlar)} kayıt DB'ye kaydedildi.")
     from_param = request.POST.get("from", "")
     from django.urls import reverse
@@ -496,10 +495,13 @@ def takvim_onayla(request):
 
 @require_POST
 def takvim_onizleme_iptal(request):
-    """Önizleme taslağını (takvim_onizleme.json) siler ve Takvim (ILP) sayfasına döner."""
+    """Önizleme taslağını temizler ve Takvim (ILP) sayfasına döner."""
     aktif_sinav = _aktif_sinav()
-    onizleme_path = _sinav_cikti_dir(aktif_sinav) / "takvim_onizleme.json"
-    onizleme_path.unlink(missing_ok=True)
+    from sinav.models import TakvimUretim
+    uretim = TakvimUretim.objects.filter(sinav=aktif_sinav).order_by("-uretim_tarihi").first()
+    if uretim and uretim.onizleme_verisi is not None:
+        uretim.onizleme_verisi = None
+        uretim.save(update_fields=["onizleme_verisi"])
     return redirect("sinav:takvim_sayfasi")
 
 
@@ -950,7 +952,11 @@ def _run_step(task_id: str, session_cfg: dict, func_name: str):
             aktif = _SB.objects.filter(aktif=True).first()
             if aktif:
                 log_text = "\n".join(_TASKS.get(task_id, {}).get("logs", []))
-                TakvimUretim.objects.create(sinav=aktif, log_metni=log_text)
+                TakvimUretim.objects.create(
+                    sinav=aktif,
+                    log_metni=log_text,
+                    onizleme_verisi=getattr(svc, "_onizleme_kayitlar", None),
+                )
         except Exception:
             pass
 

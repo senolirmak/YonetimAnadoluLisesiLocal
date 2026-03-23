@@ -157,14 +157,6 @@
   {% endif %}
 </div>
 
-<!-- ===== VERİ YÜKLEME HATIRLATMASI ===== -->
-{% if liste_formlar and not ogrenci_dosya_adi %}
-<div class="card" style="border-left:4px solid #f59e0b; background:#fffbeb; color:#92400e; padding:.9rem 1.5rem;
-     display:flex; justify-content:space-between; align-items:center;">
-  <span>e-Okul dosyaları henüz yüklenmedi.</span>
-  <a href="{% url 'sinav:veri_yukle_sayfasi' %}" class="btn btn-primary btn-sm">Dosya Yükle</a>
-</div>
-{% endif %}
 
 <style>
 .sinav-liste { display:flex; flex-direction:column; gap:.5rem; }

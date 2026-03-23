@@ -49,7 +49,7 @@
       </form>
       {% endif %}
       {% if k.sinav_takvim_sayisi > 0 %}
-      <a href="{% url 'sinav:takvim_onizleme' %}?from=gecmis" class="btn btn-primary btn-sm">Takvim Formu</a>
+      <a href="{% url 'sinav:takvim_onizleme' %}?from=gecmis&uretim_pk={{ k.pk }}" class="btn btn-primary btn-sm">Takvim Formu</a>
       {% endif %}
       <button class="btn btn-secondary btn-sm"
               onclick="toggleLog({{ k.pk }})">

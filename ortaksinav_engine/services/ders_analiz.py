@@ -70,14 +70,22 @@ class DersAnalizService(BaseService):
 
         # Sinav yapilmayacak dersleri filtrele
         sinav_yapilmayacak = self.config.get("SINAV_YAPILMAYACAK_DERSLER") or _DEFAULT_SINAV_YAPILMAYACAK
+        sinav_yapilmayacak_upper = {d.upper().strip() for d in sinav_yapilmayacak}
         df_filtreli_oncesi["Ders_upper"] = df_filtreli_oncesi["Ders"].str.upper().str.strip()
         df_filtreli = df_filtreli_oncesi[
-            ~df_filtreli_oncesi["Ders_upper"].isin(sinav_yapilmayacak)
+            ~df_filtreli_oncesi["Ders_upper"].isin(sinav_yapilmayacak_upper)
         ].drop(columns=["Ders_upper"])
 
         # FK lookup haritalari
         ders_map = {d.ders_adi: d for d in DersHavuzu.objects.all()}
         sube_map = {(ss.sinif, ss.sube): ss for ss in SinifSube.objects.all()}
+
+        # Sinav yapilmayacak derslerin mevcut SubeDers kayitlarini kaldir
+        # NOT: df_filtreli hesabından SONRA silme yapılır ki döngüde geri eklenmesın
+        if sinav_yapilmayacak:
+            silinen, _ = SubeDers.objects.filter(ders__ders_adi__in=sinav_yapilmayacak).delete()
+            if silinen:
+                self.log(f"{silinen} sinav-yapilmayacak ders/sube kaydi SubeDers'ten silindi.")
 
         # Mevcut kayitlari topla; yalnizca eksik olanlari ekle
         mevcut = set(SubeDers.objects.values_list("ders_id", "seviye", "sube_id"))

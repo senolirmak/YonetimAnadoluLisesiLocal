@@ -63,60 +63,63 @@
   <br/>
   <form method="post" action="{% url 'sinav:parametre_kaydet' %}">
     {% csrf_token %}
-    <div class="grid-2">
+    <div style="max-width:400px; display:flex; flex-direction:column; gap:.75rem;">
+      <div>
 
-      <div class="form-group">
-        {{ alg_form.baslangic_tarih.label_tag }}
-        {{ alg_form.baslangic_tarih }}
-        {% for err in alg_form.baslangic_tarih.errors %}
-          <span class="field-error">{{ err }}</span>
-        {% endfor %}
-      </div>
+        <div class="form-group">
+          {{ alg_form.baslangic_tarih.label_tag }}
+          {{ alg_form.baslangic_tarih }}
+          {% for err in alg_form.baslangic_tarih.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+        </div>
 
-      <div class="form-group">
-        {{ alg_form.oturum_saatleri.label_tag }}
-        {{ alg_form.oturum_saatleri }}
-        <span class="helptext">{{ alg_form.oturum_saatleri.help_text }}</span>
-        {% for err in alg_form.oturum_saatleri.errors %}
-          <span class="field-error">{{ err }}</span>
-        {% endfor %}
+        <div class="form-group">
+          {{ alg_form.oturum_saatleri.label_tag }}
+          {{ alg_form.oturum_saatleri }}
+          <span class="helptext">{{ alg_form.oturum_saatleri.help_text }}</span>
+          {% for err in alg_form.oturum_saatleri.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+        </div>
+
+        <div class="form-group">
+          {{ alg_form.max_extra_days.label_tag }}
+          {{ alg_form.max_extra_days }}
+          <span class="helptext">{{ alg_form.max_extra_days.help_text }}</span>
+          {% for err in alg_form.max_extra_days.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+        </div>
+
       </div>
 
       <div class="form-group">
         {{ alg_form.tatil_gunleri.label_tag }}
         {{ alg_form.tatil_gunleri }}
-        {% for err in alg_form.tatil_gunleri.errors %}
-          <span class="field-error">{{ err }}</span>
-        {% endfor %}
+        <span class="helptext">{{ alg_form.tatil_gunleri.help_text }}</span>
+        {% for err in alg_form.tatil_gunleri.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
       </div>
 
-      <div class="form-group">
-        {{ alg_form.time_limit_phase1.label_tag }}
-        {{ alg_form.time_limit_phase1 }}
-        {% for err in alg_form.time_limit_phase1.errors %}
-          <span class="field-error">{{ err }}</span>
-        {% endfor %}
-      </div>
+      <details style="margin-top:.25rem;">
+        <summary style="cursor:pointer; font-size:.85rem; color:#6b7280;">Gelişmiş (ILP Süre Limitleri)</summary>
+        <div style="display:flex; flex-direction:column; gap:.75rem; margin-top:.6rem;">
+          <div class="form-group">
+            {{ alg_form.time_limit_phase1.label_tag }}
+            <input type="number" name="{{ alg_form.time_limit_phase1.html_name }}"
+                   value="{{ alg_form.time_limit_phase1.value }}"
+                   style="width:120px;" min="30">
+            <span class="helptext">{{ alg_form.time_limit_phase1.help_text }}</span>
+            {% for err in alg_form.time_limit_phase1.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+          </div>
+          <div class="form-group">
+            {{ alg_form.time_limit_phase2.label_tag }}
+            <input type="number" name="{{ alg_form.time_limit_phase2.html_name }}"
+                   value="{{ alg_form.time_limit_phase2.value }}"
+                   style="width:120px;" min="30">
+            <span class="helptext">{{ alg_form.time_limit_phase2.help_text }}</span>
+            {% for err in alg_form.time_limit_phase2.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+          </div>
+        </div>
+      </details>
 
-      <div class="form-group">
-        {{ alg_form.time_limit_phase2.label_tag }}
-        {{ alg_form.time_limit_phase2 }}
-        {% for err in alg_form.time_limit_phase2.errors %}
-          <span class="field-error">{{ err }}</span>
-        {% endfor %}
-      </div>
-
-      <div class="form-group">
-        {{ alg_form.max_extra_days.label_tag }}
-        {{ alg_form.max_extra_days }}
-        {% for err in alg_form.max_extra_days.errors %}
-          <span class="field-error">{{ err }}</span>
-        {% endfor %}
-      </div>
-
+      <br/>
+      <button type="submit" class="btn btn-secondary">Kaydet</button>
     </div>
-    <br/>
-    <button type="submit" class="btn btn-secondary">Kaydet</button>
   </form>
 </details>
 

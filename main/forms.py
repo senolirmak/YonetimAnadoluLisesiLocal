@@ -27,8 +27,8 @@ class EgitimOgretimYiliForm(forms.ModelForm):
             "egitim_bitis": "Bitiş Tarihi",
         }
         widgets = {
-            "egitim_baslangic": forms.DateInput(attrs={"type": "date"}),
-            "egitim_bitis": forms.DateInput(attrs={"type": "date"}),
+            "egitim_baslangic": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "egitim_bitis": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }
 
     def clean(self):
@@ -66,8 +66,8 @@ class OkulDonemForm(forms.ModelForm):
             "bitis": "Bitiş Tarihi",
         }
         widgets = {
-            "baslangic": forms.DateInput(attrs={"type": "date"}),
-            "bitis": forms.DateInput(attrs={"type": "date"}),
+            "baslangic": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "bitis": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }
 
     def clean(self):
