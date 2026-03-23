@@ -6,42 +6,14 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 
-class OkulBilgileri(models.Model):
-    """
-    Okula ait temel bilgiler. Tek kayit (singleton) olarak kullanilir.
-    save() her zaman pk=1 ile kaydeder; baska kayit olusturulamaz.
-    """
-    okul_adi = models.CharField(
-        max_length=200,
-        default="Abdurrahim Karakoç Anadolu Lisesi",
-        verbose_name="Okul Adı",
-    )
-    okul_kodu = models.CharField(
-        max_length=20,
-        default="759725",
-        verbose_name="Okul Kodu",
-    )
-    okul_muduru = models.CharField(
-        max_length=200,
-        default="Neriman Sargın KOÇAK",
-        verbose_name="Okul Müdürü",
-    )
+# ---------------------------------------------------------------------------
+# OkulBilgileri — nobet.OkulBilgi için geriye dönük uyumluluk takma adı
+# ---------------------------------------------------------------------------
+def _get_okul_bilgileri():
+    from nobet.models import OkulBilgi
+    return OkulBilgi.get()
 
-    class Meta:
-        verbose_name = "Okul Bilgileri"
-        verbose_name_plural = "Okul Bilgileri"
-
-    def save(self, *args, **kwargs):
-        self.pk = 1
-        super().save(*args, **kwargs)
-
-    @classmethod
-    def get(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
-
-    def __str__(self):
-        return f"{self.okul_adi} ({self.okul_kodu})"
+OkulBilgileri = None  # views.py import'larını kırmamak için; gerçek sınıf nobet.OkulBilgi
 
 
 class SinavBilgisi(models.Model):
@@ -54,15 +26,25 @@ class SinavBilgisi(models.Model):
         ("2. Ortak Sinav", "2. Ortak Sınav"),
     ]
 
-    egitim_ogretim_yili = models.CharField(max_length=20)   # "2025-2026"
-    donem = models.CharField(max_length=20, choices=DONEM_CHOICES)
-    sinav_adi = models.CharField(max_length=100, choices=SINAV_ADI_CHOICES)
-    sinav_baslangic_tarihi = models.DateField()
-    eokul_veri_tarihi = models.DateField()
+    egitim_ogretim_yili = models.CharField(max_length=20, verbose_name="Eğitim-Öğretim Yılı")
+    donem = models.CharField(max_length=20, choices=DONEM_CHOICES, verbose_name="Dönem")
+    sinav_adi = models.CharField(max_length=100, choices=SINAV_ADI_CHOICES, verbose_name="Sınav Adı")
+    sinav_baslangic_tarihi = models.DateField(verbose_name="Sınav Başlangıç Tarihi")
+    eokul_veri_tarihi = models.DateField(verbose_name="e-Okul Veri Tarihi")
     kurum = models.ForeignKey(
-        "OkulBilgileri", on_delete=models.SET_NULL,
+        "nobet.OkulBilgi", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="sinavlar",
         verbose_name="Kurum",
+    )
+    egitim_yili_fk = models.ForeignKey(
+        "nobet.EgitimOgretimYili", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="sinavlar",
+        verbose_name="Eğitim-Öğretim Yılı (Bağlantı)",
+    )
+    donem_fk = models.ForeignKey(
+        "nobet.OkulDonem", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="sinavlar",
+        verbose_name="Dönem (Bağlantı)",
     )
     aktif = models.BooleanField(default=False)
     olusturulma_zamani = models.DateTimeField(auto_now_add=True)
@@ -79,26 +61,7 @@ class SinavBilgisi(models.Model):
         self.save()
 
 
-class Ogrenci(models.Model):
-    sinav = models.ForeignKey(
-        "SinavBilgisi", on_delete=models.CASCADE,
-        null=True, blank=True, related_name="ogrenciler",
-    )
-    okulno = models.CharField(max_length=20)
-    adi = models.CharField(max_length=100)
-    soyadi = models.CharField(max_length=100)
-    cinsiyet = models.CharField(max_length=10, blank=True)
-    sinif_sube = models.ForeignKey(
-        "SinifSube", on_delete=models.CASCADE,
-        related_name="ogrenciler", null=True,
-    )
-
-    class Meta:
-        ordering = ["sinif_sube__sinif", "sinif_sube__sube", "soyadi", "adi"]
-
-    def __str__(self):
-        ss = self.sinif_sube.sinifsube if self.sinif_sube else ""
-        return f"{ss} – {self.adi} {self.soyadi}"
+# Ogrenci modeli kaldırıldı — ogrenci.Ogrenci kullanılmaktadır.
 
 
 class DersHavuzu(models.Model):
@@ -112,34 +75,7 @@ class DersHavuzu(models.Model):
         return self.ders_adi
 
 
-class DersProgram(models.Model):
-    sinav = models.ForeignKey(
-        "SinavBilgisi", on_delete=models.CASCADE,
-        null=True, blank=True, related_name="ders_programlari",
-    )
-    giris_saat = models.CharField(max_length=10)
-    cikis_saat = models.CharField(max_length=10)
-    gun = models.CharField(max_length=15)
-    ders = models.ForeignKey(
-        "DersHavuzu", on_delete=models.CASCADE,
-        related_name="ders_programlari", null=True,
-    )
-    ders_ogretmeni = models.CharField(max_length=200)
-    sinif_sube = models.ForeignKey(
-        "SinifSube", on_delete=models.CASCADE,
-        related_name="ders_programlari", null=True,
-    )
-    ders_saati = models.IntegerField(null=True, blank=True)
-    ders_saati_adi = models.CharField(max_length=20)
-    uygulama_tarihi = models.DateField()
-
-    class Meta:
-        ordering = ["sinif_sube__sinif", "sinif_sube__sube", "ders_saati"]
-
-    def __str__(self):
-        ss = self.sinif_sube.sinifsube if self.sinif_sube else ""
-        ders = self.ders.ders_adi if self.ders else ""
-        return f"{ss} – {ders} ({self.gun})"
+# DersProgram modeli kaldırıldı — dersprogrami.NobetDersProgrami kullanılmaktadır.
 
 
 
@@ -150,8 +86,8 @@ class SubeDers(models.Model):
     )
     seviye = models.IntegerField()
     sube = models.ForeignKey(
-        "SinifSube", on_delete=models.CASCADE,
-        related_name="sube_dersler", null=True,
+        "nobet.SinifSube", on_delete=models.CASCADE,
+        related_name="sinav_sube_dersler", null=True,
     )
     class Meta:
         ordering = ["seviye", "sube", "ders"]
@@ -306,28 +242,6 @@ class DisVeri(models.Model):
         sinav_str = str(self.sinav) if self.sinav else "–"
         return f"{sinav_str} | {label} – {self.gecerlilik_tarihi}"
 
-
-class SinifSube(models.Model):
-    """
-    e-Okul ogrenci listesinden turetilen sinif/sube birimleri.
-    sinifsube ve salon alanlari kayit sirasinda otomatik hesaplanir.
-    """
-    sinif = models.IntegerField()
-    sube = models.CharField(max_length=5)
-    sinifsube = models.CharField(max_length=10, editable=False)
-    salon = models.CharField(max_length=20, editable=False)
-
-    class Meta:
-        ordering = ["sinif", "sube"]
-        unique_together = [("sinif", "sube")]
-
-    def save(self, *args, **kwargs):
-        self.sinifsube = f"{self.sinif}/{self.sube}"
-        self.salon = f"Salon {self.sinifsube}"
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.sinifsube
 
 
 class AlgoritmaParametreleri(models.Model):

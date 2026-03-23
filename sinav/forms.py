@@ -2,28 +2,22 @@ from django import forms
 from datetime import date
 import re
 
-from .models import OkulBilgileri, SinavBilgisi
-
-
-class OkulBilgileriForm(forms.ModelForm):
-    class Meta:
-        model = OkulBilgileri
-        fields = ["okul_adi", "okul_kodu", "okul_muduru"]
-        labels = {
-            "okul_adi":   "Okul Adı",
-            "okul_kodu":  "Okul Kodu",
-            "okul_muduru": "Okul Müdürü",
-        }
+from .models import SinavBilgisi
 
 
 class SinavBilgisiForm(forms.ModelForm):
     class Meta:
         model = SinavBilgisi
-        fields = ["egitim_ogretim_yili", "donem", "sinav_adi",
-                  "sinav_baslangic_tarihi", "eokul_veri_tarihi"]
+        fields = [
+            "egitim_yili_fk", "donem_fk",
+            "egitim_ogretim_yili", "donem", "sinav_adi",
+            "sinav_baslangic_tarihi", "eokul_veri_tarihi",
+        ]
         labels = {
-            "egitim_ogretim_yili": "Eğitim-Öğretim Yılı",
-            "donem": "Dönem",
+            "egitim_yili_fk": "Eğitim-Öğretim Yılı",
+            "donem_fk": "Dönem",
+            "egitim_ogretim_yili": "Yıl (metin)",
+            "donem": "Dönem (metin)",
             "sinav_adi": "Sınav Adı",
             "sinav_baslangic_tarihi": "Sınav Başlangıç Tarihi",
             "eokul_veri_tarihi": "e-Okul Veri Tarihi",
@@ -37,23 +31,6 @@ class SinavBilgisiForm(forms.ModelForm):
             "eokul_veri_tarihi": "e-Okul'dan veri çekildiği tarih",
         }
 
-
-class VeriYukleForm(forms.Form):
-    eokul_ogrenci_dosya = forms.FileField(
-        label="e-Okul Ogrenci Listesi",
-        widget=forms.FileInput(attrs={"accept": ".xlsx,.xls"}),
-        help_text="OOG01001R020_*.xls / .xlsx",
-    )
-    eokul_haftalik_program_dosya = forms.FileField(
-        label="e-Okul Haftalik Ders Programi",
-        widget=forms.FileInput(attrs={"accept": ".xlsx,.xls"}),
-        help_text="OOK11002_R01_*.xls / .xlsx",
-    )
-    uygulama_tarihi = forms.DateField(
-        label="Programin Gecerli Oldugu Tarih",
-        widget=forms.DateInput(attrs={"type": "date"}),
-        initial=date(2026, 2, 23),
-    )
 
 
 class AlgoritmaForm(forms.Form):

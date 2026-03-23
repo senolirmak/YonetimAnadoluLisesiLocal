@@ -74,7 +74,9 @@ def oturum_plani_pdf(salon_grids: dict, out_path: str, baslik: str, okul,
     salon_grids : { salon_adi: grid }   (grid = 3 blok × 6 satır × 2 koltuk)
     Her salon için bir sayfa üretir.
     """
-    from sinav.models import SinifSube, DersProgram
+    from datetime import datetime as _dt
+    from nobet.models import SinifSube
+    from dersprogrami.models import NobetDersProgrami
     sinav = aktif_uretim.sinav if aktif_uretim else None
 
     # "Salon-9_A" → SinifSube nesnesi eşleme tablosu
@@ -84,19 +86,28 @@ def oturum_plani_pdf(salon_grids: dict, out_path: str, baslik: str, okul,
     }
     salon_display = {k: ss.salon for k, ss in ss_map.items()}
 
-    # Salon → öğretmen: sınav günü ve saatinde DersProgram'dan çek
+    # Salon → öğretmen: sınav günü ve saatinde NobetDersProgrami'nden çek
     _EN_GUNLER = {0: "Monday", 1: "Tuesday", 2: "Wednesday",
                   3: "Thursday", 4: "Friday", 5: "Saturday", 6: "Sunday"}
     salon_ogretmen: dict = {}
     if tarih and saat:
         gun_adi = _EN_GUNLER.get(tarih.weekday(), "")
+        try:
+            saat_time = _dt.strptime(saat, "%H:%M").time()
+        except (ValueError, TypeError):
+            saat_time = None
         for salon_adi, ss in ss_map.items():
-            dp = (
-                DersProgram.objects
-                .filter(sinav=sinav, sinif_sube=ss, gun=gun_adi, giris_saat=saat)
-                .first()
-            )
-            salon_ogretmen[salon_adi] = dp.ders_ogretmeni if dp else ""
+            ogretmen_adi = ""
+            if saat_time:
+                dp = (
+                    NobetDersProgrami.objects
+                    .filter(sinif_sube=ss, gun=gun_adi, giris_saat=saat_time)
+                    .select_related("ogretmen")
+                    .first()
+                )
+                if dp and dp.ogretmen:
+                    ogretmen_adi = dp.ogretmen.adi_soyadi
+            salon_ogretmen[salon_adi] = ogretmen_adi
     sinav_bilgi = (
         f"{sinav.get_donem_display()}  –  {sinav.get_sinav_adi_display()}"
         if sinav else ""
@@ -391,7 +402,8 @@ def sinif_raporu_pdf(tarih, saat, oturum, out_path: str, okul, aktif_uretim):
     atandığını gösteren liste (Excel raporu ile aynı içerik).
     Sütunlar: Sıra No | Okul No | Ad Soyad | Sıra | Salon
     """
-    from sinav.models import OturmaPlani, SinifSube
+    from nobet.models import SinifSube
+    from sinav.models import OturmaPlani
 
     qs = OturmaPlani.objects.filter(
         tarih=tarih, saat=saat, oturum=oturum, uretim=aktif_uretim

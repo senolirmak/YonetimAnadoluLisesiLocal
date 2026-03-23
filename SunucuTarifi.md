@@ -1,54 +1,40 @@
-# Pardus Sunucuya Kurulum Rehberi
+# Pardus Sunucuya Kurulum / Güncelleme Rehberi
 
-Projeyi Pardus Server yüklü bilgisayara `/opt/akalyonetim` altına kurma adımları.
-
----
-
-## 1. Sunucuya Proje Dosyalarını Kopyala
-
-Geliştirme makinesinden sunucuya aktarın:
-
-```bash
-# Geliştirme makinesinde — sunucuya gönder
-rsync -av --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' \
-  --exclude='.env' --exclude='backups/' \
-  /home/senolirmak/vcodeproject/nobet_proje/ \
-  kullanici@sunucu-ip:/opt/akalyonetim/
-```
-
-Ya da ZIP ile:
-```bash
-# Geliştirme makinesinde
-cd /home/senolirmak/vcodeproject
-zip -r nobet_proje.zip nobet_proje/ --exclude "nobet_proje/.venv/*" --exclude "nobet_proje/__pycache__/*"
-
-# Sunucuya kopyala
-scp nobet_proje.zip kullanici@sunucu-ip:/opt/
-```
+Hedef dizin: `/opt/akalyonetim`
 
 ---
 
-## 2. Sunucuda Hazırlık
+## SENARYO A — İLK KEZ KURULUM (sunucuda proje hiç yok)
+
+### A1. Pardus Paketleri
 
 ```bash
-# Pardus/Debian paketleri
 sudo apt update
 sudo apt install -y python3.12 python3.12-venv python3-pip \
-  postgresql postgresql-contrib nginx git
+  postgresql postgresql-contrib nginx poppler-utils
+```
 
-# Proje dizini
-sudo mkdir -p /opt/akalyonetim
-sudo chown $USER:$USER /opt/akalyonetim
+> `poppler-utils` → pdf2image kütüphanesi için gerekli
 
-# ZIP ile gönderdiyseniz
-cd /opt
-sudo unzip nobet_proje.zip
-sudo mv nobet_proje/* akalyonetim/
+---
+
+### A2. Proje Dosyalarını Sunucuya Kopyala
+
+**Geliştirme makinesinde** çalıştır:
+
+```bash
+rsync -av \
+  --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' \
+  --exclude='.env' --exclude='backups/' --exclude='media/' \
+  /home/senolirmak/vcodeproject/nobet_proje/ \
+  KULLANICI@SUNUCU-IP:/opt/akalyonetim/
 ```
 
 ---
 
-## 3. PostgreSQL Kurulumu
+### A3. PostgreSQL Kurulumu
+
+**Sunucuda** çalıştır:
 
 ```bash
 sudo -u postgres psql <<EOF
@@ -60,25 +46,23 @@ EOF
 
 ---
 
-## 4. Python Ortamı ve Bağımlılıklar
+### A4. Python Ortamı
 
 ```bash
 cd /opt/akalyonetim
-
 python3.12 -m venv .venv
 source .venv/bin/activate
-
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
 ---
 
-## 5. .env Dosyası Oluştur
+### A5. .env Dosyası
 
 ```bash
 cat > /opt/akalyonetim/.env <<EOF
-SECRET_KEY=buraya-guclu-bir-secret-key-yazin
+SECRET_KEY=buraya-en-az-50-karakterli-guclu-bir-key-yazin
 DEBUG=False
 
 DB_NAME=nobet_db
@@ -87,7 +71,12 @@ DB_PASSWORD=452869Zx.c
 DB_HOST=localhost
 DB_PORT=5432
 
-ALLOWED_HOSTS=sunucu-ip,alan-adi.com
+TIME_ZONE=Europe/Istanbul
+LANGUAGE_CODE=tr-tr
+USE_I18N=True
+USE_TZ=True
+
+ALLOWED_HOSTS=SUNUCU-IP,alan-adi.com,localhost
 EOF
 
 chmod 600 /opt/akalyonetim/.env
@@ -95,7 +84,30 @@ chmod 600 /opt/akalyonetim/.env
 
 ---
 
-## 6. Django Kurulum Adımları
+### A6. Veritabanı Yedeğini Aktar (önerilen)
+
+Geliştirme makinesindeki güncel veriyi taşımak için:
+
+**Geliştirme makinesinde:**
+
+```bash
+# En güncel .dump dosyasını sunucuya gönder
+scp /home/senolirmak/vcodeproject/nobet_proje/backups/nobet_db_20260322_195806.dump \
+  KULLANICI@SUNUCU-IP:/opt/nobet_db.dump
+```
+
+**Sunucuda:**
+
+```bash
+PGPASSWORD=452869Zx.c pg_restore \
+  -U nobet_user -h localhost -p 5432 \
+  -d nobet_db --clean --if-exists \
+  /opt/nobet_db.dump
+```
+
+---
+
+### A7. Django Kurulum Adımları
 
 ```bash
 cd /opt/akalyonetim
@@ -107,9 +119,12 @@ python manage.py kullanici_gruplari_olustur
 python manage.py createsuperuser
 ```
 
+> Veritabanı yedeğinden geri yüklediyseniz `migrate` ve `createsuperuser`
+> atlanabilir — kullanıcılar zaten gelir.
+
 ---
 
-## 7. Gunicorn Systemd Servisi
+### A8. Gunicorn Systemd Servisi
 
 ```bash
 sudo nano /etc/systemd/system/akalyonetim.service
@@ -145,7 +160,7 @@ sudo systemctl status akalyonetim
 
 ---
 
-## 8. Nginx Yapılandırması
+### A9. Nginx Yapılandırması
 
 ```bash
 sudo nano /etc/nginx/sites-available/akalyonetim
@@ -154,7 +169,9 @@ sudo nano /etc/nginx/sites-available/akalyonetim
 ```nginx
 server {
     listen 80;
-    server_name sunucu-ip alan-adi.com;
+    server_name SUNUCU-IP alan-adi.com;
+
+    client_max_body_size 20M;
 
     location /static/ {
         alias /opt/akalyonetim/staticfiles/;
@@ -181,22 +198,80 @@ sudo systemctl restart nginx
 
 ---
 
-## 9. Veritabanı Yedeğini Aktar (Opsiyonel)
+---
 
-Geliştirme makinesindeki veriyi sunucuya taşımak isterseniz:
+## SENARYO B — ÖNCEKİ VERSİYONU GÜNCELLEME (sunucuda eski sürüm çalışıyor)
+
+### B1. Servisi Durdur
 
 ```bash
-# Geliştirme makinesinde
-PGPASSWORD=452869Zx.c pg_dump -U nobet_user -h localhost -F c -f nobet_db.dump nobet_db
-scp nobet_db.dump kullanici@sunucu-ip:/opt/
-
-# Sunucuda
-PGPASSWORD=452869Zx.c pg_restore -U nobet_user -h localhost -d nobet_db /opt/nobet_db.dump
+sudo systemctl stop akalyonetim
 ```
 
 ---
 
-## Kontrol
+### B2. Veritabanı Yedeği Al (sunucuda, güvenlik için)
+
+```bash
+PGPASSWORD=452869Zx.c pg_dump -Fc \
+  -U nobet_user -h localhost -p 5432 nobet_db \
+  > /opt/yedek_guncelleme_oncesi_$(date +%Y%m%d_%H%M%S).dump
+```
+
+---
+
+### B3. Proje Dosyalarını Güncelle
+
+**Geliştirme makinesinde** çalıştır:
+
+```bash
+rsync -av \
+  --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' \
+  --exclude='.env' --exclude='backups/' --exclude='media/' \
+  /home/senolirmak/vcodeproject/nobet_proje/ \
+  KULLANICI@SUNUCU-IP:/opt/akalyonetim/
+```
+
+---
+
+### B4. Bağımlılıkları Güncelle
+
+**Sunucuda:**
+
+```bash
+cd /opt/akalyonetim
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+---
+
+### B5. Migration ve Static Dosyalar
+
+```bash
+cd /opt/akalyonetim
+source .venv/bin/activate
+
+python manage.py migrate
+python manage.py collectstatic --noinput --clear
+python manage.py kullanici_gruplari_olustur
+```
+
+---
+
+### B6. İzinleri Düzelt ve Servisi Başlat
+
+```bash
+sudo chown -R www-data:www-data /opt/akalyonetim
+sudo systemctl start akalyonetim
+sudo systemctl status akalyonetim
+```
+
+---
+
+---
+
+## KONTROL KOMUTLARI
 
 | Komut | Amaç |
 |---|---|
@@ -204,7 +279,35 @@ PGPASSWORD=452869Zx.c pg_restore -U nobet_user -h localhost -d nobet_db /opt/nob
 | `sudo journalctl -u akalyonetim -f` | Canlı loglar |
 | `sudo systemctl status nginx` | Nginx durumu |
 | `sudo nginx -t` | Nginx config testi |
+| `sudo systemctl restart akalyonetim` | Gunicorn yeniden başlat |
+| `sudo systemctl restart nginx` | Nginx yeniden başlat |
 
 ---
 
-> `config/settings.py` dosyasında `ALLOWED_HOSTS` ayarının sunucu IP'sini içerdiğinden emin olun.
+## REQUIREMENTS (güncel paketler)
+
+```
+Django==6.0.3
+gunicorn==25.1.0
+psycopg2-binary==2.9.11
+pandas==3.0.1
+numpy==2.4.2
+openpyxl==3.1.5
+xlrd==2.0.2
+reportlab==4.4.10
+pdf2image==1.17.0
+pillow==12.1.1
+PuLP==3.3.0
+networkx==3.6.1
+python-dotenv==1.0.1
+python-decouple==3.8
+```
+
+---
+
+## NOTLAR
+
+- `DEBUG=False` olduğunda `.env` dosyasındaki `SECRET_KEY` güçlü bir değer olmalı
+- Sunucu IP'si veya alan adı `ALLOWED_HOSTS`'a eklenmeli
+- `media/` dizini rsync'e dahil edilmez — PDF çıktıları, yüklenen dosyalar orada kalır
+- Port 80 dışında çalıştırmak isterseniz Nginx'teki `listen 80` değiştirilmeli

@@ -12,6 +12,7 @@ from nobet.models import NobetGorevi, NobetPersonel, OkulBilgi, SinifSube
 from .forms import (
     DersProgramiImportForm,
     NobetImportForm,
+    OgrenciImportForm,
     OkulBilgiForm,
     PersonelImportForm,
     SinifSubeImportForm,
@@ -19,6 +20,7 @@ from .forms import (
 from .services.default_path_service import DefaultPath
 from .services.ders_programi_import_service import DersProgramiIsleyici
 from .services.nobet_import_service import NobetIsleyici
+from .services.ogrenci_import_service import OgrenciIsleyici
 from .services.personel_import_service import PersonelIsleyici
 from .services.sinifsube_import_service import sinif_sube_kaydet
 
@@ -80,6 +82,7 @@ def veriaktar_ana(request):
     sinif_form = SinifSubeImportForm(request.POST or None, prefix="sinif", initial=sinif_initial)
     ders_form = DersProgramiImportForm(request.POST or None, request.FILES or None, prefix="ders")
     nobet_form = NobetImportForm(request.POST or None, request.FILES or None, prefix="nobet")
+    ogrenci_form = OgrenciImportForm(request.POST or None, request.FILES or None, prefix="ogrenci")
 
     if request.method == "POST":
         dp = DefaultPath()
@@ -126,10 +129,23 @@ def veriaktar_ana(request):
                 NobetIsleyici(nobet_path=str(file_path), uygulama_tarihi=tarih).calistir()
                 messages.success(request, "Nöbetçi listesi başarıyla aktarıldı.")
 
+            elif "ogrenci_aktar" in request.POST and ogrenci_form.is_valid():
+                f = request.FILES["ogrenci-dosya"]
+                file_path = _save_file(f, dp)
+                sonuc = OgrenciIsleyici(file_path=str(file_path)).calistir()
+                messages.success(
+                    request,
+                    f"Öğrenci listesi aktarıldı — "
+                    f"{sonuc['yeni']} yeni, {sonuc['guncellenen']} güncellendi"
+                    + (f", {sonuc['hatali']} hatalı" if sonuc["hatali"] else "") + ".",
+                )
+
         except Exception as e:
             messages.error(request, f"Hata oluştu: {str(e)}")
 
         return redirect(request.path)
+
+    from ogrenci.models import Ogrenci as OgrenciModel
 
     adimlar = [
         OkulBilgi.objects.exists(),
@@ -137,9 +153,10 @@ def veriaktar_ana(request):
         SinifSube.objects.exists(),
         NobetDersProgrami.objects.exists(),
         NobetGorevi.objects.exists(),
+        OgrenciModel.objects.exists(),
     ]
     tamamlanan = sum(adimlar)
-    aktif_adim = next((i + 1 for i, done in enumerate(adimlar) if not done), 6)
+    aktif_adim = next((i + 1 for i, done in enumerate(adimlar) if not done), 7)
 
     return render(
         request,
@@ -151,6 +168,7 @@ def veriaktar_ana(request):
             "sinif_form": sinif_form,
             "ders_form": ders_form,
             "nobet_form": nobet_form,
+            "ogrenci_form": ogrenci_form,
             "adimlar": adimlar,
             "tamamlanan": tamamlanan,
             "aktif_adim": aktif_adim,

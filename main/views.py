@@ -2,10 +2,11 @@ from datetime import date as dt_date
 from datetime import datetime, timedelta
 from datetime import time as dt_time
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Q
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from cagri.models import OgrenciCagri
@@ -13,13 +14,17 @@ from dersprogrami.models import NobetDersProgrami
 from devamsizlik.models import OgrenciDevamsizlik
 from faaliyet.models import Faaliyet
 from nobet.models import (
+    EgitimOgretimYili,
     GunlukNobetCizelgesi,
     NobetAtanamayan,
     NobetGecmisi,
     NobetGorevi,
     NobetPersonel,
     OkulBilgi,
+    OkulDonem,
 )
+
+from .forms import EgitimOgretimYiliForm, OkulBilgiAyarForm, OkulDonemForm
 from ogrencinobet.models import OgrenciNobetGorevi
 from personeldevamsizlik.models import Devamsizlik
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
@@ -66,7 +71,7 @@ _TR_GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]
 
 @login_required
 def index(request):
-    okul_bilgi = OkulBilgi.objects.first()
+    okul_bilgi = OkulBilgi.objects.select_related("okul_donem", "okul_donem__egitim_yili", "okul_egtyil").first()
 
     today = timezone.localdate()
     day_name_en = _WEEKDAY_TO_DB.get(today.weekday(), "Monday")
@@ -101,6 +106,13 @@ def index(request):
         NobetPersonel.objects.values("brans").annotate(sayi=Count("id")).order_by("-sayi")
     )
 
+    # Günün nöbetçi öğretmenleri (yer bilgisiyle)
+    gunun_nobetci_ogretmenleri = (
+        GunlukNobetCizelgesi.objects.filter(tarih=today)
+        .select_related("ogretmen__personel")
+        .order_by("nobet_yeri", "ogretmen__personel__adi_soyadi")
+    )
+
     # Günün öğrenci istatistikleri
     devamsiz_kiz = (
         OgrenciDevamsizlik.objects.filter(tarih=today, ogrenci__cinsiyet="K")
@@ -125,6 +137,9 @@ def index(request):
     ).count()
     disiplin_cagri = OgrenciCagri.objects.filter(
         tarih=today, servis=OgrenciCagri.SERVIS_DISIPLIN
+    ).count()
+    muduriyetcagri_cagri = OgrenciCagri.objects.filter(
+        tarih=today, servis=OgrenciCagri.SERVIS_MUDURIYETCAGRI
     ).count()
 
     is_ogretmen = request.user.groups.filter(name="ogretmen").exists()
@@ -231,6 +246,7 @@ def index(request):
             "title": "Anasayfa",
             "okul_bilgi": okul_bilgi,
             "gunun_nobetci_ogrencileri": gunun_nobetci_ogrencileri,
+            "gunun_nobetci_ogretmenleri": gunun_nobetci_ogretmenleri,
             "is_ogretmen": is_ogretmen,
             "personel_bagli": personel_bagli,
             "rehberlik_sinif_sube": rehberlik_sinif_sube,
@@ -250,6 +266,7 @@ def index(request):
                 "faaliyet": faaliyet_ogrenci,
                 "rehberlik_cagri": rehberlik_cagri,
                 "disiplin_cagri": disiplin_cagri,
+                "muduriyetcagri_cagri": muduriyetcagri_cagri,
             },
         },
     )
@@ -594,7 +611,8 @@ def ogretmen_gozetim_sinif_listesi(request):
     if not _ogretmen_menu_gorumu(request.user):
         raise PermissionDenied
 
-    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani, SinifSube
+    from nobet.models import SinifSube
+    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani
     from sinav.utils import gozetmen_bul, onceki_ders_saati
 
     tarih_str = request.GET.get("tarih", "")
@@ -648,3 +666,74 @@ def ogretmen_gozetim_sinif_listesi(request):
         "ogrenciler":   ogrenciler,
         "aktif_sinav":  aktif_sinav,
     })
+
+
+# ─────────────────────────────────────────────────────────
+# Okul Yapılandırması
+# ─────────────────────────────────────────────────────────
+
+@login_required
+def okul_ayarlari(request):
+    user = request.user
+    if not (user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()):
+        raise PermissionDenied
+
+    okul = OkulBilgi.objects.select_related("okul_donem", "okul_egtyil").first()
+    egitim_yillari = EgitimOgretimYili.objects.prefetch_related("donemleri").order_by("-egitim_yili")
+
+    # Hangi form POST edildi?
+    action = request.POST.get("action", "") if request.method == "POST" else ""
+
+    # ── Okul Bilgileri formu ──────────────────────────────
+    okul_form = OkulBilgiAyarForm(
+        request.POST if action == "okul_bilgi" else None,
+        instance=okul,
+    )
+    if action == "okul_bilgi" and okul_form.is_valid():
+        okul_form.save()
+        messages.success(request, "Okul bilgileri güncellendi.")
+        return redirect("okul_ayarlari")
+
+    # ── Eğitim Yılı formu ────────────────────────────────
+    eyil_pk = request.POST.get("eyil_pk", "").strip()
+    eyil_instance = get_object_or_404(EgitimOgretimYili, pk=eyil_pk) if eyil_pk else None
+    eyil_form = EgitimOgretimYiliForm(
+        request.POST if action == "egitim_yili" else None,
+        instance=eyil_instance,
+    )
+    if action == "egitim_yili" and eyil_form.is_valid():
+        yil = eyil_form.save()
+        msg = "güncellendi" if eyil_pk else "eklendi"
+        if not eyil_pk:
+            messages.info(request, f"'{yil.egitim_yili}' eklendi. Lütfen dönem tarihlerini giriniz.")
+        else:
+            messages.success(request, f"'{yil.egitim_yili}' {msg}.")
+        return redirect("okul_ayarlari")
+
+    # ── Dönem formu ───────────────────────────────────────
+    donem_pk = request.POST.get("donem_pk", "").strip()
+    donem_instance = get_object_or_404(OkulDonem, pk=donem_pk) if donem_pk else None
+    donem_form = OkulDonemForm(
+        request.POST if action == "donem" else None,
+        instance=donem_instance,
+    )
+    if action == "donem" and donem_form.is_valid():
+        donem_form.save()
+        messages.success(request, "Dönem kaydedildi.")
+        return redirect("okul_ayarlari")
+
+    # Hatalı POST durumunda hangi formu açık tutacağız?
+    aktif_form = action if action in ("okul_bilgi", "egitim_yili", "donem") else None
+
+    context = {
+        "title": "Okul Yapılandırması",
+        "okul": okul,
+        "okul_form": okul_form,
+        "egitim_yillari": egitim_yillari,
+        "eyil_form": eyil_form,
+        "eyil_pk": eyil_pk,
+        "donem_form": donem_form,
+        "donem_pk": donem_pk,
+        "aktif_form": aktif_form,
+    }
+    return render(request, "main/okul_ayarlari.html", context)

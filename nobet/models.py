@@ -30,6 +30,16 @@ class SinifSube(models.Model):
     def sinif_sube(self):
         return f"{self.sinif}/{self.sube}"
 
+    @property
+    def sinifsube(self):
+        """sinav app uyumu için alias."""
+        return f"{self.sinif}/{self.sube}"
+
+    @property
+    def salon(self):
+        """sinav app uyumu için salon adı."""
+        return f"Salon {self.sinif}/{self.sube}"
+
 
 class NobetPersonel(models.Model):
     user = models.OneToOneField(
@@ -180,6 +190,12 @@ class OkulBilgi(models.Model):
     def __str__(self):
         return self.okul_adi or "Okul Bilgisi"
 
+    @classmethod
+    def get(cls):
+        """sinav app uyumu için singleton erişim."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
 
 class OkulDonem(models.Model):
     DONEM_CHOICES = (
@@ -187,9 +203,16 @@ class OkulDonem(models.Model):
         (2, "2. Dönem"),
     )
 
+    egitim_yili = models.ForeignKey(
+        "EgitimOgretimYili",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="donemleri",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
     donem = models.PositiveSmallIntegerField(
         choices=DONEM_CHOICES,
-        unique=True,
         verbose_name="Dönem",
     )
     baslangic = models.DateField(verbose_name="Başlangıç Tarihi")
@@ -197,14 +220,14 @@ class OkulDonem(models.Model):
 
     class Meta:
         db_table = "okul_donem"
+        unique_together = ("egitim_yili", "donem")
         verbose_name = "Okul Dönemi"
         verbose_name_plural = "Okul Dönemleri"
         ordering = ["baslangic"]
 
     def __str__(self):
         donem_adi = dict(self.DONEM_CHOICES).get(self.donem, str(self.donem))
-        return f"{donem_adi} ({self.baslangic} / {self.bitis})"
-
+        return f"{donem_adi}"
 
 class EgitimOgretimYili(models.Model):
     egitim_yili = models.CharField(

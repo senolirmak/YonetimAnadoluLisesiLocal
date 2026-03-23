@@ -155,10 +155,10 @@
   {% endif %}
 
   <!-- Özet banner -->
-  {% if tamamlanan == 5 %}
+  {% if tamamlanan == 6 %}
   <div class="alert-banner success">✔ Tüm kurulum adımları tamamlandı. Sistem kullanıma hazır.</div>
   {% else %}
-  <div class="alert-banner warning">⚙ Kurulum devam ediyor — {{ tamamlanan }}/5 adım tamamlandı.</div>
+  <div class="alert-banner warning">⚙ Kurulum devam ediyor — {{ tamamlanan }}/6 adım tamamlandı.</div>
   {% endif %}
 
   <!-- İlerleme çubuğu -->
@@ -197,6 +197,13 @@
         {% if adimlar.4 %}✓{% else %}5{% endif %}
       </div>
       <div class="prog-label {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% endif %}">Nöbet Listesi</div>
+    </div>
+    <div class="prog-connector {% if adimlar.4 %}done{% endif %}"></div>
+    <div class="prog-step">
+      <div class="prog-circle {% if adimlar.5 %}done{% elif aktif_adim == 6 %}current{% endif %}">
+        {% if adimlar.5 %}✓{% else %}6{% endif %}
+      </div>
+      <div class="prog-label {% if adimlar.5 %}done{% elif aktif_adim == 6 %}current{% endif %}">Öğrenciler</div>
     </div>
     {% endwith %}
   </div>
@@ -359,7 +366,41 @@
         </div>
         <div class="aktar-submit-row">
           <button type="submit" name="nobet_aktar" class="btn btn-primary">
-            {% if adimlar.4 %}Yeniden Yükle{% else %}Yükle ve Tamamla{% endif %}
+            {% if adimlar.4 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <!-- ADIM 6 — Öğrenci Listesi -->
+  <details class="aktar-card {% if adimlar.5 %}done{% elif aktif_adim == 6 %}active{% else %}pending{% endif %}"
+           {% if aktif_adim == 6 or adimlar.5 %}open{% endif %}>
+    <summary>
+      <span class="aktar-badge">{% if adimlar.5 %}✓{% else %}6{% endif %}</span>
+      <span class="aktar-card-title">Öğrenci Listesi</span>
+      <span class="aktar-tag {% if adimlar.5 %}done{% elif aktif_adim == 6 %}active{% else %}pending{% endif %}">
+        {% if adimlar.5 %}Tamamlandı{% elif aktif_adim == 6 %}Aktif Adım{% else %}Bekliyor{% endif %}
+      </span>
+      <span class="aktar-chevron">▼</span>
+    </summary>
+    <div class="aktar-card-body">
+      <p class="hint">e-Okul'dan indirilen öğrenci listesi dosyasını (OOG01001R020_...XLS) yükleyiniz.
+        Sınıf/şube bilgisi ve cinsiyet liste başlıklarından otomatik okunur.</p>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="aktar-form-row">
+          {% for field in ogrenci_form %}
+          <div>
+            {{ field.label_tag }}
+            {{ field }}
+            {% for error in field.errors %}<p class="error-text">{{ error }}</p>{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="aktar-submit-row">
+          <button type="submit" name="ogrenci_aktar" class="btn btn-primary">
+            {% if adimlar.5 %}Yeniden Yükle{% else %}Yükle ve Tamamla{% endif %}
           </button>
         </div>
       </form>

@@ -164,51 +164,16 @@ class DersProgramiIsleyici:
         self.processed_df.to_excel(program_listesi, index=False)
 
     def veritabanina_yaz(self):
-        from dersprogrami.models import NobetDersProgrami
-        from nobet.models import NobetOgretmen, NobetPersonel, SinifSube
+        from utility.services.main_services import EOkulVeriAktar
 
         if self.processed_df.empty:
             return
 
-        tarih = self.processed_df.iloc[0]["uygulama_tarihi"]
-        NobetDersProgrami.objects.filter(uygulama_tarihi=tarih).delete()
-        ogretmenler = self.processed_df["ders_ogretmeni"].drop_duplicates().tolist()
-        ogretmen_map = {o.adi_soyadi: o for o in NobetPersonel.objects.all()}
-        sinif_sube_map = {(ss.sinif, ss.sube): ss for ss in SinifSube.objects.all()}
-
-        objs = []
-        ogretmenobj = []
-
-        for row in self.processed_df.itertuples():
-            ogretmen = ogretmen_map.get(str(row.ders_ogretmeni))
-            if not ogretmen:
-                continue
-            sinif_sube = sinif_sube_map.get((int(row.sinif), str(row.sube)))
-            objs.append(
-                NobetDersProgrami(
-                    uygulama_tarihi=row.uygulama_tarihi,
-                    gun=row.gun,
-                    ders_saati=int(str(row.ders_saati)) if pd.notna(row.ders_saati) else 0,
-                    ders_saati_adi=row.ders_saati_adi,
-                    giris_saat=row.giris_saat,
-                    cikis_saat=row.cikis_saat,
-                    ders_adi=row.ders_adi,
-                    ogretmen=ogretmen,
-                    sinif_sube=sinif_sube,
-                )
-            )
-
-        if objs:
-            NobetDersProgrami.objects.bulk_create(objs)
-
-        for ogretmen_d in ogretmenler:
-            ogretmen = ogretmen_map.get(str(ogretmen_d))
-            if not ogretmen:
-                continue
-            ogretmenobj.append(NobetOgretmen(uygulama_tarihi=tarih, personel=ogretmen))
-
-        if ogretmenobj:
-            NobetOgretmen.objects.bulk_create(ogretmenobj, ignore_conflicts=True)
+        veri_aktar = EOkulVeriAktar()
+        status = veri_aktar.save_yeni_veri_NobetDersProgrami(self.processed_df.copy())
+        print(f"✅ {status['message']}")
+        if status.get("otomatik_eklenen_isimler"):
+            print(f"⚠️  Otomatik oluşturulan personel: {', '.join(status['otomatik_eklenen_isimler'])}")
 
     def calistir(self, program_listesi="hz_duzenlenmis_program.xlsx"):
         self.parse_program()

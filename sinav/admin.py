@@ -1,18 +1,5 @@
 from django.contrib import admin
-from .models import OkulBilgileri, SinifSube, DersHavuzu, DisVeri
-
-
-@admin.register(OkulBilgileri)
-class OkulBilgileriAdmin(admin.ModelAdmin):
-    list_display = ["okul_adi", "okul_kodu", "okul_muduru"]
-
-
-@admin.register(SinifSube)
-class SinifSubeAdmin(admin.ModelAdmin):
-    list_display = ["sinif", "sube", "sinifsube", "salon"]
-    list_filter = ["sinif"]
-    ordering = ["sinif", "sube"]
-    readonly_fields = ["sinifsube", "salon"]
+from .models import DersHavuzu, DisVeri
 
 
 @admin.register(DersHavuzu)

@@ -19,27 +19,26 @@ class DersAnalizService(BaseService):
 
     def subeders_guncelle(self, sinav=None):
         self.log("\nSubeDers guncelleniyor...")
-        from sinav.models import DersProgram, SubeDers, DersHavuzu, SinifSube
+        from nobet.models import SinifSube
+        from dersprogrami.models import NobetDersProgrami
+        from sinav.models import SubeDers, DersHavuzu
 
-        # DersProgram'dan sinif / sube / ders_adi verisi
-        qs = DersProgram.objects.all()
-        if sinav is not None:
-            qs = qs.filter(sinav=sinav)
+        # NobetDersProgrami'nden sinif / sube / ders_adi verisi
         df = pd.DataFrame(
-            qs.values(
-                ders_adi=models.F("ders__ders_adi"),
+            NobetDersProgrami.objects.values(
+                "ders_adi",
                 sinif=models.F("sinif_sube__sinif"),
                 sube=models.F("sinif_sube__sube"),
             )
         )
         if df.empty:
-            raise RuntimeError("SubeDers: DB'de ders programi yok. Once veri aktarimi yapin.")
+            raise RuntimeError("SubeDers: Haftalık ders programı boş. Veri aktarımı yapın.")
 
         df = df.dropna(subset=["ders_adi", "sinif", "sube"])
         if df.empty:
             raise RuntimeError(
-                "SubeDers: DersProgram kayitlarinda ders/sinif/sube bilgisi eksik. "
-                "Veri aktarimini yeniden yapin."
+                "SubeDers: Ders programında sınıf/şube bilgisi eksik. "
+                "Veri aktarımını yeniden yapın."
             )
 
         df["ders_adi"] = df["ders_adi"].astype(str).str.strip()

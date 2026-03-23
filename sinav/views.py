@@ -15,13 +15,16 @@ from django.http import HttpResponse, JsonResponse, FileResponse, Http404
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_POST
 
-from .forms import VeriYukleForm, AlgoritmaForm, SinavBilgisiForm, OkulBilgileriForm
+from .forms import AlgoritmaForm, SinavBilgisiForm
 from .models import (
-    SinavBilgisi, Ogrenci, OkulBilgileri,
+    SinavBilgisi,
     DersAyarlariJSON,
     DisVeri, AlgoritmaParametreleri,
-    TakvimUretim, OturmaPlani, DersProgram,
+    TakvimUretim, OturmaPlani,
 )
+from nobet.models import OkulBilgi
+from ogrenci.models import Ogrenci as OgrenciModel
+from dersprogrami.models import NobetDersProgrami
 from ortaksinav_engine import (
     CONFIG,
     temel_verileri_olustur,
@@ -161,8 +164,8 @@ def _save_ayarlar(sinav, veri: dict):
 
 
 def _kurulum_durumu():
-    from sinav.models import SinifSube
-    okul = OkulBilgileri.get()
+    from nobet.models import SinifSube
+    okul = OkulBilgi.get()
     okul_tamam = bool(okul.okul_adi.strip() and okul.okul_kodu.strip())
     veri_tamam = SinifSube.objects.exists()
     return {
@@ -173,11 +176,11 @@ def _kurulum_durumu():
 
 
 def _db_ozeti():
-    from sinav.models import DersProgram, SubeDers, Takvim, OturmaPlani
+    from sinav.models import SubeDers, Takvim, OturmaPlani
     aktif = _aktif_sinav()
     return {
-        "ogrenci":      Ogrenci.objects.filter(sinav=aktif).count(),
-        "ders_program": DersProgram.objects.filter(sinav=aktif).count(),
+        "ogrenci":      OgrenciModel.objects.count(),
+        "ders_program": NobetDersProgrami.objects.count(),
         "sube_ders":    SubeDers.objects.count(),
         "takvim":       Takvim.objects.filter(sinav=aktif).count(),
         "oturma_plani": OturmaPlani.objects.filter(sinav=aktif).count(),
@@ -221,13 +224,11 @@ def _cikti_dosyalari(alt_klasor=None, sinav=None):
 
 
 def _dosya_durumu(request):
-    saved = request.session.get("ortaksinav_config", {})
-    ogrenci_path = saved.get("eokul_ogrenci_dosya", "")
-    program_path = saved.get("eokul_haftalik_program_dosya", "")
+    """DB-first modelde dosya durumu artık kullanılmamaktadır."""
     return {
-        "ogrenci_dosya_adi": Path(ogrenci_path).name if ogrenci_path else "",
-        "program_dosya_adi": Path(program_path).name if program_path else "",
-        "uygulama_tarihi":   saved.get("uygulama_tarihi", ""),
+        "ogrenci_dosya_adi": "",
+        "program_dosya_adi": "",
+        "uygulama_tarihi":   "",
     }
 
 
@@ -282,176 +283,63 @@ def index(request):
 # ---------------------------------------------------------------
 # Veri Yukleme sayfasi
 # ---------------------------------------------------------------
-def _veri_yukle_ctx(request, yukle_form=None):
+def _veri_yukle_ctx(request):
     aktif = _aktif_sinav()
-    dosya = _dosya_durumu(request)
     dis_veri = DisVeri.objects.filter(sinav=aktif)[:20]
     return {
-        "yukle_form":    yukle_form or VeriYukleForm(),
-        "aktif_sinav":   aktif,
-        "sinav_listesi": SinavBilgisi.objects.all(),
+        "aktif_sinav":     aktif,
+        "sinav_listesi":   SinavBilgisi.objects.all(),
         "yeni_sinav_form": SinavBilgisiForm(),
         "dis_veri_gecmis": dis_veri,
-        **dosya,
+        "ogrenci_sayisi":  OgrenciModel.objects.count(),
+        "program_sayisi":  NobetDersProgrami.objects.count(),
     }
 
 
 def veri_yukle_sayfasi(request):
-    okul = OkulBilgileri.get()
+    okul = OkulBilgi.get()
     if not bool(okul.okul_adi.strip() and okul.okul_kodu.strip()):
         messages.error(request, "Veri yüklemeden önce Okul Bilgilerini doldurun.")
         return redirect("sinav:sinav_bilgisi_listesi")
     return render(request, "sinav/veri_yukle.html", _veri_yukle_ctx(request))
 
 
-def _veri_yukle_calistir(request, cfg):
-    """Adim 0+1+2 calistirir, DisVeri olusturur, ders_ayarlari'na yonlendirir."""
-    from datetime import date as _date
+def _veri_yukle_calistir(request):
+    """Adim 0+1 calistirir (DB-first), ders_ayarlari'na yonlendirir."""
     from ortaksinav_engine.services.veri_import import VeriImportService
-    from ortaksinav_engine.services.ders_analiz import DersAnalizService
 
     aktif_sinav = _aktif_sinav()
-
-    uygulama_tarihi_str = cfg.get("uygulama_tarihi", "")
-    try:
-        uygulama_tarihi = _date.fromisoformat(uygulama_tarihi_str) if uygulama_tarihi_str else _date.today()
-    except ValueError:
-        uygulama_tarihi = _date.today()
-    bugun = _date.today()
-
-    son_ogrenci = DisVeri.objects.filter(sinav=aktif_sinav, dosya_etiketi="ogrenci").first()
-    son_program = DisVeri.objects.filter(sinav=aktif_sinav, dosya_etiketi="haftalik_program").first()
-    ogrenci_tip = None if not son_ogrenci else (
-        "guncelleme" if son_ogrenci.gecerlilik_tarihi == bugun else "yeni_veri"
-    )
-    program_tip = None if not son_program else (
-        "guncelleme" if son_program.gecerlilik_tarihi == uygulama_tarihi else "yeni_veri"
-    )
-
-    _apply_config(cfg)
+    _apply_config(request.session.get("ortaksinav_config", {}))
     svc = VeriImportService(CONFIG)
     svc.temel_verileri_olustur()
     if aktif_sinav:
         svc.verileri_aktar(aktif_sinav)
     else:
-        messages.info(request, "Temel veriler (SinifSube + DersHavuzu) oluşturuldu. "
-                      "Ders programı ve öğrenci aktarımı için önce sınav oluşturun.")
+        messages.info(request, "DersHavuzu güncellendi. Öğrenci ve ders verisi için önce sınav oluşturun.")
 
-    # Dosya yollarini DisVeri kaydina ekle
-    ogrenci_dosya_yolu = cfg.get("eokul_ogrenci_dosya", "")
-    program_dosya_yolu = cfg.get("eokul_haftalik_program_dosya", "")
-    media_root = str(settings.MEDIA_ROOT)
-
-    def _rel_yol(tam_yol):
-        """MEDIA_ROOT'a göreli yol; Django FileField için gerekli."""
-        if tam_yol and tam_yol.startswith(media_root):
-            return tam_yol[len(media_root):].lstrip("/\\")
-        return tam_yol or ""
-
-    DisVeri.objects.create(
-        sinav=aktif_sinav,
-        dosya_etiketi="ogrenci",
-        gecerlilik_tarihi=bugun,
-        dosya=_rel_yol(ogrenci_dosya_yolu),
-    )
-    DisVeri.objects.create(
-        sinav=aktif_sinav,
-        dosya_etiketi="haftalik_program",
-        gecerlilik_tarihi=uygulama_tarihi,
-        dosya=_rel_yol(program_dosya_yolu),
-    )
-
-    tip_mesaj = {None: "İlk yükleme", "yeni_veri": "Yeni veri", "guncelleme": "Güncelleme"}
-    messages.success(
-        request,
-        f"Dosyalar yüklendi — haftalık program, öğrenci listesi ve ders saatleri işlendi. "
-        f"[Öğrenci: {tip_mesaj[ogrenci_tip]} | Program: {tip_mesaj[program_tip]}]"
-    )
+    messages.success(request, "Veri eşitleme tamamlandı.")
     return redirect("sinav:ders_ayarlari")
 
 
 @require_POST
 def veri_yukle(request):
-    # Okul bilgileri zorunlu (kurulum adim 1)
-    okul = OkulBilgileri.get()
+    """DB-first veri eşitleme: Excel yüklemesi gerekmez."""
+    okul = OkulBilgi.get()
     if not bool(okul.okul_adi.strip() and okul.okul_kodu.strip()):
         messages.error(request, "Veri yüklemeden önce Okul Bilgilerini doldurun.")
         return redirect("sinav:sinav_bilgisi_listesi")
-
-    form = VeriYukleForm(request.POST, request.FILES)
-    if not form.is_valid():
-        return render(request, "sinav/veri_yukle.html", _veri_yukle_ctx(request, yukle_form=form))
-
-    # Dosyaları kaydet
-    upload_dir = Path(settings.MEDIA_ROOT) / "uploads"
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    cfg = request.session.get("ortaksinav_config", {})
-
-    f = form.cleaned_data["eokul_ogrenci_dosya"]
-    dest = upload_dir / f"ogrenci_{f.name}"
-    with open(dest, "wb") as out:
-        for chunk in f.chunks():
-            out.write(chunk)
-    cfg["eokul_ogrenci_dosya"] = str(dest)
-
-    f = form.cleaned_data["eokul_haftalik_program_dosya"]
-    dest = upload_dir / f"haftalikprogram_{f.name}"
-    with open(dest, "wb") as out:
-        for chunk in f.chunks():
-            out.write(chunk)
-    cfg["eokul_haftalik_program_dosya"] = str(dest)
-    cfg["uygulama_tarihi"] = str(form.cleaned_data["uygulama_tarihi"])
-
-    request.session["ortaksinav_config"] = cfg
-    request.session.modified = True
-
-    # Mevcut DB verisiyle farki hesapla; fark varsa onay iste
-    from sinav.models import SinifSube as _SinifSube, DersHavuzu as _DersHavuzu
-    db_bos = not _SinifSube.objects.exists() and not _DersHavuzu.objects.exists()
-    if not db_bos:
-        try:
-            _apply_config(cfg)
-            from ortaksinav_engine.services.veri_import import VeriImportService
-            yeni_ss, yeni_dh = VeriImportService(CONFIG).fark_hesapla()
-            mevcut_ss = set(_SinifSube.objects.values_list("sinif", "sube"))
-            mevcut_dh = set(_DersHavuzu.objects.values_list("ders_adi", flat=True))
-            ss_eklenen = yeni_ss - mevcut_ss
-            ss_silinen = mevcut_ss - yeni_ss
-            dh_eklenen = yeni_dh - mevcut_dh
-            dh_silinen = mevcut_dh - yeni_dh
-            if ss_eklenen or ss_silinen or dh_eklenen or dh_silinen:
-                ctx = _veri_yukle_ctx(request)
-                ctx["fark"] = {
-                    "ss_eklenen": sorted(f"{s}/{b}" for s, b in ss_eklenen),
-                    "ss_silinen": sorted(f"{s}/{b}" for s, b in ss_silinen),
-                    "dh_eklenen": sorted(dh_eklenen),
-                    "dh_silinen": sorted(dh_silinen),
-                }
-                return render(request, "sinav/veri_yukle.html", ctx)
-        except Exception:
-            pass  # Parse hatası varsa onaysız devam et
-
     try:
-        return _veri_yukle_calistir(request, cfg)
+        return _veri_yukle_calistir(request)
     except Exception as e:
-        messages.error(request, f"Veri işleme hatası: {e}")
+        messages.error(request, f"Veri eşitleme hatası: {e}")
         messages.warning(request, traceback.format_exc())
         return redirect("sinav:veri_yukle_sayfasi")
 
 
 @require_POST
 def veri_yukle_onayla(request):
-    """Kullanici farki onayladiktan sonra adim0/1/2 calistirir."""
-    cfg = request.session.get("ortaksinav_config", {})
-    if not cfg.get("eokul_ogrenci_dosya") or not cfg.get("eokul_haftalik_program_dosya"):
-        messages.error(request, "Onaylanacak veri yok. Önce dosyaları yükleyin.")
-        return redirect("sinav:veri_yukle_sayfasi")
-    try:
-        return _veri_yukle_calistir(request, cfg)
-    except Exception as e:
-        messages.error(request, f"Veri işleme hatası: {e}")
-        messages.warning(request, traceback.format_exc())
-        return redirect("sinav:veri_yukle_sayfasi")
+    """DB-first modelde onay adımı yoktur; doğrudan eşitlemeye yönlendir."""
+    return redirect("sinav:veri_yukle")
 
 
 # ---------------------------------------------------------------
@@ -735,10 +623,22 @@ def takvim_gecmisi(request):
 
 
 def pdf_rapor(request):
-    """PDF rapor üretim sayfası: aktif TakvimUretim'e bağlı takvim verilerini gösterir."""
+    """PDF rapor üretim sayfası: seçili (veya aktif) TakvimUretim'e bağlı takvim verilerini gösterir."""
     from sinav.models import TakvimUretim, Takvim
     from collections import defaultdict
-    aktif = _aktif_sinav()
+
+    tum_sinavlar = SinavBilgisi.objects.order_by("-sinav_baslangic_tarihi")
+
+    sinav_pk = request.GET.get("sinav_pk")
+    if sinav_pk:
+        try:
+            secili_sinav = SinavBilgisi.objects.get(pk=sinav_pk)
+        except SinavBilgisi.DoesNotExist:
+            secili_sinav = _aktif_sinav()
+    else:
+        secili_sinav = _aktif_sinav()
+
+    aktif = secili_sinav
     aktif_uretim = (
         TakvimUretim.objects.filter(sinav=aktif, aktif=True).first()
         if aktif else None
@@ -773,7 +673,7 @@ def pdf_rapor(request):
             "dersler":   dersler,
         })
 
-    from sinav.models import OkulBilgileri, OturmaUretim
+    from sinav.models import OturmaUretim
     takvim_degisti = aktif_uretim.oturma_sifirla
     # Her oturum için OturmaUretim kaydı var mı kontrolü
     mevcut_ou = {
@@ -789,7 +689,7 @@ def pdf_rapor(request):
         gunler.append({"tarih": tarih, "oturumlar": oturumlar})
     toplam_oturum = sum(len(g["oturumlar"]) for g in gunler)
 
-    okul = OkulBilgileri.get()
+    okul = OkulBilgi.get()
     return render(request, "sinav/pdf_rapor.html", {
         "aktif_sinav":    aktif,
         "aktif_sinav_pk": aktif.pk if aktif else None,
@@ -799,6 +699,7 @@ def pdf_rapor(request):
         "toplam_oturum":  toplam_oturum,
         "gun_sayisi":     len(gunler),
         "takvim_degisti": takvim_degisti,
+        "tum_sinavlar":   tum_sinavlar,
     })
 
 
@@ -850,7 +751,7 @@ def oturma_plani_pdf_view(request):
     """OturmaPlani DB'den Oturma Planı PDF'ini anlık üretip döner."""
     import io, re as _re
     from datetime import datetime as _dt
-    from sinav.models import OturmaPlani, OkulBilgileri, OturmaUretim
+    from sinav.models import OturmaPlani, OturmaUretim
     from ortaksinav_engine.services.pdf_rapor import oturum_plani_pdf
 
     tarih_str  = request.GET.get("tarih", "")
@@ -903,7 +804,7 @@ def oturma_plani_pdf_view(request):
             }
 
     baslik = f"{tarih_str} {saat} (Oturum {oturum})"
-    okul   = OkulBilgileri.get()
+    okul   = OkulBilgi.get()
     buf    = io.BytesIO()
     oturum_plani_pdf(salon_grids, buf, baslik, okul, aktif_uretim, tarih=tarih_date, saat=saat)
     buf.seek(0)
@@ -915,7 +816,7 @@ def oturma_plani_pdf_view(request):
 def sinav_takvimi_pdf_view(request):
     """Aktif TakvimUretim'e bağlı tek sayfalık öğrenci Sınav Takvimi PDF'i döner."""
     import io
-    from sinav.models import OkulBilgileri, TakvimUretim
+    from sinav.models import TakvimUretim
     from ortaksinav_engine.services.pdf_rapor import sinav_takvimi_pdf
 
     aktif = _aktif_sinav()
@@ -929,7 +830,7 @@ def sinav_takvimi_pdf_view(request):
     from sinav.models import Takvim as TakvimModel
     TakvimModel.objects.filter(sinav=aktif, uretim__isnull=True).update(uretim=aktif_uretim)
 
-    okul = OkulBilgileri.get()
+    okul = OkulBilgi.get()
     buf  = io.BytesIO()
     sinav_takvimi_pdf(buf, okul, aktif_uretim)
     buf.seek(0)
@@ -942,7 +843,7 @@ def sinif_listesi_pdf_view(request):
     """OturmaPlani DB'den Sınıf Listesi PDF'ini anlık üretip döner."""
     import io
     from datetime import datetime as _dt
-    from sinav.models import OturmaPlani, OkulBilgileri, OturmaUretim
+    from sinav.models import OturmaPlani, OturmaUretim
     from ortaksinav_engine.services.pdf_rapor import sinif_raporu_pdf
 
     tarih_str = request.GET.get("tarih", "")
@@ -970,7 +871,7 @@ def sinif_listesi_pdf_view(request):
         ).exists():
             raise Http404
 
-    okul  = OkulBilgileri.get()
+    okul  = OkulBilgi.get()
     buf   = io.BytesIO()
     sinif_raporu_pdf(tarih_date, saat, oturum, buf, okul, aktif_uretim)
     buf.seek(0)
@@ -1135,8 +1036,7 @@ def indir_dosya(request, rel_yol: str):
 # Sinav Bilgisi CRUD
 # ---------------------------------------------------------------
 def sinav_bilgisi_listesi(request):
-    okul = OkulBilgileri.get()
-    okul_form = OkulBilgileriForm(instance=okul)
+    okul = OkulBilgi.get()
     okul_tamam = bool(okul.okul_adi.strip())
 
     kurulum = _kurulum_durumu()
@@ -1167,7 +1067,6 @@ def sinav_bilgisi_listesi(request):
         "liste_formlar": liste_formlar,
         "aktif_sinav":   _aktif_sinav(),
         "okul":          okul,
-        "okul_form":     okul_form,
         "okul_tamam":    okul_tamam,
         **kurulum,
         **dosya,
@@ -1176,16 +1075,8 @@ def sinav_bilgisi_listesi(request):
 
 @require_POST
 def okul_bilgileri_kaydet(request):
-    okul = OkulBilgileri.get()
-    form = OkulBilgileriForm(request.POST, instance=okul)
-    if form.is_valid():
-        form.save()
-        messages.success(request, "Okul bilgileri kaydedildi.")
-    else:
-        for field in form:
-            for err in field.errors:
-                messages.error(request, f"{field.label}: {err}")
-    return redirect("sinav:sinav_bilgisi_listesi")
+    """Okul bilgileri artık /okul-ayarlari/ sayfasından yönetilmektedir."""
+    return redirect("main:okul_ayarlari")
 
 
 @require_POST
@@ -1217,18 +1108,15 @@ def ogrenci_yonetim(request):
     aktif = _aktif_sinav()
     arama = request.GET.get("q", "").strip()
     sinif_filtre = request.GET.get("sinif", "").strip()
-    qs = Ogrenci.objects.filter(sinav=aktif)
+    from django.db.models import Q
+    qs = OgrenciModel.objects.all()
     if arama:
-        from django.db.models import Q
         qs = qs.filter(
             Q(adi__icontains=arama) | Q(soyadi__icontains=arama) | Q(okulno__icontains=arama)
         )
     if sinif_filtre:
-        qs = qs.filter(sinif_sube__sinif=sinif_filtre)
-    qs = qs.select_related("sinif_sube")
-    siniflar = Ogrenci.objects.filter(sinav=aktif).values_list(
-        "sinif_sube__sinif", flat=True
-    ).distinct().order_by("sinif_sube__sinif")
+        qs = qs.filter(sinif=sinif_filtre)
+    siniflar = OgrenciModel.objects.values_list("sinif", flat=True).distinct().order_by("sinif")
     return render(request, "sinav/ogrenci_yonetim.html", {
         "ogrenciler":   qs[:200],
         "arama":        arama,
@@ -1241,42 +1129,19 @@ def ogrenci_yonetim(request):
 
 @require_POST
 def ogrenci_ekle(request):
-    sinif   = request.POST.get("sinif", "").strip()
-    sube    = request.POST.get("sube", "").strip().upper()
-    adi     = request.POST.get("adi", "").strip().upper()
-    soyadi  = request.POST.get("soyadi", "").strip().upper()
-    okulno  = request.POST.get("okulno", "").strip()
-    cinsiyet = request.POST.get("cinsiyet", "").strip()
-    hatalar = []
-    if not sinif or not sinif.isdigit():
-        hatalar.append("Geçerli bir sınıf seviyesi girin.")
-    if not sube:
-        hatalar.append("Şube boş olamaz.")
-    if not adi or not soyadi:
-        hatalar.append("Ad ve soyad zorunludur.")
-    if hatalar:
-        for h in hatalar:
-            messages.error(request, h)
-    else:
-        from sinav.models import SinifSube
-        sinif_sube_obj, _ = SinifSube.objects.get_or_create(sinif=int(sinif), sube=sube)
-        aktif = _aktif_sinav()
-        Ogrenci.objects.create(
-            sinav=aktif, okulno=okulno, adi=adi, soyadi=soyadi,
-            cinsiyet=cinsiyet, sinif_sube=sinif_sube_obj,
-        )
-        messages.success(request, f"{adi} {soyadi} ({sinif_sube_obj.sinifsube}) eklendi.")
+    """Öğrenci yönetimi Veri Aktarım sayfasından yapılmaktadır."""
+    messages.info(request, "Öğrenci eklemek için Veri Aktarım sayfasını kullanın.")
     return redirect("sinav:ogrenci_yonetim")
 
 
 @require_POST
 def ogrenci_sil(request, pk: int):
     try:
-        ogr = Ogrenci.objects.select_related("sinif_sube").get(pk=pk)
-        ad = f"{ogr.adi} {ogr.soyadi} ({ogr.sinif_sube.sinifsube if ogr.sinif_sube else ''})"
+        ogr = OgrenciModel.objects.get(pk=pk)
+        ad = f"{ogr.adi} {ogr.soyadi} ({ogr.sinifsube})"
         ogr.delete()
         messages.success(request, f"{ad} listeden çıkarıldı.")
-    except Ogrenci.DoesNotExist:
+    except OgrenciModel.DoesNotExist:
         messages.error(request, "Öğrenci bulunamadı.")
     return redirect("sinav:ogrenci_yonetim")
 

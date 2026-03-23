@@ -1,3 +1,4 @@
+import random
 from datetime import datetime
 from datetime import time as Time
 from typing import Any
@@ -16,6 +17,40 @@ from nobet.models import (
     NobetPersonel,
     SinifSube,
 )
+
+
+def _generate_kimlikno() -> str:
+    """
+    Sistemde bulunmayan öğretmen için 11 haneli benzersiz placeholder kimlik no üretir.
+    Gerçek TC kimlik no algoritmasıyla çakışmaması için 999XXXXXXXX aralığı kullanılır.
+    """
+    while True:
+        kimlikno = str(random.randint(99900000000, 99999999999))
+        if not NobetPersonel.objects.filter(kimlikno=kimlikno).exists():
+            return kimlikno
+
+
+def _get_or_create_eksik_personel(adi_soyadi: str):
+    """
+    İsme göre NobetPersonel arar; bulamazsa otomatik oluşturur.
+    NobetOgretmen kaydını da garanti eder.
+    Döner: (NobetOgretmen instance, personel_created: bool)
+    """
+    personel = NobetPersonel.objects.filter(adi_soyadi=adi_soyadi).first()
+    personel_created = False
+    if not personel:
+        personel = NobetPersonel.objects.create(
+            adi_soyadi=adi_soyadi,
+            kimlikno=_generate_kimlikno(),
+            brans="Bilinmiyor",
+            gorev_tipi="Öğretmen",
+            nobeti_var=True,
+            sabit_nobet=False,
+            cinsiyet=True,
+        )
+        personel_created = True
+    ogretmen, _ = NobetOgretmen.objects.get_or_create(personel=personel)
+    return ogretmen, personel_created
 
 
 class EOkulVeriAktar:
@@ -60,6 +95,7 @@ class EOkulVeriAktar:
                                 "cinsiyet": row["cinsiyet"],
                             },
                         )
+                        NobetOgretmen.objects.get_or_create(personel=obj)
                         status["inserted" if created else "updated"] += 1
                     except Exception as e:
                         print(f"Satır hatası: {e}")
@@ -159,9 +195,18 @@ class EOkulVeriAktar:
     def save_yeni_veri_NobetGorevi(self, nobet_df: pd.DataFrame) -> dict[str, Any]:
         """
         Belirtilen uygulama tarihlerindeki kayıtları siler ve yenilerini ekler.
+        Sistemde bulunmayan öğretmenler otomatik olarak oluşturulur.
         """
         nobet_df = nobet_df.dropna(subset=["nobetci"])
-        status = {"inserted": 0, "updated": 0, "errors": 0, "status": "success", "message": ""}
+        status = {
+            "inserted": 0,
+            "updated": 0,
+            "errors": 0,
+            "otomatik_eklenen": 0,
+            "otomatik_eklenen_isimler": [],
+            "status": "success",
+            "message": "",
+        }
 
         if nobet_df.empty:
             status["message"] = "İşlenecek veri yok."
@@ -180,24 +225,25 @@ class EOkulVeriAktar:
                 if dates_to_delete:
                     NobetGorevi.objects.filter(uygulama_tarihi__in=dates_to_delete).delete()
 
-                # 2. Yeni kayıtları hazırla
-                objs_to_create = []
+                # 2. Öğretmen map'ini hazırla
                 ogretmen_map = {
                     o.personel.adi_soyadi: o
                     for o in NobetOgretmen.objects.select_related("personel").all()
                 }
 
+                objs_to_create = []
                 for _, row in nobet_df.iterrows():
                     try:
                         ogretmen_adi = str(row["nobetci"]).strip()
                         ogretmen = ogretmen_map.get(ogretmen_adi)
 
                         if not ogretmen:
-                            raise ValueError(
-                                f"'{ogretmen_adi}' isimli öğretmen veritabanında bulunamadı."
-                            )
+                            ogretmen, created = _get_or_create_eksik_personel(ogretmen_adi)
+                            ogretmen_map[ogretmen_adi] = ogretmen
+                            if created:
+                                status["otomatik_eklenen"] += 1
+                                status["otomatik_eklenen_isimler"].append(ogretmen_adi)
 
-                        # Tarihi normalize et (saat kısmını sıfırla)
                         uygulama_tarihi = pd.to_datetime(row["uygulama_tarihi"]).replace(
                             hour=0, minute=0, second=0, microsecond=0
                         )
@@ -212,15 +258,20 @@ class EOkulVeriAktar:
                                 nobet_yeri=row["nobet_yeri"],
                             )
                         )
-
                     except Exception as row_error:
-                        raise row_error
+                        print(f"⚠️ Satır hatası ({row.get('nobetci', '???')}): {row_error}")
+                        status["errors"] += 1
 
                 if objs_to_create:
                     NobetGorevi.objects.bulk_create(objs_to_create)
                     status["inserted"] = len(objs_to_create)
 
-            status["message"] = f"Nöbet: {status['inserted']} kayıt başarıyla eklendi."
+            status["message"] = (
+                f"Nöbet: {status['inserted']} kayıt eklendi"
+                + (f", {status['otomatik_eklenen']} yeni personel otomatik oluşturuldu" if status["otomatik_eklenen"] else "")
+                + (f", {status['errors']} satır hatalı" if status["errors"] else "")
+                + "."
+            )
 
         except Exception as e:
             status.update(
@@ -237,9 +288,18 @@ class EOkulVeriAktar:
     def save_yeni_veri_NobetDersProgrami(self, program_df: pd.DataFrame) -> dict[str, Any]:
         """
         Aynı uygulama_tarihi için kayıtları siler, yenilerini ekler.
+        Sistemde bulunmayan öğretmenler otomatik olarak oluşturulur.
         """
         program_df = program_df.dropna(subset=["ders_ogretmeni"])
-        status = {"inserted": 0, "updated": 0, "errors": 0, "status": "success", "message": ""}
+        status = {
+            "inserted": 0,
+            "updated": 0,
+            "errors": 0,
+            "otomatik_eklenen": 0,
+            "otomatik_eklenen_isimler": [],
+            "status": "success",
+            "message": "",
+        }
 
         if program_df.empty:
             status["message"] = "İşlenecek veri yok."
@@ -260,23 +320,24 @@ class EOkulVeriAktar:
                 if dates_to_delete:
                     NobetDersProgrami.objects.filter(uygulama_tarihi__in=dates_to_delete).delete()
 
-                # 2. Yeni kayıtları hazırla
-                objs_to_create = []
+                # 2. Map'leri hazırla
                 personel_map = {p.adi_soyadi: p for p in NobetPersonel.objects.all()}
                 sinif_sube_map = {(ss.sinif, ss.sube): ss for ss in SinifSube.objects.all()}
 
+                objs_to_create = []
                 for _, row in program_df.iterrows():
                     try:
-                        # 🔹 Öğretmeni bul
                         ogretmen_adi = str(row["ders_ogretmeni"]).strip()
                         ogretmen = personel_map.get(ogretmen_adi)
 
                         if not ogretmen:
-                            raise ValueError(
-                                f"'{ogretmen_adi}' isimli öğretmen veritabanında bulunamadı."
-                            )
+                            nobet_ogretmen, created = _get_or_create_eksik_personel(ogretmen_adi)
+                            ogretmen = nobet_ogretmen.personel
+                            personel_map[ogretmen_adi] = ogretmen
+                            if created:
+                                status["otomatik_eklenen"] += 1
+                                status["otomatik_eklenen_isimler"].append(ogretmen_adi)
 
-                        # 🔹 Tarih normalize et
                         uygulama_tarihi = pd.to_datetime(row["uygulama_tarihi"], errors="coerce")
                         if pd.isna(uygulama_tarihi):
                             uygulama_tarihi = timezone.now().replace(
@@ -286,7 +347,6 @@ class EOkulVeriAktar:
                             uygulama_tarihi = uygulama_tarihi.replace(
                                 hour=0, minute=0, second=0, microsecond=0
                             )
-
                         if timezone.is_naive(uygulama_tarihi):
                             uygulama_tarihi = timezone.make_aware(uygulama_tarihi)
 
@@ -306,15 +366,20 @@ class EOkulVeriAktar:
                                 ),
                             )
                         )
-
                     except Exception as row_err:
-                        raise row_err
+                        print(f"⚠️ Satır hatası ({row.get('ders_ogretmeni', '???')}): {row_err}")
+                        status["errors"] += 1
 
                 if objs_to_create:
                     NobetDersProgrami.objects.bulk_create(objs_to_create)
                     status["inserted"] = len(objs_to_create)
 
-            status["message"] = f"Ders programı: {status['inserted']} kayıt başarıyla eklendi."
+            status["message"] = (
+                f"Ders programı: {status['inserted']} kayıt eklendi"
+                + (f", {status['otomatik_eklenen']} yeni personel otomatik oluşturuldu" if status["otomatik_eklenen"] else "")
+                + (f", {status['errors']} satır hatalı" if status["errors"] else "")
+                + "."
+            )
 
         except Exception as e:
             status.update(

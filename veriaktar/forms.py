@@ -55,6 +55,10 @@ class OkulBilgiForm(forms.Form):
     )
 
 
+class OgrenciImportForm(forms.Form):
+    dosya = forms.FileField(label="Öğrenci Listesi Excel Dosyası (OOG01001R020_...XLS)")
+
+
 class SinifSubeImportForm(forms.Form):
     sinif_9 = forms.CharField(
         label="9. Sınıf Şubeleri",

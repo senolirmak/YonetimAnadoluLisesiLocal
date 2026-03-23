@@ -89,7 +89,8 @@ class OturmaPlanService(BaseService):
         self.log("\nSecili oturumlar tamamlandi.\n")
 
     def generate_oturum(self, tarih: str, saat: str, oturum: int, aktif_sinav=None, aktif_uretim=None):
-        from sinav.models import Takvim, Ogrenci, OturmaPlani
+        from ogrenci.models import Ogrenci as OgrenciModel
+        from sinav.models import Takvim, OturmaPlani
 
         self.log(f"\nOturum yerlesimi: {tarih} {saat} (Oturum {oturum})")
         baslik = f"{tarih} {saat} (Oturum {oturum})"
@@ -116,12 +117,11 @@ class OturmaPlanService(BaseService):
             for s in normalize_sube_cell(t.subeler)
         }
 
-        df_o = pd.DataFrame(Ogrenci.objects.filter(sinav=aktif_sinav).values(
-            "okulno", "adi", "soyadi", "cinsiyet",
-            sinifsube=F("sinif_sube__sinifsube"),
-            sube=F("sinif_sube__sube"),
-            sinif=F("sinif_sube__sinif"),
+        df_o = pd.DataFrame(OgrenciModel.objects.values(
+            "okulno", "adi", "soyadi", "cinsiyet", "sinif", "sube",
         ))
+        if not df_o.empty:
+            df_o["sinifsube"] = df_o["sinif"].astype(str) + "/" + df_o["sube"].astype(str)
         if df_o.empty:
             self.log("DB'de ogrenci yok. Adim 1'i calistirin.")
             return

@@ -101,6 +101,7 @@
                     <div class="menu-button-group">
                         <a href="/admin/" class="btn btn-primary btn-lg">Yönetici Paneline Git</a>
                         <a href="{% url 'sinav:index' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Ortak Sınav Yönetimi</a>
+                        <a href="{% url 'okul_ayarlari' %}" class="btn btn-lg" style="background-color: #495057; color: white;">Okul Yapılandırması</a>
                         <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" class="btn btn-lg"
                            style="background-color:#fd7e14;color:#fff;position:relative;">
                             Faaliyet Onayları
@@ -222,6 +223,9 @@
                         <a href="{% url 'haftalik_ders_programi' %}" class="btn btn-lg" style="background-color: #6610f2; color: white;">Ders Programım</a>
                         <a href="{% url 'dersdefteri:ders_listesi' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Ders Defterim</a>
                     </div>
+                    <div style="margin-top:10px;padding:8px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;font-size:0.85em;color:#0369a1;">
+                        Yönetmelik değişene kadar Yoklama ve Sınıf Defteri elle yazılması gereken evraklardır. Yoklama ve Defterinizi burada doldurduğunuz için teşekkür ederim.
+                    </div>
                 </div>
                 {% endif %}
 
@@ -256,6 +260,9 @@
                         <strong>Sınıf Rehber Öğretmenliği:</strong> {{ rehberlik_sinif_sube }}
                     </div>
                     {% endif %}
+                    <div style="margin-top:10px;padding:8px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;font-size:0.85em;color:#0369a1;">
+                        Sınıf Rehber Öğretmenliği göreviniz varsa Öğrenci bilgilerinden özellikle iletişim bilgilerini güncelleme/ekleme yaptığınız için teşekkür ederim.
+                    </div>
                 </div>
 
                 <hr class="menu-divider">
@@ -311,8 +318,7 @@
             </div>
         </div>
 
-        <!-- 2. Kolon: Günün Öğrenci İstatistikleri (yöneticilere görünür) -->
-        {% if is_yonetici %}
+        <!-- 2. Kolon: Günün Öğrenci İstatistikleri -->
         <div class="index-col-side">
             <div class="menu-group">
                 <div class="menu-group-title">Günün Öğrenci Durumu</div>
@@ -341,26 +347,15 @@
                     <span>Disiplin Çağrısı</span>
                     <span class="badge" style="background-color:#dc3545;color:#fff;">{{ ogrenci_istatistik.disiplin_cagri }}</span>
                 </div>
+                <div class="info-item">
+                    <span>Müdüriyet Çağrısı</span>
+                    <span class="badge" style="background-color:#343a40;color:#fff;">{{ ogrenci_istatistik.muduriyetcagri_cagri }}</span>
+                </div>
 
                 {% if is_mudur_yardimcisi %}
                 <div style="margin-top:14px;">
                     <a href="{% url 'devamsizlik:ogrenci_devamsizlik_listesi' %}" class="btn btn-sm btn-outline-secondary" style="width:100%;">Detaylı Görünüm</a>
                 </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- 2. Kolon: Okul Bilgileri + Günün Nöbetçi Öğrencileri -->
-        <div class="index-col-side">
-            <div class="menu-group">
-                <div class="menu-group-title">Okul Bilgileri</div>
-                {% if okul_bilgi %}
-                    <div class="info-item"><strong>Okul Adı:</strong> <span>{{ okul_bilgi.okul_adi|default:"-" }}</span></div>
-                    <div class="info-item"><strong>Okul Kodu:</strong> <span>{{ okul_bilgi.okul_kodu|default:"-" }}</span></div>
-                    <div class="info-item"><strong>Okul Müdürü:</strong> <span>{{ okul_bilgi.okul_muduru|default:"-" }}</span></div>
-                {% else %}
-                    <p class="text-muted">Okul bilgileri henüz girilmemiş.</p>
                 {% endif %}
             </div>
 
@@ -385,7 +380,44 @@
                 {% endif %}
             </div>
         </div>
-        
+
+        <!-- 2. Kolon: Okul Bilgileri -->
+        <div class="index-col-side">
+            <div class="menu-group">
+                <div class="menu-group-title">Okul Bilgileri</div>
+                {% if okul_bilgi %}
+                    <div class="info-item"><strong>Okul Adı:</strong> <span>{{ okul_bilgi.okul_adi|default:"-" }}</span></div>
+                    <div class="info-item"><strong>Okul Kodu:</strong> <span>{{ okul_bilgi.okul_kodu|default:"-" }}</span></div>
+                    <div class="info-item"><strong>Okul Müdürü:</strong> <span>{{ okul_bilgi.okul_muduru|default:"-" }}</span></div>
+                    <div class="info-item"><strong>Eğitim-Öğretim Yılı:</strong> <span>{{ okul_bilgi.okul_egtyil|default:"-" }}</span></div>
+                    <div class="info-item"><strong>Dönem:</strong> <span>{{ okul_bilgi.okul_donem|default:"-" }}</span></div>
+                {% else %}
+                    <p class="text-muted">Okul bilgileri henüz girilmemiş.</p>
+                {% endif %}
+            </div>
+
+            <div class="menu-group">
+                <div class="menu-group-title">
+                    Günün Nöbetçi Öğretmenleri
+                    {% if gunun_nobetci_ogretmenleri %}
+                    <span class="badge badge-info" style="font-size:0.8em;margin-left:6px;">{{ gunun_nobetci_ogretmenleri|length }}</span>
+                    {% endif %}
+                </div>
+                {% if gunun_nobetci_ogretmenleri %}
+                <ul class="list-group">
+                    {% for n in gunun_nobetci_ogretmenleri %}
+                    <li class="list-item" style="padding:5px 0;border-bottom:1px solid #f1f1f1;display:flex;justify-content:space-between;align-items:center;gap:.5rem;">
+                        <span style="font-size:0.9em;">{{ n.ogretmen.personel.adi_soyadi }}</span>
+                        <span class="badge badge-secondary" style="font-size:0.75em;white-space:nowrap;">{{ n.nobet_yeri }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted" style="font-size:0.9em;">Bugün için nöbet çizelgesi oluşturulmamış.</p>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- 3. Kolon: Personel Bilgileri ve İstatistikler -->
         <div class="index-col-side">
             <div class="menu-group">

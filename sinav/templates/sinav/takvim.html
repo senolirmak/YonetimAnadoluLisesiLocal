@@ -183,7 +183,7 @@ async function runAdim4() {
 
   while (true) {
     await new Promise(r => setTimeout(r, 1200));
-    const res = await fetch(`/gorev/${data.task_id}/`).then(r => r.json());
+    const res = await fetch(`{% url 'sinav:gorev_durumu' '00' %}`.replace('00', data.task_id)).then(r => r.json());
     logBox.textContent = res.logs.join("\n");
     logBox.scrollTop = logBox.scrollHeight;
     if (res.done) {

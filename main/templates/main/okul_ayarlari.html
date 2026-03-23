@@ -1,0 +1,337 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} – Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+  .ay-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+  .ay-kart {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    padding: 1.25rem 1.5rem;
+  }
+  .ay-kart-full { width: 100%; }
+  .ay-kart-half { flex: 1; min-width: 300px; }
+  .ay-baslik {
+    font-size: 1rem; font-weight: 700; color: #1a1a2e;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: .6rem; margin-bottom: 1rem;
+  }
+  .ay-form-row { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; }
+  .ay-form-group { display: flex; flex-direction: column; gap: .25rem; flex: 1; min-width: 180px; }
+  .ay-form-group label { font-size: .82rem; font-weight: 600; color: #374151; }
+  .ay-form-group input, .ay-form-group select {
+    padding: .45rem .65rem;
+    border: 1px solid #ced4da; border-radius: 6px;
+    font-size: .9rem;
+  }
+  .ay-form-group input:focus, .ay-form-group select:focus {
+    outline: 2px solid #417690; border-color: transparent;
+  }
+  .ay-error { color: #dc2626; font-size: .78rem; margin-top: .15rem; }
+  .ay-btn-row { display: flex; gap: .75rem; margin-top: 1rem; flex-wrap: wrap; }
+  .btn-kaydet {
+    padding: .45rem 1.2rem;
+    background: #417690; color: #fff;
+    border: none; border-radius: 6px;
+    font-size: .9rem; font-weight: 600; cursor: pointer;
+  }
+  .btn-kaydet:hover { background: #345f75; }
+  .btn-ekle {
+    padding: .35rem .9rem;
+    background: #fff; color: #417690;
+    border: 1px solid #417690; border-radius: 6px;
+    font-size: .82rem; font-weight: 600; cursor: pointer;
+  }
+  .btn-ekle:hover { background: #f0f7fa; }
+
+  /* Yıl/dönem listesi */
+  .yil-liste { display: flex; flex-direction: column; gap: .5rem; }
+  .yil-satir {
+    border: 1px solid #e5e7eb; border-radius: 7px;
+    overflow: hidden;
+  }
+  .yil-satir-baslik {
+    display: flex; align-items: center; gap: .75rem;
+    padding: .6rem 1rem;
+    background: #f9fafb; cursor: pointer;
+    font-weight: 600; font-size: .9rem; color: #1a1a2e;
+  }
+  .yil-satir-baslik:hover { background: #f0f7fa; }
+  .yil-satir-icerik { padding: 1rem; border-top: 1px solid #e5e7eb; }
+  .donem-liste { display: flex; flex-direction: column; gap: .5rem; margin-top: .75rem; }
+  .donem-satir {
+    display: flex; align-items: center; gap: .75rem;
+    padding: .45rem .75rem;
+    background: #fafafa; border: 1px solid #e5e7eb; border-radius: 6px;
+    font-size: .88rem;
+  }
+  .donem-satir .donem-adi { font-weight: 600; min-width: 80px; }
+  .donem-satir .donem-tarih { color: #6b7280; }
+  .btn-duzenle {
+    margin-left: auto;
+    padding: .2rem .65rem;
+    background: #fff; color: #6b7280;
+    border: 1px solid #ced4da; border-radius: 5px;
+    font-size: .78rem; cursor: pointer;
+  }
+  .btn-duzenle:hover { background: #f3f4f6; }
+
+  /* Inline form paneli */
+  .inline-form-panel {
+    margin-top: .75rem;
+    padding: .9rem 1rem;
+    background: #f0f7fa;
+    border: 1px solid #b8d4e0;
+    border-radius: 7px;
+  }
+  .inline-form-panel .ay-baslik { font-size: .88rem; color: #2c5f75; margin-bottom: .75rem; }
+</style>
+
+<div class="container">
+  <h2 class="page-title mb-20">{{ title }}</h2>
+
+  {% if messages %}
+  <ul style="list-style:none;padding:0;margin-bottom:1rem;">
+    {% for m in messages %}
+    <li style="padding:.55rem 1rem;border-radius:6px;margin-bottom:.35rem;
+               background:{% if 'success' in m.tags %}#d1fae5{% elif 'info' in m.tags %}#dbeafe{% else %}#fee2e2{% endif %};
+               color:{% if 'success' in m.tags %}#065f46{% elif 'info' in m.tags %}#1e40af{% else %}#991b1b{% endif %};">
+      {{ m }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <div class="ay-grid">
+
+    <!-- ── Okul Bilgileri ── -->
+    <div class="ay-kart ay-kart-full">
+      <div class="ay-baslik">Okul Bilgileri</div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="okul_bilgi">
+        <div class="ay-form-row">
+          {% for field in okul_form %}
+          <div class="ay-form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="ay-error">{{ field.errors.0 }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% if okul_form.non_field_errors %}
+        <div class="ay-error" style="margin-top:.5rem;">{{ okul_form.non_field_errors.0 }}</div>
+        {% endif %}
+        <div class="ay-btn-row">
+          <button type="submit" class="btn-kaydet">Kaydet</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── Eğitim-Öğretim Yılları ── -->
+    <div class="ay-kart ay-kart-full">
+      <div class="ay-baslik" style="display:flex;align-items:center;gap:.75rem;">
+        Eğitim-Öğretim Yılları ve Dönemler
+        <button class="btn-ekle" onclick="togglePanel('yeni-yil-panel')">+ Yeni Yıl Ekle</button>
+      </div>
+
+      <!-- Yeni Yıl Ekleme Paneli -->
+      <div id="yeni-yil-panel"
+           style="{% if aktif_form == 'egitim_yili' and not eyil_pk %}display:block{% else %}display:none{% endif %}">
+        <div class="inline-form-panel">
+          <div class="ay-baslik">Yeni Eğitim-Öğretim Yılı</div>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="egitim_yili">
+            <div class="ay-form-row">
+              {% for field in eyil_form %}
+              <div class="ay-form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<div class="ay-error">{{ field.errors.0 }}</div>{% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% if eyil_form.non_field_errors %}
+            <div class="ay-error" style="margin-top:.5rem;">{{ eyil_form.non_field_errors.0 }}</div>
+            {% endif %}
+            <div class="ay-btn-row">
+              <button type="submit" class="btn-kaydet">Kaydet</button>
+              <button type="button" class="btn-ekle" onclick="togglePanel('yeni-yil-panel')">İptal</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Mevcut Yıllar Listesi -->
+      <div class="yil-liste" style="margin-top:.75rem;">
+        {% for yil in egitim_yillari %}
+        <div class="yil-satir">
+          <div class="yil-satir-baslik" onclick="togglePanel('yil-{{ yil.pk }}')">
+            <span>{{ yil.egitim_yili }}</span>
+            <span style="font-weight:400;font-size:.82rem;color:#6b7280;">
+              {{ yil.egitim_baslangic }} – {{ yil.egitim_bitis }}
+            </span>
+            <span style="margin-left:auto;font-size:.8rem;color:#9ca3af;">▾</span>
+          </div>
+
+          <div id="yil-{{ yil.pk }}"
+               style="{% if aktif_form == 'egitim_yili' and eyil_pk == yil.pk|stringformat:'s' %}display:block{% elif aktif_form == 'donem' and donem_pk %}display:block{% else %}display:none{% endif %}">
+            <div class="yil-satir-icerik">
+
+              <!-- Yılı Düzenle -->
+              <button class="btn-ekle" onclick="togglePanel('yil-duzenle-{{ yil.pk }}')">Yılı Düzenle</button>
+              <button class="btn-ekle" style="margin-left:.5rem;" onclick="togglePanel('yeni-donem-{{ yil.pk }}')">+ Dönem Ekle</button>
+
+              <div id="yil-duzenle-{{ yil.pk }}"
+                   style="{% if aktif_form == 'egitim_yili' and eyil_pk == yil.pk|stringformat:'s' %}display:block{% else %}display:none{% endif %}">
+                <div class="inline-form-panel" style="margin-top:.75rem;">
+                  <div class="ay-baslik">Yılı Düzenle</div>
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="egitim_yili">
+                    <input type="hidden" name="eyil_pk" value="{{ yil.pk }}">
+                    <div class="ay-form-row">
+                      <div class="ay-form-group">
+                        <label>Eğitim-Öğretim Yılı</label>
+                        <input type="text" name="egitim_yili" value="{{ yil.egitim_yili }}" required>
+                      </div>
+                      <div class="ay-form-group">
+                        <label>Başlangıç</label>
+                        <input type="date" name="egitim_baslangic" value="{{ yil.egitim_baslangic|date:'Y-m-d' }}" required>
+                      </div>
+                      <div class="ay-form-group">
+                        <label>Bitiş</label>
+                        <input type="date" name="egitim_bitis" value="{{ yil.egitim_bitis|date:'Y-m-d' }}" required>
+                      </div>
+                    </div>
+                    {% if aktif_form == 'egitim_yili' and eyil_pk == yil.pk|stringformat:'s' and eyil_form.non_field_errors %}
+                    <div class="ay-error" style="margin-top:.5rem;">{{ eyil_form.non_field_errors.0 }}</div>
+                    {% endif %}
+                    <div class="ay-btn-row">
+                      <button type="submit" class="btn-kaydet">Güncelle</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <!-- Dönemler -->
+              <div class="donem-liste">
+                {% for donem in yil.donemleri.all %}
+                <div class="donem-satir">
+                  <span class="donem-adi">{{ donem.get_donem_display }}</span>
+                  <span class="donem-tarih">{{ donem.baslangic }} – {{ donem.bitis }}</span>
+                  <button class="btn-duzenle" onclick="togglePanel('donem-{{ donem.pk }}')">Düzenle</button>
+                </div>
+                <div id="donem-{{ donem.pk }}"
+                     style="{% if aktif_form == 'donem' and donem_pk == donem.pk|stringformat:'s' %}display:block{% else %}display:none{% endif %}">
+                  <div class="inline-form-panel">
+                    <div class="ay-baslik">Dönemi Düzenle</div>
+                    <form method="post">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="donem">
+                      <input type="hidden" name="donem_pk" value="{{ donem.pk }}">
+                      <div class="ay-form-row">
+                        <div class="ay-form-group">
+                          <label>Dönem</label>
+                          <select name="donem">
+                            <option value="1" {% if donem.donem == 1 %}selected{% endif %}>1. Dönem</option>
+                            <option value="2" {% if donem.donem == 2 %}selected{% endif %}>2. Dönem</option>
+                          </select>
+                        </div>
+                        <div class="ay-form-group">
+                          <label>Eğitim Yılı</label>
+                          <select name="egitim_yili">
+                            {% for ey in egitim_yillari %}
+                            <option value="{{ ey.pk }}" {% if ey.pk == donem.egitim_yili_id %}selected{% endif %}>{{ ey.egitim_yili }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <div class="ay-form-group">
+                          <label>Başlangıç</label>
+                          <input type="date" name="baslangic" value="{{ donem.baslangic|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="ay-form-group">
+                          <label>Bitiş</label>
+                          <input type="date" name="bitis" value="{{ donem.bitis|date:'Y-m-d' }}" required>
+                        </div>
+                      </div>
+                      {% if aktif_form == 'donem' and donem_pk == donem.pk|stringformat:'s' and donem_form.non_field_errors %}
+                      <div class="ay-error" style="margin-top:.5rem;">{{ donem_form.non_field_errors.0 }}</div>
+                      {% endif %}
+                      <div class="ay-btn-row">
+                        <button type="submit" class="btn-kaydet">Güncelle</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+                {% empty %}
+                <div style="font-size:.85rem;color:#9ca3af;padding:.4rem 0;">Henüz dönem eklenmemiş.</div>
+                {% endfor %}
+              </div>
+
+              <!-- Yeni Dönem Ekleme -->
+              <div id="yeni-donem-{{ yil.pk }}" style="display:none;">
+                <div class="inline-form-panel" style="margin-top:.75rem;">
+                  <div class="ay-baslik">Yeni Dönem</div>
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="donem">
+                    <div class="ay-form-row">
+                      <div class="ay-form-group">
+                        <label>Dönem</label>
+                        <select name="donem">
+                          <option value="1">1. Dönem</option>
+                          <option value="2">2. Dönem</option>
+                        </select>
+                      </div>
+                      <div class="ay-form-group">
+                        <label>Eğitim Yılı</label>
+                        <select name="egitim_yili">
+                          {% for ey in egitim_yillari %}
+                          <option value="{{ ey.pk }}" {% if ey.pk == yil.pk %}selected{% endif %}>{{ ey.egitim_yili }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="ay-form-group">
+                        <label>Başlangıç</label>
+                        <input type="date" name="baslangic" required>
+                      </div>
+                      <div class="ay-form-group">
+                        <label>Bitiş</label>
+                        <input type="date" name="bitis" required>
+                      </div>
+                    </div>
+                    <div class="ay-btn-row">
+                      <button type="submit" class="btn-kaydet">Ekle</button>
+                      <button type="button" class="btn-ekle" onclick="togglePanel('yeni-donem-{{ yil.pk }}')">İptal</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <p style="color:#9ca3af;font-size:.9rem;">Henüz eğitim-öğretim yılı eklenmemiş.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div><!-- /ay-grid -->
+</div>
+
+<script>
+function togglePanel(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+
+{% endblock %}

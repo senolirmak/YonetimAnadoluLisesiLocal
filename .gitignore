@@ -28,6 +28,7 @@ media/
 .env
 .env.*
 !.env.example
+SunucuTarifi.md
 
 # Veritabanı yedekleri
 backups/
