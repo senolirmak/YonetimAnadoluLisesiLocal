@@ -1,0 +1,115 @@
+{% extends "sinav/base.html" %}
+{% block title %}Sınav Medya Yönetimi{% endblock %}
+
+{% block sinav_content %}
+
+<div class="card" style="border-left:4px solid #6366f1; padding:1rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem;">
+  <div>
+    <h2 style="margin:0; color:#3730a3;">Sınav Medya Yönetimi</h2>
+    <span style="font-size:.82rem; color:#6b7280;">
+      (Uygulama) sınavları için seviyeye göre video/ses yükleyin.
+    </span>
+  </div>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+  <div class="card" style="border-left:4px solid {% if msg.tags == 'error' %}#dc2626{% else %}#16a34a{% endif %};
+       background:{% if msg.tags == 'error' %}#fef2f2{% else %}#f0fdf4{% endif %};
+       color:{% if msg.tags == 'error' %}#991b1b{% else %}#15803d{% endif %};
+       padding:.75rem 1.5rem;">{{ msg }}</div>
+  {% endfor %}
+{% endif %}
+
+{% if not slot_listesi %}
+<div class="card" style="text-align:center; color:#9ca3af; padding:2rem;">
+  Takvimde henüz (Uygulama) slotu yok. Önce sınav takvimi oluşturun.
+</div>
+{% endif %}
+
+{% for item in slot_listesi %}
+{% with t=item.takvim %}
+<div class="card" style="padding:1.2rem 1.5rem;">
+
+  <div style="font-weight:700; font-size:1rem; color:#1a1a2e; margin-bottom:.75rem;">
+    📅 {{ t.tarih|date:"d.m.Y" }} – {{ t.saat }}
+    &nbsp;|&nbsp;
+    <span style="color:#6366f1;">{{ t.ders_adi }}</span>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:.5rem;">
+    {% for satir in item.satirlar %}
+    <div style="display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;
+                border:1px solid #e5e7eb; border-radius:6px;
+                padding:.6rem 1rem; background:#fafafa;">
+
+      <span style="font-weight:600; min-width:85px; color:#374151;">{{ satir.label }}</span>
+
+      {% if satir.medya %}
+        {% with m=satir.medya %}
+        <span style="font-size:.82rem; color:#6b7280; flex:1; word-break:break-all;">
+          📎 {{ m.dosya.name }}
+        </span>
+
+        {% if m.serbest %}
+          <span class="badge-serbest">🔓 Serbest</span>
+        {% else %}
+          <span class="badge-kilitli">🔒 Kilitli</span>
+        {% endif %}
+
+        <a href="{% url 'sinavmedia:oynat' m.pk %}" target="_blank"
+           class="btn btn-secondary btn-sm">▶ Test</a>
+
+        <form method="post" action="{% url 'sinavmedia:serbest_toggle' m.pk %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm
+            {% if m.serbest %}btn-kilitle{% else %}btn-serbest{% endif %}">
+            {% if m.serbest %}Kilitle{% else %}Serbest Bırak{% endif %}
+          </button>
+        </form>
+
+        <form method="post" action="{% url 'sinavmedia:sil' m.pk %}" style="display:inline;"
+              onsubmit="return confirm('Dosya silinsin mi?')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-danger-soft">Sil</button>
+        </form>
+        {% endwith %}
+
+      {% else %}
+        <form method="post" action="{% url 'sinavmedia:yukle' t.pk satir.seviye %}"
+              enctype="multipart/form-data"
+              style="display:flex; align-items:center; gap:.5rem; flex:1; flex-wrap:wrap;">
+          {% csrf_token %}
+          <input type="file" name="dosya" accept="video/*,audio/*"
+                 style="font-size:.82rem; flex:1; min-width:160px;" required>
+          <input type="text" name="aciklama" placeholder="Açıklama (isteğe bağlı)"
+                 style="font-size:.82rem; width:180px; padding:.3rem .5rem;
+                        border:1px solid #d1d5db; border-radius:4px;">
+          <button type="submit" class="btn btn-primary btn-sm">Yükle</button>
+        </form>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endwith %}
+{% endfor %}
+
+<style>
+.badge-serbest {
+  font-size:.75rem; font-weight:600; padding:.2rem .6rem; border-radius:999px;
+  background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; white-space:nowrap;
+}
+.badge-kilitli {
+  font-size:.75rem; font-weight:600; padding:.2rem .6rem; border-radius:999px;
+  background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; white-space:nowrap;
+}
+.btn-serbest  { background:#d1fae5; color:#065f46; }
+.btn-kilitle  { background:#fef3c7; color:#92400e; }
+.btn-danger-soft { background:#fee2e2; color:#991b1b; }
+</style>
+
+{% endblock %}

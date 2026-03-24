@@ -584,12 +584,36 @@ def ogretmen_sinav_gozetim(request):
                 and _onceki_saat is not None
                 and simdi_str >= _onceki_saat
             )
+            # Medya butonu için: (Uygulama) slotları + öğretmenin seviyelerine ait medyalar
+            seviyeler = set()
+            for ss in eslesen:
+                try:
+                    seviyeler.add(int(ss.split("-")[0].strip()))
+                except (ValueError, IndexError):
+                    pass
+
+            from sinavmedia.models import SinavMedia
+            from sinav.models import Takvim as TakvimModel
+            uygulama_takvimler = TakvimModel.objects.filter(
+                sinav=aktif_sinav, uretim=aktif_uretim,
+                tarih=tarih, saat=saat, ders_adi__icontains="(Uygulama)",
+            )
+            medyalar = []
+            for t in uygulama_takvimler:
+                for sev in sorted(seviyeler):
+                    try:
+                        m = SinavMedia.objects.get(takvim=t, seviye=sev)
+                        medyalar.append({"pk": m.pk, "label": m.get_seviye_display()})
+                    except SinavMedia.DoesNotExist:
+                        pass
+
             gozetim_slotlari.append({
                 "tarih":       tarih,
                 "saat":        saat,
                 "onceki_saat": _onceki_saat,
                 "siniflar":    eslesen,
                 "aktif":       _aktif,
+                "medyalar":    medyalar,
             })
 
     return render(request, "main/ogretmen_sinav_gozetim.html", {

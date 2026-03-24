@@ -60,6 +60,14 @@
               </span>
             {% endif %}
           {% endfor %}
+
+          {% for m in slot.medyalar %}
+            <a href="{% url 'sinavmedia:oynat' m.pk %}" target="_blank"
+               class="btn btn-sm"
+               style="background-color:#6366f1;color:#fff;text-decoration:none;">
+              ▶ {{ m.label }} Medya
+            </a>
+          {% endfor %}
         </div>
       </div>
       {% endfor %}
