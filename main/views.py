@@ -204,7 +204,6 @@ def index(request):
                 SinavBilgisi as _SinavBilgisi,
                 TakvimUretim as _TakvimUretim,
                 OturmaPlani as _OturmaPlani,
-                DersProgram as _DersProgram,
             )
             _ogretmen_adi = request.user.personel.adi_soyadi
             _aktif_sinav = _SinavBilgisi.objects.filter(aktif=True).first()
@@ -530,7 +529,7 @@ def ogretmen_sinav_gozetim(request):
     if not _ogretmen_menu_gorumu(request.user):
         raise PermissionDenied
 
-    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani, DersProgram
+    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani
     from sinav.utils import gozetmen_bul, onceki_ders_saati
 
     try:
