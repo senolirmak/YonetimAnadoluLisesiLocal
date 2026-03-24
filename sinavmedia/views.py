@@ -46,9 +46,17 @@ def yonetim(request):
     if not _mudur_yardimcisi_mi(request.user):
         raise Http404
 
+    # Aktif sınav + aktif üretim filtresi — duplicate üretimlerden korunmak için
+    from sinav.models import SinavBilgisi, TakvimUretim as TU
+    aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
+    aktif_uretim = TU.objects.filter(sinav=aktif_sinav, aktif=True).first() if aktif_sinav else None
+
     # Sadece (Uygulama) içeren takvim slotlarını getir
     takvimler = (
-        Takvim.objects.filter(ders_adi__icontains="(Uygulama)")
+        Takvim.objects.filter(
+            ders_adi__icontains="(Uygulama)",
+            uretim=aktif_uretim,
+        )
         .prefetch_related("medyalar")
         .order_by("tarih", "saat", "ders_adi")
     )
