@@ -23,7 +23,8 @@ def gozetmen_bul(aktif_sinav, tarih, saat: str, sinifsube: str) -> str | None:
     Kural: saat - 50 dakikada aynı sınıfta dersi olan öğretmen gözetmendir.
     Eşleşme bulunamazsa None döner.
     """
-    from .models import DersProgram
+    from datetime import time as dt_time
+    from dersprogrami.models import NobetDersProgrami
 
     onceki_saat = onceki_ders_saati(saat)
     if not onceki_saat:
@@ -31,11 +32,28 @@ def gozetmen_bul(aktif_sinav, tarih, saat: str, sinifsube: str) -> str | None:
 
     gun = tarih.strftime("%A")  # "Monday", "Tuesday", ...
 
-    dp = DersProgram.objects.filter(
-        sinav=aktif_sinav,
-        gun=gun,
-        giris_saat=onceki_saat,
-        sinif_sube__sinifsube=sinifsube,
-    ).values_list("ders_ogretmeni", flat=True).first()
+    # sinifsube "9/A" → sinif=9, sube="A"
+    try:
+        sinif_str, sube = sinifsube.split("/")
+        sinif = int(sinif_str)
+    except (ValueError, AttributeError):
+        return None
 
-    return dp  # str veya None
+    h, m = map(int, onceki_saat.split(":"))
+    giris = dt_time(h, m)
+
+    dp = (
+        NobetDersProgrami.objects
+        .filter(
+            gun=gun,
+            giris_saat=giris,
+            sinif_sube__sinif=sinif,
+            sinif_sube__sube=sube,
+            uygulama_tarihi__lte=tarih,
+        )
+        .order_by("-uygulama_tarihi")
+        .select_related("ogretmen")
+        .first()
+    )
+
+    return dp.ogretmen.adi_soyadi if dp else None
