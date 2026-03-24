@@ -618,8 +618,14 @@ def ogretmen_sinav_gozetim(request):
                 if salon_val:
                     salon_map[ss] = salon_val
 
-            # Benzersiz salonlar için yoklama linkleri
-            salonlar = list(dict.fromkeys(salon_map.values()))
+            # Benzersiz salonlar için yoklama linkleri (ham değer → görünen ad)
+            def salon_goster(s):
+                return s.replace("-", " ", 1).replace("_", "/")
+
+            salonlar = [
+                {"ham": s, "ad": salon_goster(s)}
+                for s in dict.fromkeys(salon_map.values())
+            ]
 
             gozetim_slotlari.append({
                 "tarih":       tarih,
@@ -791,11 +797,14 @@ def sinav_salon_yoklama(request):
 
     yoklama_alindi = bool(mevcut_yoklama)
 
+    salon_ad = salon.replace("-", " ", 1).replace("_", "/") if salon else salon
+
     return render(request, "main/sinav_salon_yoklama.html", {
-        "title":            f"Salon Yoklaması – {salon}",
+        "title":            f"Salon Yoklaması – {salon_ad}",
         "tarih":            tarih,
         "saat":             saat,
         "salon":            salon,
+        "salon_ad":         salon_ad,
         "ogrenciler":       ogrenciler,
         "yoklama_alindi":   yoklama_alindi,
         "aktif_sinav":      aktif_sinav,
