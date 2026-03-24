@@ -33,7 +33,8 @@
     {% else %}
       {% for slot in gozetim_slotlari %}
       <div class="card mb-20">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:12px;">
+        <!-- Slot başlığı -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:14px;">
           <div>
             <strong>{{ slot.tarih|date:"d.m.Y l" }}</strong>
             <span style="margin-left:10px;color:#6c757d;font-size:.9rem;">
@@ -43,48 +44,86 @@
               {% endif %}
             </span>
           </div>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;">
-          {% for ss in slot.siniflar %}
-            {% if slot.aktif %}
-              <a href="{% url 'ogretmen_gozetim_sinif_listesi' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&sinifsube={{ ss }}"
+          <!-- Medya butonları -->
+          {% if slot.medyalar %}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            {% for m in slot.medyalar %}
+              <a href="{% url 'sinavmedia:oynat' m.pk %}" target="_blank"
                  class="btn btn-sm"
-                 style="background-color:#0d6efd;color:#fff;text-decoration:none;">
-                {{ ss }} — Sınıf Listesi
+                 style="background-color:#6366f1;color:#fff;text-decoration:none;">
+                ▶ {{ m.label }} Medya
               </a>
-            {% else %}
-              <span class="btn btn-sm"
-                    style="background-color:#9ca3af;color:#fff;cursor:not-allowed;opacity:.6;"
-                    title="Bu slot için henüz görüntüleme zamanı gelmedi.">
-                {{ ss }} — Sınıf Listesi
-              </span>
-            {% endif %}
-          {% endfor %}
-
-          {% for salon in slot.salonlar %}
-            {% if slot.aktif %}
-              <a href="{% url 'sinav_salon_yoklama' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&salon={{ salon.ham }}"
-                 class="btn btn-sm"
-                 style="background-color:#059669;color:#fff;text-decoration:none;">
-                📋 {{ salon.ad }} Yoklama
-              </a>
-            {% else %}
-              <span class="btn btn-sm"
-                    style="background-color:#9ca3af;color:#fff;cursor:not-allowed;opacity:.6;"
-                    title="Sınav saatinde aktif olacak.">
-                📋 {{ salon.ad }} Yoklama
-              </span>
-            {% endif %}
-          {% endfor %}
-
-          {% for m in slot.medyalar %}
-            <a href="{% url 'sinavmedia:oynat' m.pk %}" target="_blank"
-               class="btn btn-sm"
-               style="background-color:#6366f1;color:#fff;text-decoration:none;">
-              ▶ {{ m.label }} Medya
-            </a>
-          {% endfor %}
+            {% endfor %}
+          </div>
+          {% endif %}
         </div>
+
+        <!-- İki sütunlu tablo -->
+        <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+          <thead>
+            <tr style="background:#f0f2f5;">
+              <th style="padding:.5rem 1rem;text-align:left;border:1px solid #e5e7eb;color:#374151;font-weight:600;">
+                Kelebek Salon Dağılımı
+              </th>
+              <th style="padding:.5rem 1rem;text-align:left;border:1px solid #e5e7eb;color:#374151;font-weight:600;">
+                Sınav Yoklama Girişi
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <!-- Kelebek Salon Dağılımı -->
+              <td style="padding:.75rem 1rem;border:1px solid #e5e7eb;vertical-align:top;">
+                {% if slot.siniflar %}
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                    {% for ss in slot.siniflar %}
+                      {% if slot.aktif %}
+                        <a href="{% url 'ogretmen_gozetim_sinif_listesi' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&sinifsube={{ ss }}"
+                           class="btn btn-sm"
+                           style="background-color:#0d6efd;color:#fff;text-decoration:none;">
+                          {{ ss }} — Sınıf Listesi
+                        </a>
+                      {% else %}
+                        <span class="btn btn-sm"
+                              style="background-color:#9ca3af;color:#fff;cursor:not-allowed;opacity:.6;"
+                              title="Bu slot için henüz görüntüleme zamanı gelmedi.">
+                          {{ ss }} — Sınıf Listesi
+                        </span>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <span style="color:#9ca3af;font-size:.85rem;">—</span>
+                {% endif %}
+              </td>
+
+              <!-- Sınav Yoklama Girişi -->
+              <td style="padding:.75rem 1rem;border:1px solid #e5e7eb;vertical-align:top;">
+                {% if slot.salonlar %}
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                    {% for salon in slot.salonlar %}
+                      {% if slot.aktif %}
+                        <a href="{% url 'sinav_salon_yoklama' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&salon={{ salon.ham }}"
+                           class="btn btn-sm"
+                           style="background-color:#059669;color:#fff;text-decoration:none;">
+                          📋 {{ salon.ad }} Yoklama
+                        </a>
+                      {% else %}
+                        <span class="btn btn-sm"
+                              style="background-color:#9ca3af;color:#fff;cursor:not-allowed;opacity:.6;"
+                              title="Sınav saatinde aktif olacak.">
+                          📋 {{ salon.ad }} Yoklama
+                        </span>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <span style="color:#9ca3af;font-size:.85rem;">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       {% endfor %}
     {% endif %}
