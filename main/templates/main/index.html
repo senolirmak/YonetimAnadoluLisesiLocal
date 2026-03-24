@@ -240,12 +240,12 @@
                 </div>
                 {% endif %}
 
-                {% if sinav_gozetim_var %}
+                {% if is_ogretmen_menu %}
                 <hr class="menu-divider">
                 <div class="menu-section">
                     <div class="menu-group-title">Sınav İşlemleri</div>
                     <div class="menu-button-group">
-                        <a href="{% url 'ogretmen_sinav_gozetim' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Sınav Kelebek Yerleşim Listeleri</a>
+                        <a href="{% url 'ogretmen_sinav_gozetim' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Sınav Gözetim Listem</a>
                     </div>
                 </div>
                 {% endif %}
