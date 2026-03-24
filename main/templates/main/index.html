@@ -229,6 +229,17 @@
                 </div>
                 {% endif %}
 
+                {% if is_mudur_yardimcisi %}
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Sınav Menüsü</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'sinav:index' %}" class="btn btn-lg" style="background-color: #4f46e5; color: white;">Ortak Sınav Yönetimi</a>
+                        <a href="{% url 'sinavmedia:yonetim' %}" class="btn btn-lg" style="background-color: #6366f1; color: white;">Sınav Medya Yönetimi</a>
+                    </div>
+                </div>
+                {% endif %}
+
                 {% if sinav_gozetim_var %}
                 <hr class="menu-divider">
                 <div class="menu-section">
