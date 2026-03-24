@@ -1,0 +1,151 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container">
+
+  <a href="{% url 'ogretmen_sinav_gozetim' %}"
+     style="display:inline-flex;align-items:center;gap:.3rem;color:#6366f1;font-size:.85rem;text-decoration:none;margin-bottom:14px;">
+    ← Gözetim Listime Dön
+  </a>
+
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+    <h2 class="page-title" style="margin:0;">Salon Yoklaması – {{ salon }}</h2>
+    {% if yoklama_alindi %}
+    <span style="background:#16a34a;color:#fff;font-size:.78rem;font-weight:600;
+                 padding:.2rem .8rem;border-radius:99px;">✓ Yoklama Alındı</span>
+    {% endif %}
+  </div>
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div style="margin-bottom:12px;padding:.7rem 1rem;border-radius:6px;
+                background:#d1fae5;border:1px solid #6ee7b7;color:#065f46;font-size:.9rem;">
+      {{ msg }}
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="card mb-20" style="padding:10px 16px;font-size:.88rem;background:#f0f9ff;
+       border:1px solid #bae6fd;border-radius:7px;display:flex;gap:1.5rem;flex-wrap:wrap;color:#0369a1;">
+    {% if tarih %}<span><strong>Tarih:</strong> {{ tarih|date:"d.m.Y l" }}</span>{% endif %}
+    <span><strong>Saat:</strong> {{ saat }}</span>
+    <span><strong>Salon:</strong> {{ salon }}</span>
+    {% if aktif_sinav %}<span><strong>Sınav:</strong> {{ aktif_sinav }}</span>{% endif %}
+    <span><strong>Öğrenci Sayısı:</strong> {{ ogrenciler|length }}</span>
+  </div>
+
+  {% if not ogrenciler %}
+    <p style="color:#9ca3af;">Bu salon için öğrenci kaydı bulunamadı.</p>
+  {% else %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <!-- Toplu işaret butonları -->
+    <div style="display:flex;gap:.5rem;margin-bottom:12px;flex-wrap:wrap;">
+      <button type="button" onclick="tumunuIsaretle('mevcut')"
+              style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;
+                     padding:.3rem .9rem;border-radius:5px;cursor:pointer;font-size:.85rem;">
+        Tümü Mevcut
+      </button>
+      <button type="button" onclick="tumunuIsaretle('yok')"
+              style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;
+                     padding:.3rem .9rem;border-radius:5px;cursor:pointer;font-size:.85rem;">
+        Tümü Yok
+      </button>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+      <thead>
+        <tr style="background:#f0f2f5;">
+          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">#</th>
+          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">Okul No</th>
+          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">Adı Soyadı</th>
+          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">Sınıf</th>
+          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">Ders</th>
+          <th style="padding:.5rem .8rem;text-align:center;border-bottom:2px solid #e5e7eb;">Durum</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in ogrenciler %}
+        <tr class="yoklama-satir durum-{{ o.durum }}" style="border-bottom:1px solid #f1f1f1;">
+          <td style="padding:.45rem .8rem;color:#9ca3af;font-size:.8rem;">{{ o.sira_no }}</td>
+          <td style="padding:.45rem .8rem;">{{ o.okulno }}</td>
+          <td style="padding:.45rem .8rem;font-weight:500;">{{ o.adi_soyadi }}</td>
+          <td style="padding:.45rem .8rem;">{{ o.sinifsube }}</td>
+          <td style="padding:.45rem .8rem;font-size:.8rem;color:#6b7280;">{{ o.ders_adi }}</td>
+          <td style="padding:.45rem .8rem;text-align:center;">
+            <div style="display:flex;gap:.4rem;justify-content:center;">
+              {% for val, lbl, renk in durum_secenekleri %}
+              <label style="cursor:pointer;">
+                <input type="radio" name="durum_{{ o.okulno }}" value="{{ val }}"
+                       {% if o.durum == val %}checked{% endif %}
+                       onchange="satiriRenkle(this)"
+                       style="display:none;">
+                <span class="durum-btn durum-btn-{{ val }}
+                      {% if o.durum == val %}aktif{% endif %}">
+                  {{ lbl }}
+                </span>
+              </label>
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div style="margin-top:1.2rem;display:flex;gap:.75rem;align-items:center;">
+      <button type="submit" class="btn btn-primary">Yoklamayı Kaydet</button>
+      <a href="{% url 'ogretmen_sinav_gozetim' %}" class="btn btn-secondary btn-sm">İptal</a>
+    </div>
+  </form>
+  {% endif %}
+
+</div>
+
+<style>
+.durum-btn {
+  display: inline-block;
+  padding: .2rem .65rem;
+  border-radius: 5px;
+  font-size: .78rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: all .15s;
+}
+.durum-btn-mevcut { background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
+.durum-btn-mevcut.aktif { background:#16a34a; color:#fff; border-color:#16a34a; }
+.durum-btn-yok    { background:#fef2f2; color:#dc2626; border-color:#fecaca; }
+.durum-btn-yok.aktif    { background:#dc2626; color:#fff; border-color:#dc2626; }
+.durum-btn-gec    { background:#fffbeb; color:#d97706; border-color:#fde68a; }
+.durum-btn-gec.aktif    { background:#d97706; color:#fff; border-color:#d97706; }
+
+.yoklama-satir.durum-yok  td { background:#fff5f5; }
+.yoklama-satir.durum-gec  td { background:#fffbeb; }
+</style>
+
+<script>
+function satiriRenkle(input) {
+  const tr = input.closest("tr");
+  tr.className = tr.className.replace(/durum-\w+/, "durum-" + input.value);
+  // Aynı gruptaki tüm butonların aktif sınıfını güncelle
+  const btns = tr.querySelectorAll(".durum-btn");
+  btns.forEach(btn => btn.classList.remove("aktif"));
+  input.nextElementSibling.classList.add("aktif");
+}
+
+function tumunuIsaretle(durum) {
+  document.querySelectorAll(`input[type=radio][value=${durum}]`).forEach(r => {
+    r.checked = true;
+    satiriRenkle(r);
+  });
+}
+</script>
+
+{% endblock %}

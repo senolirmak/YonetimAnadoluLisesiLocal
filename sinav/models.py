@@ -316,6 +316,41 @@ class TakvimUretim(models.Model):
         return f"{self.sinav} – {local_dt:%d.%m.%Y %H:%M}"
 
 
+class SinavSalonYoklama(models.Model):
+    DURUM_CHOICES = [
+        ("mevcut", "Mevcut"),
+        ("yok", "Yok"),
+        ("gec", "Geç"),
+    ]
+
+    uretim = models.ForeignKey(
+        "TakvimUretim", on_delete=models.CASCADE,
+        related_name="salon_yoklamalar",
+    )
+    tarih = models.DateField()
+    saat = models.CharField(max_length=10)
+    salon = models.CharField(max_length=50)
+    okulno = models.CharField(max_length=20)
+    adi_soyadi = models.CharField(max_length=200)
+    sinifsube = models.CharField(max_length=10)
+    sira_no = models.IntegerField()
+    durum = models.CharField(max_length=10, choices=DURUM_CHOICES, default="mevcut")
+    kaydeden = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="+",
+    )
+    kayit_zamani = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["tarih", "saat", "salon", "sira_no"]
+        unique_together = [("uretim", "tarih", "saat", "salon", "okulno")]
+        verbose_name = "Sınav Salon Yoklama"
+        verbose_name_plural = "Sınav Salon Yoklamaları"
+
+    def __str__(self):
+        return f"{self.tarih} {self.saat} {self.salon} – {self.okulno} {self.adi_soyadi}"
+
+
 # ---------------------------------------------------------------------------
 # Sinyaller
 # ---------------------------------------------------------------------------

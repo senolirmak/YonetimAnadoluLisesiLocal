@@ -657,6 +657,7 @@ def ogretmen_gozetim_sinif_listesi(request):
     ogrenciler = []
     ogretmen_adi = None
     ders_adi = ""
+    salon_raw = None
     if tarih and saat and sinifsube and aktif_uretim:
         salon_map = {
             f"Salon-{ss.sinif}_{ss.sube}": ss.salon
@@ -669,6 +670,7 @@ def ogretmen_gozetim_sinif_listesi(request):
             .order_by("salon", "sira_no")
         )
         ders_adi = qs.values_list("ders_adi", flat=True).first() or ""
+        salon_raw = qs.values_list("salon", flat=True).first()
         ogrenciler = [
             {
                 "sira_no":    o.sira_no,
@@ -689,6 +691,104 @@ def ogretmen_gozetim_sinif_listesi(request):
         "ogretmen_adi": ogretmen_adi,
         "ogrenciler":   ogrenciler,
         "aktif_sinav":  aktif_sinav,
+        "salon":        salon_raw,
+    })
+
+
+# ─────────────────────────────────────────────────────────
+# Sınav Salon Yoklaması
+# ─────────────────────────────────────────────────────────
+
+def sinav_salon_yoklama(request):
+    if not _ogretmen_menu_gorumu(request.user):
+        raise PermissionDenied
+
+    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani, SinavSalonYoklama
+
+    tarih_str = request.GET.get("tarih", "")
+    saat      = request.GET.get("saat", "")
+    salon     = request.GET.get("salon", "")
+
+    try:
+        tarih = dt_date.fromisoformat(tarih_str)
+    except (ValueError, TypeError):
+        tarih = None
+
+    aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
+    aktif_uretim = (
+        TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        if aktif_sinav else None
+    )
+
+    # POST → kaydet
+    if request.method == "POST" and tarih and saat and salon and aktif_uretim:
+        ogrenciler_qs = OturmaPlani.objects.filter(
+            uretim=aktif_uretim, tarih=tarih, saat=saat, salon=salon
+        )
+        for o in ogrenciler_qs:
+            durum = request.POST.get(f"durum_{o.okulno}", "mevcut")
+            SinavSalonYoklama.objects.update_or_create(
+                uretim=aktif_uretim,
+                tarih=tarih,
+                saat=saat,
+                salon=salon,
+                okulno=o.okulno,
+                defaults={
+                    "adi_soyadi": o.adi_soyadi,
+                    "sinifsube":  o.sinifsube,
+                    "sira_no":    o.sira_no,
+                    "durum":      durum,
+                    "kaydeden":   request.user,
+                },
+            )
+        from django.contrib import messages
+        messages.success(request, f"{salon} – {saat} yoklaması kaydedildi.")
+        return redirect(
+            f"{request.path}?tarih={tarih_str}&saat={saat}&salon={salon}"
+        )
+
+    # GET → yoklama formunu hazırla
+    ogrenciler = []
+    mevcut_yoklama = {}
+    if tarih and saat and salon and aktif_uretim:
+        qs = OturmaPlani.objects.filter(
+            uretim=aktif_uretim, tarih=tarih, saat=saat, salon=salon
+        ).order_by("sira_no")
+
+        mevcut_yoklama = {
+            y.okulno: y.durum
+            for y in SinavSalonYoklama.objects.filter(
+                uretim=aktif_uretim, tarih=tarih, saat=saat, salon=salon
+            )
+        }
+
+        ogrenciler = [
+            {
+                "sira_no":    o.sira_no,
+                "okulno":     o.okulno,
+                "adi_soyadi": o.adi_soyadi,
+                "sinifsube":  o.sinifsube,
+                "ders_adi":   o.ders_adi,
+                "durum":      mevcut_yoklama.get(o.okulno, "mevcut"),
+            }
+            for o in qs
+        ]
+
+    yoklama_alindi = bool(mevcut_yoklama)
+
+    return render(request, "main/sinav_salon_yoklama.html", {
+        "title":            f"Salon Yoklaması – {salon}",
+        "tarih":            tarih,
+        "saat":             saat,
+        "salon":            salon,
+        "ogrenciler":       ogrenciler,
+        "yoklama_alindi":   yoklama_alindi,
+        "aktif_sinav":      aktif_sinav,
+        "durum_secenekleri": [
+            ("mevcut", "Mevcut", "green"),
+            ("yok",    "Yok",    "red"),
+            ("gec",    "Geç",    "orange"),
+        ],
     })
 
 
