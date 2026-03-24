@@ -606,6 +606,21 @@ def ogretmen_sinav_gozetim(request):
                     except SinavMedia.DoesNotExist:
                         pass
 
+            # Her sinifsube için salon bilgisini al
+            salon_map = {}
+            for ss in eslesen:
+                salon_val = (
+                    OturmaPlani.objects
+                    .filter(uretim=aktif_uretim, tarih=tarih, saat=saat, sinifsube=ss)
+                    .values_list("salon", flat=True)
+                    .first()
+                )
+                if salon_val:
+                    salon_map[ss] = salon_val
+
+            # Benzersiz salonlar için yoklama linkleri
+            salonlar = list(dict.fromkeys(salon_map.values()))
+
             gozetim_slotlari.append({
                 "tarih":       tarih,
                 "saat":        saat,
@@ -613,6 +628,7 @@ def ogretmen_sinav_gozetim(request):
                 "siniflar":    eslesen,
                 "aktif":       _aktif,
                 "medyalar":    medyalar,
+                "salonlar":    salonlar,
             })
 
     return render(request, "main/ogretmen_sinav_gozetim.html", {

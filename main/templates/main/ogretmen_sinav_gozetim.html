@@ -61,6 +61,14 @@
             {% endif %}
           {% endfor %}
 
+          {% for salon in slot.salonlar %}
+            <a href="{% url 'sinav_salon_yoklama' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&salon={{ salon }}"
+               class="btn btn-sm"
+               style="background-color:#059669;color:#fff;text-decoration:none;">
+              📋 {{ salon }} Yoklama
+            </a>
+          {% endfor %}
+
           {% for m in slot.medyalar %}
             <a href="{% url 'sinavmedia:oynat' m.pk %}" target="_blank"
                class="btn btn-sm"
