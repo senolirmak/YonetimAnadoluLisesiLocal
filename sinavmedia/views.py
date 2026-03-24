@@ -7,9 +7,29 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from sinav.models import Takvim
+from sinav.models import DersHavuzu, SubeDers, Takvim
 
 from .models import SinavMedia
+
+SEVIYE_LABELS = {9: "9. Sınıf", 10: "10. Sınıf", 11: "11. Sınıf", 12: "12. Sınıf"}
+
+
+def _ders_seviyeleri(ders_adi):
+    """SubeDers tablosundan dersin okutulduğu seviyeleri döndürür."""
+    base = ders_adi.replace(" (Uygulama)", "").replace(" (Yazili)", "").strip()
+    ders = DersHavuzu.objects.filter(ders_adi=base).first()
+    if not ders:
+        # Tam eşleşme yoksa içeren ara
+        ders = DersHavuzu.objects.filter(ders_adi__icontains=base).first()
+    if not ders:
+        return list(SEVIYE_LABELS.items())  # Bilinmiyorsa hepsini göster
+    seviyeler = (
+        SubeDers.objects.filter(ders=ders)
+        .values_list("seviye", flat=True)
+        .distinct()
+        .order_by("seviye")
+    )
+    return [(sev, SEVIYE_LABELS[sev]) for sev in seviyeler if sev in SEVIYE_LABELS]
 
 TOLERANS_DAKIKA = 5
 
@@ -33,15 +53,14 @@ def yonetim(request):
         .order_by("tarih", "saat", "ders_adi")
     )
 
-    SEVIYELER = [(9, "9. Sınıf"), (10, "10. Sınıf"), (11, "11. Sınıf"), (12, "12. Sınıf")]
-
-    # Her slot için seviye satırlarını hazırla
+    # Her slot için seviye satırlarını SubeDers'ten akıllıca hazırla
     slot_listesi = []
     for t in takvimler:
         medya_map = {m.seviye: m for m in t.medyalar.all()}
+        seviyeler = _ders_seviyeleri(t.ders_adi)
         satirlar = [
             {"seviye": sev, "label": lbl, "medya": medya_map.get(sev)}
-            for sev, lbl in SEVIYELER
+            for sev, lbl in seviyeler
         ]
         slot_listesi.append({"takvim": t, "satirlar": satirlar})
 
