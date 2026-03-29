@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("rehberlik", "0006_drop_ogrencicagri_table"),
-        ("okul", "0006_add_nobetpersonel"),
+        ("okul", "0009_rename_nobetpersonel_to_personel"),
     ]
 
     operations = [
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
                         related_name="gorusulen_gorusmeler",
-                        to="okul.nobetpersonel",
+                        to="okul.personel",
                         verbose_name="Görüşülen Öğretmen",
                     ),
                 ),
@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
                         related_name="gorusmeler",
-                        to="okul.nobetpersonel",
+                        to="okul.personel",
                         verbose_name="Rehber Öğretmen",
                     ),
                 ),

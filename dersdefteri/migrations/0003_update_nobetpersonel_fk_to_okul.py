@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("dersdefteri", "0002_update_sinifsube_fk_to_okul"),
-        ("okul", "0006_add_nobetpersonel"),
+        ("okul", "0009_rename_nobetpersonel_to_personel"),
     ]
 
     operations = [
@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                     field=models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="ders_defterleri",
-                        to="okul.nobetpersonel",
+                        to="okul.personel",
                         verbose_name="Öğretmen",
                     ),
                 ),

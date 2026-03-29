@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("faaliyet", "0003_onaylayan_bilgisi"),
-        ("okul", "0006_add_nobetpersonel"),
+        ("okul", "0009_rename_nobetpersonel_to_personel"),
     ]
 
     operations = [
@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                     field=models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="faaliyetler",
-                        to="okul.nobetpersonel",
+                        to="okul.personel",
                         verbose_name="Öğretmen",
                     ),
                 ),

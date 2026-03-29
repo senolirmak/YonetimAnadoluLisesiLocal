@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("nobet", "0019_remove_sinifsube"),
-        ("okul", "0006_add_nobetpersonel"),
+        ("okul", "0009_rename_nobetpersonel_to_personel"),
     ]
 
     operations = [
@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                     field=models.OneToOneField(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="ogretmen",
-                        to="okul.nobetpersonel",
+                        to="okul.personel",
                     ),
                 ),
             ],
