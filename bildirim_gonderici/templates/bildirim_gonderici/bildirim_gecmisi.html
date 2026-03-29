@@ -1,0 +1,80 @@
+{% extends "layouts/base.html" %}
+{% block title %}Bildirim Geçmişi{% endblock %}
+
+{% block content %}
+<div style="max-width:1000px; margin:2rem auto; padding:0 1rem;">
+
+  <div class="card" style="border-left:4px solid #7c3aed; padding:1rem 1.5rem; margin-bottom:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+      <div>
+        <h2 style="margin:0 0 .25rem; color:#6d28d9;">Bildirim Geçmişi</h2>
+        <span style="font-size:.85rem; color:#6b7280;">Son 200 kayıt</span>
+      </div>
+      <a href="{% url 'bildirim:tahta_listesi' %}"
+         style="padding:.45rem .9rem; border-radius:6px; text-decoration:none; border:1px solid #d1d5db; color:#374151; font-size:.9rem;">
+        ← Tahtalar
+      </a>
+    </div>
+  </div>
+
+  {% if not kayitlar %}
+    <div class="card" style="padding:2rem; text-align:center; color:#6b7280;">
+      Henüz bildirim kaydı yok.
+    </div>
+  {% else %}
+  <div class="card" style="padding:1rem 1.5rem; overflow-x:auto;">
+    <table style="width:100%; border-collapse:collapse; font-size:.875rem; min-width:700px;">
+      <thead>
+        <tr style="background:#f5f3ff; text-align:left;">
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #ddd6fe;">Zaman</th>
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #ddd6fe;">Tür</th>
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #ddd6fe;">Hedef Sınıf</th>
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #ddd6fe;">Başlık</th>
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #ddd6fe;">Gönderen</th>
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #ddd6fe; text-align:center;">Durum</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in kayitlar %}
+        <tr style="border-bottom:1px solid #f3f4f6; {% if forloop.even %}background:#fafafa;{% endif %}">
+          <td style="padding:.45rem .75rem; color:#6b7280; white-space:nowrap; font-size:.8rem;">
+            {{ k.gonderim_zamani|date:"d.m.Y H:i:s" }}
+          </td>
+          <td style="padding:.45rem .75rem;">
+            {% if k.tur == 'cagri' %}
+              <span style="background:#dbeafe; color:#1e40af; padding:.15rem .5rem; border-radius:10px; font-size:.78rem;">Çağrı</span>
+            {% elif k.tur == 'duyuru' %}
+              <span style="background:#fef3c7; color:#92400e; padding:.15rem .5rem; border-radius:10px; font-size:.78rem;">Duyuru</span>
+            {% else %}
+              <span style="background:#f3f4f6; color:#6b7280; padding:.15rem .5rem; border-radius:10px; font-size:.78rem;">Test</span>
+            {% endif %}
+          </td>
+          <td style="padding:.45rem .75rem; font-weight:600;">
+            {{ k.tahta.sinif_sube|default:"—" }}
+          </td>
+          <td style="padding:.45rem .75rem; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+              title="{{ k.baslik }}">
+            {{ k.baslik }}
+          </td>
+          <td style="padding:.45rem .75rem; color:#6b7280;">
+            {{ k.gonderen.get_full_name|default:k.gonderen.username|default:"—" }}
+          </td>
+          <td style="padding:.45rem .75rem; text-align:center;">
+            {% if k.durum == 'basarili' %}
+              <span style="background:#dcfce7; color:#166534; padding:.15rem .5rem; border-radius:10px; font-size:.78rem;">✓ Başarılı</span>
+            {% else %}
+              <span style="background:#fee2e2; color:#991b1b; padding:.15rem .5rem; border-radius:10px; font-size:.78rem;"
+                    title="{{ k.hata_mesaji }}">
+                ✗ Başarısız
+              </span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

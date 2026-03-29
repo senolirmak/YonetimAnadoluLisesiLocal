@@ -1,0 +1,23 @@
+{% extends "layouts/base.html" %}
+{% block title %}Tahta Sil{% endblock %}
+
+{% block content %}
+<div style="max-width:480px; margin:2rem auto; padding:0 1rem;">
+  <div class="card" style="padding:1.5rem; border-left:4px solid #ef4444;">
+    <h2 style="color:#991b1b; margin-top:0;">Tahta Silinecek</h2>
+    <p><strong>{{ tahta.sinif_sube }}</strong> — <code>{{ tahta.ip_adresi }}:{{ tahta.port }}</code></p>
+    <p style="color:#6b7280; font-size:.9rem;">Bu işlem geri alınamaz.</p>
+    <form method="post" style="display:flex; gap:.75rem; margin-top:1.25rem;">
+      {% csrf_token %}
+      <button type="submit"
+              style="background:#ef4444; border:none; color:#fff; padding:.55rem 1.25rem; border-radius:6px; cursor:pointer;">
+        Evet, Sil
+      </button>
+      <a href="{% url 'bildirim:tahta_listesi' %}"
+         style="padding:.55rem 1.25rem; border-radius:6px; text-decoration:none; border:1px solid #d1d5db; color:#374151;">
+        İptal
+      </a>
+    </form>
+  </div>
+</div>
+{% endblock %}

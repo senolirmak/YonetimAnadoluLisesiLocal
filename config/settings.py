@@ -67,7 +67,12 @@ INSTALLED_APPS = [
     "sinav",
     "dersdefteri",
     "sinavmedia",
+    "bildirim_gonderici",
 ]
+
+# ── Sınıf Tahtası Bildirim Ayarları ──────────────────────────
+BILDIRIM_ANAHTAR = "okul-bildirim-2024"   # Tahta ajanındaki GIZLI_ANAHTAR ile aynı olmalı
+BILDIRIM_TIMEOUT = 4                       # HTTP bağlantı zaman aşımı (saniye)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

@@ -1,0 +1,17 @@
+[Unit]
+Description=Okul Tahtası Bildirim Ajanı
+After=network.target graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/tahta_agent/agent.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Servis root olarak çalışır (notify-send için kullanıcı ortamına erişmek gerekir)
+User=root
+
+[Install]
+WantedBy=multi-user.target

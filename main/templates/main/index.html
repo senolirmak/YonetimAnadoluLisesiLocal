@@ -239,6 +239,14 @@
                         <a href="{% url 'sinav:ogrenci_sinav_yeri' %}" class="btn btn-lg" style="background-color: #7c3aed; color: white;">Öğrenci Sınav Yeri Sorgula</a>
                     </div>
                 </div>
+                <hr class="menu-divider">
+                <div class="menu-section">
+                    <div class="menu-group-title">Tahta Bildirimleri</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'bildirim:tahta_listesi' %}" class="btn btn-lg" style="background-color: #0891b2; color: white;">Sınıf Tahtaları</a>
+                        <a href="{% url 'bildirim:bildirim_gecmisi' %}" class="btn btn-lg" style="background-color: #0e7490; color: white;">Bildirim Geçmişi</a>
+                    </div>
+                </div>
                 {% endif %}
 
                 {% if is_ogretmen_menu and sinav_aktif_var %}

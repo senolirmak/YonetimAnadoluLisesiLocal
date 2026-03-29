@@ -1,0 +1,55 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ baslik }}{% endblock %}
+
+{% block content %}
+<div style="max-width:540px; margin:2rem auto; padding:0 1rem;">
+
+  <div class="card" style="border-left:4px solid #0891b2; padding:1rem 1.5rem; margin-bottom:1.5rem;">
+    <h2 style="margin:0; color:#0e7490;">{{ baslik }}</h2>
+  </div>
+
+  <div class="card" style="padding:1.5rem;">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+      <div style="margin-bottom:1.1rem;">
+        <label style="display:block; font-size:.875rem; font-weight:600; color:#374151; margin-bottom:.35rem;">
+          {{ field.label }}{% if field.field.required %} <span style="color:#dc2626;">*</span>{% endif %}
+        </label>
+        {{ field }}
+        {% if field.errors %}
+          <div style="color:#dc2626; font-size:.8rem; margin-top:.25rem;">{{ field.errors|join:", " }}</div>
+        {% endif %}
+        {% if field.help_text %}
+          <div style="color:#6b7280; font-size:.8rem; margin-top:.25rem;">{{ field.help_text }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <div style="display:flex; gap:.75rem; margin-top:1.5rem;">
+        <button type="submit" class="btn btn-primary"
+                style="background:#0891b2; border:none; color:#fff; padding:.55rem 1.5rem; border-radius:6px; cursor:pointer;">
+          Kaydet
+        </button>
+        <a href="{% url 'bildirim:tahta_listesi' %}"
+           style="padding:.55rem 1.25rem; border-radius:6px; text-decoration:none; border:1px solid #d1d5db; color:#374151; font-size:.9rem;">
+          İptal
+        </a>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+<style>
+  select, input[type=text], input[type=number] {
+    width: 100%;
+    padding: .5rem .75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: .95rem;
+    box-sizing: border-box;
+  }
+  input[type=checkbox] { width: auto; margin-right: .5rem; }
+</style>
+{% endblock %}
