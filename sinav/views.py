@@ -488,7 +488,7 @@ def takvim_onizleme(request):
                 "Tarih":   t.tarih.strftime("%Y-%m-%d"),
                 "Saat":    t.saat,
                 "Oturum":  t.oturum,
-                "Ders":    t.ders.ders_adi if t.ders else "",
+                "Ders":    t.ders_tam_adi,
                 "Subeler": t.subeler,
             }
             for t in qs

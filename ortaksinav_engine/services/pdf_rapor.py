@@ -272,13 +272,16 @@ def sinav_takvimi_pdf(out, okul, aktif_uretim):
         Takvim.objects
         .filter(uretim=aktif_uretim)
         .order_by("tarih", "oturum", "saat")
-        .values("tarih", "saat", "oturum", "ders__ders_adi")
+        .values("tarih", "saat", "oturum", "ders__ders_adi", "sinav_turu")
     )
 
     # (tarih, oturum, saat) → [ders_adi, ...]
     session_map = defaultdict(list)
     for r in qs:
-        session_map[(r["tarih"], r["oturum"], r["saat"])].append(r["ders__ders_adi"] or "")
+        adi = r["ders__ders_adi"] or ""
+        if r["sinav_turu"]:
+            adi = f"{adi} ({r['sinav_turu']})"
+        session_map[(r["tarih"], r["oturum"], r["saat"])].append(adi)
     sessions = sorted(session_map.items(), key=lambda x: (x[0][0], x[0][1]))
 
     h_okul = _header_style(size=12, bold=False)

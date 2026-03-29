@@ -114,7 +114,7 @@ class OturmaPlanService(BaseService):
 
         salon_adlari = [f"Salon-{s.replace('/', '_')}" for s in subeler]
         sube_to_ders = {
-            s: (t.ders.ders_adi if t.ders else "")
+            s: t.ders_tam_adi
             for t in takvim_qs.select_related("ders")
             for s in normalize_sube_cell(t.subeler)
         }
