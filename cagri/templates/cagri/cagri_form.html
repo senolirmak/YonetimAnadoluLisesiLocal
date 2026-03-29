@@ -188,13 +188,28 @@
 (function () {
     var API_URL         = "{% url 'cagri:ders_programi_api' %}";
     var GRUP_MODU       = {{ grup_modu|yesno:"true,false" }};
+    var CAGRI_YAPAN_ADI   = "{{ cagri_yapan_adi|escapejs }}";
+    var CAGRI_YAPAN_UNVAN = "{{ cagri_yapan_unvan|escapejs }}";
     var dersAdiInput    = document.getElementById('dersAdiInput');
     var ogretmenAdiInput= document.getElementById('ogretmenAdiInput');
     var dersSaatiSel    = document.getElementById('id_ders_saati');
     var tarihInput      = document.getElementById('id_tarih');
     var uyari           = document.getElementById('dersProgramiUyari');
+    var cagriMetniInput = document.getElementById('id_cagri_metni');
+    var cagriMetniOtomatik = false;
     var seciliSinif     = '';
     var seciliSube      = '';
+
+    function cagriMetniOlustur(ogretmenAdi) {
+        if (!ogretmenAdi || !CAGRI_YAPAN_ADI) return;
+        cagriMetniInput.value = 'Sayın ' + ogretmenAdi.trim() + ' Hocam, çağrı pusulasında bilgileri bulunan öğrencinin'
+            + ' idari bir konu için ' + CAGRI_YAPAN_UNVAN
+            + ' odasına gelmesi rica olunur. Bilgilerinize.\n' + CAGRI_YAPAN_ADI;
+        cagriMetniOtomatik = true;
+    }
+    if (cagriMetniInput) {
+        cagriMetniInput.addEventListener('input', function () { cagriMetniOtomatik = false; });
+    }
 
     function yukle() {
         var tarih = tarihInput.value;
@@ -234,6 +249,9 @@
             var opt = this.options[this.selectedIndex];
             if (dersAdiInput)     dersAdiInput.value     = opt.dataset.dersAdi     || '';
             if (ogretmenAdiInput) ogretmenAdiInput.value = opt.dataset.ogretmenAdi || '';
+            if (opt.value && cagriMetniInput && (cagriMetniInput.value === '' || cagriMetniOtomatik)) {
+                cagriMetniOlustur(opt.dataset.ogretmenAdi || '');
+            }
         });
     }
     if (tarihInput) tarihInput.addEventListener('change', yukle);

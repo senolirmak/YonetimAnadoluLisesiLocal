@@ -7,16 +7,16 @@ from .dagitim import (
     manuel_dagitim,
     nobet_dagitim,
 )
+from ..services.pdf_rapor import NobetPDFReport
 from .ders_doldurma import (
-    NobetPDFReport,
     _generate_pdf_bytes,
     download_ders_doldurma_pdf,
     download_ders_doldurma_png,
-    download_ders_doldurma_xlsx,
     nobet_ders_doldurma,
 )
 from .gunun_nobetcileri import (
     devamsizlik_sinif_pdf,
+    download_gunun_nobetcileri_pdf,
     download_gunun_nobetcileri_png,
     download_unassigned_ders_png,
     gunun_nobetcileri,
@@ -55,9 +55,9 @@ __all__ = [
     "nobet_ders_doldurma",
     "download_ders_doldurma_pdf",
     "download_ders_doldurma_png",
-    "download_ders_doldurma_xlsx",
     # gunun_nobetcileri
     "gunun_nobetcileri",
+    "download_gunun_nobetcileri_pdf",
     "download_gunun_nobetcileri_png",
     "download_unassigned_ders_png",
     "devamsizlik_sinif_pdf",

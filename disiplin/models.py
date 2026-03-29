@@ -32,7 +32,7 @@ class DisiplinGorusme(models.Model):
     takip_tarihi = models.DateField(null=True, blank=True, verbose_name="Takip Tarihi")
     gizli = models.BooleanField(default=False, verbose_name="Gizli Kayıt")
     kayit_eden = models.ForeignKey(
-        "nobet.NobetPersonel",
+        "okul.Personel",
         null=True,
         on_delete=models.SET_NULL,
         related_name="disiplin_gorusmeleri",

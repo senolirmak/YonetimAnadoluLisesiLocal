@@ -9,8 +9,9 @@ warnings.filterwarnings("ignore")
 
 
 class PersonelIsleyici:
-    def __init__(self, personel_path, uygulama_tarihi="2026/02/23"):
+    def __init__(self, personel_path, uygulama_tarihi="2026/02/23", kullanici=None):
         self.uygulama_tarihi = uygulama_tarihi
+        self.kullanici = kullanici
         self.Default_Path = DefaultPath()
         self.personel_path = self.Default_Path.resolve_veri_path(personel_path)
         self.df_personel = pd.read_excel(self.personel_path, sheet_name="Sayfa1")
@@ -39,10 +40,45 @@ class PersonelIsleyici:
 
     def veritabanina_yaz(self):
         veri_aktar = EOkulVeriAktar()
-        p_status = veri_aktar.save_yeni_veri_NobetPersonel(self.df_personel.copy())
-        print(f"✅ {p_status['message']}")
+        return veri_aktar.save_yeni_veri_NobetPersonel(self.df_personel.copy())
+
+    def _aktar_gecmisi_kaydet(self, status):
+        from okul.models import VeriAktarimGecmisi
+
+        import pandas as pd
+        uygulama_tarihi = None
+        try:
+            uygulama_tarihi = pd.to_datetime(self.uygulama_tarihi).date()
+        except Exception:
+            pass
+
+        uyarilar = []
+        if status.get("otomatik_eklenen_isimler"):
+            uyarilar.append(
+                f"Otomatik oluşturulan personel: {', '.join(status['otomatik_eklenen_isimler'])}"
+            )
+
+        durum = "basarili"
+        if status.get("errors"):
+            durum = "kismi" if status.get("inserted") else "hatali"
+        if uyarilar:
+            durum = "kismi"
+
+        VeriAktarimGecmisi.objects.create(
+            dosya_turu="personel_listesi",
+            dosya_adi=self.personel_path.name,
+            uygulama_tarihi=uygulama_tarihi,
+            kullanici=self.kullanici,
+            kayit_sayisi=status.get("inserted", 0),
+            hata_sayisi=status.get("errors", 0),
+            otomatik_eklenen=status.get("otomatik_eklenen", 0),
+            durum=durum,
+            notlar="\n".join(uyarilar),
+        )
 
     def calistir(self, personel_listesi="hz_personel_listesi.xlsx"):
         self.personel_data()
         self.kaydet(personel_listesi)
-        self.veritabanina_yaz()
+        status = self.veritabanina_yaz()
+        self._aktar_gecmisi_kaydet(status)
+        return status

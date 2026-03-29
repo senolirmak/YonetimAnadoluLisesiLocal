@@ -7,12 +7,13 @@ from django.db import transaction
 from django.shortcuts import render
 from django.utils import timezone
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 from personeldevamsizlik.models import Devamsizlik
 from utility.services.main_services import IstatistikService
 
 from ..forms import NobetDagitimForm
 from ..models import GunlukNobetCizelgesi, NobetGorevi, NobetOgretmen
+from ..services.pdf_rapor import get_report_header_info as _get_report_header_info
 from .permissions import (
     is_mudur_yardimcisi,
     is_yonetici,
@@ -37,28 +38,6 @@ _TR_GUNLER = {
 def _gun_adi_tr(date):
     return _TR_GUNLER[date.weekday()]
 
-
-def _get_report_header_info(target_date):
-    """
-    Verilen tarih için Eğitim Yılı, Dönem ve Hafta bilgisini döndürür.
-    """
-    simdi = target_date
-    hafta_baslangici = simdi - timedelta(days=simdi.weekday())  # Pazartesi
-    hafta_no = hafta_baslangici.isocalendar()[1]
-    simdi_ay = simdi.month
-
-    donem_sayi = {
-        1: [9, 10, 11, 12, 1],
-        2: [2, 3, 4, 5, 6],
-    }
-
-    donem_numarasi = next((k for k, v in donem_sayi.items() if simdi_ay in v), None)
-    donem = f"{donem_numarasi}. Dönem" if donem_numarasi else "Yaz Dönemi"
-
-    egitim_yili = (
-        f"{simdi.year}-{simdi.year + 1}" if simdi_ay > 8 else f"{simdi.year - 1}-{simdi.year}"
-    )
-    return f"{egitim_yili} Eğitim Öğretim Yılı {donem} {hafta_no}. Hafta"
 
 
 # ─────────────────────────────────────────────
@@ -100,13 +79,15 @@ def nobet_dagitim(request):
             }
             for gun in gun_map.keys():
                 gunluk_gorevler = list(
-                    NobetGorevi.objects.filter(nobet_gun=gun).order_by("nobet_yeri")
+                    NobetGorevi.objects.filter(nobet_gun=gun)
+                    .select_related("nobet_yeri")
+                    .order_by("nobet_yeri__ad")
                 )
 
                 if not gunluk_gorevler:
                     continue
 
-                yerler = [g.nobet_yeri for g in gunluk_gorevler]
+                yerler = [g.nobet_yeri.ad if g.nobet_yeri else "" for g in gunluk_gorevler]
 
                 if len(yerler) < 2:
                     continue
@@ -125,9 +106,13 @@ def nobet_dagitim(request):
         elif "rotasyon_kaydet" in request.POST:
             updates = request.session.get("rotation_preview", {})
             if updates:
+                from nobet.models import NobetYerleri
+                yer_map = {y.ad: y.pk for y in NobetYerleri.objects.filter(ad__in=updates.values())}
                 with transaction.atomic():
-                    for gorev_id, yeni_yer in updates.items():
-                        NobetGorevi.objects.filter(id=gorev_id).update(nobet_yeri=yeni_yer)
+                    for gorev_id, yeni_yer_ad in updates.items():
+                        yer_pk = yer_map.get(yeni_yer_ad)
+                        if yer_pk:
+                            NobetGorevi.objects.filter(id=gorev_id).update(nobet_yeri_id=yer_pk)
 
                 del request.session["rotation_preview"]
                 messages.success(request, "Nöbet yerleri rotasyonu başarıyla kaydedildi.")
@@ -146,9 +131,11 @@ def nobet_dagitim(request):
 
     cuma = pazartesi + timedelta(days=4)
 
-    nobetler = NobetGorevi.objects.filter(uygulama_tarihi__range=[pazartesi, cuma])
+    nobetler = NobetGorevi.objects.filter(
+        uygulama_tarihi__range=[pazartesi, cuma]
+    ).select_related("nobet_yeri", "ogretmen__personel")
 
-    nobet_yerleri = sorted(list(set(nobetler.values_list("nobet_yeri", flat=True))))
+    nobet_yerleri = sorted(list(set(nobetler.values_list("nobet_yeri__ad", flat=True))))
 
     gun_map = {
         "Monday": "Pazartesi",
@@ -162,7 +149,7 @@ def nobet_dagitim(request):
     veri_matrisi = {yer: {g: [] for g in tr_gunler} for yer in nobet_yerleri}
 
     for nobet in nobetler:
-        yer = nobet.nobet_yeri
+        yer = nobet.nobet_yeri.ad if nobet.nobet_yeri else ""
 
         if rotation_preview and str(nobet.pk) in rotation_preview:
             yer = rotation_preview[str(nobet.pk)]
@@ -271,7 +258,7 @@ def manuel_dagitim(request):
                 baslangic_tarihi__lte=save_date, bitis_tarihi__gte=save_date
             ).select_related("ogretmen__personel")
             program_date_q = (
-                NobetDersProgrami.objects.filter(uygulama_tarihi__lte=save_date)
+                DersProgrami.objects.filter(uygulama_tarihi__lte=save_date)
                 .order_by("-uygulama_tarihi")
                 .values_list("uygulama_tarihi", flat=True)
                 .first()
@@ -286,21 +273,22 @@ def manuel_dagitim(request):
                         if devamsiz.ders_saatleri
                         else list(range(1, 9))
                     )
-                    dersler = NobetDersProgrami.objects.filter(
+                    dersler = DersProgrami.objects.filter(
                         ogretmen_id=p_id,
                         gun=day_name_en,
                         uygulama_tarihi=program_date_q,
-                        ders_saati__in=allowed_hours,
-                    ).select_related("sinif_sube")
+                        ders_saati__derssaati_no__in=allowed_hours,
+                    ).select_related("sinif_sube", "ders_saati")
                     for ders in dersler:
-                        if 1 <= ders.ders_saati <= 8 and ders.sinif_sube:
+                        ds_no = ders.ders_saati.derssaati_no if ders.ders_saati else None
+                        if ds_no and 1 <= ds_no <= 8 and ders.sinif_sube:
                             sinif_label = str(ders.sinif_sube)
                             all_empty_lessons.append(
                                 {
-                                    "saat": ders.ders_saati,
+                                    "saat": ds_no,
                                     "sinif": sinif_label,
                                     "devamsiz_id": p_id,
-                                    "unique_key": f"{ders.ders_saati}_{p_id}|{sinif_label}",
+                                    "unique_key": f"{ds_no}_{p_id}|{sinif_label}",
                                 }
                             )
 
@@ -404,11 +392,13 @@ def manuel_dagitim(request):
     if gorev_date:
         nobet_gorevleri = (
             NobetGorevi.objects.filter(uygulama_tarihi=gorev_date, nobet_gun=day_name_en)
-            .select_related("ogretmen__personel")
-            .order_by("nobet_yeri")
+            .select_related("ogretmen__personel", "nobet_yeri")
+            .order_by("nobet_yeri__ad")
         )
         for gorev in nobet_gorevleri:
-            yer = gunluk_degisiklikler.get(gorev.ogretmen.pk, gorev.nobet_yeri)
+            yer = gunluk_degisiklikler.get(
+                gorev.ogretmen.pk, gorev.nobet_yeri.ad if gorev.nobet_yeri else ""
+            )
             nobetciler.append(
                 {
                     "id": gorev.ogretmen.personel.pk,
@@ -427,7 +417,7 @@ def manuel_dagitim(request):
     bos_dersler_havuzu = {i: [] for i in range(1, 9)}
 
     program_date = (
-        NobetDersProgrami.objects.filter(uygulama_tarihi__lte=target_date)
+        DersProgrami.objects.filter(uygulama_tarihi__lte=target_date)
         .order_by("-uygulama_tarihi")
         .values_list("uygulama_tarihi", flat=True)
         .first()
@@ -444,17 +434,18 @@ def manuel_dagitim(request):
                 else list(range(1, 9))
             )
 
-            dersler = NobetDersProgrami.objects.filter(
+            dersler = DersProgrami.objects.filter(
                 ogretmen_id=p_id,
                 gun=day_name_en,
                 uygulama_tarihi=program_date,
-                ders_saati__in=allowed_hours,
-            ).select_related("sinif_sube")
+                ders_saati__derssaati_no__in=allowed_hours,
+            ).select_related("sinif_sube", "ders_saati")
 
             for ders in dersler:
-                if 1 <= ders.ders_saati <= 8 and ders.sinif_sube:
+                ds_no = ders.ders_saati.derssaati_no if ders.ders_saati else None
+                if ds_no and 1 <= ds_no <= 8 and ders.sinif_sube:
                     sinif_label = str(ders.sinif_sube)
-                    bos_dersler_havuzu[ders.ders_saati].append(
+                    bos_dersler_havuzu[ds_no].append(
                         {
                             "val": f"{p_id}|{sinif_label}",
                             "label": f"{sinif_label} ({p_ad})",
@@ -496,9 +487,9 @@ def manuel_dagitim(request):
 
     for n in nobetciler:
         satir = {"nobetci": n, "hucreler": []}
-        kendi_dersleri = NobetDersProgrami.objects.filter(
+        kendi_dersleri = DersProgrami.objects.filter(
             ogretmen_id=n["id"], gun=day_name_en, uygulama_tarihi=program_date
-        ).values_list("ders_saati", flat=True)
+        ).values_list("ders_saati__derssaati_no", flat=True)
 
         for saat in range(1, 9):
             durum = {}

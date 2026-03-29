@@ -74,9 +74,8 @@ def oturum_plani_pdf(salon_grids: dict, out_path: str, baslik: str, okul,
     salon_grids : { salon_adi: grid }   (grid = 3 blok × 6 satır × 2 koltuk)
     Her salon için bir sayfa üretir.
     """
-    from datetime import datetime as _dt
-    from nobet.models import SinifSube
-    from dersprogrami.models import NobetDersProgrami
+    from okul.models import SinifSube
+    from ortaksinav_engine.utils import salon_gozetmen_bul
     sinav = aktif_uretim.sinav if aktif_uretim else None
 
     # "Salon-9_A" → SinifSube nesnesi eşleme tablosu
@@ -84,30 +83,8 @@ def oturum_plani_pdf(salon_grids: dict, out_path: str, baslik: str, okul,
         f"Salon-{ss.sinifsube.replace('/', '_')}": ss
         for ss in SinifSube.objects.all()
     }
-    salon_display = {k: ss.salon for k, ss in ss_map.items()}
-
-    # Salon → öğretmen: sınav günü ve saatinde NobetDersProgrami'nden çek
-    _EN_GUNLER = {0: "Monday", 1: "Tuesday", 2: "Wednesday",
-                  3: "Thursday", 4: "Friday", 5: "Saturday", 6: "Sunday"}
-    salon_ogretmen: dict = {}
-    if tarih and saat:
-        gun_adi = _EN_GUNLER.get(tarih.weekday(), "")
-        try:
-            saat_time = _dt.strptime(saat, "%H:%M").time()
-        except (ValueError, TypeError):
-            saat_time = None
-        for salon_adi, ss in ss_map.items():
-            ogretmen_adi = ""
-            if saat_time:
-                dp = (
-                    NobetDersProgrami.objects
-                    .filter(sinif_sube=ss, gun=gun_adi, giris_saat=saat_time)
-                    .select_related("ogretmen")
-                    .first()
-                )
-                if dp and dp.ogretmen:
-                    ogretmen_adi = dp.ogretmen.adi_soyadi
-            salon_ogretmen[salon_adi] = ogretmen_adi
+    salon_display  = {k: ss.salon for k, ss in ss_map.items()}
+    salon_ogretmen = salon_gozetmen_bul(tarih, saat, ss_map)
     sinav_bilgi = (
         f"{sinav.get_donem_display()}  –  {sinav.get_sinav_adi_display()}"
         if sinav else ""
@@ -295,13 +272,13 @@ def sinav_takvimi_pdf(out, okul, aktif_uretim):
         Takvim.objects
         .filter(uretim=aktif_uretim)
         .order_by("tarih", "oturum", "saat")
-        .values("tarih", "saat", "oturum", "ders_adi")
+        .values("tarih", "saat", "oturum", "ders__ders_adi")
     )
 
     # (tarih, oturum, saat) → [ders_adi, ...]
     session_map = defaultdict(list)
     for r in qs:
-        session_map[(r["tarih"], r["oturum"], r["saat"])].append(r["ders_adi"] or "")
+        session_map[(r["tarih"], r["oturum"], r["saat"])].append(r["ders__ders_adi"] or "")
     sessions = sorted(session_map.items(), key=lambda x: (x[0][0], x[0][1]))
 
     h_okul = _header_style(size=12, bold=False)
@@ -396,18 +373,22 @@ def _sinif_sube_key(s):
     return (99, s)
 
 
-def sinif_raporu_pdf(tarih, saat, oturum, out_path: str, okul, aktif_uretim):
+def sinif_raporu_pdf(tarih, saat, oturum, out_path: str, okul, aktif_uretim, sinifsube_filter=None):
     """
     Her şube için bir sayfa: o şubedeki öğrencilerin hangi salona/sıraya
     atandığını gösteren liste (Excel raporu ile aynı içerik).
     Sütunlar: Sıra No | Okul No | Ad Soyad | Sıra | Salon
+    sinifsube_filter verilirse sadece o şube gösterilir.
     """
-    from nobet.models import SinifSube
+    from okul.models import SinifSube
     from sinav.models import OturmaPlani
 
     qs = OturmaPlani.objects.filter(
         tarih=tarih, saat=saat, oturum=oturum, uretim=aktif_uretim
-    ).order_by("sinifsube", "okulno")
+    )
+    if sinifsube_filter:
+        qs = qs.filter(sinifsube=sinifsube_filter)
+    qs = qs.order_by("sinifsube", "okulno")
 
     if not qs.exists():
         return
@@ -444,7 +425,9 @@ def sinif_raporu_pdf(tarih, saat, oturum, out_path: str, okul, aktif_uretim):
         ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
         ("ALIGN",         (2, 1), (2, -1),  "LEFT"),
+        ("ALIGN",         (4, 1), (4, -1),  "LEFT"),
         ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+        ("LEFTPADDING",   (4, 1), (4, -1),  10),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
         ("TOPPADDING",    (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),

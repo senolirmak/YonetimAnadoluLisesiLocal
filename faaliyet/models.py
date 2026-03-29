@@ -1,6 +1,5 @@
 from django.db import models
 
-from nobet.models import NobetPersonel
 from ogrenci.models import Ogrenci
 
 
@@ -19,7 +18,7 @@ class Faaliyet(models.Model):
     yer = models.CharField(max_length=200, verbose_name="Yapıldığı Yer")
     aciklama = models.TextField(blank=True, verbose_name="Açıklama")
     ogretmen = models.ForeignKey(
-        NobetPersonel,
+        "okul.Personel",
         on_delete=models.CASCADE,
         related_name="faaliyetler",
         verbose_name="Öğretmen",

@@ -32,8 +32,9 @@ class DersProgramiIsleyici:
         8: "14:25",
     }
 
-    def __init__(self, file_path, uygulama_tarihi="2026/02/23"):
+    def __init__(self, file_path, uygulama_tarihi="2026/02/23", kullanici=None):
         self.uygulama_tarihi = uygulama_tarihi
+        self.kullanici = kullanici
         self.sinif_bilgileri = self.sinif_bilgilerini_getir()
         self.Default_Path = DefaultPath()
         self.file_path = self.Default_Path.resolve_veri_path(file_path)
@@ -42,7 +43,7 @@ class DersProgramiIsleyici:
         self.processed_df: pd.DataFrame
 
     def sinif_bilgilerini_getir(self):
-        from nobet.models import SinifSube
+        from okul.models import SinifSube
 
         sinif_bilgileri = defaultdict(list)
         for sinif, sube in SinifSube.objects.values_list("sinif", "sube"):
@@ -165,20 +166,63 @@ class DersProgramiIsleyici:
         program_listesi.parent.mkdir(parents=True, exist_ok=True)
         self.processed_df.to_excel(program_listesi, index=False)
 
+    def _ders_havuzunu_sync_et(self):
+        from okul.models import DersHavuzu
+
+        dersler = self.processed_df["ders_adi"].dropna().str.strip().unique()
+        for ders in dersler:
+            if ders:
+                DersHavuzu.objects.get_or_create(ders_adi=ders)
+
     def veritabanina_yaz(self):
         from utility.services.main_services import EOkulVeriAktar
 
         if self.processed_df.empty:
-            return
+            return {"inserted": 0, "errors": 0}
 
+        self._ders_havuzunu_sync_et()
         veri_aktar = EOkulVeriAktar()
-        status = veri_aktar.save_yeni_veri_NobetDersProgrami(self.processed_df.copy())
-        print(f"✅ {status['message']}")
+        status = veri_aktar.save_yeni_veri_DersProgrami(self.processed_df.copy())
+        return status
+
+    def _aktar_gecmisi_kaydet(self, status):
+        from okul.models import VeriAktarimGecmisi
+
+        import pandas as pd
+        uygulama_tarihi = None
+        try:
+            uygulama_tarihi = pd.to_datetime(self.uygulama_tarihi).date()
+        except Exception:
+            pass
+
+        uyarilar = []
         if status.get("otomatik_eklenen_isimler"):
-            print(f"⚠️  Otomatik oluşturulan personel: {', '.join(status['otomatik_eklenen_isimler'])}")
+            uyarilar.append(
+                f"Otomatik oluşturulan personel: {', '.join(status['otomatik_eklenen_isimler'])}"
+            )
+
+        durum = "basarili"
+        if status.get("errors"):
+            durum = "kismi" if status.get("inserted") else "hatali"
+        if uyarilar:
+            durum = "kismi"
+
+        VeriAktarimGecmisi.objects.create(
+            dosya_turu="ders_programi",
+            dosya_adi=self.file_path.name,
+            uygulama_tarihi=uygulama_tarihi,
+            kullanici=self.kullanici,
+            kayit_sayisi=status.get("inserted", 0),
+            hata_sayisi=status.get("errors", 0),
+            otomatik_eklenen=status.get("otomatik_eklenen", 0),
+            durum=durum,
+            notlar="\n".join(uyarilar),
+        )
 
     def calistir(self, program_listesi="hz_duzenlenmis_program.xlsx"):
         self.parse_program()
         self.ekle_ders_saati()
         self.kaydet(program_listesi)
-        self.veritabanina_yaz()
+        status = self.veritabanina_yaz()
+        self._aktar_gecmisi_kaydet(status)
+        return status

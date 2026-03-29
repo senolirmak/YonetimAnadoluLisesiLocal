@@ -21,7 +21,7 @@ class OgrenciCagri(models.Model):
         verbose_name="Servis",
     )
     kayit_eden = models.ForeignKey(
-        "nobet.NobetPersonel",
+        "okul.Personel",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,

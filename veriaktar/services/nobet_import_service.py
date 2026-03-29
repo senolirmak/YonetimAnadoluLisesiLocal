@@ -9,8 +9,9 @@ warnings.filterwarnings("ignore")
 
 
 class NobetIsleyici:
-    def __init__(self, nobet_path, uygulama_tarihi="2026/02/23"):
+    def __init__(self, nobet_path, uygulama_tarihi="2026/02/23", kullanici=None):
         self.uygulama_tarihi = uygulama_tarihi
+        self.kullanici = kullanici
         self.Default_Path = DefaultPath()
         self.nobet_path = self.Default_Path.resolve_veri_path(nobet_path)
 
@@ -52,12 +53,56 @@ class NobetIsleyici:
         nobet_listesi.parent.mkdir(parents=True, exist_ok=True)
         self.nobetci_veri.to_excel(nobet_listesi, index=False)
 
+    def _nobet_yerlerini_sync_et(self):
+        from nobet.models import NobetYerleri
+
+        yerler = self.nobetci_veri["nobet_yeri"].dropna().str.strip().unique()
+        for yer in yerler:
+            if yer:
+                NobetYerleri.objects.get_or_create(ad=yer)
+
     def veritabanina_yaz(self):
+        self._nobet_yerlerini_sync_et()
         veri_aktar = EOkulVeriAktar()
-        n_status = veri_aktar.save_yeni_veri_NobetGorevi(self.nobetci_veri.copy())
-        print(f"✅ {n_status['message']}")
+        return veri_aktar.save_yeni_veri_NobetGorevi(self.nobetci_veri.copy())
 
     def calistir(self, nobet_listesi="hz_duzenlenmis_nobet.xlsx"):
         self.nobet_nobetgorevi_data()
         self.kaydet(nobet_listesi)
-        self.veritabanina_yaz()
+        status = self.veritabanina_yaz()
+        self._aktar_gecmisi_kaydet(status)
+        return status
+
+    def _aktar_gecmisi_kaydet(self, status):
+        from okul.models import VeriAktarimGecmisi
+
+        uyarilar = []
+        if status.get("otomatik_eklenen_isimler"):
+            uyarilar.append(
+                f"Otomatik oluşturulan personel: {', '.join(status['otomatik_eklenen_isimler'])}"
+            )
+
+        durum = "basarili"
+        if status.get("errors"):
+            durum = "kismi" if status.get("inserted") else "hatali"
+        if uyarilar:
+            durum = "kismi"
+
+        import pandas as pd
+        uygulama_tarihi = None
+        try:
+            uygulama_tarihi = pd.to_datetime(self.uygulama_tarihi).date()
+        except Exception:
+            pass
+
+        VeriAktarimGecmisi.objects.create(
+            dosya_turu="nobet_listesi",
+            dosya_adi=self.nobet_path.name,
+            uygulama_tarihi=uygulama_tarihi,
+            kullanici=self.kullanici,
+            kayit_sayisi=status.get("inserted", 0),
+            hata_sayisi=status.get("errors", 0),
+            otomatik_eklenen=status.get("otomatik_eklenen", 0),
+            durum=durum,
+            notlar="\n".join(uyarilar),
+        )

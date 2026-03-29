@@ -10,7 +10,7 @@ from django.utils import timezone
 # OkulBilgileri — nobet.OkulBilgi için geriye dönük uyumluluk takma adı
 # ---------------------------------------------------------------------------
 def _get_okul_bilgileri():
-    from nobet.models import OkulBilgi
+    from okul.models import OkulBilgi
     return OkulBilgi.get()
 
 OkulBilgileri = None  # views.py import'larını kırmamak için; gerçek sınıf nobet.OkulBilgi
@@ -32,17 +32,17 @@ class SinavBilgisi(models.Model):
     sinav_baslangic_tarihi = models.DateField(verbose_name="Sınav Başlangıç Tarihi")
     eokul_veri_tarihi = models.DateField(verbose_name="e-Okul Veri Tarihi")
     kurum = models.ForeignKey(
-        "nobet.OkulBilgi", on_delete=models.SET_NULL,
+        "okul.OkulBilgi", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="sinavlar",
         verbose_name="Kurum",
     )
     egitim_yili_fk = models.ForeignKey(
-        "nobet.EgitimOgretimYili", on_delete=models.SET_NULL,
+        "okul.EgitimOgretimYili", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="sinavlar",
         verbose_name="Eğitim-Öğretim Yılı (Bağlantı)",
     )
     donem_fk = models.ForeignKey(
-        "nobet.OkulDonem", on_delete=models.SET_NULL,
+        "okul.OkulDonem", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="sinavlar",
         verbose_name="Dönem (Bağlantı)",
     )
@@ -71,29 +71,21 @@ class SinavBilgisi(models.Model):
 # Ogrenci modeli kaldırıldı — ogrenci.Ogrenci kullanılmaktadır.
 
 
-class DersHavuzu(models.Model):
-    """e-Okul haftalik ders programindan elde edilen tekil ders adi havuzu."""
-    ders_adi = models.CharField(max_length=200, unique=True)
+# DersHavuzu, DersSaatleri → okul app'ine taşındı.
+# Mevcut import'ların kırılmaması için backward-compat takma adlar:
+from okul.models import DersHavuzu, DersSaatleri  # noqa: F401, E402
 
-    class Meta:
-        ordering = ["ders_adi"]
-
-    def __str__(self):
-        return self.ders_adi
-
-
-# DersProgram modeli kaldırıldı — dersprogrami.NobetDersProgrami kullanılmaktadır.
-
+# DersProgram modeli kaldırıldı — dersprogrami.DersProgrami kullanılmaktadır.
 
 
 class SubeDers(models.Model):
-    ders =  models.ForeignKey(
-        "DersHavuzu", on_delete=models.CASCADE,
+    ders = models.ForeignKey(
+        "okul.DersHavuzu", on_delete=models.CASCADE,
         related_name="sube_dersler", null=True,
     )
     seviye = models.IntegerField()
     sube = models.ForeignKey(
-        "nobet.SinifSube", on_delete=models.CASCADE,
+        "okul.SinifSube", on_delete=models.CASCADE,
         related_name="sinav_sube_dersler", null=True,
     )
     class Meta:
@@ -115,13 +107,30 @@ class Takvim(models.Model):
     )
     tarih = models.DateField()
     saat = models.CharField(max_length=10)
+    ders_saati = models.ForeignKey(
+        "okul.DersSaatleri", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="takvimler",
+        verbose_name="Ders Saati",
+    )
     oturum = models.IntegerField()
     ders = models.ForeignKey(
-        "DersHavuzu", on_delete=models.CASCADE,
+        "okul.DersHavuzu", on_delete=models.CASCADE,
         related_name="takvimler", null=True,
     )
-    ders_adi = models.CharField(max_length=200, blank=True, default="")
+    SINAV_TURU_CHOICES = [("", "Normal"), ("Yazili", "Yazılı"), ("Uygulama", "Uygulama")]
+    sinav_turu = models.CharField(
+        max_length=20, blank=True, default="",
+        choices=SINAV_TURU_CHOICES,
+        verbose_name="Sınav Türü",
+    )
     subeler = models.TextField()
+
+    @property
+    def ders_tam_adi(self):
+        adi = str(self.ders) if self.ders else ""
+        if self.sinav_turu:
+            return f"{adi} ({self.sinav_turu})"
+        return adi
 
     class Meta:
         ordering = ["tarih", "saat", "ders"]
@@ -148,6 +157,11 @@ class OturmaPlani(models.Model):
     sinifsube = models.CharField(max_length=10)
     adi_soyadi = models.CharField(max_length=200)
     ders_adi = models.CharField(max_length=200)
+    gozetmen = models.CharField(max_length=200, blank=True, default="")
+    salon_sinif_sube = models.ForeignKey(
+        "okul.SinifSube", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="+",
+    )
 
     class Meta:
         ordering = ["tarih", "saat", "salon", "sira_no"]
@@ -310,6 +324,12 @@ class TakvimUretim(models.Model):
     class Meta:
         ordering = ["-uretim_tarihi"]
 
+    def aktif_yap(self):
+        """Bu üretimi aktif takvim üretimi olarak işaretle (aynı sınava ait diğerleri pasif)."""
+        TakvimUretim.objects.filter(sinav=self.sinav).update(aktif=False)
+        self.aktif = True
+        self.save(update_fields=["aktif"])
+
     def __str__(self):
         from django.utils import timezone
         local_dt = timezone.localtime(self.uretim_tarihi)
@@ -374,7 +394,7 @@ def takvim_satir_degisti(sender, instance, **_kwargs):
     except sender.DoesNotExist:
         return
 
-    izlenen = ["tarih", "saat", "oturum", "ders_adi", "subeler"]
+    izlenen = ["tarih", "saat", "oturum", "ders_id", "subeler"]
     degisiklikler = [
         f"{alan}: {getattr(eski, alan)} → {getattr(instance, alan)}"
         for alan in izlenen
@@ -384,7 +404,7 @@ def takvim_satir_degisti(sender, instance, **_kwargs):
         return
 
     simdi = timezone.localtime(timezone.now())
-    ders_kimlik = instance.ders_adi or f"pk={instance.pk}"
+    ders_kimlik = (instance.ders.ders_adi if instance.ders_id else None) or f"pk={instance.pk}"
     log_satiri = (
         f"[{simdi:%d.%m.%Y %H:%M:%S}] Güncellendi – {ders_kimlik} (Takvim pk={instance.pk})\n"
         + "".join(f"  {d}\n" for d in degisiklikler)

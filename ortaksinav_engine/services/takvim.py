@@ -61,7 +61,9 @@ class TakvimService(BaseService):
         df["Seviye"] = df["Seviye"].astype(int)
         df["Sube"] = df["Seviye"].astype(str) + "/" + df["Sube"]
 
-        CIFT_OTURUMLU_DERSLER = self.config.get("CIFT_OTURUMLU_DERSLER") or _DEFAULT_CIFT_OTURUMLU
+        from okul.models import DersHavuzu as _DH
+        _db_cift = list(_DH.objects.filter(cift_oturum=1).values_list("ders_adi", flat=True))
+        CIFT_OTURUMLU_DERSLER = _db_cift or self.config.get("CIFT_OTURUMLU_DERSLER") or _DEFAULT_CIFT_OTURUMLU
 
         # Cift oturumlu dersleri ikiye ayir
         rows = []

@@ -7,7 +7,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from sinav.models import DersHavuzu, SubeDers, Takvim
+from okul.models import DersHavuzu
+from sinav.models import SubeDers, Takvim
 
 from .models import SinavMedia
 
@@ -34,8 +35,7 @@ def _ders_seviyeleri(ders_adi):
 TOLERANS_DAKIKA = 5
 
 
-def _mudur_yardimcisi_mi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 # ---------------------------------------------------------------
@@ -54,18 +54,20 @@ def yonetim(request):
     # Sadece (Uygulama) içeren takvim slotlarını getir
     takvimler = (
         Takvim.objects.filter(
-            ders_adi__icontains="(Uygulama)",
+            sinav_turu="Uygulama",
             uretim=aktif_uretim,
         )
+        .select_related("ders")
         .prefetch_related("medyalar")
-        .order_by("tarih", "saat", "ders_adi")
+        .order_by("tarih", "saat", "ders__ders_adi")
+        .distinct()
     )
 
     # Her slot için seviye satırlarını SubeDers'ten akıllıca hazırla
     slot_listesi = []
     for t in takvimler:
         medya_map = {m.seviye: m for m in t.medyalar.all()}
-        seviyeler = _ders_seviyeleri(t.ders_adi)
+        seviyeler = _ders_seviyeleri(t.ders.ders_adi if t.ders else "")
         satirlar = [
             {"seviye": sev, "label": lbl, "medya": medya_map.get(sev)}
             for sev, lbl in seviyeler
@@ -84,7 +86,7 @@ def yukle(request, takvim_pk, seviye):
     if not _mudur_yardimcisi_mi(request.user):
         raise Http404
 
-    takvim = get_object_or_404(Takvim, pk=takvim_pk, ders_adi__icontains="(Uygulama)")
+    takvim = get_object_or_404(Takvim, pk=takvim_pk, sinav_turu="Uygulama")
     dosya = request.FILES.get("dosya")
     if not dosya:
         messages.error(request, "Dosya seçilmedi.")

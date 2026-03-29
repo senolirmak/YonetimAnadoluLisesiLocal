@@ -5,7 +5,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 from devamsizlik.models import OgrenciDevamsizlik
 from ogrenci.models import Ogrenci
 
@@ -23,8 +23,7 @@ def _personel(request):
         return None
 
 
-def _mudur_yardimcisi_mi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 def _ogrenci_verileri():
@@ -33,7 +32,7 @@ def _ogrenci_verileri():
     )
     # Ders programı lookup için SinifSube kayıtları (sinif + sube ayrı ayrı)
     dp_sinifsube = (
-        NobetDersProgrami.objects.filter(sinif_sube__isnull=False)
+        DersProgrami.objects.filter(sinif_sube__isnull=False)
         .values_list("sinif_sube__sinif", "sinif_sube__sube")
         .distinct()
         .order_by("sinif_sube__sinif", "sinif_sube__sube")
@@ -238,7 +237,7 @@ def faaliyet_sil(request, pk):
 @login_required
 def ders_programi_getir(request):
     """
-    Verilen gün + sınıf/şube için NobetDersProgrami kayıtlarını döndürür.
+    Verilen gün + sınıf/şube için DersProgrami kayıtlarını döndürür.
     GET parametreleri: gun (Monday…), sinif (int), sube (str)
     """
     gun = request.GET.get("gun", "").strip()
@@ -249,21 +248,21 @@ def ders_programi_getir(request):
         return JsonResponse({"dersler": []})
 
     qs = (
-        NobetDersProgrami.objects.filter(
+        DersProgrami.objects.filter(
             gun=gun,
             sinif_sube__sinif=sinif,
             sinif_sube__sube__iexact=sube,
         )
-        .select_related("sinif_sube")
-        .order_by("ders_saati")
+        .select_related("sinif_sube", "ders_saati")
+        .order_by("ders_saati__derssaati_no")
     )
 
     dersler = [
         {
-            "ders_no": d.ders_saati,
+            "ders_no": d.ders_saati.derssaati_no if d.ders_saati else None,
             "ders_adi": d.ders_adi,
-            "baslangic": d.giris_saat.strftime("%H:%M"),
-            "bitis": d.cikis_saat.strftime("%H:%M"),
+            "baslangic": d.giris_saat.strftime("%H:%M") if d.giris_saat else "",
+            "bitis": d.cikis_saat.strftime("%H:%M") if d.cikis_saat else "",
         }
         for d in qs
     ]
@@ -360,14 +359,17 @@ def faaliyet_devamsizlik(request, pk):
     ogrenciler = list(faaliyet.ogrenciler.order_by("sinif", "sube", "soyadi", "adi"))
 
     if request.method == "POST":
+        from okul.models import DersSaatleri as _DersSaatleri
+        _ds_map = {d.derssaati_no: d for d in _DersSaatleri.objects.all()}
         with transaction.atomic():
             for ds in ders_saatleri:
                 devamsiz_ids = set(int(x) for x in request.POST.getlist(f"devamsiz_{ds.ders_no}"))
+                ds_obj = _ds_map.get(ds.ders_no)
                 # Bu faaliyet için aynı tarih+ders_saatindeki önceki kayıtları temizle
                 OgrenciDevamsizlik.objects.filter(
                     ogrenci__in=ogrenciler,
                     tarih=faaliyet.tarih,
-                    ders_saati=ds.ders_no,
+                    ders_saati=ds_obj,
                     aciklama__startswith="Faaliyet:",
                 ).delete()
 
@@ -381,7 +383,7 @@ def faaliyet_devamsizlik(request, pk):
                     OgrenciDevamsizlik.objects.update_or_create(
                         ogrenci=ogr,
                         tarih=faaliyet.tarih,
-                        ders_saati=ds.ders_no,
+                        ders_saati=ds_obj,
                         defaults={
                             "ders_adi": f"Faaliyet: {faaliyet.konu}",
                             "ogretmen_adi": personel.adi_soyadi,
@@ -402,7 +404,7 @@ def faaliyet_devamsizlik(request, pk):
             OgrenciDevamsizlik.objects.filter(
                 ogrenci__in=ogrenciler,
                 tarih=faaliyet.tarih,
-                ders_saati=ds.ders_no,
+                ders_saati__derssaati_no=ds.ders_no,
                 aciklama__startswith="Faaliyet:",
             )
             .exclude(aciklama="Faaliyet: Katıldı")
@@ -459,7 +461,7 @@ def faaliyet_rapor(request, pk):
             OgrenciDevamsizlik.objects.filter(
                 ogrenci__in=ogrenciler,
                 tarih=faaliyet.tarih,
-                ders_saati=ds.ders_no,
+                ders_saati__derssaati_no=ds.ders_no,
                 aciklama__startswith="Faaliyet:",
             )
             .exclude(aciklama="Faaliyet: Katıldı")
@@ -535,7 +537,7 @@ def faaliyet_rapor_pdf(request, pk):
             OgrenciDevamsizlik.objects.filter(
                 ogrenci__in=ogrenciler,
                 tarih=faaliyet.tarih,
-                ders_saati=ds.ders_no,
+                ders_saati__derssaati_no=ds.ders_no,
                 aciklama__startswith="Faaliyet:",
             )
             .exclude(aciklama="Faaliyet: Katıldı")

@@ -1,0 +1,85 @@
+{% extends "sinav/base.html" %}
+{% block title %}Gözetmen Özeti{% endblock %}
+
+{% block sinav_content %}
+<div class="card" style="border-left:4px solid #16a34a; padding:1rem 1.5rem; margin-bottom:1.5rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+    <div>
+      <h2 style="margin:0 0 .25rem; color:#15803d;">Gözetmen & Sınıf Listesi Özeti</h2>
+      {% if aktif_sinav %}
+        <span style="font-size:.85rem; color:#374151;"><strong>Sınav:</strong> {{ aktif_sinav }}</span>
+      {% endif %}
+      {% if aktif_uretim %}
+        &nbsp;|&nbsp;
+        <span style="font-size:.85rem; color:#374151;"><strong>Takvim:</strong> {{ aktif_uretim.uretim_tarihi|date:"d.m.Y H:i" }}</span>
+      {% endif %}
+    </div>
+    <a href="{% url 'sinav:pdf_rapor' %}{% if aktif_uretim %}?uretim_pk={{ aktif_uretim.pk }}{% endif %}"
+       class="btn btn-secondary btn-sm">← PDF Rapor</a>
+  </div>
+</div>
+
+{% if not aktif_uretim %}
+  <div class="alert alert-warning">Aktif takvim üretimi bulunamadı.</div>
+{% elif not gozetmenler %}
+  <div class="alert alert-info">Bu takvimde gözetmen veya Sınıf Listesi PDF eşleşmesi bulunamadı.</div>
+{% else %}
+  <div class="card" style="padding:1rem 1.5rem;">
+    <p style="font-size:.85rem; color:#6b7280; margin-bottom:1rem;">
+      {{ gozetmenler|length }} öğretmen listeleniyor.
+      <strong>Önizle</strong> bağlantıları öğretmenin sayfasını yönetici olarak açar.
+    </p>
+    <table style="width:100%; border-collapse:collapse; font-size:.88rem;">
+      <thead>
+        <tr style="background:#f3f4f6; text-align:left;">
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #e5e7eb;">#</th>
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #e5e7eb;">Öğretmen Adı</th>
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #e5e7eb; text-align:center;">
+            <span style="color:#1d4ed8;">Gözetim</span>
+          </th>
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #e5e7eb; text-align:center;">
+            <span style="color:#b45309;">Sınıf Listesi</span>
+          </th>
+          <th style="padding:.5rem .75rem; border-bottom:2px solid #e5e7eb;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in gozetmenler %}
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:.45rem .75rem; color:#9ca3af;">{{ forloop.counter }}</td>
+          <td style="padding:.45rem .75rem; font-weight:600;">{{ g.ad }}</td>
+          <td style="padding:.45rem .75rem; text-align:center;">
+            {% if g.slot_sayisi %}
+            <span style="background:#dbeafe; color:#1d4ed8; padding:.15rem .6rem; border-radius:12px; font-size:.8rem;">
+              {{ g.slot_sayisi }}
+            </span>
+            {% else %}
+            <span style="color:#d1d5db;">—</span>
+            {% endif %}
+          </td>
+          <td style="padding:.45rem .75rem; text-align:center;">
+            {% if g.siniflistesi_adet %}
+            <span style="background:#fef3c7; color:#b45309; padding:.15rem .6rem; border-radius:12px; font-size:.8rem;"
+                  title="{% for s in siniflistesi_map|default_if_none:'' %}{% endfor %}">
+              {{ g.siniflistesi_adet }}
+            </span>
+            {% else %}
+            <span style="color:#d1d5db;">—</span>
+            {% endif %}
+          </td>
+          <td style="padding:.45rem .75rem;">
+            <a href="{% url 'ogretmen_sinav_gozetim' %}?preview_ogretmen={{ g.ad|urlencode }}"
+               target="_blank"
+               class="btn btn-sm"
+               style="background:#6366f1;color:#fff;text-decoration:none;">
+              Önizle
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+{% endblock %}

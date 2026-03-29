@@ -4,7 +4,7 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 from nobet.models import NobetPersonel
 from utility.constants import WEEKDAY_TO_DB
 
@@ -63,18 +63,18 @@ def ders_listesi(request):
     ders_durumu = []
     if personel:
         dersler = (
-            NobetDersProgrami.objects.filter(ogretmen=personel, gun=gun_db)
-            .select_related("sinif_sube")
-            .order_by("ders_saati")
+            DersProgrami.objects.filter(ogretmen=personel, gun=gun_db)
+            .select_related("sinif_sube", "ders_saati")
+            .order_by("ders_saati__derssaati_no")
         )
         mevcut_kayitlar = {
-            k.ders_saati: k
+            k.ders_saati_id: k
             for k in DersDefteri.objects.filter(ogretmen=personel, tarih=today)
         }
         for ders in dersler:
             ders_durumu.append({
                 "ders": ders,
-                "kayit": mevcut_kayitlar.get(ders.ders_saati),
+                "kayit": mevcut_kayitlar.get(ders.ders_saati_id),
             })
 
     context = {
@@ -103,7 +103,7 @@ def kayit_form(request, dp_pk):
     if not personel and not is_yonetici:
         raise PermissionDenied
 
-    dp = get_object_or_404(NobetDersProgrami, pk=dp_pk)
+    dp = get_object_or_404(DersProgrami, pk=dp_pk)
 
     # Öğretmen sadece kendi dersine erişebilir
     if not is_yonetici and dp.ogretmen != personel:
@@ -136,8 +136,6 @@ def kayit_form(request, dp_pk):
             sinif_sube=dp.sinif_sube,
             ders_adi=dp.ders_adi,
             ders_saati=dp.ders_saati,
-            giris_saat=dp.giris_saat,
-            cikis_saat=dp.cikis_saat,
         )
 
     # Yoklama verisinden devamsız öğrencileri çek
@@ -149,7 +147,7 @@ def kayit_form(request, dp_pk):
         devamsiz_qs = (
             OgrenciDevamsizlik.objects.filter(
                 tarih=today,
-                ders_saati=dp.ders_saati,
+                ders_saati=dp.ders_saati.derssaati_no if dp.ders_saati else None,
                 ogrenci__sinif=dp.sinif_sube.sinif,
                 ogrenci__sube=dp.sinif_sube.sube,
             )
@@ -168,8 +166,6 @@ def kayit_form(request, dp_pk):
             kayit.sinif_sube = dp.sinif_sube
             kayit.ders_adi = dp.ders_adi
             kayit.ders_saati = dp.ders_saati
-            kayit.giris_saat = dp.giris_saat
-            kayit.cikis_saat = dp.cikis_saat
         kayit.save()
         # Yoklama verisinden devamsız öğrencileri M2M'e yaz
         devamsiz_ogrenci_ids = devamsiz_qs.values_list("ogrenci_id", flat=True)

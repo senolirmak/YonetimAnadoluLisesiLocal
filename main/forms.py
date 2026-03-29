@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
-from nobet.models import EgitimOgretimYili, OkulBilgi, OkulDonem
+from okul.models import EgitimOgretimYili, OkulBilgi, OkulDonem
 
 
 class OkulBilgiAyarForm(forms.ModelForm):

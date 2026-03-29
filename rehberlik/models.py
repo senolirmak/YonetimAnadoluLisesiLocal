@@ -25,7 +25,7 @@ class Gorusme(models.Model):
         verbose_name="Grup Öğrencileri",
     )
     gorusulen_ogretmen = models.ForeignKey(
-        "nobet.NobetPersonel",
+        "okul.Personel",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -53,7 +53,7 @@ class Gorusme(models.Model):
         verbose_name="Gizli Kayıt",
     )
     rehber = models.ForeignKey(
-        "nobet.NobetPersonel",
+        "okul.Personel",
         null=True,
         on_delete=models.SET_NULL,
         related_name="gorusmeler",

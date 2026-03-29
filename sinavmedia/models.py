@@ -12,7 +12,7 @@ class SinavMedia(models.Model):
         "sinav.Takvim",
         on_delete=models.CASCADE,
         related_name="medyalar",
-        limit_choices_to={"ders_adi__icontains": "(Uygulama)"},
+        limit_choices_to={"sinav_turu": "Uygulama"},
     )
     seviye = models.IntegerField(choices=SEVIYE_CHOICES)
     dosya = models.FileField(upload_to=sinav_media_upload_path)

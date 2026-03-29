@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
-from nobet.models import OkulBilgi
+from okul.models import OkulBilgi
 
 from .models import DersSaati, Duyuru, Etkinlik, KioskAyar, MedyaIcerik
 
@@ -128,10 +128,6 @@ def kiosk(request):
         {"url": reverse("pano:index"), "duration": ayar.ana_sayfa_sure},
         {"url": reverse("pano:etkinlikler"), "duration": ayar.etkinlik_sure},
     ]
-
-    # Gösterilecek aktif etkinlik yoksa, etkinlikler sayfasını listeden çıkar
-    if not Etkinlik.objects.filter(aktif=True, baslangic__date__gte=timezone.now().date()).exists():
-        pages = [p for p in pages if p["url"] != reverse("pano:etkinlikler")]
 
     context = {
         "pages": json.dumps(pages),

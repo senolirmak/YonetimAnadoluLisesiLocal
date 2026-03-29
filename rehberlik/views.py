@@ -18,8 +18,7 @@ def _rehber_mi(user):
     return user.is_superuser or user.groups.filter(name="rehber_ogretmen").exists()
 
 
-def _mudur_yardimcisi_mi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 def _personel(request):
@@ -220,10 +219,14 @@ def gorusme_olustur(request):
                     cagri_obj.gorusme_rehberlik = gorusme  # type: ignore[assignment]
                     cagri_obj.save(update_fields=["gorusme_rehberlik"])
                     if cagri_obj.ogrenci and cagri_obj.ders_saati:
+                        from okul.models import DersSaatleri as _DersSaatleri
+                        _ds_obj = _DersSaatleri.objects.filter(
+                            derssaati_no=cagri_obj.ders_saati
+                        ).first()
                         OgrenciDevamsizlik.objects.update_or_create(
                             ogrenci=cagri_obj.ogrenci,
                             tarih=cagri_obj.tarih,
-                            ders_saati=cagri_obj.ders_saati,
+                            ders_saati=_ds_obj,
                             defaults={
                                 "ders_adi": cagri_obj.ders_adi or "Rehberlik",
                                 "ogretmen_adi": personel.adi_soyadi,

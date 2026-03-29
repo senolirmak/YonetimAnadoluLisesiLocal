@@ -31,7 +31,7 @@ class SinavBilgisiForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from nobet.models import OkulDonem
+        from okul.models import OkulDonem
         self.fields["egitim_yili_fk"].required = True
         self.fields["donem_fk"].required = True
         self.fields["donem_fk"].queryset = (

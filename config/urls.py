@@ -48,6 +48,7 @@ urlpatterns = [
     path("veriaktar/", include("veriaktar.urls")),
     path("ogrencinobet/", include("ogrencinobet.urls")),
     path("pano/", include("pano.urls")),
+    path("okul/", include("okul.urls")),
     path("sinav/", include("sinav.urls")),
     path("dersdefteri/", include("dersdefteri.urls")),
     path("sinavmedia/", include("sinavmedia.urls")),

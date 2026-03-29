@@ -4,12 +4,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 
+from okul.auth import is_mudur_yardimcisi  # noqa: F401 — re-export
+
 YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
 TARIH_DEGISTIREBILIR_GRUPLAR = {"mudur_yardimcisi", "okul_muduru"}
-
-
-def is_mudur_yardimcisi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
 
 
 def is_yonetici(user):

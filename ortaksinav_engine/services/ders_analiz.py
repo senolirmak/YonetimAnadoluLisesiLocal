@@ -19,14 +19,15 @@ class DersAnalizService(BaseService):
 
     def subeders_guncelle(self, sinav=None):
         self.log("\nSubeDers guncelleniyor...")
-        from nobet.models import SinifSube
-        from dersprogrami.models import NobetDersProgrami
-        from sinav.models import SubeDers, DersHavuzu
+        from okul.models import SinifSube
+        from dersprogrami.models import DersProgrami
+        from okul.models import DersHavuzu
+        from sinav.models import SubeDers
 
-        # NobetDersProgrami'nden sinif / sube / ders_adi verisi
+        # DersProgrami'nden sinif / sube / ders_adi verisi
         df = pd.DataFrame(
-            NobetDersProgrami.objects.values(
-                "ders_adi",
+            DersProgrami.objects.values(
+                ders_adi=models.F("ders__ders_adi"),
                 sinif=models.F("sinif_sube__sinif"),
                 sube=models.F("sinif_sube__sube"),
             )
@@ -69,7 +70,9 @@ class DersAnalizService(BaseService):
         df_filtreli_oncesi = pd.DataFrame(satirlar)
 
         # Sinav yapilmayacak dersleri filtrele
-        sinav_yapilmayacak = self.config.get("SINAV_YAPILMAYACAK_DERSLER") or _DEFAULT_SINAV_YAPILMAYACAK
+        from okul.models import DersHavuzu as _DH
+        _db_yapilmayacak = list(_DH.objects.filter(sinav_yapilmayacak=True).values_list("ders_adi", flat=True))
+        sinav_yapilmayacak = _db_yapilmayacak or self.config.get("SINAV_YAPILMAYACAK_DERSLER") or _DEFAULT_SINAV_YAPILMAYACAK
         sinav_yapilmayacak_upper = {d.upper().strip() for d in sinav_yapilmayacak}
         df_filtreli_oncesi["Ders_upper"] = df_filtreli_oncesi["Ders"].str.upper().str.strip()
         df_filtreli = df_filtreli_oncesi[

@@ -7,6 +7,12 @@
 <div class="container">
     <div class="mb-20">
         <h2 class="page-title mb-20">{{ title }}</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+            <a href="{% url 'devamsizlik_list' %}" class="btn btn-info">1. Devamsızlık</a>
+            <a href="{% url 'nobet_dagitim' %}" class="btn btn-primary">2. Haftalık Nöbet</a>
+            <a href="{% url 'gunun_nobetcileri' %}" class="btn btn-warning">3. Günün Nöbetçileri</a>
+            <a href="{% url 'nobet_ders_doldurma' %}" class="btn btn-success">4. Ders Doldurma</a>
+        </div>
 
         {% if messages %}
         <div class="mb-20">
@@ -28,7 +34,6 @@
                 <label for="{{ form.baslangic_tarihi.id_for_label }}" class="form-label-bold" style="margin-right: 10px;">{{ form.baslangic_tarihi.label }}:</label>
                 {{ form.baslangic_tarihi }}
                 <button type="submit" class="btn btn-primary" style="margin-left: 10px;">Getir</button>
-                <a href="{% url 'gunun_nobetcileri' %}" class="btn btn-warning" style="margin-left: 10px;">Günün Nöbetçileri</a>
             </div>
 
             {% if is_mudur_yardimcisi %}

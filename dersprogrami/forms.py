@@ -1,6 +1,6 @@
 from django import forms
 
-from nobet.models import SinifSube
+from okul.models import SinifSube
 from veriaktar.forms import DersProgramiImportForm
 
 

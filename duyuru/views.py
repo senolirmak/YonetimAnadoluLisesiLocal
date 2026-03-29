@@ -10,7 +10,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import DeleteView, UpdateView
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 from nobet.models import NobetGecmisi
 from nobet.views import is_yonetici, yonetici_required
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
@@ -76,7 +76,7 @@ def duyuru_listesi(request):
 
     ders_programlari = defaultdict(list)
     if program_q_objects:
-        program_results = NobetDersProgrami.objects.filter(program_q_objects).select_related(
+        program_results = DersProgrami.objects.filter(program_q_objects).select_related(
             "ogretmen", "sinif_sube"
         )
         for dp in program_results:

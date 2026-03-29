@@ -85,7 +85,9 @@ class OturmaPlanService(BaseService):
                 self.log(f"{tarih} {saat} (Oturum {oturum}) isleniyor...")
                 self.generate_oturum(tarih, saat, oturum, aktif_sinav, aktif_uretim)
             except Exception as e:
+                import traceback as _tb
                 self.log(f"HATA {tarih} {saat} (Oturum {oturum}): {e}")
+                self.log(_tb.format_exc())
         self.log("\nSecili oturumlar tamamlandi.\n")
 
     def generate_oturum(self, tarih: str, saat: str, oturum: int, aktif_sinav=None, aktif_uretim=None):
@@ -96,9 +98,9 @@ class OturmaPlanService(BaseService):
         baslik = f"{tarih} {saat} (Oturum {oturum})"
 
         if aktif_uretim is not None:
-            takvim_qs = Takvim.objects.filter(tarih=tarih, saat=saat, uretim=aktif_uretim)
+            takvim_qs = Takvim.objects.filter(tarih=tarih, saat=saat, uretim=aktif_uretim).select_related("ders_saati")
         else:
-            takvim_qs = Takvim.objects.filter(tarih=tarih, saat=saat, sinav=aktif_sinav)
+            takvim_qs = Takvim.objects.filter(tarih=tarih, saat=saat, sinav=aktif_sinav).select_related("ders_saati")
         if not takvim_qs.exists():
             self.log("Belirtilen tarih/saat icin takvim verisi bulunamadi.")
             return
@@ -112,7 +114,7 @@ class OturmaPlanService(BaseService):
 
         salon_adlari = [f"Salon-{s.replace('/', '_')}" for s in subeler]
         sube_to_ders = {
-            s: (t.ders_adi or (t.ders.ders_adi if t.ders else ""))
+            s: (t.ders.ders_adi if t.ders else "")
             for t in takvim_qs.select_related("ders")
             for s in normalize_sube_cell(t.subeler)
         }
@@ -162,12 +164,46 @@ class OturmaPlanService(BaseService):
                 takvim_uretim=aktif_uretim, tarih=tarih_date, saat=saat, oturum=oturum
             )
 
+        # Salon → gözetmen: sınav saatinde o salonun ders programındaki öğretmen
+        from okul.models import SinifSube as _SS
+        from ortaksinav_engine.utils import salon_gozetmen_bul
+        ss_map = {}
+        for sube_str in subeler:
+            parts = sube_str.split("/")
+            if len(parts) == 2:
+                try:
+                    ss = _SS.objects.filter(sinif=int(parts[0]), sube=parts[1]).first()
+                except (ValueError, TypeError):
+                    ss = None
+                if ss:
+                    ss_map[f"Salon-{sube_str.replace('/', '_')}"] = ss
+        ders_saati_obj = takvim_qs.first().ders_saati
+        salon_gozetmen = salon_gozetmen_bul(tarih_date, ders_saati_obj or saat, ss_map)
+
+        # Sıra numaralandırması: pdf_rapor.oturum_plani_pdf ile birebir aynı seat_map
+        # Grup 1→1-12, Grup 2→13-24, Grup 3→25-36
+        # Çift satır sol→sağ, tek satır sağ→sol (S-şekli)
+        COLS_PER_BLOCK = 2
+
         op_records = []
         for salon, grid in salon_grids.items():
-            seat_number = 1
-            for block in grid:
-                for row_cells in block:
-                    for s in row_cells:
+            gozetmen = salon_gozetmen.get(salon, "")
+            salon_ss = ss_map.get(salon)
+            n_blocks   = len(grid)
+            n_rows_blk = len(grid[0]) if grid else 6
+
+            seat_map = {}
+            sn = 1
+            for b in range(n_blocks):
+                for r in range(n_rows_blk):
+                    for c in ([0, 1] if r % 2 == 0 else [1, 0]):
+                        seat_map[(b, r, c)] = sn
+                        sn += 1
+
+            for block_idx, block in enumerate(grid):
+                for row_idx, row_cells in enumerate(block):
+                    for col_idx, s in enumerate(row_cells):
+                        seat_number = seat_map[(block_idx, row_idx, col_idx)]
                         if isinstance(s, dict):
                             adi = str(s.get("adi") or s.get("ad") or "")
                             soyadi = str(s.get("soyadi") or s.get("soyad") or "")
@@ -180,8 +216,9 @@ class OturmaPlanService(BaseService):
                                 sinifsube=str(s.get("sinifsube") or ""),
                                 adi_soyadi=f"{adi} {soyadi}".strip(),
                                 ders_adi=str(s.get("ders") or ""),
+                                gozetmen=gozetmen,
+                                salon_sinif_sube=salon_ss,
                             ))
-                        seat_number += 1
         OturmaPlani.objects.bulk_create(op_records)
 
         toplam = len(df_o)

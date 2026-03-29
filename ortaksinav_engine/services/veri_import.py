@@ -3,11 +3,11 @@
 VeriImportService – DB-first veri doğrulama ve DersHavuzu senkronizasyonu.
 
 Adim 0 (temel_verileri_olustur):
-    - DersHavuzu ← dersprogrami.NobetDersProgrami.ders_adi
+    - DersHavuzu ← dersprogrami.DersProgrami.ders_adi
 
 Adim 1 (verileri_aktar):
     - Öğrenci ve ders programı verilerinin varlığını doğrular.
-    - Kaynak: ogrenci.Ogrenci + dersprogrami.NobetDersProgrami
+    - Kaynak: ogrenci.Ogrenci + dersprogrami.DersProgrami
 """
 
 from ortaksinav_engine.services.base import BaseService
@@ -17,18 +17,18 @@ class VeriImportService(BaseService):
     """DB kaynaklarından DersHavuzu'nu senkronize eden servis."""
 
     # ------------------------------------------------------------------
-    # Adim 0 – DersHavuzu: NobetDersProgrami'nden güncelle
+    # Adim 0 – DersHavuzu: DersProgrami'nden güncelle
     # ------------------------------------------------------------------
 
     def temel_verileri_olustur(self):
         self.log("\nTemel veriler güncelleniyor (DersHavuzu)...")
 
-        from dersprogrami.models import NobetDersProgrami
-        from sinav.models import DersHavuzu
+        from dersprogrami.models import DersProgrami
+        from okul.models import DersHavuzu
 
         tekil_dersler = {
             d.strip()
-            for d in NobetDersProgrami.objects.values_list("ders_adi", flat=True).distinct()
+            for d in DersProgrami.objects.values_list("ders__ders_adi", flat=True).distinct()
             if d and d.strip()
         }
         mevcut_dh = set(DersHavuzu.objects.values_list("ders_adi", flat=True))
@@ -48,8 +48,8 @@ class VeriImportService(BaseService):
         Mevcut SinifSube ve DersHavuzu setlerini döndürür.
         DB-first modelde fark yoktur; geriye dönük uyumluluk için korundu.
         """
-        from nobet.models import SinifSube
-        from sinav.models import DersHavuzu
+        from okul.models import SinifSube
+        from okul.models import DersHavuzu
         mevcut_ss = set(SinifSube.objects.values_list("sinif", "sube"))
         mevcut_dh = set(DersHavuzu.objects.values_list("ders_adi", flat=True))
         return mevcut_ss, mevcut_dh
@@ -62,12 +62,12 @@ class VeriImportService(BaseService):
         """DB'deki kaynak verilerin varlığını doğrular."""
         self.log("\nVeri durumu kontrol ediliyor...")
 
-        from nobet.models import SinifSube
-        from dersprogrami.models import NobetDersProgrami
+        from okul.models import SinifSube
+        from dersprogrami.models import DersProgrami
         from ogrenci.models import Ogrenci as OgrenciModel
 
         ss_count  = SinifSube.objects.count()
-        dp_count  = NobetDersProgrami.objects.count()
+        dp_count  = DersProgrami.objects.count()
         ogr_count = OgrenciModel.objects.count()
 
         if not ss_count:

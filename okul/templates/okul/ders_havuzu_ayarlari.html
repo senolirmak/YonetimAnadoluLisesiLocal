@@ -1,0 +1,71 @@
+{% extends "sinav/base.html" %}
+{% load okul_extras %}
+{% block sinav_title %}Ders Havuzu Ayarları{% endblock %}
+
+{% block sinav_content %}
+{% if messages %}
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }}" style="margin-bottom:1rem;">{{ msg }}</div>
+  {% endfor %}
+{% endif %}
+
+<form method="post" action="{% url 'okul:ders_havuzu_ayarlari_kaydet' %}">
+  {% csrf_token %}
+  {% if next_url %}<input type="hidden" name="next_url" value="{{ next_url }}">{% endif %}
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem;">
+    <div>
+      <h2 style="margin:0 0 .2rem; font-size:1.05rem;">Ders Havuzu Ayarları</h2>
+      <p style="color:#64748b; font-size:.82rem; margin:0;">
+        Adım 3 (SubeDers) ve Adım 4 (ILP) bu ayarları kullanır.
+        &nbsp;·&nbsp;<span style="color:#b91c1c;">Kırmızı = sınav yapılmayacak</span>
+        &nbsp;·&nbsp;<span style="color:#1d4ed8;">Mavi = çift oturum</span>
+      </p>
+    </div>
+    <button type="submit" class="btn btn-primary" style="flex-shrink:0;">Kaydet</button>
+  </div>
+
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="table" style="margin:0;">
+      <thead style="background:#f1f5f9;">
+        <tr>
+          <th style="padding:.75rem 1rem; font-weight:600; color:#374151;">Ders Adı</th>
+          <th style="padding:.75rem 1rem; font-weight:600; color:#374151; width:220px;">Sınav Türü</th>
+          <th style="padding:.75rem 1rem; font-weight:600; color:#374151; width:160px; text-align:center;">Sınav Yapılmayacak</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ders in dersler %}
+          {% with form=forms|get_item:ders.pk %}
+          <tr style="{% if ders.sinav_yapilmayacak %}background:#fef2f2;{% elif ders.cift_oturum == 1 %}background:#eff6ff;{% endif %}">
+            <td style="padding:.6rem 1rem; vertical-align:middle;">
+              {{ ders.ders_adi }}
+              {% if ders.cift_oturum == 1 %}
+                <span style="font-size:.75rem; background:#dbeafe; color:#1d4ed8; border-radius:4px; padding:1px 6px; margin-left:6px;">Çift Oturum</span>
+              {% endif %}
+              {% if ders.sinav_yapilmayacak %}
+                <span style="font-size:.75rem; background:#fee2e2; color:#b91c1c; border-radius:4px; padding:1px 6px; margin-left:6px;">Sınav Yok</span>
+              {% endif %}
+            </td>
+            <td style="padding:.4rem 1rem; vertical-align:middle;">
+              {{ form.cift_oturum }}
+            </td>
+            <td style="padding:.4rem 1rem; vertical-align:middle; text-align:center;">
+              {{ form.sinav_yapilmayacak }}
+            </td>
+          </tr>
+          {% endwith %}
+        {% empty %}
+          <tr><td colspan="3" style="padding:2rem; text-align:center; color:#94a3b8;">
+            Ders havuzu boş. Önce veri aktarımı yapın.
+          </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-top:.5rem; font-size:.82rem; color:#94a3b8;">
+    {{ dersler|length }} ders
+  </div>
+</form>
+{% endblock %}

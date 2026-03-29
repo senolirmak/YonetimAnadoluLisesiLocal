@@ -1,23 +1,10 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
+from okul.auth import MudurYardimcisiMixin
+
 from .forms import DevamsizlikForm
 from .models import Devamsizlik
-
-
-def _is_mudur_yardimcisi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
-
-
-class MudurYardimcisiMixin(LoginRequiredMixin):
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return self.handle_no_permission()
-        if not _is_mudur_yardimcisi(request.user):
-            raise PermissionDenied
-        return super().dispatch(request, *args, **kwargs)
 
 
 class DevamsizlikListView(MudurYardimcisiMixin, ListView):

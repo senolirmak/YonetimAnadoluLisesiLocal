@@ -13,67 +13,38 @@ GUNLER = (
 )
 
 
-# Create your models here.
-class SinifSube(models.Model):
-    sinif = models.IntegerField()
-    sube = models.CharField(max_length=2)
+class NobetYerleri(models.Model):
+    """
+    Nöbet listesi verisinden elde edilen tekil nöbet yeri havuzu.
+
+    Import sırasında NobetGorevi.nobet_yeri stringleri buraya sync edilir.
+    Aktif=False yapılan yerler otomatik dağıtım dışında tutulabilir.
+    """
+
+    ad = models.CharField(max_length=100, unique=True, verbose_name="Nöbet Yeri")
+    aktif = models.BooleanField(default=True, verbose_name="Aktif")
 
     class Meta:
-        unique_together = ("sinif", "sube")
-        verbose_name = "Sınıf Şube"
-        verbose_name_plural = "Sınıf ve Şubeler"
+        db_table = "nobet_yerleri"
+        ordering = ["ad"]
+        verbose_name = "Nöbet Yeri"
+        verbose_name_plural = "Nöbet Yerleri"
 
     def __str__(self):
-        return f"{self.sinif}/{self.sube}"
-
-    @property
-    def sinif_sube(self):
-        return f"{self.sinif}/{self.sube}"
-
-    @property
-    def sinifsube(self):
-        """sinav app uyumu için alias."""
-        return f"{self.sinif}/{self.sube}"
-
-    @property
-    def salon(self):
-        """sinav app uyumu için salon adı."""
-        return f"Salon {self.sinif}/{self.sube}"
+        return self.ad
 
 
-class NobetPersonel(models.Model):
-    user = models.OneToOneField(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="personel",
-        verbose_name="Kullanıcı",
-    )
-    kimlikno = models.CharField(max_length=11, unique=True)
-    adi_soyadi = models.CharField(max_length=100, unique=True)
-    brans = models.CharField(max_length=50)
-    CINSIYET_CHOICES = (
-        (True, "Erkek"),
-        (False, "Kadın"),
-    )
-    cinsiyet = models.BooleanField(default=True, choices=CINSIYET_CHOICES)
-    nobeti_var = models.BooleanField(default=True)
-    gorev_tipi = models.CharField(max_length=50, blank=True, null=True)
-    sabit_nobet = models.BooleanField(default=False)
+# SinifSube → okul app'ine taşındı. Backward-compat:
+from okul.models import SinifSube  # noqa: F401, E402
 
-    class Meta:
-        db_table = "nobet_personel"
-        verbose_name = "Personel"
-        verbose_name_plural = "Personel Listesi"
-
-    def __str__(self):
-        return self.adi_soyadi
+# NobetPersonel → okul app'ine Personel adıyla taşındı. Backward-compat:
+from okul.models import Personel  # noqa: F401, E402
+from okul.models import Personel as NobetPersonel  # noqa: F401, E402
 
 
 class NobetOgretmen(models.Model):
     personel = models.OneToOneField(
-        NobetPersonel, on_delete=models.CASCADE, related_name="ogretmen"
+        "okul.Personel", on_delete=models.CASCADE, related_name="ogretmen"
     )
     uygulama_tarihi = models.DateField(default=timezone.now)
 
@@ -88,7 +59,14 @@ class NobetOgretmen(models.Model):
 
 class NobetGorevi(models.Model):
     nobet_gun = models.CharField(max_length=10, choices=GUNLER)
-    nobet_yeri = models.CharField(max_length=100)
+    nobet_yeri = models.ForeignKey(
+        "NobetYerleri",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="gorevler",
+        verbose_name="Nöbet Yeri",
+    )
     uygulama_tarihi = models.DateField(default=timezone.now)
     ogretmen = models.ForeignKey(NobetOgretmen, on_delete=models.CASCADE, related_name="nobetler")
 
@@ -161,92 +139,9 @@ class GunlukNobetCizelgesi(models.Model):
         verbose_name_plural = "Günlük Nöbet Çizelgeleri"
 
 
-class OkulBilgi(models.Model):
-    okul_kodu = models.CharField(max_length=20, blank=True, verbose_name="Okul Kodu")
-    okul_adi = models.CharField(max_length=200, blank=True, verbose_name="Okul Adı")
-    okul_muduru = models.CharField(max_length=100, blank=True, verbose_name="Okul Müdürü")
-    okul_donem = models.ForeignKey(
-        "OkulDonem",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="+",
-        verbose_name="Aktif Dönem",
-    )
-    okul_egtyil = models.ForeignKey(
-        "EgitimOgretimYili",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="+",
-        verbose_name="Aktif Eğitim-Öğretim Yılı",
-    )
-
-    class Meta:
-        db_table = "okul_bilgi"
-        verbose_name = "Okul Bilgisi"
-        verbose_name_plural = "Okul Bilgileri"
-
-    def __str__(self):
-        return self.okul_adi or "Okul Bilgisi"
-
-    @classmethod
-    def get(cls):
-        """sinav app uyumu için singleton erişim."""
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
-
-
-class OkulDonem(models.Model):
-    DONEM_CHOICES = (
-        (1, "1. Dönem"),
-        (2, "2. Dönem"),
-    )
-
-    egitim_yili = models.ForeignKey(
-        "EgitimOgretimYili",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="donemleri",
-        verbose_name="Eğitim-Öğretim Yılı",
-    )
-    donem = models.PositiveSmallIntegerField(
-        choices=DONEM_CHOICES,
-        verbose_name="Dönem",
-    )
-    baslangic = models.DateField(verbose_name="Başlangıç Tarihi")
-    bitis = models.DateField(verbose_name="Bitiş Tarihi")
-
-    class Meta:
-        db_table = "okul_donem"
-        unique_together = ("egitim_yili", "donem")
-        verbose_name = "Okul Dönemi"
-        verbose_name_plural = "Okul Dönemleri"
-        ordering = ["baslangic"]
-
-    def __str__(self):
-        donem_adi = dict(self.DONEM_CHOICES).get(self.donem, str(self.donem))
-        return f"{donem_adi}"
-
-class EgitimOgretimYili(models.Model):
-    egitim_yili = models.CharField(
-        max_length=9,
-        unique=True,
-        verbose_name="Eğitim-Öğretim Yılı",
-        help_text="Örnek: 2025-2026",
-    )
-    egitim_baslangic = models.DateField(verbose_name="Yıl Başlangıç Tarihi")
-    egitim_bitis = models.DateField(verbose_name="Yıl Bitiş Tarihi")
-
-    class Meta:
-        db_table = "egitim_ogretim_yili"
-        verbose_name = "Eğitim-Öğretim Yılı"
-        verbose_name_plural = "Eğitim-Öğretim Yılları"
-        ordering = ["-egitim_yili"]
-
-    def __str__(self):
-        return self.egitim_yili
+# OkulBilgi, OkulDonem, EgitimOgretimYili → okul app'ine taşındı.
+# Mevcut import'ların kırılmaması için backward-compat takma adlar:
+from okul.models import EgitimOgretimYili, OkulBilgi, OkulDonem  # noqa: F401, E402
 
 
 class VeriYukleme(models.Model):

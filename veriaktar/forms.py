@@ -57,6 +57,13 @@ class OkulBilgiForm(forms.Form):
 
 class OgrenciImportForm(forms.Form):
     dosya = forms.FileField(label="Öğrenci Listesi Excel Dosyası (OOG01001R020_...XLS)")
+    dosya_tarihi = forms.DateField(
+        label="Dosya Tarihi",
+        required=False,
+        initial=timezone.localdate,
+        widget=forms.DateInput(attrs={"type": "date", "class": "vDateField"}, format="%Y-%m-%d"),
+        help_text="e-Okul'dan alınan listenin ait olduğu tarih",
+    )
 
 
 class SinifSubeImportForm(forms.Form):

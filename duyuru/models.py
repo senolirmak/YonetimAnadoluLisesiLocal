@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-from nobet.models import SinifSube
+from okul.models import SinifSube
 
 
 class Duyuru(models.Model):

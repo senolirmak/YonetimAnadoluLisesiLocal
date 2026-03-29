@@ -9,14 +9,13 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci
 
 from .models import OgrenciDevamsizlik
 
 
-def _mudur_yardimcisi_mi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 def _ust_yonetici_mi(user):
@@ -90,10 +89,10 @@ def ogretmen_devamsizlik(request, ders_saati=None):
         for i in range(5)  # Pazartesi–Cuma
     ]
 
-    bugun_dersleri = NobetDersProgrami.objects.filter(
+    bugun_dersleri = DersProgrami.objects.filter(
         ogretmen=personel,
         gun=gun_adi,
-    ).order_by("ders_saati")
+    ).select_related("ders_saati").order_by("ders_saati__derssaati_no")
 
     if not bugun_dersleri.exists():
         return render(
@@ -113,14 +112,15 @@ def ogretmen_devamsizlik(request, ders_saati=None):
 
     # Ders seçimi: URL parametresi yoksa → bugünse aktif ders, değilse None
     if ders_saati:
-        secili_ders = bugun_dersleri.filter(ders_saati=ders_saati).first()
+        secili_ders = bugun_dersleri.filter(ders_saati__derssaati_no=ders_saati).first()
 
         # Bugün için: ders saati dışında direkt URL ile erişim engelle
         if secili_ders and secili_tarih == bugun:
             if not _ders_aktif_mi(secili_ders, secili_tarih, bugun, simdi):
+                ds_no = secili_ders.ders_saati.derssaati_no if secili_ders.ders_saati else "?"
                 messages.warning(
                     request,
-                    f"{secili_ders.ders_saati}. ders yoklaması yalnızca ders saati içinde açılabilir "
+                    f"{ds_no}. ders yoklaması yalnızca ders saati içinde açılabilir "
                     f"({secili_ders.giris_saat.strftime('%H:%M')}–{secili_ders.cikis_saat.strftime('%H:%M')}).",
                 )
                 return redirect(
@@ -181,7 +181,7 @@ def ogretmen_devamsizlik(request, ders_saati=None):
                     OgrenciDevamsizlik.objects.create(
                         ogrenci=ogr,
                         tarih=post_tarih,
-                        ders_saati=secili_ders.ders_saati,
+                        ders_saati=secili_ders.ders_saati,  # FK obj
                         ders_adi=secili_ders.ders_adi,
                         ogretmen_adi=personel.adi_soyadi,
                     )
@@ -222,7 +222,7 @@ def ogrenci_devamsizlik_listesi(request):
     kaynak = request.GET.get("kaynak", "")
 
     qs = OgrenciDevamsizlik.objects.select_related("ogrenci").order_by(
-        "-tarih", "ogrenci__sinif", "ogrenci__sube", "ders_saati"
+        "-tarih", "ogrenci__sinif", "ogrenci__sube", "ders_saati__derssaati_no"
     )
 
     if tarih_bas:
@@ -369,7 +369,7 @@ def _build_pdf(qs, tarih_bas, tarih_bit, secili_sinifler, okul_adi=""):
                     para(ogr.sinifsube, size=8),
                     para(ogr.okulno, size=8),
                     para(f"{ogr.adi} {ogr.soyadi}", size=8),
-                    para(str(kayit.ders_saati), size=8),
+                    para(str(kayit.ders_saati.derssaati_no) if kayit.ders_saati else "—", size=8),
                     para(aciklama_goster, size=8),
                 ]
             )
@@ -447,7 +447,7 @@ def ogrenci_devamsizlik_pdf(request):
     qs = (
         OgrenciDevamsizlik.objects.select_related("ogrenci")
         .filter(tarih__gte=tarih_bas, tarih__lte=tarih_bit)
-        .order_by("tarih", "ogrenci__sinif", "ogrenci__sube", "ogrenci__okulno", "ders_saati")
+        .order_by("tarih", "ogrenci__sinif", "ogrenci__sube", "ogrenci__okulno", "ders_saati__derssaati_no")
     )
 
     if secili_sinifler:
@@ -466,7 +466,7 @@ def ogrenci_devamsizlik_pdf(request):
             },
         )
 
-    from nobet.models import OkulBilgi
+    from okul.models import OkulBilgi
 
     okul_bilgi = OkulBilgi.objects.first()
     okul_adi = okul_bilgi.okul_adi if okul_bilgi else ""

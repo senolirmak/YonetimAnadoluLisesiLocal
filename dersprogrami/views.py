@@ -13,18 +13,16 @@ from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
 from veriaktar.forms import DersProgramiImportForm
 
 from .forms import SinifSubeSecimForm
-from .models import NobetDersProgrami
+from .models import DersProgrami
 
 # ─────────────────────────────────────────────
 # Yetki yardımcıları
 # ─────────────────────────────────────────────
 
+from okul.auth import is_mudur_yardimcisi, mudur_yardimcisi_required  # noqa: E402
+
 YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
 TARIH_DEGISTIREBILIR_GRUPLAR = {"mudur_yardimcisi", "okul_muduru"}
-
-
-def _is_mudur_yardimcisi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
 
 
 def _is_yonetici(user):
@@ -33,17 +31,6 @@ def _is_yonetici(user):
 
 def _is_tarih_degistirebilir(user):
     return user.is_superuser or user.groups.filter(name__in=TARIH_DEGISTIREBILIR_GRUPLAR).exists()
-
-
-def mudur_yardimcisi_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapper(request, *args, **kwargs):
-        if not _is_mudur_yardimcisi(request.user):
-            raise PermissionDenied
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
 
 
 def yonetici_required(view_func):
@@ -174,16 +161,21 @@ def ogretmen_program(request):
     current_day_db = _WEEKDAY_TO_DB.get(today.weekday(), "Monday")
 
     gun_saatleri_qs = (
-        NobetDersProgrami.objects.filter(gun=current_day_db)
-        .values("ders_saati", "ders_saati_adi", "giris_saat", "cikis_saat")
-        .order_by("ders_saati")
+        DersProgrami.objects.filter(gun=current_day_db)
+        .select_related("ders_saati")
+        .order_by("ders_saati__derssaati_no")
     )
     seen_ds = set()
     gun_saatleri = []
-    for row in gun_saatleri_qs:
-        if row["ders_saati"] not in seen_ds:
-            seen_ds.add(row["ders_saati"])
-            gun_saatleri.append(row)
+    for dp in gun_saatleri_qs:
+        if dp.ders_saati and dp.ders_saati_id not in seen_ds:
+            seen_ds.add(dp.ders_saati_id)
+            gun_saatleri.append({
+                "ders_saati": dp.ders_saati.derssaati_no,
+                "ders_saati_adi": dp.ders_saati.ders_adi,
+                "giris_saat": dp.ders_saati.derssaati_baslangic,
+                "cikis_saat": dp.ders_saati.derssaati_bitis,
+            })
 
     auto_ders_saati = None
     _auto_giris = None
@@ -208,15 +200,15 @@ def ogretmen_program(request):
 
     if current_ders_saati:
         derste_personel_ids = set(
-            NobetDersProgrami.objects.filter(
-                gun=current_day_db, ders_saati=current_ders_saati
+            DersProgrami.objects.filter(
+                gun=current_day_db, ders_saati__derssaati_no=current_ders_saati
             ).values_list("ogretmen_id", flat=True)
         )
     else:
         derste_personel_ids = set()
 
     bugun_dersi_olan_ids = set(
-        NobetDersProgrami.objects.filter(gun=current_day_db).values_list("ogretmen_id", flat=True)
+        DersProgrami.objects.filter(gun=current_day_db).values_list("ogretmen_id", flat=True)
     )
 
     devamsiz_personel_ids = set(
@@ -262,9 +254,9 @@ def ogretmen_program(request):
         elif p.id in derste_personel_ids or atamalar:
             ders_bilgisi = ""
             if p.id in derste_personel_ids:
-                kayit = NobetDersProgrami.objects.filter(
-                    gun=current_day_db, ders_saati=current_ders_saati, ogretmen=p
-                ).first()
+                kayit = DersProgrami.objects.filter(
+                    gun=current_day_db, ders_saati__derssaati_no=current_ders_saati, ogretmen=p
+                ).select_related("ders_saati", "ders").first()
                 if kayit:
                     sinif = str(kayit.sinif_sube) if kayit.sinif_sube else ""
                     ders_bilgisi = f"{sinif} – {kayit.ders_adi}".strip(" –")
@@ -341,22 +333,27 @@ def sinif_program(request):
     current_day_db = _WEEKDAY_TO_DB.get(today.weekday(), "Monday")
 
     tum_program = list(
-        NobetDersProgrami.objects.select_related("sinif_sube", "ogretmen")
+        DersProgrami.objects.select_related("sinif_sube", "ogretmen", "ders_saati", "ders")
         .filter(sinif_sube__isnull=False)
-        .order_by("sinif_sube__sinif", "sinif_sube__sube", "ders_saati")
+        .order_by("sinif_sube__sinif", "sinif_sube__sube", "ders_saati__derssaati_no")
     )
 
     gun_saatleri_qs = (
-        NobetDersProgrami.objects.filter(gun=current_day_db)
-        .values("ders_saati", "ders_saati_adi", "giris_saat", "cikis_saat")
-        .order_by("ders_saati")
+        DersProgrami.objects.filter(gun=current_day_db)
+        .select_related("ders_saati")
+        .order_by("ders_saati__derssaati_no")
     )
     seen_ds = set()
     gun_saatleri = []
-    for row in gun_saatleri_qs:
-        if row["ders_saati"] not in seen_ds:
-            seen_ds.add(row["ders_saati"])
-            gun_saatleri.append(row)
+    for dp in gun_saatleri_qs:
+        if dp.ders_saati and dp.ders_saati_id not in seen_ds:
+            seen_ds.add(dp.ders_saati_id)
+            gun_saatleri.append({
+                "ders_saati": dp.ders_saati.derssaati_no,
+                "ders_saati_adi": dp.ders_saati.ders_adi,
+                "giris_saat": dp.ders_saati.derssaati_baslangic,
+                "cikis_saat": dp.ders_saati.derssaati_bitis,
+            })
 
     auto_ders_saati = None
     for row in gun_saatleri:
@@ -426,12 +423,12 @@ def sinif_program(request):
             for s_saat in range(1, 20):
                 devamsiz_saatler_map[(p_id, s_saat)] = neden
 
-    tum_ders_saatleri = sorted({dp.ders_saati for dp in tum_program})
+    tum_ders_saatleri = sorted({dp.ders_saati.derssaati_no for dp in tum_program if dp.ders_saati})
 
     ders_saati_adi_map = {}
     for dp in tum_program:
-        if dp.ders_saati not in ders_saati_adi_map and dp.ders_saati_adi:
-            ders_saati_adi_map[dp.ders_saati] = dp.ders_saati_adi
+        if dp.ders_saati and dp.ders_saati.derssaati_no not in ders_saati_adi_map:
+            ders_saati_adi_map[dp.ders_saati.derssaati_no] = dp.ders_saati.ders_adi
 
     sinif_data = []
     for sid in sinif_ids_sirali:
@@ -441,7 +438,7 @@ def sinif_program(request):
         aktif_ders = None
         if current_ders_saati:
             aktif_matches = [
-                d for d in dersler if d.gun == current_day_db and d.ders_saati == current_ders_saati
+                d for d in dersler if d.gun == current_day_db and d.ders_saati and d.ders_saati.derssaati_no == current_ders_saati
             ]
             if aktif_matches:
                 nobetci = atama_map.get((str(s), current_ders_saati))
@@ -458,7 +455,7 @@ def sinif_program(request):
         for ds in tum_ders_saatleri:
             cells = []
             for gdb in GUN_DB:
-                matches = [d for d in dersler if d.ders_saati == ds and d.gun == gdb]
+                matches = [d for d in dersler if d.ders_saati and d.ders_saati.derssaati_no == ds and d.gun == gdb]
                 if matches:
                     nobetci = None
                     is_atanamayan = False
@@ -533,9 +530,9 @@ def sinif_ogretmenleri(request):
 
     if secilen_sinif:
         dersler = (
-            NobetDersProgrami.objects.filter(sinif_sube=secilen_sinif)
-            .select_related("ogretmen")
-            .order_by("ogretmen__adi_soyadi", "gun", "ders_saati")
+            DersProgrami.objects.filter(sinif_sube=secilen_sinif)
+            .select_related("ogretmen", "ders_saati", "ders")
+            .order_by("ogretmen__adi_soyadi", "gun", "ders_saati__derssaati_no")
         )
 
         # (personel_pk, ders_adi) → {personel, ders_adi, sayi}
@@ -567,15 +564,15 @@ def sinif_ogretmenleri(request):
 
 @login_required
 def dersprogrami_listesi(request):
-    from nobet.models import SinifSube
+    from okul.models import SinifSube
 
     # Filtre parametreleri
     ogretmen_id = request.GET.get("ogretmen", "").strip()
     sinif_id = request.GET.get("sinif_sube", "").strip()
     gun = request.GET.get("gun", "").strip()
 
-    qs = NobetDersProgrami.objects.select_related("ogretmen", "sinif_sube").order_by(
-        "ogretmen__adi_soyadi", "gun", "ders_saati"
+    qs = DersProgrami.objects.select_related("ogretmen", "sinif_sube", "ders_saati", "ders").order_by(
+        "ogretmen__adi_soyadi", "gun", "ders_saati__derssaati_no"
     )
 
     if ogretmen_id:
@@ -649,25 +646,25 @@ def haftalik_ders_programi(request):
     rehberlik_siniflari = []
 
     if secilen_personel:
-        dersler = (
-            NobetDersProgrami.objects.filter(ogretmen=secilen_personel)
-            .select_related("sinif_sube")
-            .order_by("ders_saati")
+        dersler = list(
+            DersProgrami.objects.filter(ogretmen=secilen_personel)
+            .select_related("sinif_sube", "ders_saati", "ders")
+            .order_by("ders_saati__derssaati_no")
         )
         ders_saatleri_bilgi = {}
         for d in dersler:
-            if d.ders_saati not in ders_saatleri_bilgi:
-                ders_saatleri_bilgi[d.ders_saati] = {
-                    "ders_saati_adi": d.ders_saati_adi,
-                    "giris_saat": d.giris_saat,
-                    "cikis_saat": d.cikis_saat,
+            if d.ders_saati and d.ders_saati.derssaati_no not in ders_saatleri_bilgi:
+                ders_saatleri_bilgi[d.ders_saati.derssaati_no] = {
+                    "ders_saati_adi": d.ders_saati.ders_adi,
+                    "giris_saat": d.ders_saati.derssaati_baslangic,
+                    "cikis_saat": d.ders_saati.derssaati_bitis,
                 }
         for ds in sorted(ders_saatleri_bilgi.keys()):
             bilgi = ders_saatleri_bilgi[ds]
             cells = []
             for gun_db in GUN_DB:
                 match = next(
-                    (d for d in dersler if d.ders_saati == ds and d.gun == gun_db), None
+                    (d for d in dersler if d.ders_saati and d.ders_saati.derssaati_no == ds and d.gun == gun_db), None
                 )
                 cells.append(match)
             program_tablo.append({
@@ -689,9 +686,9 @@ def haftalik_ders_programi(request):
 
         # Rehberlik ve Yönlendirme dersi verdiği sınıflar
         rehberlik_siniflari = list(
-            NobetDersProgrami.objects.filter(
+            DersProgrami.objects.filter(
                 ogretmen=secilen_personel,
-                ders_adi__icontains="rehberlik",
+                ders__ders_adi__icontains="rehberlik",
                 sinif_sube__isnull=False,
             )
             .values_list("sinif_sube__sinif", "sinif_sube__sube")
@@ -743,6 +740,6 @@ def dersprogrami_yukle(request):
     context = {
         "title": "Ders Programı Yükle",
         "form": form,
-        "toplam": NobetDersProgrami.objects.count(),
+        "toplam": DersProgrami.objects.count(),
     }
     return render(request, "dersprogrami/dersprogrami_yukle.html", context)

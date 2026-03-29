@@ -16,6 +16,26 @@ def onceki_ders_saati(saat: str) -> str | None:
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
+def saat_offset(saat: str, dakika: int) -> str:
+    """'HH:MM' formatına dakika ekler/çıkarır. Sonucu 'HH:MM' döner (negatif → '00:00')."""
+    h, m = map(int, saat.split(":"))
+    total = max(0, h * 60 + m + dakika)
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def slot_aktif_mi(tarih, saat: str, bugun, simdi_str: str,
+                  baslangic_dk: int = -30, bitis_dk: int = 120) -> bool:
+    """Slot'un buton erişimine açık olup olmadığını döner."""
+    if tarih != bugun:
+        return False
+    return saat_offset(saat, baslangic_dk) <= simdi_str <= saat_offset(saat, bitis_dk)
+
+
+def salon_goster(salon_kodu: str) -> str:
+    """'Salon-10_B' → 'Salon 10/B' formatına çevirir."""
+    return salon_kodu.replace("-", " ", 1).replace("_", "/")
+
+
 def gozetmen_bul(aktif_sinav, tarih, saat: str, sinifsube: str) -> str | None:
     """
     Verilen (tarih, saat, sinifsube) için gözetmen öğretmenini döndürür.
@@ -24,7 +44,7 @@ def gozetmen_bul(aktif_sinav, tarih, saat: str, sinifsube: str) -> str | None:
     Eşleşme bulunamazsa None döner.
     """
     from datetime import time as dt_time
-    from dersprogrami.models import NobetDersProgrami
+    from dersprogrami.models import DersProgrami
 
     onceki_saat = onceki_ders_saati(saat)
     if not onceki_saat:
@@ -43,7 +63,7 @@ def gozetmen_bul(aktif_sinav, tarih, saat: str, sinifsube: str) -> str | None:
     giris = dt_time(h, m)
 
     dp = (
-        NobetDersProgrami.objects
+        DersProgrami.objects
         .filter(
             gun=gun,
             giris_saat=giris,

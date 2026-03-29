@@ -22,8 +22,11 @@ class OgrenciIsleyici:
         re.IGNORECASE,
     )
 
-    def __init__(self, file_path):
+    def __init__(self, file_path, kullanici=None, dosya_tarihi=None):
         self.file_path = str(file_path)
+        self._file_name = str(file_path).split("/")[-1].split("\\")[-1]
+        self.kullanici = kullanici
+        self.dosya_tarihi = dosya_tarihi
         self._kayitlar = []
 
     # ------------------------------------------------------------------
@@ -114,6 +117,23 @@ class OgrenciIsleyici:
         return {"yeni": yeni, "guncellenen": guncellenen, "hatali": hatali}
 
     # ------------------------------------------------------------------
+    def _aktar_gecmisi_kaydet(self, status):
+        from okul.models import VeriAktarimGecmisi
+
+        durum = "basarili" if not status.get("hatali") else "kismi"
+
+        VeriAktarimGecmisi.objects.create(
+            dosya_turu="ogrenci_listesi",
+            dosya_adi=self._file_name,
+            dosya_tarihi=self.dosya_tarihi,
+            kullanici=self.kullanici,
+            kayit_sayisi=status.get("yeni", 0) + status.get("guncellenen", 0),
+            hata_sayisi=status.get("hatali", 0),
+            durum=durum,
+        )
+
     def calistir(self) -> dict:
         self.parse()
-        return self.veritabanina_yaz()
+        status = self.veritabanina_yaz()
+        self._aktar_gecmisi_kaydet(status)
+        return status

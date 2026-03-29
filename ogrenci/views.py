@@ -5,7 +5,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 
 from .forms import OgrenciAdresForm, OgrenciDetayForm
 from .models import Ogrenci, OgrenciAdres, OgrenciDetay
@@ -18,11 +18,11 @@ def _rehberlik_sinif_sube(user):
     except Exception:
         return None
     ders = (
-        NobetDersProgrami.objects.filter(
+        DersProgrami.objects.filter(
             ogretmen=personel,
-            ders_adi__iexact="rehberlik ve yönlendirme",
+            ders__ders_adi__iexact="rehberlik ve yönlendirme",
         )
-        .select_related("sinif_sube")
+        .select_related("sinif_sube", "ders")
         .first()
     )
     return ders.sinif_sube if ders else None

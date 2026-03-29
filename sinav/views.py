@@ -12,7 +12,8 @@ from .utils import gozetmen_bul, onceki_ders_saati
 from django.conf import settings
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse, FileResponse, Http404
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .forms import AlgoritmaForm, SinavBilgisiForm
@@ -22,9 +23,9 @@ from .models import (
     DisVeri, AlgoritmaParametreleri,
     TakvimUretim, OturmaPlani,
 )
-from nobet.models import OkulBilgi
+from okul.models import OkulBilgi
 from ogrenci.models import Ogrenci as OgrenciModel
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 from ortaksinav_engine import (
     CONFIG,
     temel_verileri_olustur,
@@ -164,7 +165,7 @@ def _save_ayarlar(sinav, veri: dict):
 
 
 def _kurulum_durumu():
-    from nobet.models import SinifSube
+    from okul.models import SinifSube
     okul = OkulBilgi.get()
     okul_tamam = bool(okul.okul_adi.strip() and okul.okul_kodu.strip())
     veri_tamam = SinifSube.objects.exists()
@@ -180,7 +181,7 @@ def _db_ozeti():
     aktif = _aktif_sinav()
     return {
         "ogrenci":      OgrenciModel.objects.count(),
-        "ders_program": NobetDersProgrami.objects.count(),
+        "ders_program": DersProgrami.objects.count(),
         "sube_ders":    SubeDers.objects.count(),
         "takvim":       Takvim.objects.filter(sinav=aktif).count(),
         "oturma_plani": OturmaPlani.objects.filter(sinav=aktif).count(),
@@ -292,7 +293,7 @@ def _veri_yukle_ctx(request):
         "yeni_sinav_form": SinavBilgisiForm(),
         "dis_veri_gecmis": dis_veri,
         "ogrenci_sayisi":  OgrenciModel.objects.count(),
-        "program_sayisi":  NobetDersProgrami.objects.count(),
+        "program_sayisi":  DersProgrami.objects.count(),
     }
 
 
@@ -367,6 +368,70 @@ def sinav_bilgisi_aktif_yap(request, pk: int):
     return redirect("sinav:sinav_bilgisi_listesi")
 
 
+@login_required
+def takvim_uretim_aktif_yap(request, pk: int):
+    """Seçili TakvimUretim'i aktif yap → öğretmen sayfaları bu üretime göre güncellenir."""
+    uretim = get_object_or_404(TakvimUretim, pk=pk)
+    uretim.aktif_yap()
+    messages.success(request, f"Takvim üretimi ({uretim.uretim_tarihi:%d.%m.%Y %H:%M}) aktif yapıldı.")
+    return redirect(f"{reverse('sinav:pdf_rapor')}?uretim_pk={pk}")
+
+
+@login_required
+def gozetmen_ozet(request):
+    """Aktif TakvimUretim'deki tüm gözetmenler + Sınıf Listesi PDF öğretmenlerini listeler."""
+    from sinav.services.ders_sinav_eslestir import tum_siniflistesi_eslestir
+
+    aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
+    aktif_uretim = (
+        TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        if aktif_sinav else None
+    )
+
+    gozetmenler = []
+    siniflistesi_map: dict = {}
+
+    if aktif_uretim:
+        # Gözetmen listesi + slot sayıları
+        rows = (
+            OturmaPlani.objects
+            .filter(uretim=aktif_uretim)
+            .exclude(gozetmen__isnull=True)
+            .exclude(gozetmen="")
+            .values_list("gozetmen", flat=True)
+            .distinct()
+            .order_by("gozetmen")
+        )
+        gozetmen_slot_sayisi = {}
+        for ad in rows:
+            gozetmen_slot_sayisi[ad] = (
+                OturmaPlani.objects
+                .filter(uretim=aktif_uretim, gozetmen__iexact=ad)
+                .values("tarih", "saat", "oturum")
+                .distinct()
+                .count()
+            )
+
+        # Sınıf Listesi PDF: dp_saat = saat - 50dk ile eşleşen tüm öğretmenler
+        siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim, dp_offset_dk=-50)
+
+        # Tüm adları birleştir (gozetmen + siniflistesi sahibi)
+        tum_adlar = sorted(set(gozetmen_slot_sayisi) | set(siniflistesi_map))
+        for ad in tum_adlar:
+            gozetmenler.append({
+                "ad":               ad,
+                "slot_sayisi":      gozetmen_slot_sayisi.get(ad, 0),
+                "siniflistesi_adet": len(siniflistesi_map.get(ad, [])),
+            })
+
+    return render(request, "sinav/gozetmen_ozet.html", {
+        "aktif_sinav":      aktif_sinav,
+        "aktif_uretim":     aktif_uretim,
+        "gozetmenler":      gozetmenler,
+        "siniflistesi_map": siniflistesi_map,
+    })
+
+
 # ---------------------------------------------------------------
 # Takvim sayfasi context + view
 # ---------------------------------------------------------------
@@ -423,7 +488,7 @@ def takvim_onizleme(request):
                 "Tarih":   t.tarih.strftime("%Y-%m-%d"),
                 "Saat":    t.saat,
                 "Oturum":  t.oturum,
-                "Ders":    t.ders_adi or (t.ders.ders_adi if t.ders else ""),
+                "Ders":    t.ders.ders_adi if t.ders else "",
                 "Subeler": t.subeler,
             }
             for t in qs
@@ -450,7 +515,8 @@ def takvim_onizleme(request):
 @require_POST
 def takvim_onayla(request):
     from datetime import datetime as dt
-    from sinav.models import Takvim as TakvimModel, TakvimUretim, DersHavuzu
+    from okul.models import DersHavuzu
+    from sinav.models import Takvim as TakvimModel, TakvimUretim
     aktif_sinav = _aktif_sinav()
     uretim = TakvimUretim.objects.filter(sinav=aktif_sinav).order_by("-uretim_tarihi").first()
     if not uretim or uretim.onizleme_verisi is None:
@@ -468,18 +534,33 @@ def takvim_onayla(request):
             obj = ders_map.get(base)
         return obj
 
+    def _sinav_turu(ders_adi_str):
+        if ders_adi_str.endswith(" (Uygulama)"):
+            return "Uygulama"
+        if ders_adi_str.endswith(" (Yazili)"):
+            return "Yazili"
+        return ""
+
+    # Takvim.ders_saati FK için saat string → DersSaatleri eşlemesi
+    from okul.models import DersSaatleri as _DS
+    saatler_map = {
+        str(ds.derssaati_baslangic)[:5]: ds
+        for ds in _DS.objects.all()
+    }
+
     # Yalnızca bu uretim'e ait eski Takvim kayıtlarını temizle (yeniden onaylama durumu)
     TakvimModel.objects.filter(uretim=uretim).delete()
     TakvimModel.objects.bulk_create([
         TakvimModel(
-            sinav    = aktif_sinav,
-            uretim   = uretim,
-            tarih    = dt.strptime(r["Tarih"], "%Y-%m-%d").date(),
-            saat     = r["Saat"],
-            oturum   = int(r["Oturum"]),
-            ders     = _ders_fk(r["Ders"]),
-            ders_adi = r["Ders"],
-            subeler  = r["Subeler"],
+            sinav      = aktif_sinav,
+            uretim     = uretim,
+            tarih      = dt.strptime(r["Tarih"], "%Y-%m-%d").date(),
+            saat       = r["Saat"],
+            ders_saati = saatler_map.get(r["Saat"]),
+            oturum     = int(r["Oturum"]),
+            ders       = _ders_fk(r["Ders"]),
+            sinav_turu = _sinav_turu(r["Ders"]),
+            subeler    = r["Subeler"],
         )
         for r in kayitlar
     ])
@@ -625,45 +706,45 @@ def takvim_gecmisi(request):
 
 
 def pdf_rapor(request):
-    """PDF rapor üretim sayfası: seçili (veya aktif) TakvimUretim'e bağlı takvim verilerini gösterir."""
-    from sinav.models import TakvimUretim, Takvim
+    """PDF rapor üretim sayfası: seçili TakvimUretim'e bağlı takvim verilerini gösterir."""
+    from sinav.models import TakvimUretim, Takvim, OturmaUretim
     from collections import defaultdict
 
-    tum_sinavlar = SinavBilgisi.objects.order_by("-sinav_baslangic_tarihi")
-
-    sinav_pk = request.GET.get("sinav_pk")
-    if sinav_pk:
+    # Belirli üretim seçilmişse onu kullan; yoksa aktif üretimi bul
+    uretim_pk = request.GET.get("uretim_pk")
+    if uretim_pk:
         try:
-            secili_sinav = SinavBilgisi.objects.get(pk=sinav_pk)
-        except SinavBilgisi.DoesNotExist:
-            secili_sinav = _aktif_sinav()
+            secili_uretim = TakvimUretim.objects.select_related("sinav").get(pk=uretim_pk)
+        except TakvimUretim.DoesNotExist:
+            messages.error(request, "Seçilen üretim bulunamadı.")
+            return redirect("sinav:takvim_gecmisi")
     else:
-        secili_sinav = _aktif_sinav()
-
-    aktif = secili_sinav
-    aktif_uretim = (
-        TakvimUretim.objects.filter(sinav=aktif, aktif=True).first()
-        if aktif else None
-    )
-    if not aktif_uretim:
+        aktif = _aktif_sinav()
+        secili_uretim = (
+            TakvimUretim.objects.filter(sinav=aktif, aktif=True).select_related("sinav").first()
+            if aktif else None
+        )
+    if not secili_uretim:
         messages.error(request, "PDF rapor için önce Takvim Geçmişi'nden bir takvim seçin.")
         return redirect("sinav:takvim_gecmisi")
 
-    # Eski kayıtları (uretim=None) aktif üretimle ilişkilendir
-    Takvim.objects.filter(sinav=aktif, uretim__isnull=True).update(uretim=aktif_uretim)
+    aktif = secili_uretim.sinav
+
+    # Eski kayıtları (uretim=None) bu üretimle ilişkilendir
+    Takvim.objects.filter(sinav=aktif, uretim__isnull=True).update(uretim=secili_uretim)
 
     takvim_kayitlari = (
         Takvim.objects
-        .filter(uretim=aktif_uretim)
+        .filter(uretim=secili_uretim)
         .select_related("ders")
         .order_by("tarih", "saat", "oturum", "ders__ders_adi")
     )
 
-    # Oturum bazında gruplama: {tarih: [{saat, oturum, tarih_str, dersler:[...]}, ...]}
+    # Oturum bazında gruplama
     session_map = defaultdict(list)
     for t in takvim_kayitlari:
         session_map[(t.tarih, t.saat, t.oturum)].append(
-            t.ders_adi or (t.ders.ders_adi if t.ders else "")
+            t.ders.ders_adi if t.ders else ""
         )
 
     gun_map = defaultdict(list)
@@ -675,33 +756,38 @@ def pdf_rapor(request):
             "dersler":   dersler,
         })
 
-    from sinav.models import OturmaUretim
-    takvim_degisti = aktif_uretim.oturma_sifirla
-    # Her oturum için OturmaUretim kaydı var mı kontrolü
+    takvim_degisti = secili_uretim.oturma_sifirla
+    # Yalnızca bu üretimin OturmaUretim kayıtları
     mevcut_ou = {
         (ou.tarih, ou.saat, ou.oturum): ou
-        for ou in OturmaUretim.objects.filter(takvim_uretim=aktif_uretim)
+        for ou in OturmaUretim.objects.filter(takvim_uretim=secili_uretim)
     }
     gunler = []
     for tarih, oturumlar in sorted(gun_map.items()):
         for ot in oturumlar:
             ou = mevcut_ou.get((tarih, ot["saat"], ot["oturum"]))
             ot["oturma_mevcut"] = ou is not None
-            ot["oturma_uretim_pk"] = ou.pk if ou else None
+            ot["uretim_pk"] = secili_uretim.pk
         gunler.append({"tarih": tarih, "oturumlar": oturumlar})
     toplam_oturum = sum(len(g["oturumlar"]) for g in gunler)
 
+    # Aynı sınavın diğer üretimleri (selector için)
+    diger_uretimler = (
+        TakvimUretim.objects
+        .filter(sinav=aktif)
+        .order_by("-uretim_tarihi")
+    ) if aktif else []
+
     okul = OkulBilgi.get()
     return render(request, "sinav/pdf_rapor.html", {
-        "aktif_sinav":    aktif,
-        "aktif_sinav_pk": aktif.pk if aktif else None,
-        "aktif_uretim":   aktif_uretim,
-        "okul":           okul,
-        "gunler":         gunler,
-        "toplam_oturum":  toplam_oturum,
-        "gun_sayisi":     len(gunler),
-        "takvim_degisti": takvim_degisti,
-        "tum_sinavlar":   tum_sinavlar,
+        "aktif_sinav":      aktif,
+        "secili_uretim":    secili_uretim,
+        "okul":             okul,
+        "gunler":           gunler,
+        "toplam_oturum":    toplam_oturum,
+        "gun_sayisi":       len(gunler),
+        "takvim_degisti":   takvim_degisti,
+        "diger_uretimler":  diger_uretimler,
     })
 
 
@@ -771,15 +857,24 @@ def oturma_plani_pdf_view(request):
             takvim_uretim_id=int(uretim_pk), tarih=tarih_date, saat=saat, oturum=oturum
         ).select_related("takvim_uretim").first()
         if not ou:
+            # Aktif TakvimUretim değişmiş olabilir; planı üreten gerçek kaydı bul
+            ou = OturmaUretim.objects.filter(
+                tarih=tarih_date, saat=saat, oturum=oturum
+            ).select_related("takvim_uretim").first()
+        if not ou:
             raise Http404
         aktif_uretim = ou.takvim_uretim
     else:
         from sinav.models import TakvimUretim as _TU
         aktif_uretim = _TU.objects.filter(sinav=_aktif_sinav(), aktif=True).first()
 
+    salon_filter = request.GET.get("salon", "")
     qs = OturmaPlani.objects.filter(
         tarih=tarih_date, saat=saat, oturum=oturum, uretim=aktif_uretim
-    ).order_by("salon", "sira_no")
+    )
+    if salon_filter:
+        qs = qs.filter(salon=salon_filter)
+    qs = qs.order_by("salon", "sira_no")
     if not qs.exists():
         raise Http404
 
@@ -848,10 +943,11 @@ def sinif_listesi_pdf_view(request):
     from sinav.models import OturmaPlani, OturmaUretim
     from ortaksinav_engine.services.pdf_rapor import sinif_raporu_pdf
 
-    tarih_str = request.GET.get("tarih", "")
-    saat      = request.GET.get("saat", "")
-    oturum    = int(request.GET.get("oturum", 1))
-    uretim_pk = request.GET.get("uretim")
+    tarih_str      = request.GET.get("tarih", "")
+    saat           = request.GET.get("saat", "")
+    oturum         = int(request.GET.get("oturum", 1))
+    uretim_pk      = request.GET.get("uretim")
+    sinifsube_filtre = request.GET.get("sinifsube", "") or None
     try:
         tarih_date = _dt.strptime(tarih_str, "%Y-%m-%d").date()
     except ValueError:
@@ -862,6 +958,11 @@ def sinif_listesi_pdf_view(request):
         ou = OturmaUretim.objects.filter(
             takvim_uretim_id=int(uretim_pk), tarih=tarih_date, saat=saat, oturum=oturum
         ).select_related("takvim_uretim").first()
+        if not ou:
+            # Aktif TakvimUretim değişmiş olabilir; planı üreten gerçek kaydı bul
+            ou = OturmaUretim.objects.filter(
+                tarih=tarih_date, saat=saat, oturum=oturum
+            ).select_related("takvim_uretim").first()
         if not ou:
             raise Http404
         aktif_uretim = ou.takvim_uretim
@@ -875,7 +976,7 @@ def sinif_listesi_pdf_view(request):
 
     okul  = OkulBilgi.get()
     buf   = io.BytesIO()
-    sinif_raporu_pdf(tarih_date, saat, oturum, buf, okul, aktif_uretim)
+    sinif_raporu_pdf(tarih_date, saat, oturum, buf, okul, aktif_uretim, sinifsube_filter=sinifsube_filtre)
     buf.seek(0)
     fname = f"Sinif_Listesi_{tarih_str}_{saat.replace(':', '')}.pdf"
     return HttpResponse(buf.read(), content_type="application/pdf",
@@ -1182,21 +1283,12 @@ def _bolumle(tum_dersler: list, efektif: set) -> tuple[list, list]:
 
 
 def ders_ayarlari(request):
-    from sinav.models import DersHavuzu
+    from okul.models import DersHavuzu
     aktif = _aktif_sinav()
     veri = _get_ayarlar(aktif)
-    yapilmayacak_secili = set(veri.get("yapilmayacak", []))
-    cift_secili = set(veri.get("cift_oturumlu", []))
 
-    dp_dersler = set(DersHavuzu.objects.values_list("ders_adi", flat=True))
-    tum_dersler = sorted(dp_dersler | yapilmayacak_secili | cift_secili)
-
-    # Hic kayit yoksa varsayilanlar on secili gelsin
-    efektif_yap  = yapilmayacak_secili  if yapilmayacak_secili  else set(_VARSAYILAN_SINAV_YAPILMAYACAK)
-    efektif_cift = cift_secili          if cift_secili          else set(_VARSAYILAN_CIFT_OTURUMLU)
-
-    yap_secili_liste, yap_diger_liste   = _bolumle(tum_dersler, efektif_yap)
-    cift_secili_liste, cift_diger_liste = _bolumle(tum_dersler, efektif_cift)
+    dp_dersler = list(DersHavuzu.objects.order_by("ders_adi"))
+    tum_dersler = sorted(DersHavuzu.objects.values_list("ders_adi", flat=True))
 
     catisma_gruplari = veri.get("catisma_gruplari", [])
     esleme_ciftleri  = veri.get("ayni_slot_esleme", [])
@@ -1208,33 +1300,21 @@ def ders_ayarlari(request):
         "dersler": [d.strip() for d in _VARSAYILAN_CATISMA_GRUBU["dersler"].split(",") if d.strip()],
     }
 
+    yapilmayacak_dersler = [d for d in dp_dersler if d.sinav_yapilmayacak]
+    cift_dersler         = [d for d in dp_dersler if d.cift_oturum == 1]
+
     return render(request, "sinav/ders_ayarlari.html", {
         "aktif_sinav":          aktif,
         "dp_dolu":              bool(dp_dersler),
-        # Yapilmayacak
-        "yap_secili_liste":     yap_secili_liste,
-        "yap_diger_liste":      yap_diger_liste,
-        "yapilmayacak_kayitli": bool(yapilmayacak_secili),
-        # Cift oturumlu
-        "cift_secili_liste":    cift_secili_liste,
-        "cift_diger_liste":     cift_diger_liste,
-        "cift_kayitli":         bool(cift_secili),
-        # Sayac icin toplam secili sayisi
-        "yapilmayacak_secili_sayi": len(efektif_yap & (dp_dersler | yapilmayacak_secili | cift_secili)),
-        "cift_secili_sayi":         len(efektif_cift & (dp_dersler | yapilmayacak_secili | cift_secili)),
-        # Varsayilanlar (tag gostermek icin)
-        "varsayilan_yapilmayacak": set(_VARSAYILAN_SINAV_YAPILMAYACAK),
-        "varsayilan_cift":         set(_VARSAYILAN_CIFT_OTURUMLU),
+        # DB'den okunan listeler (salt okunur gösterim)
+        "yapilmayacak_dersler": yapilmayacak_dersler,
+        "cift_dersler":         cift_dersler,
         # JS icin JSON dizgileri
         "sabit_json":              _json.dumps(sabit_raw, ensure_ascii=False),
         "catisma_json":            _json.dumps(catisma_gruplari, ensure_ascii=False),
         "esleme_json":             _json.dumps(esleme_ciftleri, ensure_ascii=False),
-        "tum_dersler_json":        _json.dumps(tum_dersler, ensure_ascii=False),
-        "varsayilan_yap_json":     _json.dumps(sorted(_VARSAYILAN_SINAV_YAPILMAYACAK), ensure_ascii=False),
-        "varsayilan_cift_json":    _json.dumps(sorted(_VARSAYILAN_CIFT_OTURUMLU), ensure_ascii=False),
         "varsayilan_catisma_json": _json.dumps(varsayilan_catisma, ensure_ascii=False),
-        # Eski template'de kullanilan alanlar (hâlâ lazim)
-        "tum_dersler_sabit":    tum_dersler,
+        "tum_dersler_sabit":       tum_dersler,
     })
 
 
@@ -1245,13 +1325,8 @@ def ders_ayarlari_kaydet(request):
         messages.error(request, "Önce aktif bir sınav seçin.")
         return redirect("sinav:ders_ayarlari")
 
-    yapilmayacak_secili = request.POST.getlist("yapilmayacak")
-    cift_secili = request.POST.getlist("cift")
-
     import json as _json
     veri = _get_ayarlar(aktif)
-    veri["yapilmayacak"] = sorted(yapilmayacak_secili)
-    veri["cift_oturumlu"] = sorted(cift_secili)
 
     for key, field in [("sabit_sinavlar", "sabit_json"),
                         ("catisma_gruplari", "catisma_json"),
@@ -1273,11 +1348,13 @@ def ders_ayarlari_kaydet(request):
         DersAnalizService(CONFIG).subeders_guncelle(aktif)
         from sinav.models import SubeDers
         n = SubeDers.objects.count()
+        from okul.models import DersHavuzu as _DH
+        n_yap  = _DH.objects.filter(sinav_yapilmayacak=True).count()
+        n_cift = _DH.objects.filter(cift_oturum=1).count()
         messages.success(
             request,
             f"Ders ayarları kaydedildi ve dersler filtrelendi "
-            f"({len(yapilmayacak_secili)} hariç, {len(cift_secili)} çift oturumlu, "
-            f"{n} aktif ders/şube)."
+            f"({n_yap} hariç, {n_cift} çift oturumlu, {n} aktif ders/şube)."
         )
     except Exception as e:
         messages.error(request, f"Ders filtreleme hatası: {e}")

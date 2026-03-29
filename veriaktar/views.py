@@ -1,13 +1,13 @@
 from collections import defaultdict
-from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
 
-from dersprogrami.models import NobetDersProgrami
-from nobet.models import NobetGorevi, NobetPersonel, OkulBilgi, SinifSube
+from dersprogrami.models import DersProgrami
+from nobet.models import NobetGorevi, NobetPersonel
+from okul.models import SinifSube
+from okul.models import OkulBilgi
 
 from .forms import (
     DersProgramiImportForm,
@@ -17,29 +17,14 @@ from .forms import (
     PersonelImportForm,
     SinifSubeImportForm,
 )
+from okul.auth import mudur_yardimcisi_required
+
 from .services.default_path_service import DefaultPath
 from .services.ders_programi_import_service import DersProgramiIsleyici
 from .services.nobet_import_service import NobetIsleyici
 from .services.ogrenci_import_service import OgrenciIsleyici
 from .services.personel_import_service import PersonelIsleyici
 from .services.sinifsube_import_service import sinif_sube_kaydet
-
-
-def mudur_yardimcisi_required(view_func):
-    @wraps(view_func)
-    def _wrapped(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            from django.contrib.auth.views import redirect_to_login
-
-            return redirect_to_login(request.get_full_path())
-        if not (
-            request.user.is_superuser
-            or request.user.groups.filter(name="mudur_yardimcisi").exists()
-        ):
-            raise PermissionDenied
-        return view_func(request, *args, **kwargs)
-
-    return _wrapped
 
 
 def _save_file(f, dp):
@@ -102,7 +87,7 @@ def veriaktar_ana(request):
                 f = request.FILES["personel-dosya"]
                 tarih = personel_form.cleaned_data["uygulama_tarihi"]
                 file_path = _save_file(f, dp)
-                PersonelIsleyici(personel_path=str(file_path), uygulama_tarihi=tarih).calistir()
+                PersonelIsleyici(personel_path=str(file_path), uygulama_tarihi=tarih, kullanici=request.user).calistir()
                 messages.success(request, "Personel listesi başarıyla aktarıldı.")
 
             elif "sinif_sube_aktar" in request.POST and sinif_form.is_valid():
@@ -119,20 +104,21 @@ def veriaktar_ana(request):
                 f = request.FILES["ders-dosya"]
                 tarih = ders_form.cleaned_data["uygulama_tarihi"]
                 file_path = _save_file(f, dp)
-                DersProgramiIsleyici(file_path=str(file_path), uygulama_tarihi=tarih).calistir()
+                DersProgramiIsleyici(file_path=str(file_path), uygulama_tarihi=tarih, kullanici=request.user).calistir()
                 messages.success(request, "Ders programı başarıyla aktarıldı.")
 
             elif "nobet_aktar" in request.POST and nobet_form.is_valid():
                 f = request.FILES["nobet-dosya"]
                 tarih = nobet_form.cleaned_data["uygulama_tarihi"]
                 file_path = _save_file(f, dp)
-                NobetIsleyici(nobet_path=str(file_path), uygulama_tarihi=tarih).calistir()
+                NobetIsleyici(nobet_path=str(file_path), uygulama_tarihi=tarih, kullanici=request.user).calistir()
                 messages.success(request, "Nöbetçi listesi başarıyla aktarıldı.")
 
             elif "ogrenci_aktar" in request.POST and ogrenci_form.is_valid():
                 f = request.FILES["ogrenci-dosya"]
+                dosya_tarihi = ogrenci_form.cleaned_data.get("dosya_tarihi")
                 file_path = _save_file(f, dp)
-                sonuc = OgrenciIsleyici(file_path=str(file_path)).calistir()
+                sonuc = OgrenciIsleyici(file_path=str(file_path), kullanici=request.user, dosya_tarihi=dosya_tarihi).calistir()
                 messages.success(
                     request,
                     f"Öğrenci listesi aktarıldı — "
@@ -151,7 +137,7 @@ def veriaktar_ana(request):
         OkulBilgi.objects.exists(),
         NobetPersonel.objects.exists(),
         SinifSube.objects.exists(),
-        NobetDersProgrami.objects.exists(),
+        DersProgrami.objects.exists(),
         NobetGorevi.objects.exists(),
         OgrenciModel.objects.exists(),
     ]

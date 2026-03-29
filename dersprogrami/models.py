@@ -12,27 +12,58 @@ GUNLER = (
 )
 
 
-class NobetDersProgrami(models.Model):
+class DersProgrami(models.Model):
     gun = models.CharField(max_length=10, choices=GUNLER)
-    giris_saat = models.TimeField()
-    cikis_saat = models.TimeField()
-    ders_adi = models.CharField(max_length=100)
+    ders = models.ForeignKey(
+        "okul.DersHavuzu",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="dersprogrami",
+        verbose_name="Ders",
+    )
     sinif_sube = models.ForeignKey(
-        "nobet.SinifSube",
+        "okul.SinifSube",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="dersprogrami",
         verbose_name="Sınıf/Şube",
     )
-    ders_saati = models.IntegerField()
-    ders_saati_adi = models.CharField(max_length=10)
+    ders_saati = models.ForeignKey(
+        "okul.DersSaatleri",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="dersprogrami",
+        verbose_name="Ders Saati",
+    )
     uygulama_tarihi = models.DateField(default=timezone.now)
     ogretmen = models.ForeignKey(
-        "nobet.NobetPersonel", on_delete=models.CASCADE, related_name="dersprogrami"
+        "okul.Personel", on_delete=models.CASCADE, related_name="dersprogrami"
     )
 
     class Meta:
         db_table = "nobet_dersprogrami"
         verbose_name = "Ders Programı"
         verbose_name_plural = "Haftalık Ders Programı"
+
+    # ------------------------------------------------------------------
+    # Backward-compat properties — ORM sorguları için .derssaati_no kullanın
+    # ------------------------------------------------------------------
+
+    @property
+    def giris_saat(self):
+        return self.ders_saati.derssaati_baslangic if self.ders_saati else None
+
+    @property
+    def cikis_saat(self):
+        return self.ders_saati.derssaati_bitis if self.ders_saati else None
+
+    @property
+    def ders_saati_adi(self):
+        return self.ders_saati.ders_adi if self.ders_saati else ""
+
+    @property
+    def ders_adi(self):
+        return self.ders.ders_adi if self.ders else ""

@@ -8,7 +8,13 @@
 <div class="container">
     <div class="mb-20">
         <h2 class="page-title mb-20">{{ title }}</h2>
-        
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+            <a href="{% url 'devamsizlik_list' %}" class="btn btn-info">1. Devamsızlık</a>
+            <a href="{% url 'nobet_dagitim' %}" class="btn btn-primary">2. Haftalık Nöbet</a>
+            <a href="{% url 'gunun_nobetcileri' %}" class="btn btn-warning">3. Günün Nöbetçileri</a>
+            <a href="{% url 'nobet_ders_doldurma' %}" class="btn btn-success">4. Ders Doldurma</a>
+        </div>
+
         {% if messages %}
         <div class="mb-20">
             {% for message in messages %}
@@ -45,9 +51,8 @@
                 {% endif %}
                 <div style="display: inline-flex; align-items: center; margin-left: 10px;">
                     <select class="form-control rapor-select" style="width: auto; margin-right: 6px;">
-                        <option value="{% url 'download_ders_doldurma_png' %}">PNG (Resim)</option>
                         <option value="{% url 'download_ders_doldurma_pdf' %}">PDF</option>
-                        <option value="{% url 'download_ders_doldurma_xlsx' %}">Excel (.xlsx)</option>
+                        <option value="{% url 'download_ders_doldurma_png' %}">PNG (Resim)</option>
                     </select>
                     <button type="button" class="btn btn-info"
                             onclick="var s=this.previousElementSibling; window.open(s.value, '_blank')">

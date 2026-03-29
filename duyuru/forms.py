@@ -2,7 +2,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 
 from .models import Duyuru
 
@@ -27,7 +27,7 @@ class DuyuruForm(forms.ModelForm):
         try:
             # Ders programından benzersiz ve sıralı ders saatlerini al
             ders_saatleri_qs = (
-                NobetDersProgrami.objects.order_by("ders_saati")
+                DersProgrami.objects.order_by("ders_saati")
                 .values_list("ders_saati", flat=True)
                 .distinct()
             )

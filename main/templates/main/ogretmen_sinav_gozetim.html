@@ -7,13 +7,21 @@
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
 
 <div class="container">
-  <h2 class="page-title mb-20">Öğrencilerin Kelebek Sisteminde Sıra ve Salon Bilgileri</h2>
+  <h2 class="page-title mb-20">Sınav Gözetim Listem</h2>
+
+  {% if is_preview %}
+  <div style="padding:.6rem 1rem;background:#fef9c3;border:1px solid #fbbf24;border-radius:6px;font-size:.85rem;color:#92400e;margin-bottom:1rem;">
+    <strong>Yönetici Önizlemesi:</strong> {{ ogretmen_adi }} adlı öğretmenin sayfası gösteriliyor.
+    <a href="{% url 'sinav:gozetmen_ozet' %}" style="margin-left:.75rem;color:#92400e;text-decoration:underline;">← Gözetmen Listesine Dön</a>
+  </div>
+  {% endif %}
 
   {% if hata %}
     <div class="alert alert-danger">{{ hata }}</div>
 
   {% else %}
-    <div class="card mb-20" style="padding:12px 16px;font-size:.9rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:7px;display:flex;gap:1.5rem;flex-wrap:wrap;color:#0369a1;">
+    {# ── Bilgi bandı ── #}
+    <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:center;padding:.6rem 1rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:7px;font-size:.88rem;color:#0369a1;margin-bottom:1.25rem;">
       <span><strong>Öğretmen:</strong> {{ ogretmen_adi }}</span>
       {% if aktif_sinav %}
         <span><strong>Sınav:</strong> {{ aktif_sinav }}</span>
@@ -27,106 +35,134 @@
       {% endif %}
     </div>
 
-    {% if not gozetim_slotlari %}
-      <p class="text-muted">Bu sınav döneminde gözetmen olarak atandığınız oturum bulunamadı.</p>
+    {% if not tarih_gruplari %}
+      <p class="text-muted">Bu sınav döneminde gözetmen olarak atandığınız veya ilgili oturum bulunamadı.</p>
 
     {% else %}
-      {% for slot in gozetim_slotlari %}
-      <div class="card mb-20">
-        <!-- Slot başlığı -->
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:14px;">
-          <div>
-            <strong>{{ slot.tarih|date:"d.m.Y l" }}</strong>
-            <span style="margin-left:10px;color:#6c757d;font-size:.9rem;">
-              Sınav: {{ slot.saat }}
-              {% if slot.onceki_saat %}
-                &nbsp;|&nbsp; Önceki ders: {{ slot.onceki_saat }}
-              {% endif %}
-            </span>
-          </div>
-          <!-- Medya butonları -->
-          {% if slot.medyalar %}
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            {% for m in slot.medyalar %}
-              <a href="{% url 'sinavmedia:oynat' m.pk %}" target="_blank"
-                 class="btn btn-sm"
-                 style="background-color:#6366f1;color:#fff;text-decoration:none;">
-                ▶ {{ m.label }} Medya
-              </a>
-            {% endfor %}
-          </div>
-          {% endif %}
+      {% for gun in tarih_gruplari %}
+
+      {# ── Gün kartı ── #}
+      <div class="card mb-20" style="padding:0;overflow:hidden;">
+
+        {# Tarih başlığı #}
+        <div style="padding:.55rem 1rem;background:#f0f2f5;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:.75rem;">
+          <strong style="font-size:.95rem;color:#1f2937;">{{ gun.tarih|date:"d.m.Y" }}</strong>
+          <span style="font-size:.82rem;color:#6b7280;">{{ gun.tarih|date:"l" }}</span>
         </div>
 
-        <!-- İki sütunlu tablo -->
-        <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+        {# Tablo #}
+        <table style="width:100%;border-collapse:collapse;font-size:.87rem;">
           <thead>
-            <tr style="background:#f0f2f5;">
-              <th style="padding:.5rem 1rem;text-align:left;border:1px solid #e5e7eb;color:#374151;font-weight:600;">
-                Kelebek Salon Dağılımı
-              </th>
-              <th style="padding:.5rem 1rem;text-align:left;border:1px solid #e5e7eb;color:#374151;font-weight:600;">
-                Sınav Yoklama Girişi
-              </th>
+            <tr style="background:#fafafa;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;">
+              <th style="padding:.45rem .75rem;text-align:left;">Saat</th>
+              <th style="padding:.45rem .75rem;text-align:left;">Oturum</th>
+              <th style="padding:.45rem .75rem;text-align:left;">Görev</th>
+              <th style="padding:.45rem .75rem;text-align:left;">Sınıf</th>
+              <th style="padding:.45rem .75rem;text-align:left;">İşlemler</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <!-- Kelebek Salon Dağılımı -->
-              <td style="padding:.75rem 1rem;border:1px solid #e5e7eb;vertical-align:top;">
-                {% if slot.siniflar %}
-                  <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                    {% for ss in slot.siniflar %}
-                      {% if slot.aktif %}
-                        <a href="{% url 'ogretmen_gozetim_sinif_listesi' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&sinifsube={{ ss }}"
-                           class="btn btn-sm"
-                           style="background-color:#0d6efd;color:#fff;text-decoration:none;">
-                          {{ ss }} — Sınıf Listesi
-                        </a>
-                      {% else %}
-                        <span class="btn btn-sm"
-                              style="background-color:#9ca3af;color:#fff;cursor:not-allowed;opacity:.6;"
-                              title="Bu slot için henüz görüntüleme zamanı gelmedi.">
-                          {{ ss }} — Sınıf Listesi
-                        </span>
-                      {% endif %}
-                    {% endfor %}
-                  </div>
-                {% else %}
-                  <span style="color:#9ca3af;font-size:.85rem;">—</span>
-                {% endif %}
-              </td>
 
-              <!-- Sınav Yoklama Girişi -->
-              <td style="padding:.75rem 1rem;border:1px solid #e5e7eb;vertical-align:top;">
-                {% if slot.salonlar %}
-                  <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            {% for slot in gun.gozetim %}
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:.55rem .75rem;font-weight:600;color:#1f2937;white-space:nowrap;">{{ slot.saat }}</td>
+              <td style="padding:.55rem .75rem;color:#6b7280;">{{ slot.oturum }}</td>
+              <td style="padding:.55rem .75rem;">
+                <span style="background:#dbeafe;color:#1d4ed8;padding:.15rem .55rem;border-radius:10px;font-size:.78rem;font-weight:600;white-space:nowrap;">Gözetmen</span>
+              </td>
+              <td style="padding:.55rem .75rem;color:#374151;">
+                {% for salon in slot.salonlar %}{{ salon.ad }}{% if not forloop.last %}, {% endif %}{% endfor %}
+              </td>
+              <td style="padding:.55rem .75rem;">
+                <div style="display:flex;flex-wrap:wrap;gap:5px;">
+                  {% if slot.salonlar and aktif_uretim %}
                     {% for salon in slot.salonlar %}
-                      {% if slot.aktif %}
-                        <a href="{% url 'sinav_salon_yoklama' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&salon={{ salon.ham }}"
-                           class="btn btn-sm"
-                           style="background-color:#059669;color:#fff;text-decoration:none;">
-                          📋 {{ salon.ad }} Yoklama
-                        </a>
-                      {% else %}
-                        <span class="btn btn-sm"
-                              style="background-color:#9ca3af;color:#fff;cursor:not-allowed;opacity:.6;"
-                              title="Sınav saatinde aktif olacak.">
-                          📋 {{ salon.ad }} Yoklama
-                        </span>
-                      {% endif %}
+                    {% if slot.aktif %}
+                    <a href="{% url 'sinav:oturma_plani_pdf_view' %}?uretim={{ aktif_uretim.pk }}&tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&oturum={{ slot.oturum }}&salon={{ salon.ham }}"
+                       target="_blank" class="btn btn-sm"
+                       style="background:#6366f1;color:#fff;text-decoration:none;font-size:.78rem;padding:.2rem .55rem;">
+                      🦋 {{ salon.ad }} Kelebek
+                    </a>
+                    {% else %}
+                    <span class="btn btn-sm"
+                          style="background:#e5e7eb;color:#9ca3af;font-size:.78rem;padding:.2rem .55rem;cursor:not-allowed;"
+                          title="Sınav saatinde aktif olur">
+                      🦋 {{ salon.ad }} Kelebek
+                    </span>
+                    {% endif %}
                     {% endfor %}
-                  </div>
-                {% else %}
-                  <span style="color:#9ca3af;font-size:.85rem;">—</span>
+                    {% for salon in slot.salonlar %}
+                    {% if slot.aktif %}
+                    <a href="{% url 'sinav_salon_yoklama' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&salon={{ salon.ham }}"
+                       class="btn btn-sm"
+                       style="background:#059669;color:#fff;text-decoration:none;font-size:.78rem;padding:.2rem .55rem;">
+                      📋 {{ salon.ad }} Yoklama
+                    </a>
+                    {% else %}
+                    <span class="btn btn-sm"
+                          style="background:#e5e7eb;color:#9ca3af;font-size:.78rem;padding:.2rem .55rem;cursor:not-allowed;"
+                          title="Sınav saatinde aktif olur">
+                      📋 {{ salon.ad }} Yoklama
+                    </span>
+                    {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                  {% if slot.medyalar %}
+                    {% if slot.aktif %}
+                    <a href="{% url 'ogretmen_sinav_medya' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&oturum={{ slot.oturum }}"
+                       class="btn btn-sm"
+                       style="background:#dc2626;color:#fff;text-decoration:none;font-size:.78rem;padding:.2rem .55rem;">
+                      🔊 Sınav Medyası
+                    </a>
+                    {% else %}
+                    <span class="btn btn-sm"
+                          style="background:#e5e7eb;color:#9ca3af;font-size:.78rem;padding:.2rem .55rem;cursor:not-allowed;"
+                          title="Sınav saatinde aktif olur">
+                      🔊 Sınav Medyası
+                    </span>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+
+
+            {% for slot in gun.siniflistesi %}
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:.55rem .75rem;font-weight:600;color:#1f2937;white-space:nowrap;">{{ slot.saat }}</td>
+              <td style="padding:.55rem .75rem;color:#6b7280;">{{ slot.oturum }}</td>
+              <td style="padding:.55rem .75rem;">
+                <span style="background:#fef3c7;color:#b45309;padding:.15rem .55rem;border-radius:10px;font-size:.78rem;font-weight:600;white-space:nowrap;">Sınıf Listesini Göster</span>
+              </td>
+              <td style="padding:.55rem .75rem;font-weight:600;color:#374151;">{{ slot.sinifsube }}</td>
+              <td style="padding:.55rem .75rem;">
+                {% if aktif_uretim and slot.sinifsube %}
+                  {% if slot.aktif %}
+                  <a href="{% url 'sinav:sinif_listesi_pdf_view' %}?uretim={{ aktif_uretim.pk }}&tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&oturum={{ slot.oturum }}&sinifsube={{ slot.sinifsube }}"
+                     target="_blank" class="btn btn-sm"
+                     style="background:#f59e0b;color:#fff;text-decoration:none;font-size:.78rem;padding:.2rem .55rem;">
+                    📋 {{ slot.sinifsube }} Sınıf Listesi
+                  </a>
+                  {% else %}
+                  <span class="btn btn-sm"
+                        style="background:#e5e7eb;color:#9ca3af;font-size:.78rem;padding:.2rem .55rem;cursor:not-allowed;"
+                        title="Sınav saatinde aktif olur">
+                    📋 {{ slot.sinifsube }} Sınıf Listesi
+                  </span>
+                  {% endif %}
                 {% endif %}
               </td>
             </tr>
+            {% endfor %}
+
           </tbody>
         </table>
       </div>
-      {% endfor %}
+
+      {% endfor %}{# end gun #}
     {% endif %}
+
   {% endif %}
 
 </div>

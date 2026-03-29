@@ -30,24 +30,24 @@
     {% endfor %}
   {% endif %}
 
-  <div class="card mb-20" style="padding:10px 16px;font-size:.88rem;background:#f0f9ff;
-       border:1px solid #bae6fd;border-radius:7px;display:flex;gap:1.5rem;flex-wrap:wrap;color:#0369a1;">
+  <div style="padding:10px 16px;font-size:.88rem;background:#f0f9ff;
+       border:1px solid #bae6fd;border-radius:7px;display:flex;gap:1.5rem;flex-wrap:wrap;color:#0369a1;margin-bottom:1rem;">
     {% if tarih %}<span><strong>Tarih:</strong> {{ tarih|date:"d.m.Y l" }}</span>{% endif %}
     <span><strong>Saat:</strong> {{ saat }}</span>
     <span><strong>Salon:</strong> {{ salon_ad }}</span>
     {% if aktif_sinav %}<span><strong>Sınav:</strong> {{ aktif_sinav }}</span>{% endif %}
-    <span><strong>Öğrenci Sayısı:</strong> {{ ogrenciler|length }}</span>
+    <span><strong>Öğrenci:</strong> {{ ogrenciler|length }}</span>
   </div>
 
   {% if not ogrenciler %}
     <p style="color:#9ca3af;">Bu salon için öğrenci kaydı bulunamadı.</p>
   {% else %}
 
-  <form method="post">
+  <form method="post" id="yoklama-form">
     {% csrf_token %}
 
-    <!-- Toplu işaret butonları -->
-    <div style="display:flex;gap:.5rem;margin-bottom:12px;flex-wrap:wrap;">
+    {# Toplu işaret butonları #}
+    <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
       <button type="button" onclick="tumunuIsaretle('mevcut')"
               style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;
                      padding:.3rem .9rem;border-radius:5px;cursor:pointer;font-size:.85rem;">
@@ -58,49 +58,65 @@
                      padding:.3rem .9rem;border-radius:5px;cursor:pointer;font-size:.85rem;">
         Tümü Yok
       </button>
+      <span style="font-size:.8rem;color:#9ca3af;margin-left:.5rem;">
+        <span id="mevcut-say" style="color:#16a34a;font-weight:700;">0</span> mevcut &nbsp;
+        <span id="yok-say" style="color:#dc2626;font-weight:700;">0</span> yok &nbsp;
+        <span id="gec-say" style="color:#d97706;font-weight:700;">0</span> geç
+      </span>
     </div>
 
-    <table style="width:100%;border-collapse:collapse;font-size:.88rem;">
-      <thead>
-        <tr style="background:#f0f2f5;">
-          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">#</th>
-          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">Okul No</th>
-          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">Adı Soyadı</th>
-          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">Sınıf</th>
-          <th style="padding:.5rem .8rem;text-align:left;border-bottom:2px solid #e5e7eb;">Ders</th>
-          <th style="padding:.5rem .8rem;text-align:center;border-bottom:2px solid #e5e7eb;">Durum</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for o in ogrenciler %}
-        <tr class="yoklama-satir durum-{{ o.durum }}" style="border-bottom:1px solid #f1f1f1;">
-          <td style="padding:.45rem .8rem;color:#9ca3af;font-size:.8rem;">{{ o.sira_no }}</td>
-          <td style="padding:.45rem .8rem;">{{ o.okulno }}</td>
-          <td style="padding:.45rem .8rem;font-weight:500;">{{ o.adi_soyadi }}</td>
-          <td style="padding:.45rem .8rem;">{{ o.sinifsube }}</td>
-          <td style="padding:.45rem .8rem;font-size:.8rem;color:#6b7280;">{{ o.ders_adi }}</td>
-          <td style="padding:.45rem .8rem;text-align:center;">
-            <div style="display:flex;gap:.4rem;justify-content:center;">
-              {% for val, lbl, renk in durum_secenekleri %}
-              <label style="cursor:pointer;">
-                <input type="radio" name="durum_{{ o.okulno }}" value="{{ val }}"
-                       {% if o.durum == val %}checked{% endif %}
-                       onchange="satiriRenkle(this)"
-                       style="display:none;">
-                <span class="durum-btn durum-btn-{{ val }}
-                      {% if o.durum == val %}aktif{% endif %}">
-                  {{ lbl }}
-                </span>
-              </label>
-              {% endfor %}
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {# Tahta #}
+    <div style="text-align:center;background:#374151;color:#fff;font-size:.78rem;font-weight:600;
+                letter-spacing:.08em;padding:.35rem;border-radius:5px;margin-bottom:1.5rem;">
+      TAHTA
+    </div>
 
-    <div style="margin-top:1.2rem;display:flex;gap:.75rem;align-items:center;">
+    {# Oturma düzeni: 3 grup × 2 sütun × N satır #}
+    <div style="overflow-x:auto;">
+      <div style="display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr;gap:8px;min-width:560px;">
+
+        {# Grup başlıkları #}
+        <div style="text-align:center;font-size:.72rem;color:#9ca3af;font-weight:600;padding-bottom:4px;">GRUP 1</div>
+        <div></div>
+        <div style="text-align:center;font-size:.72rem;color:#9ca3af;font-weight:600;padding-bottom:4px;">GRUP 2</div>
+        <div></div>
+        <div style="text-align:center;font-size:.72rem;color:#9ca3af;font-weight:600;padding-bottom:4px;">GRUP 3</div>
+
+        {% for row in grid %}
+        {# Her satır: 3 grup, gruplar arasında koridor boşluğu #}
+          {% for grp in row %}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+            {% for ogr in grp %}
+            <div class="koltuk {% if not ogr.bos %}koltuk-dolu durum-{{ ogr.durum }}{% else %}koltuk-bos{% endif %}"
+                 data-okulno="{{ ogr.okulno }}">
+              <div class="koltuk-sira">{{ ogr.pdf_sira }}</div>
+              {% if not ogr.bos %}
+              <div class="koltuk-ad">{{ ogr.adi_soyadi }}</div>
+              <div class="koltuk-sinif">{{ ogr.sinifsube }}</div>
+              <div class="koltuk-durumlar">
+                {% for val, lbl, renk in durum_secenekleri %}
+                <label>
+                  <input type="radio" name="durum_{{ ogr.okulno }}" value="{{ val }}"
+                         {% if ogr.durum == val %}checked{% endif %}
+                         onchange="koltuguGuncelle(this)">
+                  <span class="d-btn d-btn-{{ val }} {% if ogr.durum == val %}aktif{% endif %}">{{ lbl }}</span>
+                </label>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% if not forloop.last %}
+          <div class="koridor"></div>
+          {% endif %}
+          {% endfor %}
+        {% endfor %}
+
+      </div>
+    </div>
+
+    <div style="margin-top:1.5rem;display:flex;gap:.75rem;align-items:center;">
       <button type="submit" class="btn btn-primary">Yoklamayı Kaydet</button>
       <a href="{% url 'ogretmen_sinav_gozetim' %}" class="btn btn-secondary btn-sm">İptal</a>
     </div>
@@ -110,42 +126,111 @@
 </div>
 
 <style>
-.durum-btn {
+/* Koltuk kartı */
+.koltuk {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 5px 6px;
+  background: #fafafa;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background .15s, border-color .15s;
+}
+.koltuk-bos {
+  background: #f9fafb;
+  border-color: #f3f4f6;
+  min-height: 90px;
+  opacity: .5;
+}
+.koltuk-sira {
+  font-size: .65rem;
+  color: #9ca3af;
+  font-weight: 700;
+  line-height: 1;
+  text-align: right;
+}
+.koltuk-ad {
+  font-size: .72rem;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.25;
+  word-break: break-word;
+}
+.koltuk-sinif {
+  font-size: .68rem;
+  color: #6b7280;
+}
+.koltuk-durumlar {
+  display: flex;
+  gap: 2px;
+  margin-top: auto;
+  padding-top: 3px;
+  flex-wrap: wrap;
+}
+.koltuk-durumlar label { cursor: pointer; }
+.koltuk-durumlar input[type=radio] { display: none; }
+
+/* Durum renkleri (koltuk arka planı) */
+.koltuk.durum-mevcut { background: #f0fdf4; border-color: #86efac; }
+.koltuk.durum-yok    { background: #fff1f2; border-color: #fca5a5; }
+.koltuk.durum-gec    { background: #fffbeb; border-color: #fde68a; }
+
+/* Durum butonları */
+.d-btn {
   display: inline-block;
-  padding: .2rem .65rem;
-  border-radius: 5px;
-  font-size: .78rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: .65rem;
   font-weight: 600;
   border: 1px solid transparent;
-  transition: all .15s;
+  white-space: nowrap;
 }
-.durum-btn-mevcut { background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
-.durum-btn-mevcut.aktif { background:#16a34a; color:#fff; border-color:#16a34a; }
-.durum-btn-yok    { background:#fef2f2; color:#dc2626; border-color:#fecaca; }
-.durum-btn-yok.aktif    { background:#dc2626; color:#fff; border-color:#dc2626; }
-.durum-btn-gec    { background:#fffbeb; color:#d97706; border-color:#fde68a; }
-.durum-btn-gec.aktif    { background:#d97706; color:#fff; border-color:#d97706; }
+.d-btn-mevcut         { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+.d-btn-mevcut.aktif   { background: #16a34a; color: #fff; border-color: #16a34a; }
+.d-btn-yok            { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.d-btn-yok.aktif      { background: #dc2626; color: #fff; border-color: #dc2626; }
+.d-btn-gec            { background: #fffbeb; color: #d97706; border-color: #fde68a; }
+.d-btn-gec.aktif      { background: #d97706; color: #fff; border-color: #d97706; }
 
-.yoklama-satir.durum-yok  td { background:#fff5f5; }
-.yoklama-satir.durum-gec  td { background:#fffbeb; }
+/* Koridor */
+.koridor {
+  background: repeating-linear-gradient(
+    90deg, #f3f4f6 0px, #f3f4f6 3px, transparent 3px, transparent 8px
+  );
+  border-radius: 3px;
+}
 </style>
 
 <script>
-function satiriRenkle(input) {
-  const tr = input.closest("tr");
-  tr.className = tr.className.replace(/durum-\w+/, "durum-" + input.value);
-  // Aynı gruptaki tüm butonların aktif sınıfını güncelle
-  const btns = tr.querySelectorAll(".durum-btn");
-  btns.forEach(btn => btn.classList.remove("aktif"));
+function koltuguGuncelle(input) {
+  const koltuk = input.closest(".koltuk");
+  koltuk.className = koltuk.className.replace(/durum-\w+/, "durum-" + input.value);
+  koltuk.querySelectorAll(".d-btn").forEach(b => b.classList.remove("aktif"));
   input.nextElementSibling.classList.add("aktif");
+  sayilariGuncelle();
 }
 
 function tumunuIsaretle(durum) {
-  document.querySelectorAll(`input[type=radio][value=${durum}]`).forEach(r => {
+  document.querySelectorAll(`.koltuk-dolu input[type=radio][value=${durum}]`).forEach(r => {
     r.checked = true;
-    satiriRenkle(r);
+    koltuguGuncelle(r);
   });
 }
+
+function sayilariGuncelle() {
+  const counts = {mevcut: 0, yok: 0, gec: 0};
+  document.querySelectorAll('.koltuk-dolu').forEach(k => {
+    const checked = k.querySelector('input[type=radio]:checked');
+    if (checked) counts[checked.value] = (counts[checked.value] || 0) + 1;
+  });
+  document.getElementById('mevcut-say').textContent = counts.mevcut;
+  document.getElementById('yok-say').textContent = counts.yok;
+  document.getElementById('gec-say').textContent = counts.gec;
+}
+
+document.addEventListener('DOMContentLoaded', sayilariGuncelle);
 </script>
 
 {% endblock %}

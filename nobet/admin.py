@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 from django.urls import path
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 from personeldevamsizlik.models import Devamsizlik
 from veriaktar.forms import (
     DersProgramiImportForm,
@@ -193,10 +193,10 @@ class NobetOgretmenAdmin(admin.ModelAdmin):
     inlines = [NobetIstatistikInline]
 
 
-@admin.register(NobetDersProgrami)
-class NobetDersProgramiAdmin(admin.ModelAdmin):
+@admin.register(DersProgrami)
+class DersProgramiAdmin(admin.ModelAdmin):
     list_display = ("ogretmen", "gun", "ders_saati", "ders_adi", "sinif_sube")
-    search_fields = ("ogretmen__adi_soyadi", "ders_adi")
+    search_fields = ("ogretmen__adi_soyadi", "ders__ders_adi")
     list_filter = ("gun", "sinif_sube")
 
 
@@ -306,7 +306,7 @@ class VeriYuklemeAdmin(admin.ModelAdmin):
                     f = request.FILES["personel-dosya"]
                     tarih = personel_form.cleaned_data["uygulama_tarihi"]
                     path = self.save_file(f, dp)
-                    PersonelIsleyici(personel_path=path.name, uygulama_tarihi=tarih).calistir()
+                    PersonelIsleyici(personel_path=path.name, uygulama_tarihi=tarih, kullanici=request.user).calistir()
                     messages.success(request, "Personel listesi başarıyla aktarıldı.")
 
                 elif "sinif_sube_aktar" in request.POST and sinif_form.is_valid():
@@ -323,14 +323,14 @@ class VeriYuklemeAdmin(admin.ModelAdmin):
                     f = request.FILES["ders-dosya"]
                     tarih = ders_form.cleaned_data["uygulama_tarihi"]
                     path = self.save_file(f, dp)
-                    DersProgramiIsleyici(file_path=path.name, uygulama_tarihi=tarih).calistir()
+                    DersProgramiIsleyici(file_path=path.name, uygulama_tarihi=tarih, kullanici=request.user).calistir()
                     messages.success(request, "Ders programı başarıyla aktarıldı.")
 
                 elif "nobet_aktar" in request.POST and nobet_form.is_valid():
                     f = request.FILES["nobet-dosya"]
                     tarih = nobet_form.cleaned_data["uygulama_tarihi"]
                     path = self.save_file(f, dp)
-                    NobetIsleyici(nobet_path=path.name, uygulama_tarihi=tarih).calistir()
+                    NobetIsleyici(nobet_path=path.name, uygulama_tarihi=tarih, kullanici=request.user).calistir()
                     messages.success(request, "Nöbetçi listesi başarıyla aktarıldı.")
 
             except Exception as e:
@@ -343,11 +343,19 @@ class VeriYuklemeAdmin(admin.ModelAdmin):
             OkulBilgi.objects.exists(),
             NobetPersonel.objects.exists(),
             SinifSube.objects.exists(),
-            NobetDersProgrami.objects.exists(),
+            DersProgrami.objects.exists(),
             NobetGorevi.objects.exists(),
         ]
         tamamlanan = sum(adimlar)
         aktif_adim = next((i + 1 for i, done in enumerate(adimlar) if not done), 6)
+
+        # ── Son aktarım kayıtları ──────────────────────────────
+        from okul.models import VeriAktarimGecmisi
+        son_aktarimlar = (
+            VeriAktarimGecmisi.objects
+            .filter(dosya_turu__in=["personel_listesi", "ders_programi", "nobet_listesi"])
+            .order_by("-yukleme_tarihi")[:10]
+        )
 
         context = {
             "title": "Kurulum Sihirbazı",
@@ -360,6 +368,7 @@ class VeriYuklemeAdmin(admin.ModelAdmin):
             "adimlar": adimlar,
             "tamamlanan": tamamlanan,
             "aktif_adim": aktif_adim,
+            "son_aktarimlar": son_aktarimlar,
             "media": self.media,
         }
         context.update(self.admin_site.each_context(request))

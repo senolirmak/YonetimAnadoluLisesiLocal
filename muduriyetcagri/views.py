@@ -173,10 +173,14 @@ def gorusme_olustur(request):
                     cagri_obj.gorusme_muduriyetcagri = gorusme  # type: ignore[assignment]
                     cagri_obj.save(update_fields=["gorusme_muduriyetcagri"])
                     if cagri_obj.ogrenci and cagri_obj.ders_saati:
+                        from okul.models import DersSaatleri as _DersSaatleri
+                        _ds_obj = _DersSaatleri.objects.filter(
+                            derssaati_no=cagri_obj.ders_saati
+                        ).first()
                         OgrenciDevamsizlik.objects.update_or_create(
                             ogrenci=cagri_obj.ogrenci,
                             tarih=cagri_obj.tarih,
-                            ders_saati=cagri_obj.ders_saati,
+                            ders_saati=_ds_obj,
                             defaults={
                                 "ders_adi": cagri_obj.ders_adi or "Müdüriyet",
                                 "ogretmen_adi": request.user.get_full_name()

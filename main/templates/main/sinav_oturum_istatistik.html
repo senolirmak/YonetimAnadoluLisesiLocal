@@ -1,0 +1,95 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:18px;">
+    <h2 class="page-title" style="margin:0;">Sınav Oturum İstatistikleri</h2>
+    {% if aktif_sinav %}
+    <span style="font-size:.82rem;color:#6b7280;">{{ aktif_sinav }}</span>
+    {% endif %}
+  </div>
+
+  {% if not tarih_gruplari %}
+  <p style="color:#9ca3af;padding:2rem 0;text-align:center;">Aktif sınav üretimi bulunamadı veya oturma planı henüz oluşturulmadı.</p>
+  {% else %}
+
+  {% for tg in tarih_gruplari %}
+  <div style="margin-bottom:2rem;">
+
+    {# Tarih başlığı #}
+    <div style="font-weight:700;font-size:.95rem;color:#1e3a5f;
+                background:#eff6ff;border:1px solid #bfdbfe;
+                border-radius:6px;padding:.5rem 1rem;margin-bottom:.75rem;">
+      {{ tg.tarih|date:"d.m.Y l" }}
+    </div>
+
+    {% for og in tg.oturum_gruplari %}
+    <div style="margin-bottom:1rem;">
+
+      {# Oturum alt başlığı #}
+      <div style="display:flex;align-items:center;gap:.5rem;
+                  padding:.3rem .75rem;margin-bottom:.5rem;">
+        <span style="font-size:.8rem;font-weight:700;color:#374151;
+                     background:#f3f4f6;border:1px solid #e5e7eb;
+                     border-radius:5px;padding:.15rem .6rem;">
+          {{ og.oturum }}. Oturum
+        </span>
+        <span style="font-size:.8rem;color:#6b7280;">{{ og.saat }}</span>
+      </div>
+
+      {# Salon kartları #}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.6rem;
+                  padding-left:.5rem;">
+        {% for salon in og.salonlar %}
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:.8rem 1rem;background:#fafafa;">
+
+          <div style="font-size:.78rem;font-weight:600;color:#1d4ed8;
+                      background:#dbeafe;padding:2px 8px;border-radius:99px;
+                      display:inline-block;margin-bottom:.5rem;">
+            {{ salon.salon_ad }}
+          </div>
+
+          <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+            {% for satir in salon.satirlar %}
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:3px 0;color:#374151;">
+                {{ satir.seviye }}. Sınıf {{ satir.ders_adi }}
+              </td>
+              <td style="text-align:right;font-weight:700;color:#1f2937;padding:3px 0 3px 8px;">
+                {{ satir.n }}
+              </td>
+            </tr>
+            {% endfor %}
+            <tr>
+              <td style="padding-top:5px;font-weight:600;color:#374151;font-size:.78rem;">Toplam</td>
+              <td style="padding-top:5px;text-align:right;font-weight:800;
+                         color:#1d4ed8;font-size:.88rem;">{{ salon.toplam }}</td>
+            </tr>
+          </table>
+
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+    {% endfor %}
+
+  </div>
+  {% endfor %}
+
+  {# Genel özet #}
+  <div style="margin-top:.5rem;padding:.6rem 1rem;background:#f0fdf4;border:1px solid #bbf7d0;
+              border-radius:6px;font-size:.85rem;color:#15803d;">
+    <strong>Toplam Öğrenci (tüm oturumlar):</strong> {{ genel_toplam }}
+  </div>
+
+  {% endif %}
+
+</div>
+{% endblock %}

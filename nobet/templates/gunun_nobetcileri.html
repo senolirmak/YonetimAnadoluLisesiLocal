@@ -10,7 +10,13 @@
 <div class="container-sm" style="max-width: 900px;">
     <div class="mb-20">
         <h2 class="page-title mb-20">{{ title }}</h2>
-        
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+            <a href="{% url 'devamsizlik_list' %}" class="btn btn-info">1. Devamsızlık</a>
+            <a href="{% url 'nobet_dagitim' %}" class="btn btn-primary">2. Haftalık Nöbet</a>
+            <a href="{% url 'gunun_nobetcileri' %}" class="btn btn-warning">3. Günün Nöbetçileri</a>
+            <a href="{% url 'nobet_ders_doldurma' %}" class="btn btn-success">4. Ders Doldurma</a>
+        </div>
+
         {% if messages %}
         <div class="mb-20">
             {% for message in messages %}
@@ -26,10 +32,11 @@
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                 <div style="display: flex; align-items: center;">
                     <label for="id_tarih" class="form-label-bold" style="margin-right: 10px;">Tarih Seçiniz:</label>
-                    {{ form.tarih }}
+                    <input type="date" id="id_tarih" name="tarih" value="{{ target_date|date:'Y-m-d' }}" class="form-control" required style="width:auto;">
                     <button type="submit" class="btn btn-primary" style="margin-left: 10px;">Getir</button>
                     <div style="display: inline-flex; align-items: center; margin-left: 10px;">
                         <select class="form-control rapor-select" style="width: auto; margin-right: 6px;">
+                            <option value="{% url 'download_gunun_nobetcileri_pdf' %}?tarih={{ target_date|date:'Y-m-d' }}">PDF</option>
                             <option value="{% url 'download_gunun_nobetcileri_png' %}?tarih={{ target_date|date:'Y-m-d' }}">PNG (Resim)</option>
                         </select>
                         <button type="button" class="btn btn-info"
@@ -73,7 +80,7 @@
                             <select name="place_{{ gorev.id }}" class="form-control smart-select">
                                 <option value="">-- Yer Seçiniz --</option>
                                 {% for yer in tum_yerler %}
-                                <option value="{{ yer }}" {% if yer == gorev.nobet_yeri %}selected{% endif %}>{{ yer }}</option>
+                                <option value="{{ yer }}" {% if gorev.nobet_yeri and yer == gorev.nobet_yeri.ad %}selected{% endif %}>{{ yer }}</option>
                                 {% endfor %}
                             </select>
                             {% else %}

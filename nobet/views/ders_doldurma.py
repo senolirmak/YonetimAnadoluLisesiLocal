@@ -1,23 +1,17 @@
-import os
 from datetime import datetime, time
 from io import BytesIO
 
 import pandas as pd
-from django.conf import settings
+from reportlab.lib import colors
+from reportlab.platypus import Paragraph, TableStyle
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 from personeldevamsizlik.models import Devamsizlik
 from utility.services.main_services import IstatistikService
 from utility.services.nobet_dagitimi_service import AdvancedNobetDagitim
@@ -29,96 +23,9 @@ from ..models import (
     NobetOgretmen,
     NobetPersonel,
 )
-from .dagitim import _get_report_header_info, _gun_adi_tr
+from ..services.pdf_rapor import NobetPDFReport
+from .dagitim import _gun_adi_tr
 from .permissions import is_mudur_yardimcisi, is_yonetici
-
-# ─────────────────────────────────────────────
-# PDF Rapor Yardımcı Sınıfı
-# ─────────────────────────────────────────────
-
-
-class NobetPDFReport:
-    """PDF Rapor oluşturma işlemlerini yöneten yardımcı sınıf."""
-
-    def __init__(self, buffer, target_date, title, dynamic_height=False, row_count=0):
-        self.buffer = buffer
-        self.target_date = target_date
-        self.title = title
-        self.dynamic_height = dynamic_height
-        self.row_count = row_count
-        self.elements = []
-        self.styles = getSampleStyleSheet()
-        self.font_name = "Helvetica"
-        self.font_name_bold = "Helvetica-Bold"
-        self._register_fonts()
-        self._init_document()
-
-    def _register_fonts(self):
-        try:
-            font_path = os.path.join(settings.BASE_DIR, "main", "static", "fonts", "DejaVuSans.ttf")
-            font_path_bold = os.path.join(
-                settings.BASE_DIR, "main", "static", "fonts", "DejaVuSans-Bold.ttf"
-            )
-            pdfmetrics.registerFont(TTFont("DejaVuSans", font_path))
-            pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", font_path_bold))
-            self.font_name = "DejaVuSans"
-            self.font_name_bold = "DejaVuSans-Bold"
-        except Exception:
-            pass
-
-    def _init_document(self):
-        page_width, page_height = A4
-        if self.dynamic_height:
-            estimated_height = 150 + (self.row_count * 30)
-            page_height = max(estimated_height, 200)
-
-        self.pagesize = (page_width, page_height)
-
-        self.title_style = self.styles["h1"]
-        self.title_style.fontName = self.font_name_bold
-        self.title_style.alignment = 1
-
-        self.header_style = ParagraphStyle(
-            name="Header", fontName=self.font_name_bold, textColor=colors.whitesmoke, alignment=1
-        )
-        self.cell_style = ParagraphStyle(name="Cell", fontName=self.font_name, alignment=1)
-
-        self.header_style_small = ParagraphStyle(
-            name="HeaderSmall",
-            fontName=self.font_name_bold,
-            fontSize=10,
-            parent=self.styles["Normal"],
-            textColor=colors.whitesmoke,
-        )
-        self.cell_style_small = ParagraphStyle(
-            name="CellSmall", fontName=self.font_name, fontSize=9, parent=self.styles["Normal"]
-        )
-
-    def add_header(self, custom_title_color=None):
-        if custom_title_color:
-            self.title_style.textColor = custom_title_color
-
-        header_info = _get_report_header_info(self.target_date)
-        self.elements.append(Paragraph(header_info, self.title_style))
-        self.elements.append(Paragraph(self.title, self.title_style))
-        self.elements.append(Spacer(1, 20))
-
-    def add_table(self, data, col_widths, style=None):
-        t = Table(data, colWidths=col_widths)
-        if style:
-            t.setStyle(style)
-        self.elements.append(t)
-
-    def build(self):
-        doc = SimpleDocTemplate(
-            self.buffer,
-            pagesize=self.pagesize,
-            rightMargin=30,
-            leftMargin=30,
-            topMargin=30,
-            bottomMargin=30,
-        )
-        doc.build(self.elements)
 
 
 # ─────────────────────────────────────────────
@@ -449,7 +356,7 @@ def nobet_ders_doldurma(request):
         day_name_en = days_map[target_date.weekday()]
 
         program_date = (
-            NobetDersProgrami.objects.filter(uygulama_tarihi__lte=target_date)
+            DersProgrami.objects.filter(uygulama_tarihi__lte=target_date)
             .order_by("-uygulama_tarihi")
             .values_list("uygulama_tarihi", flat=True)
             .first()
@@ -457,7 +364,7 @@ def nobet_ders_doldurma(request):
 
         if not program_date:
             program_date = (
-                NobetDersProgrami.objects.order_by("-uygulama_tarihi")
+                DersProgrami.objects.order_by("-uygulama_tarihi")
                 .values_list("uygulama_tarihi", flat=True)
                 .first()
             )
@@ -489,14 +396,14 @@ def nobet_ders_doldurma(request):
                 else list(range(1, 9))
             )
 
-            lessons = NobetDersProgrami.objects.filter(
+            lessons = DersProgrami.objects.filter(
                 ogretmen__id=p_id,
                 gun=day_name_en,
                 uygulama_tarihi=program_date,
-                ders_saati__in=allowed_hours,
-            ).select_related("sinif_sube")
+                ders_saati__derssaati_no__in=allowed_hours,
+            ).select_related("sinif_sube", "ders_saati")
 
-            dersleri = {ders.ders_saati: str(ders.sinif_sube) for ders in lessons if ders.sinif_sube}
+            dersleri = {ders.ders_saati.derssaati_no: str(ders.sinif_sube) for ders in lessons if ders.sinif_sube and ders.ders_saati}
             if dersleri:
                 absent_teachers_data.append(
                     {
@@ -525,10 +432,10 @@ def nobet_ders_doldurma(request):
             if p_id in absent_teacher_ids:
                 continue
 
-            lessons = NobetDersProgrami.objects.filter(
+            lessons = DersProgrami.objects.filter(
                 ogretmen__id=p_id, gun=day_name_en, uygulama_tarihi=program_date
-            ).select_related("sinif_sube")
-            dersleri = {ders.ders_saati: str(ders.sinif_sube) for ders in lessons if ders.sinif_sube}
+            ).select_related("sinif_sube", "ders_saati")
+            dersleri = {ders.ders_saati.derssaati_no: str(ders.sinif_sube) for ders in lessons if ders.sinif_sube and ders.ders_saati}
 
             available_teachers_data.append(
                 {
@@ -822,131 +729,3 @@ def download_ders_doldurma_png(request):
     messages.error(request, "Rapor resmi oluşturulamadı.")
     return redirect("nobet_ders_doldurma")
 
-
-@login_required
-def download_ders_doldurma_xlsx(request):
-    tarih_str = request.GET.get("tarih")
-    assignments = []
-    target_date = None
-
-    if tarih_str:
-        start_dt = None
-        end_dt = None
-        try:
-            view_dt = datetime.strptime(tarih_str, "%Y-%m-%d %H:%M:%S")
-            target_date = view_dt.date()
-            start_dt = timezone.make_aware(view_dt.replace(microsecond=0))
-            end_dt = timezone.make_aware(view_dt.replace(microsecond=999999))
-        except ValueError:
-            try:
-                target_date = datetime.strptime(tarih_str, "%Y-%m-%d").date()
-                start_day = timezone.make_aware(datetime.combine(target_date, time.min))
-                end_day = timezone.make_aware(datetime.combine(target_date, time.max))
-                latest_rec = (
-                    NobetGecmisi.objects.filter(tarih__range=[start_day, end_day])
-                    .order_by("-tarih")
-                    .first()
-                )
-                latest_un = (
-                    NobetAtanamayan.objects.filter(tarih__range=[start_day, end_day])
-                    .order_by("-tarih")
-                    .first()
-                )
-
-                found_dt = None
-                if latest_rec and latest_un:
-                    found_dt = (
-                        latest_rec.tarih if latest_rec.tarih >= latest_un.tarih else latest_un.tarih
-                    )
-                elif latest_rec:
-                    found_dt = latest_rec.tarih
-                elif latest_un:
-                    found_dt = latest_un.tarih
-
-                if found_dt:
-                    start_dt = found_dt.replace(microsecond=0)
-                    end_dt = found_dt.replace(microsecond=999999)
-            except ValueError:
-                pass
-
-        if start_dt and end_dt:
-            saved_assigns = NobetGecmisi.objects.filter(
-                tarih__range=[start_dt, end_dt]
-            ).select_related("ogretmen__personel")
-            if saved_assigns.exists():
-                query_date = target_date
-                absent_records = Devamsizlik.objects.filter(
-                    baslangic_tarihi__lte=query_date, bitis_tarihi__gte=query_date
-                ).select_related("ogretmen__personel")
-                absent_map = {
-                    r.ogretmen.personel.pk: r.get_devamsiz_tur_display() for r in absent_records
-                }
-
-                for s in saved_assigns:
-                    assignments.append(
-                        {
-                            "hour": s.saat,
-                            "class": s.sinif,
-                            "teacher_id": s.ogretmen.personel.pk,
-                            "absent_teacher_id": s.devamsiz,
-                            "devamsiz_tur": absent_map.get(s.devamsiz, "-"),
-                        }
-                    )
-
-    if not assignments:
-        assignments = request.session.get("nobet_assignments", [])
-        date_str = request.session.get(
-            "nobet_target_date", timezone.localdate().strftime("%Y-%m-%d")
-        )
-        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-
-    if not assignments:
-        messages.error(request, "Rapor oluşturmak için atanmış ders bulunamadı.")
-        return redirect("nobet_ders_doldurma")
-
-    all_ids = set()
-    for item in assignments:
-        all_ids.add(item.get("teacher_id"))
-        all_ids.add(item.get("absent_teacher_id"))
-    personeller = NobetPersonel.objects.filter(id__in=all_ids)
-    personel_map = {p.pk: p.adi_soyadi for p in personeller}
-    brans_map = {p.pk: p.brans for p in personeller}
-
-    report_data = []
-    for item in sorted(assignments, key=lambda x: x.get("hour", 0)):
-        report_data.append(
-            {
-                "Ders Saati": f"{item.get('hour', '?')}. Ders",
-                "Sınıf": str(item.get("class", "")),
-                "Devamsız Öğretmen": personel_map.get(item.get("absent_teacher_id"), "-"),
-                "Mazeret": str(item.get("devamsiz_tur", "")),
-                "Görevlendirilen Nöbetçi": personel_map.get(item.get("teacher_id"), "-"),
-                "Nöbetçi Branşı": brans_map.get(item.get("teacher_id"), "-"),
-            }
-        )
-
-    df = pd.DataFrame(report_data)
-
-    header_info = _get_report_header_info(target_date)
-    title_text = f"{header_info} - Ders Doldurma Listesi ({target_date.strftime('%d.%m.%Y')} {_gun_adi_tr(target_date)})"
-
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Ders Doldurma", startrow=2)
-        worksheet = writer.sheets["Ders Doldurma"]
-        worksheet["A1"] = title_text
-
-        for i, col in enumerate(df.columns):
-            column_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
-            worksheet.column_dimensions[chr(65 + i)].width = column_len
-
-    output.seek(0)
-
-    response = HttpResponse(
-        output, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    response["Content-Disposition"] = (
-        f'attachment; filename="ders_doldurma_{target_date.strftime("%Y-%m-%d")}.xlsx"'
-    )
-
-    return response

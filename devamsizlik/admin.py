@@ -16,4 +16,4 @@ class OgrenciDevamsizlikAdmin(admin.ModelAdmin):
         "aciklama",
     )
     date_hierarchy = "tarih"
-    ordering = ("-tarih", "ders_saati")
+    ordering = ("-tarih", "ders_saati__derssaati_no")

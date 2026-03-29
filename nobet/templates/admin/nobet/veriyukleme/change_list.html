@@ -209,6 +209,53 @@
         </div>
     </details>
 
+    <!-- ════════════════════════════════════════ -->
+    <!-- Son Aktarım Geçmişi                     -->
+    <!-- ════════════════════════════════════════ -->
+    {% if son_aktarimlar %}
+    <div style="margin-top:32px;">
+        <h3 style="font-size:1em;font-weight:600;color:#495057;border-bottom:2px solid #dee2e6;padding-bottom:6px;margin-bottom:12px;">Son Aktarımlar</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:0.875em;">
+            <thead>
+                <tr style="background:#f8f9fa;text-align:left;">
+                    <th style="padding:6px 10px;border-bottom:1px solid #dee2e6;">Tür</th>
+                    <th style="padding:6px 10px;border-bottom:1px solid #dee2e6;">Dosya</th>
+                    <th style="padding:6px 10px;border-bottom:1px solid #dee2e6;">Tarih</th>
+                    <th style="padding:6px 10px;border-bottom:1px solid #dee2e6;">Yükleyen</th>
+                    <th style="padding:6px 10px;border-bottom:1px solid #dee2e6;text-align:center;">Kayıt</th>
+                    <th style="padding:6px 10px;border-bottom:1px solid #dee2e6;text-align:center;">Hata</th>
+                    <th style="padding:6px 10px;border-bottom:1px solid #dee2e6;">Durum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in son_aktarimlar %}
+                <tr style="border-bottom:1px solid #f1f1f1;">
+                    <td style="padding:5px 10px;">{{ a.get_dosya_turu_display }}</td>
+                    <td style="padding:5px 10px;color:#6c757d;font-size:0.85em;">{{ a.dosya_adi }}</td>
+                    <td style="padding:5px 10px;white-space:nowrap;">{{ a.yukleme_tarihi|date:"d.m.Y H:i" }}</td>
+                    <td style="padding:5px 10px;">{{ a.kullanici|default:"-" }}</td>
+                    <td style="padding:5px 10px;text-align:center;">{{ a.kayit_sayisi }}</td>
+                    <td style="padding:5px 10px;text-align:center;">
+                        {% if a.hata_sayisi %}
+                        <span style="color:#dc3545;font-weight:600;">{{ a.hata_sayisi }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td style="padding:5px 10px;">
+                        {% if a.durum == "basarili" %}
+                        <span style="color:#28a745;">✔ Başarılı</span>
+                        {% elif a.durum == "kismi" %}
+                        <span style="color:#fd7e14;">⚠ Kısmi</span>
+                        {% else %}
+                        <span style="color:#dc3545;">✖ Hatalı</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
 </div>
 </div>
 {% endblock %}

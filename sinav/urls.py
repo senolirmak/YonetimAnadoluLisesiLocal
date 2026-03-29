@@ -36,6 +36,8 @@ urlpatterns = [
     path("sinav-bilgisi/<int:pk>/duzenle/", views.sinav_bilgisi_duzenle, name="sinav_bilgisi_duzenle"),
     path("sinav-bilgisi/<int:pk>/aktif/", views.sinav_bilgisi_aktif_yap, name="sinav_bilgisi_aktif_yap"),
     path("sinav-bilgisi/<int:pk>/sil/", views.sinav_bilgisi_sil, name="sinav_bilgisi_sil"),
+    path("takvim-uretim/<int:pk>/aktif/", views.takvim_uretim_aktif_yap, name="takvim_uretim_aktif_yap"),
+    path("gozetmen-ozet/", views.gozetmen_ozet, name="gozetmen_ozet"),
 
     # Ogrenci Yonetimi
     path("ogrenciler/", views.ogrenci_yonetim, name="ogrenci_yonetim"),

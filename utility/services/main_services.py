@@ -7,7 +7,7 @@ import pandas as pd
 from django.db import transaction
 from django.utils import timezone
 
-from dersprogrami.models import NobetDersProgrami
+from dersprogrami.models import DersProgrami
 from nobet.models import (
     NobetAtanamayan,
     NobetGecmisi,
@@ -231,6 +231,10 @@ class EOkulVeriAktar:
                     for o in NobetOgretmen.objects.select_related("personel").all()
                 }
 
+                # 3. NobetYerleri map'ini hazırla (string → FK id)
+                from nobet.models import NobetYerleri
+                yer_map = {y.ad: y for y in NobetYerleri.objects.all()}
+
                 objs_to_create = []
                 for _, row in nobet_df.iterrows():
                     try:
@@ -250,12 +254,16 @@ class EOkulVeriAktar:
                         if timezone.is_naive(uygulama_tarihi):
                             uygulama_tarihi = timezone.make_aware(uygulama_tarihi)
 
+                        yer_adi = str(row["nobet_yeri"]).strip()
+                        if yer_adi not in yer_map:
+                            yer_map[yer_adi], _ = NobetYerleri.objects.get_or_create(ad=yer_adi)
+
                         objs_to_create.append(
                             NobetGorevi(
                                 ogretmen=ogretmen,
                                 uygulama_tarihi=uygulama_tarihi,
                                 nobet_gun=row["nobet_gun"],
-                                nobet_yeri=row["nobet_yeri"],
+                                nobet_yeri=yer_map[yer_adi],
                             )
                         )
                     except Exception as row_error:
@@ -285,7 +293,7 @@ class EOkulVeriAktar:
         return status
 
     # ------------------ DERS PROGRAMI ------------------
-    def save_yeni_veri_NobetDersProgrami(self, program_df: pd.DataFrame) -> dict[str, Any]:
+    def save_yeni_veri_DersProgrami(self, program_df: pd.DataFrame) -> dict[str, Any]:
         """
         Aynı uygulama_tarihi için kayıtları siler, yenilerini ekler.
         Sistemde bulunmayan öğretmenler otomatik olarak oluşturulur.
@@ -318,11 +326,14 @@ class EOkulVeriAktar:
                     dates_to_delete.add(d)
 
                 if dates_to_delete:
-                    NobetDersProgrami.objects.filter(uygulama_tarihi__in=dates_to_delete).delete()
+                    DersProgrami.objects.filter(uygulama_tarihi__in=dates_to_delete).delete()
 
                 # 2. Map'leri hazırla
+                from okul.models import DersSaatleri, DersHavuzu
                 personel_map = {p.adi_soyadi: p for p in NobetPersonel.objects.all()}
                 sinif_sube_map = {(ss.sinif, ss.sube): ss for ss in SinifSube.objects.all()}
+                ders_saati_map = {ds.derssaati_no: ds for ds in DersSaatleri.objects.all()}
+                ders_havuzu_map = {d.ders_adi: d for d in DersHavuzu.objects.all()}
 
                 objs_to_create = []
                 for _, row in program_df.iterrows():
@@ -351,19 +362,20 @@ class EOkulVeriAktar:
                             uygulama_tarihi = timezone.make_aware(uygulama_tarihi)
 
                         sinif_sube = sinif_sube_map.get((int(row["sinif"]), str(row["sube"])))
+                        ders_saati_obj = ders_saati_map.get(int(row["ders_saati"]))
+                        ders_adi_str = str(row["ders_adi"]).strip() if row["ders_adi"] else ""
+                        ders_obj = ders_havuzu_map.get(ders_adi_str)
+                        if ders_obj is None and ders_adi_str:
+                            ders_obj, _ = DersHavuzu.objects.get_or_create(ders_adi=ders_adi_str)
+                            ders_havuzu_map[ders_adi_str] = ders_obj
                         objs_to_create.append(
-                            NobetDersProgrami(
+                            DersProgrami(
                                 ogretmen=ogretmen,
                                 gun=row["gun"],
-                                ders_saati=int(row["ders_saati"]),
+                                ders_saati=ders_saati_obj,
                                 uygulama_tarihi=uygulama_tarihi,
-                                ders_adi=row["ders_adi"],
+                                ders=ders_obj,
                                 sinif_sube=sinif_sube,
-                                giris_saat=self.parse_time(row["giris_saat"]),
-                                cikis_saat=self.parse_time(row["cikis_saat"]),
-                                ders_saati_adi=row.get(
-                                    "ders_saati_adi", f"{row['ders_saati']}. Ders"
-                                ),
                             )
                         )
                     except Exception as row_err:
@@ -371,7 +383,7 @@ class EOkulVeriAktar:
                         status["errors"] += 1
 
                 if objs_to_create:
-                    NobetDersProgrami.objects.bulk_create(objs_to_create)
+                    DersProgrami.objects.bulk_create(objs_to_create)
                     status["inserted"] = len(objs_to_create)
 
             status["message"] = (

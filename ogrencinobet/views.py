@@ -10,7 +10,7 @@ from ogrenci.models import Ogrenci
 from .models import OgrenciNobetGorevi
 
 NOBETCI_ACIKLAMA = "Nöbetçi"
-NOBET_DERS_SAATI = 0  # tüm gün için özel sabit
+NOBET_DERS_SAATI = None  # tüm gün için özel sabit (FK null)
 
 
 def _sinifsube_secenekleri():
@@ -108,15 +108,19 @@ def nobetci_form(request):
                         tarih=secili_tarih,
                         olusturan=olusturan,
                     )
-                    OgrenciDevamsizlik.objects.update_or_create(
+                    OgrenciDevamsizlik.objects.filter(
                         ogrenci=ogr,
                         tarih=secili_tarih,
                         ders_saati=NOBET_DERS_SAATI,
-                        defaults={
-                            "ders_adi": "Nöbet Görevi",
-                            "ogretmen_adi": olusturan,
-                            "aciklama": NOBETCI_ACIKLAMA,
-                        },
+                        aciklama=NOBETCI_ACIKLAMA,
+                    ).delete()
+                    OgrenciDevamsizlik.objects.create(
+                        ogrenci=ogr,
+                        tarih=secili_tarih,
+                        ders_saati=NOBET_DERS_SAATI,
+                        ders_adi="Nöbet Görevi",
+                        ogretmen_adi=olusturan,
+                        aciklama=NOBETCI_ACIKLAMA,
                     )
 
         messages.success(request, f"{len(secili_ids)} öğrenci nöbetçi olarak kaydedildi.")

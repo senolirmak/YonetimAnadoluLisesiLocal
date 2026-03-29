@@ -1,5 +1,3 @@
-from functools import wraps
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
@@ -8,6 +6,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from nobet.models import NobetPersonel
+from okul.auth import mudur_yardimcisi_required
 
 from .forms import (
     KayitForm,
@@ -16,26 +15,6 @@ from .forms import (
     ProfilDuzenleForm,
     SifreDegistirForm,
 )
-
-# ─────────────────────────────────────────────
-# Yetki yardımcıları
-# ─────────────────────────────────────────────
-
-
-def _is_mudur_yardimcisi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
-
-
-def mudur_yardimcisi_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapper(request, *args, **kwargs):
-        if not _is_mudur_yardimcisi(request.user):
-            messages.error(request, "Bu işlem için yetkiniz yok.")
-            return redirect("index")
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
 
 
 # ─────────────────────────────────────────────

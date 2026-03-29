@@ -39,51 +39,23 @@
       <div class="da-card-header">
         <div>
           <h2>Sınav Yapılmayacak Dersler</h2>
-          <p class="helptext">
-            İşaretlenen dersler Adım 3'te (SubeDers) filtrelenir.
-            {% if not yapilmayacak_kayitli %}<span class="da-varsayilan-bilgi">Varsayılan öneriler işaretli.</span>{% endif %}
-          </p>
+          <p class="helptext">Adım 3'te (SubeDers) bu dersler filtrelenir.</p>
         </div>
-        <div class="da-header-actions">
-          <button type="button" class="btn btn-secondary btn-sm"
-                  onclick="tumunuSec('yapilmayacak', true)">Tümünü İşaretle</button>
-          <button type="button" class="btn btn-secondary btn-sm"
-                  onclick="tumunuSec('yapilmayacak', false)">Temizle</button>
-          <button type="button" class="btn btn-secondary btn-sm"
-                  onclick="yukleVarsayilan('yapilmayacak')"
-                  title="Varsayılan listeyi işaretle">Varsayılanları İşaretle</button>
+        <a href="{% url 'okul:ders_havuzu_ayarlari' %}?next={{ request.path }}"
+           class="btn btn-secondary btn-sm" style="flex-shrink:0;">Düzenle ›</a>
+      </div>
+      {% if yapilmayacak_dersler %}
+      <div class="ders-checklist">
+        {% for d in yapilmayacak_dersler %}
+        <div class="ders-item ders-secili">
+          <span>{{ d.ders_adi }}</span>
+          <span class="da-tag">sınav yok</span>
         </div>
-      </div>
-
-      {% if yap_secili_liste or yap_diger_liste %}
-      <div class="ders-checklist" id="list-yapilmayacak">
-
-        {% for ders in yap_secili_liste %}
-        <label class="ders-item ders-secili">
-          <input type="checkbox" name="yapilmayacak" value="{{ ders }}" checked>
-          <span>{{ ders }}</span>
-          {% if ders in varsayilan_yapilmayacak %}<span class="da-tag">varsayılan</span>{% endif %}
-        </label>
         {% endfor %}
-
-        {% if yap_secili_liste and yap_diger_liste %}
-        <div class="liste-ayirici"><span>Diğer dersler</span></div>
-        {% endif %}
-
-        {% for ders in yap_diger_liste %}
-        <label class="ders-item">
-          <input type="checkbox" name="yapilmayacak" value="{{ ders }}">
-          <span>{{ ders }}</span>
-          {% if ders in varsayilan_yapilmayacak %}<span class="da-tag">varsayılan</span>{% endif %}
-        </label>
-        {% endfor %}
-
       </div>
-      <p class="da-secim-bilgi">
-        <span id="count-yapilmayacak">{{ yap_secili_liste|length }}</span> ders seçili
-      </p>
+      <p class="da-secim-bilgi">{{ yapilmayacak_dersler|length }} ders</p>
       {% else %}
-      <p class="bos-mesaj">Ders listesi boş — Adım 0 çalıştırın veya "Varsayılanları İşaretle" ile başlayın.</p>
+      <p class="bos-mesaj">Henüz işaretli ders yok — "Düzenle" ile ayarlayın.</p>
       {% endif %}
     </div>
 
@@ -92,51 +64,23 @@
       <div class="da-card-header">
         <div>
           <h2>İki Oturumlu Dersler</h2>
-          <p class="helptext">
-            Adım 4'te bu dersler Yazılı + Uygulama olarak iki ayrı slot alır.
-            {% if not cift_kayitli %}<span class="da-varsayilan-bilgi">Varsayılan öneriler işaretli.</span>{% endif %}
-          </p>
+          <p class="helptext">Adım 4'te Yazılı + Uygulama olarak iki ayrı slot alır.</p>
         </div>
-        <div class="da-header-actions">
-          <button type="button" class="btn btn-secondary btn-sm"
-                  onclick="tumunuSec('cift', true)">Tümünü İşaretle</button>
-          <button type="button" class="btn btn-secondary btn-sm"
-                  onclick="tumunuSec('cift', false)">Temizle</button>
-          <button type="button" class="btn btn-secondary btn-sm"
-                  onclick="yukleVarsayilan('cift')"
-                  title="Varsayılan listeyi işaretle">Varsayılanları İşaretle</button>
+        <a href="{% url 'okul:ders_havuzu_ayarlari' %}?next={{ request.path }}"
+           class="btn btn-secondary btn-sm" style="flex-shrink:0;">Düzenle ›</a>
+      </div>
+      {% if cift_dersler %}
+      <div class="ders-checklist">
+        {% for d in cift_dersler %}
+        <div class="ders-item ders-secili">
+          <span>{{ d.ders_adi }}</span>
+          <span class="da-tag da-tag-cift">çift oturum</span>
         </div>
-      </div>
-
-      {% if cift_secili_liste or cift_diger_liste %}
-      <div class="ders-checklist" id="list-cift">
-
-        {% for ders in cift_secili_liste %}
-        <label class="ders-item ders-secili">
-          <input type="checkbox" name="cift" value="{{ ders }}" checked>
-          <span>{{ ders }}</span>
-          {% if ders in varsayilan_cift %}<span class="da-tag da-tag-cift">varsayılan</span>{% endif %}
-        </label>
         {% endfor %}
-
-        {% if cift_secili_liste and cift_diger_liste %}
-        <div class="liste-ayirici"><span>Diğer dersler</span></div>
-        {% endif %}
-
-        {% for ders in cift_diger_liste %}
-        <label class="ders-item">
-          <input type="checkbox" name="cift" value="{{ ders }}">
-          <span>{{ ders }}</span>
-          {% if ders in varsayilan_cift %}<span class="da-tag da-tag-cift">varsayılan</span>{% endif %}
-        </label>
-        {% endfor %}
-
       </div>
-      <p class="da-secim-bilgi">
-        <span id="count-cift">{{ cift_secili_liste|length }}</span> ders seçili
-      </p>
+      <p class="da-secim-bilgi">{{ cift_dersler|length }} ders</p>
       {% else %}
-      <p class="bos-mesaj">Ders listesi boş — Adım 0 çalıştırın veya "Varsayılanları İşaretle" ile başlayın.</p>
+      <p class="bos-mesaj">Henüz işaretli ders yok — "Düzenle" ile ayarlayın.</p>
       {% endif %}
     </div>
 
@@ -501,8 +445,6 @@
 // ──────────────────────────────────────────────
 // Başlangıç verileri (Django'dan)
 // ──────────────────────────────────────────────
-const VARSAYILAN_YAP  = {{ varsayilan_yap_json|safe }};
-const VARSAYILAN_CIFT = {{ varsayilan_cift_json|safe }};
 const VARSAYILAN_CATISMA = {{ varsayilan_catisma_json|safe }};
 
 let sabitState   = {{ sabit_json|safe }};
@@ -665,34 +607,6 @@ function eslemeSil(i) {
   eslemeState.splice(i, 1);
   renderEsleme();
 }
-
-// ──────────────────────────────────────────────
-// Checkbox yardımcıları
-// ──────────────────────────────────────────────
-function tumunuSec(grup, durum) {
-  document.querySelectorAll(`input[name="${grup}"]`).forEach(cb => cb.checked = durum);
-  guncelSayac(grup);
-}
-
-function yukleVarsayilan(grup) {
-  const liste = grup === "yapilmayacak" ? VARSAYILAN_YAP : VARSAYILAN_CIFT;
-  document.querySelectorAll(`input[name="${grup}"]`).forEach(cb => {
-    if (liste.includes(cb.value)) cb.checked = true;
-  });
-  guncelSayac(grup);
-}
-
-function guncelSayac(grup) {
-  const secili = document.querySelectorAll(`input[name="${grup}"]:checked`).length;
-  const el = document.getElementById(`count-${grup}`);
-  if (el) el.textContent = secili;
-}
-
-["yapilmayacak", "cift"].forEach(grup => {
-  document.querySelectorAll(`input[name="${grup}"]`).forEach(cb => {
-    cb.addEventListener("change", () => guncelSayac(grup));
-  });
-});
 
 // ──────────────────────────────────────────────
 // Form submit: JSON hidden inputs güncelle

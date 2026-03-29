@@ -7,8 +7,8 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from dersprogrami.models import NobetDersProgrami
-from nobet.models import SinifSube
+from dersprogrami.models import DersProgrami
+from okul.models import SinifSube
 from ogrenci.models import Ogrenci
 
 from .models import OgrenciCagri
@@ -69,8 +69,7 @@ def _disiplin_mi(user):
     )
 
 
-def _mudur_yardimcisi_mi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 def _mudur_mi(user):
@@ -342,6 +341,17 @@ def cagri_olustur(request, servis):
         for h in hatalar:
             messages.error(request, h)
 
+    cagri_yapan_adi = ""
+    cagri_yapan_unvan = ""
+    if servis == OgrenciCagri.SERVIS_MUDURIYETCAGRI:
+        try:
+            yonetici = request.user.okul_yonetici
+            cagri_yapan_adi = yonetici.adi_soyadi
+            cagri_yapan_unvan = yonetici.get_unvan_display()
+        except Exception:
+            cagri_yapan_adi = request.user.get_full_name() or request.user.username
+            cagri_yapan_unvan = "Müdür Yardımcısı"
+
     return render(
         request,
         "cagri/cagri_form.html",
@@ -357,6 +367,8 @@ def cagri_olustur(request, servis):
             "sinif_gruplari": sinif_gruplari,
             "tek_sinif": tek_sinif,
             "gorusme_id": gorusme_id_str,
+            "cagri_yapan_adi": cagri_yapan_adi,
+            "cagri_yapan_unvan": cagri_yapan_unvan,
         },
     )
 
@@ -442,14 +454,14 @@ def ders_programi_api(request):
         return JsonResponse([], safe=False)
 
     dersler = (
-        NobetDersProgrami.objects.filter(sinif_sube=ss, gun=gun)
-        .select_related("ogretmen")
-        .order_by("ders_saati")
+        DersProgrami.objects.filter(sinif_sube=ss, gun=gun)
+        .select_related("ogretmen", "ders", "ders_saati")
+        .order_by("ders_saati__derssaati_no")
     )
     return JsonResponse(
         [
             {
-                "ders_saati": d.ders_saati,
+                "ders_saati": d.ders_saati.derssaati_no if d.ders_saati else None,
                 "ders_saati_adi": d.ders_saati_adi,
                 "ders_adi": d.ders_adi,
                 "ogretmen_adi": d.ogretmen.adi_soyadi,

@@ -10,13 +10,10 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.platypus import Paragraph, Spacer, TableStyle
+from reportlab.platypus import Paragraph, TableStyle
 
 from personeldevamsizlik.models import Devamsizlik
 
-from ..forms import NobetDersDoldurmaForm
 from ..models import (
     GunlukNobetCizelgesi,
     NobetAtanamayan,
@@ -24,8 +21,8 @@ from ..models import (
     NobetGorevi,
     NobetPersonel,
 )
+from ..services.pdf_rapor import NobetPDFReport
 from .dagitim import _gun_adi_tr
-from .ders_doldurma import NobetPDFReport
 from .permissions import is_mudur_yardimcisi, is_yonetici
 
 # ─────────────────────────────────────────────
@@ -101,8 +98,8 @@ def gunun_nobetcileri(request):
     if gorev_date:
         tum_gorevler = (
             NobetGorevi.objects.filter(uygulama_tarihi=gorev_date, nobet_gun=day_name_en)
-            .select_related("ogretmen__personel")
-            .order_by("nobet_yeri")
+            .select_related("ogretmen__personel", "nobet_yeri")
+            .order_by("nobet_yeri__ad")
         )
 
         full_day_hours = set(range(1, 9))
@@ -113,9 +110,13 @@ def gunun_nobetcileri(request):
             )
         )
 
+        from nobet.models import NobetYerleri
+        yer_map = {y.ad: y for y in NobetYerleri.objects.all()}
+
         for gorev in tum_gorevler:
             if gorev.ogretmen.pk in gunluk_degisiklikler:
-                gorev.nobet_yeri = gunluk_degisiklikler[gorev.ogretmen.pk]
+                yer_str = gunluk_degisiklikler[gorev.ogretmen.pk]
+                gorev.nobet_yeri = yer_map.get(yer_str, gorev.nobet_yeri)
 
             is_full_absent = False
             absences = Devamsizlik.objects.filter(
@@ -154,12 +155,14 @@ def gunun_nobetcileri(request):
                 gorevler.append(gorev)
 
     tum_yerler = (
-        NobetGorevi.objects.values_list("nobet_yeri", flat=True).distinct().order_by("nobet_yeri")
+        NobetGorevi.objects.filter(nobet_yeri__isnull=False)
+        .values_list("nobet_yeri__ad", flat=True)
+        .distinct()
+        .order_by("nobet_yeri__ad")
     )
 
     context = {
         "title": "Günün Nöbetçileri",
-        "form": NobetDersDoldurmaForm(initial={"tarih": target_date}),
         "target_date": target_date,
         "gorevler": gorevler,
         "tum_yerler": tum_yerler,
@@ -172,23 +175,10 @@ def gunun_nobetcileri(request):
 # ─────────────────────────────────────────────
 
 
-@login_required
-def download_gunun_nobetcileri_png(request):
-    target_date = timezone.localdate()
-    if request.GET.get("tarih"):
-        try:
-            target_date = datetime.strptime(request.GET.get("tarih"), "%Y-%m-%d").date()
-        except ValueError:
-            pass
-
+def _generate_gunun_nobetcileri_pdf_bytes(target_date):
     days_map = {
-        0: "Monday",
-        1: "Tuesday",
-        2: "Wednesday",
-        3: "Thursday",
-        4: "Friday",
-        5: "Saturday",
-        6: "Sunday",
+        0: "Monday", 1: "Tuesday", 2: "Wednesday", 3: "Thursday",
+        4: "Friday", 5: "Saturday", 6: "Sunday",
     }
     day_name_en = days_map[target_date.weekday()]
 
@@ -203,23 +193,22 @@ def download_gunun_nobetcileri_png(request):
     if gorev_date:
         tum_gorevler = (
             NobetGorevi.objects.filter(uygulama_tarihi=gorev_date, nobet_gun=day_name_en)
-            .select_related("ogretmen__personel")
-            .order_by("nobet_yeri")
+            .select_related("ogretmen__personel", "nobet_yeri")
+            .order_by("nobet_yeri__ad")
         )
-
         full_day_hours = set(range(1, 9))
-
         gunluk_degisiklikler = dict(
             GunlukNobetCizelgesi.objects.filter(tarih=target_date).values_list(
                 "ogretmen_id", "nobet_yeri"
             )
         )
-
+        from nobet.models import NobetYerleri
+        yer_map = {y.ad: y for y in NobetYerleri.objects.all()}
         counter = 1
         for gorev in tum_gorevler:
             if gorev.ogretmen.pk in gunluk_degisiklikler:
-                gorev.nobet_yeri = gunluk_degisiklikler[gorev.ogretmen.pk]
-
+                yer_str = gunluk_degisiklikler[gorev.ogretmen.pk]
+                gorev.nobet_yeri = yer_map.get(yer_str, gorev.nobet_yeri)
             is_full_absent = False
             absences = Devamsizlik.objects.filter(
                 ogretmen=gorev.ogretmen,
@@ -230,11 +219,9 @@ def download_gunun_nobetcileri_png(request):
                 abs_start = absence.baslangic_tarihi
                 if isinstance(abs_start, datetime):
                     abs_start = abs_start.date()
-
                 abs_end = absence.bitis_tarihi if absence.bitis_tarihi else abs_start
                 if isinstance(abs_end, datetime):
                     abs_end = abs_end.date()
-
                 if abs_start < target_date < abs_end:
                     is_full_absent = True
                 else:
@@ -251,20 +238,16 @@ def download_gunun_nobetcileri_png(request):
                             pass
                 if is_full_absent:
                     break
-
             if not is_full_absent:
-                data_rows.append(
-                    [
-                        str(counter),
-                        gorev.ogretmen.personel.adi_soyadi,
-                        gorev.ogretmen.personel.brans,
-                        gorev.nobet_yeri,
-                    ]
-                )
+                data_rows.append([
+                    str(counter),
+                    gorev.ogretmen.personel.adi_soyadi,
+                    gorev.ogretmen.personel.brans,
+                    str(gorev.nobet_yeri) if gorev.nobet_yeri else "",
+                ])
                 counter += 1
 
     buffer = BytesIO()
-
     report = NobetPDFReport(
         buffer,
         target_date,
@@ -273,30 +256,23 @@ def download_gunun_nobetcileri_png(request):
         row_count=len(data_rows) if data_rows else 1,
     )
     report.add_header()
-
     headers = ["#", "Nöbetçi Öğretmen", "Branş", "Nöbet Yeri"]
-
     table_data = [[Paragraph(h, report.header_style) for h in headers]]
     if not data_rows:
-        table_data.append(
-            [
-                Paragraph("-", report.cell_style),
-                Paragraph("Kayıt Bulunamadı", report.cell_style),
-                Paragraph("-", report.cell_style),
-                Paragraph("-", report.cell_style),
-            ]
-        )
+        table_data.append([
+            Paragraph("-", report.cell_style),
+            Paragraph("Kayıt Bulunamadı", report.cell_style),
+            Paragraph("-", report.cell_style),
+            Paragraph("-", report.cell_style),
+        ])
     else:
         for r in data_rows:
-            table_data.append(
-                [
-                    Paragraph(r[0], report.cell_style),
-                    Paragraph(r[1], report.cell_style),
-                    Paragraph(r[2], report.cell_style),
-                    Paragraph(r[3], report.cell_style),
-                ]
-            )
-
+            table_data.append([
+                Paragraph(r[0], report.cell_style),
+                Paragraph(r[1], report.cell_style),
+                Paragraph(r[2], report.cell_style),
+                Paragraph(r[3], report.cell_style),
+            ])
     style = TableStyle(
         [
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4F81BD")),
@@ -312,15 +288,42 @@ def download_gunun_nobetcileri_png(request):
             if i % 2 != 0
         ]
     )
-
     report.add_table(table_data, col_widths=[40, 160, 120, 210], style=style)
     report.build()
-
     pdf_bytes = buffer.getvalue()
     buffer.close()
+    return pdf_bytes, target_date
+
+
+@login_required
+def download_gunun_nobetcileri_pdf(request):
+    target_date = timezone.localdate()
+    if request.GET.get("tarih"):
+        try:
+            target_date = datetime.strptime(request.GET.get("tarih"), "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    pdf_bytes, target_date = _generate_gunun_nobetcileri_pdf_bytes(target_date)
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'attachment; filename="gunun_nobetcileri_{target_date.strftime("%Y-%m-%d")}.pdf"'
+    )
+    response.write(pdf_bytes)
+    return response
+
+
+@login_required
+def download_gunun_nobetcileri_png(request):
+    target_date = timezone.localdate()
+    if request.GET.get("tarih"):
+        try:
+            target_date = datetime.strptime(request.GET.get("tarih"), "%Y-%m-%d").date()
+        except ValueError:
+            pass
 
     from pdf2image import convert_from_bytes
 
+    pdf_bytes, target_date = _generate_gunun_nobetcileri_pdf_bytes(target_date)
     try:
         images = convert_from_bytes(pdf_bytes, dpi=150)
         if images:
@@ -544,7 +547,7 @@ def devamsizlik_sinif_pdf(request):
     kayitlar = (
         OgrenciDevamsizlik.objects.filter(tarih=target_date, ogrenci__sinif=sinif)
         .select_related("ogrenci")
-        .order_by("ogrenci__sube", "ders_saati", "ogrenci__soyadi", "ogrenci__adi")
+        .order_by("ogrenci__sube", "ders_saati__derssaati_no", "ogrenci__soyadi", "ogrenci__adi")
     )
 
     buffer = _BytesIO()
@@ -605,7 +608,7 @@ def devamsizlik_sinif_pdf(request):
                         Paragraph(f"{k.ogrenci.adi} {k.ogrenci.soyadi}", report.cell_style_small),
                         Paragraph(k.ogrenci.sube, report.cell_style_small),
                         Paragraph(
-                            f"{k.ders_saati}." if k.ders_saati else "—", report.cell_style_small
+                            f"{k.ders_saati.derssaati_no}." if k.ders_saati else "—", report.cell_style_small
                         ),
                         Paragraph(k.ders_adi or "—", report.cell_style_small),
                         Paragraph(k.ogretmen_adi or "—", report.cell_style_small),

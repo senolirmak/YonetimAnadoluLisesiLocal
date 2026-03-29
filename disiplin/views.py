@@ -7,8 +7,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from cagri.models import OgrenciCagri
-from dersprogrami.models import NobetDersProgrami
-from nobet.models import SinifSube
+from dersprogrami.models import DersProgrami
+from okul.models import SinifSube
 from ogrenci.models import Ogrenci
 
 from .models import DisiplinGorusme
@@ -27,8 +27,7 @@ def _disiplin_mi(user):
     )
 
 
-def _mudur_yardimcisi_mi(user):
-    return user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 def _personel(request):
@@ -225,10 +224,14 @@ def gorusme_olustur(request):
                     cagri_obj.gorusme_disiplin = gorusme  # type: ignore[assignment]
                     cagri_obj.save(update_fields=["gorusme_disiplin"])
                     if cagri_obj.ogrenci and cagri_obj.ders_saati:
+                        from okul.models import DersSaatleri as _DersSaatleri
+                        _ds_obj = _DersSaatleri.objects.filter(
+                            derssaati_no=cagri_obj.ders_saati
+                        ).first()
                         OgrenciDevamsizlik.objects.update_or_create(
                             ogrenci=cagri_obj.ogrenci,
                             tarih=cagri_obj.tarih,
-                            ders_saati=cagri_obj.ders_saati,
+                            ders_saati=_ds_obj,
                             defaults={
                                 "ders_adi": cagri_obj.ders_adi or "Disiplin",
                                 "ogretmen_adi": personel.adi_soyadi,
@@ -452,14 +455,14 @@ def ders_programi_api(request):
         return JsonResponse([], safe=False)
 
     dersler = (
-        NobetDersProgrami.objects.filter(sinif_sube=ss, gun=gun)
-        .select_related("ogretmen")
-        .order_by("ders_saati")
+        DersProgrami.objects.filter(sinif_sube=ss, gun=gun)
+        .select_related("ogretmen", "ders_saati")
+        .order_by("ders_saati__derssaati_no")
     )
 
     data = [
         {
-            "ders_saati": d.ders_saati,
+            "ders_saati": d.ders_saati.derssaati_no if d.ders_saati else None,
             "ders_saati_adi": d.ders_saati_adi,
             "ders_adi": d.ders_adi,
             "ogretmen_adi": d.ogretmen.adi_soyadi,

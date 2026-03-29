@@ -1,4 +1,4 @@
-from nobet.models import SinifSube
+from okul.models import SinifSube
 
 
 def sinif_sube_kaydet(sinif_bilgileri):

@@ -10,9 +10,43 @@
     <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
       <a href="{% url 'sinav:sinav_takvimi_pdf_view' %}" target="_blank"
          class="btn btn-primary btn-sm">Sınav Takvimi PDF</a>
+      <!-- Öğretmen sayfası butonu -->
+      {% if secili_uretim.aktif %}
+        <a href="{% url 'sinav:gozetmen_ozet' %}"
+           target="_blank"
+           class="btn btn-sm"
+           style="background:#16a34a;color:#fff;text-decoration:none;">
+          ✓ Aktif — Gözetmen Önizleme
+        </a>
+      {% else %}
+        <form method="post" action="{% url 'sinav:takvim_uretim_aktif_yap' secili_uretim.pk %}" style="margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm"
+                  style="background:#d97706;color:#fff;cursor:pointer;"
+                  title="Bu üretimi aktif yap → öğretmen sayfaları bu takvime göre güncellenir.">
+            ⚡ Aktif Yap → Öğretmen Sayfaları
+          </button>
+        </form>
+      {% endif %}
       <a href="{% url 'sinav:takvim_gecmisi' %}" class="btn btn-secondary btn-sm">← Takvim Geçmişi</a>
     </div>
   </div>
+
+  <!-- Üretim seçici -->
+  {% if diger_uretimler|length > 1 %}
+  <form method="get" style="margin-bottom:.75rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+    <label style="font-size:.82rem; color:#374151; font-weight:600;">Takvim Üretimi:</label>
+    <select name="uretim_pk" onchange="this.form.submit()"
+            style="font-size:.82rem; padding:.3rem .6rem; border:1px solid #d1d5db; border-radius:5px;">
+      {% for u in diger_uretimler %}
+      <option value="{{ u.pk }}" {% if u.pk == secili_uretim.pk %}selected{% endif %}>
+        {{ u.uretim_tarihi|date:"d.m.Y H:i" }}{% if u.aktif %} ✓ Aktif{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+
   <div class="pr-bilgi-grid">
     <div class="pr-bilgi-item">
       <span class="pr-bilgi-label">Okul</span>
@@ -48,7 +82,7 @@
     </div>
     <div class="pr-bilgi-item">
       <span class="pr-bilgi-label">Takvim Üretim Tarihi</span>
-      <span class="pr-bilgi-val">{{ aktif_uretim.uretim_tarihi|date:"d.m.Y H:i" }}</span>
+      <span class="pr-bilgi-val">{{ secili_uretim.uretim_tarihi|date:"d.m.Y H:i" }}</span>
     </div>
     <div class="pr-bilgi-item">
       <span class="pr-bilgi-label">Sınav Günü / Oturum</span>
@@ -101,9 +135,9 @@
       <span class="oturum-dersler">{{ ot.dersler|join:", " }}</span>
       <span class="oturum-links">
         {% if ot.oturma_mevcut %}
-        <a href="{% url 'sinav:oturma_plani_pdf_view' %}?uretim={{ aktif_uretim.pk }}&tarih={{ ot.tarih_str }}&saat={{ ot.saat }}&oturum={{ ot.oturum }}"
+        <a href="{% url 'sinav:oturma_plani_pdf_view' %}?uretim={{ ot.uretim_pk }}&tarih={{ ot.tarih_str }}&saat={{ ot.saat }}&oturum={{ ot.oturum }}"
            class="link-pdf link-pdf-op" target="_blank">Oturma_Plani {{ ot.tarih_str }} {{ ot.saat }}</a>
-        <a href="{% url 'sinav:sinif_listesi_pdf_view' %}?uretim={{ aktif_uretim.pk }}&tarih={{ ot.tarih_str }}&saat={{ ot.saat }}&oturum={{ ot.oturum }}"
+        <a href="{% url 'sinav:sinif_listesi_pdf_view' %}?uretim={{ ot.uretim_pk }}&tarih={{ ot.tarih_str }}&saat={{ ot.saat }}&oturum={{ ot.oturum }}"
            class="link-pdf link-pdf-sl" target="_blank">Sinif_Listesi {{ ot.tarih_str }} {{ ot.saat }}</a>
         {% endif %}
       </span>
@@ -112,7 +146,7 @@
     {% endfor %}
   </div>
 
-  <div class="log-box" id="log-uret" style="margin-top:1rem;">{% if aktif_uretim.degisiklik_logu %}{{ aktif_uretim.degisiklik_logu }}{% else %}Henüz bir işlem başlatılmadı.{% endif %}</div>
+  <div class="log-box" id="log-uret" style="margin-top:1rem;">{% if secili_uretim.degisiklik_logu %}{{ secili_uretim.degisiklik_logu }}{% else %}Henüz bir işlem başlatılmadı.{% endif %}</div>
 </div>
 
 <style>
@@ -174,7 +208,7 @@
 <script>
 const OP_URL = "{% url 'sinav:oturma_plani_pdf_view' %}";
 const SL_URL = "{% url 'sinav:sinif_listesi_pdf_view' %}";
-const AKTIF_URETIM_PK = {{ aktif_uretim.pk }};
+const AKTIF_URETIM_PK = {{ secili_uretim.pk }};
 
 const logUret   = document.getElementById("log-uret");
 const badgeUret = document.getElementById("badge-uret");
