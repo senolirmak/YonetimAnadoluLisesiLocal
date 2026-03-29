@@ -67,4 +67,7 @@ urlpatterns = [
     path("takvim/iptal/", views.takvim_onizleme_iptal, name="takvim_onizleme_iptal"),
     path("takvim/guncelle/", views.takvim_guncelle, name="takvim_guncelle"),
 
+    # Öğrenci Sınav Yeri Sorgulama
+    path("ogrenci-sinav-yeri/", views.ogrenci_sinav_yeri, name="ogrenci_sinav_yeri"),
+
 ]

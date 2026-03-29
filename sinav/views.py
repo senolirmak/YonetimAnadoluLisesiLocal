@@ -1536,3 +1536,55 @@ def esleme_sil(request, idx: int):
     else:
         messages.error(request, "Kayıt bulunamadı.")
     return redirect("sinav:ders_ayarlari")
+
+
+# ---------------------------------------------------------------
+# Öğrenci Sınav Yeri Sorgulama
+# ---------------------------------------------------------------
+def _sinav_sorgu_izni(user):
+    """mudur_yardimcisi, okul_muduru, ogretmen ve benzeri tüm okul personeline izin verir."""
+    if user.is_superuser or user.is_staff:
+        return True
+    gruplar = set(user.groups.values_list("name", flat=True))
+    return bool(gruplar & {
+        "mudur_yardimcisi", "okul_muduru",
+        "ogretmen", "rehber_ogretmen", "disiplin_kurulu",
+    })
+
+
+@login_required
+def ogrenci_sinav_yeri(request):
+    if not _sinav_sorgu_izni(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+
+    aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
+    aktif_uretim = (
+        TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        if aktif_sinav else None
+    )
+
+    okulno   = request.GET.get("okulno", "").strip()
+    sonuclar = []
+    hata     = None
+
+    if okulno:
+        if not aktif_uretim:
+            hata = "Aktif sınav takvimi bulunamadı."
+        else:
+            sonuclar = list(
+                OturmaPlani.objects
+                .filter(uretim=aktif_uretim, okulno=okulno)
+                .order_by("tarih", "saat", "oturum")
+                .values("tarih", "saat", "salon", "sira_no", "ders_adi", "sinifsube", "adi_soyadi")
+            )
+            if not sonuclar:
+                hata = f"'{okulno}' okul numarasına ait kayıt bulunamadı."
+
+    return render(request, "sinav/ogrenci_sinav_yeri.html", {
+        "aktif_sinav":  aktif_sinav,
+        "aktif_uretim": aktif_uretim,
+        "okulno":       okulno,
+        "sonuclar":     sonuclar,
+        "hata":         hata,
+    })

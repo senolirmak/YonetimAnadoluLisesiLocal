@@ -236,6 +236,7 @@
                     <div class="menu-button-group">
                         <a href="{% url 'sinav:index' %}" class="btn btn-lg" style="background-color: #4f46e5; color: white;">Ortak Sınav Yönetimi</a>
                         <a href="{% url 'sinavmedia:yonetim' %}" class="btn btn-lg" style="background-color: #6366f1; color: white;">Sınav Medya Yönetimi</a>
+                        <a href="{% url 'sinav:ogrenci_sinav_yeri' %}" class="btn btn-lg" style="background-color: #7c3aed; color: white;">Öğrenci Sınav Yeri Sorgula</a>
                     </div>
                 </div>
                 {% endif %}
@@ -249,6 +250,7 @@
                         <a href="{% url 'ogretmen_sinav_gozetim' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Sınav Gözetim Listem</a>
                         {% endif %}
                         <a href="{% url 'sinav_oturum_istatistik' %}" class="btn btn-lg" style="background-color: #6366f1; color: white;">Sınav Oturum İstatistikleri</a>
+                        <a href="{% url 'sinav:ogrenci_sinav_yeri' %}" class="btn btn-lg" style="background-color: #7c3aed; color: white;">Öğrenci Sınav Yeri Sorgula</a>
                     </div>
                 </div>
                 {% endif %}

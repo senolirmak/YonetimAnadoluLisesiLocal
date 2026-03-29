@@ -1,0 +1,126 @@
+{% extends "layouts/base.html" %}
+{% block title %}Öğrenci Sınav Yeri Sorgulama{% endblock %}
+
+{% block content %}
+<div style="max-width:800px; margin:2rem auto; padding:0 1rem;">
+
+  <div class="card" style="border-left:4px solid #7c3aed; padding:1rem 1.5rem; margin-bottom:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+      <div>
+        <h2 style="margin:0 0 .25rem; color:#6d28d9;">Öğrenci Sınav Yeri Sorgulama</h2>
+        {% if aktif_sinav %}
+          <span style="font-size:.85rem; color:#374151;">
+            <strong>Sınav:</strong> {{ aktif_sinav }}
+          </span>
+        {% else %}
+          <span style="font-size:.85rem; color:#dc2626;">Aktif sınav tanımlı değil.</span>
+        {% endif %}
+      </div>
+      <a href="{% url 'index' %}" class="btn btn-secondary btn-sm">← Ana Sayfa</a>
+    </div>
+  </div>
+
+  <!-- Arama Formu -->
+  <div class="card" style="padding:1.25rem 1.5rem; margin-bottom:1.5rem; background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px;">
+    <form method="get" action="{% url 'sinav:ogrenci_sinav_yeri' %}">
+      <div style="display:flex; gap:.75rem; align-items:flex-end; flex-wrap:wrap;">
+        <div style="flex:1; min-width:220px;">
+          <label for="okulno" style="display:block; font-size:.875rem; font-weight:600; color:#374151; margin-bottom:.35rem;">
+            Öğrenci Okul Numarası
+          </label>
+          <input
+            type="text"
+            id="okulno"
+            name="okulno"
+            value="{{ okulno }}"
+            placeholder="Okul numarasını giriniz..."
+            autocomplete="off"
+            autofocus
+            style="width:100%; padding:.55rem .75rem; border:1px solid #d1d5db; border-radius:6px; font-size:.95rem; outline:none; box-sizing:border-box;"
+            onfocus="this.style.borderColor='#7c3aed'"
+            onblur="this.style.borderColor='#d1d5db'"
+          >
+        </div>
+        <div>
+          <button type="submit" class="btn btn-primary"
+                  style="background:#7c3aed; border:none; color:#fff; padding:.57rem 1.25rem; border-radius:6px; font-size:.95rem; cursor:pointer; white-space:nowrap;">
+            Sorgula
+          </button>
+          {% if okulno %}
+          <a href="{% url 'sinav:ogrenci_sinav_yeri' %}"
+             style="margin-left:.5rem; font-size:.85rem; color:#6b7280; text-decoration:none;">Temizle</a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Sonuçlar -->
+  {% if okulno %}
+    {% if hata %}
+      <div style="padding:.75rem 1rem; border-radius:6px; background:#fffbeb; border:1px solid #fcd34d; color:#92400e;">
+        {{ hata }}
+      </div>
+    {% elif sonuclar %}
+      <div class="card" style="padding:1rem 1.5rem;">
+
+        <!-- Öğrenci Başlığı -->
+        <div style="margin-bottom:1rem; padding:.75rem 1rem; background:#f5f3ff; border-radius:6px; border:1px solid #ddd6fe;">
+          <span style="font-size:1rem; font-weight:700; color:#4c1d95;">
+            {{ sonuclar.0.adi_soyadi }}
+          </span>
+          <span style="margin-left:.75rem; font-size:.85rem; color:#6b7280;">
+            Okul No: <strong>{{ okulno }}</strong>
+          </span>
+          <span style="margin-left:.75rem; font-size:.85rem; color:#6b7280;">
+            Sınıf: <strong>{{ sonuclar.0.sinifsube }}</strong>
+          </span>
+        </div>
+
+        <p style="font-size:.85rem; color:#6b7280; margin-bottom:.75rem;">
+          {{ sonuclar|length }} oturum listeleniyor.
+        </p>
+
+        <table style="width:100%; border-collapse:collapse; font-size:.9rem;">
+          <thead>
+            <tr style="background:#ede9fe; text-align:left;">
+              <th style="padding:.5rem .75rem; border-bottom:2px solid #c4b5fd;">#</th>
+              <th style="padding:.5rem .75rem; border-bottom:2px solid #c4b5fd;">Tarih</th>
+              <th style="padding:.5rem .75rem; border-bottom:2px solid #c4b5fd;">Saat</th>
+              <th style="padding:.5rem .75rem; border-bottom:2px solid #c4b5fd;">Ders</th>
+              <th style="padding:.5rem .75rem; border-bottom:2px solid #c4b5fd; text-align:center;">Salon</th>
+              <th style="padding:.5rem .75rem; border-bottom:2px solid #c4b5fd; text-align:center;">Sıra No</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sonuclar %}
+            <tr style="border-bottom:1px solid #f3f4f6; {% if forloop.even %}background:#fdfcff;{% endif %}">
+              <td style="padding:.5rem .75rem; color:#9ca3af;">{{ forloop.counter }}</td>
+              <td style="padding:.5rem .75rem; font-weight:600;">
+                {{ s.tarih|date:"d.m.Y" }}
+                <span style="font-size:.8rem; color:#9ca3af; margin-left:.25rem;">
+                  ({{ s.tarih|date:"l" }})
+                </span>
+              </td>
+              <td style="padding:.5rem .75rem;">{{ s.saat }}</td>
+              <td style="padding:.5rem .75rem;">{{ s.ders_adi }}</td>
+              <td style="padding:.5rem .75rem; text-align:center;">
+                <span style="background:#dbeafe; color:#1e40af; padding:.2rem .65rem; border-radius:12px; font-size:.85rem; font-weight:600;">
+                  {{ s.salon }}
+                </span>
+              </td>
+              <td style="padding:.5rem .75rem; text-align:center;">
+                <span style="background:#dcfce7; color:#166534; padding:.2rem .65rem; border-radius:12px; font-size:.85rem; font-weight:700;">
+                  {{ s.sira_no }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  {% endif %}
+
+</div>
+{% endblock %}
