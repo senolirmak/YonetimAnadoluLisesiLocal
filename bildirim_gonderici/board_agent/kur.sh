@@ -33,6 +33,15 @@ SERVIS_ADI="tahta_agent"
 SERVIS_DOSYA="/etc/systemd/system/${SERVIS_ADI}.service"
 LOG_DOSYA="/var/log/tahta_agent.log"
 DINLEME_PORTU="8765"
+SCRIPT_DIZIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DOSYA="$SCRIPT_DIZIN/config.txt"
+
+# ── USB'deki config.txt'den değerleri oku ────────────────────
+SUNUCU_IP=""
+if [[ -f "$CONFIG_DOSYA" ]]; then
+    SUNUCU_IP=$(grep -E "^SUNUCU_IP=" "$CONFIG_DOSYA" | cut -d'=' -f2 | xargs)
+    bilgi "config.txt okundu → SUNUCU_IP=$SUNUCU_IP" 2>/dev/null || true
+fi
 
 # ── Root kontrolü ─────────────────────────────────────────────
 [[ $EUID -ne 0 ]] && hata "Bu script root yetkisiyle çalıştırılmalıdır: sudo bash $0"
@@ -205,8 +214,17 @@ echo ""
 echo -e "  Port ${DINLEME_PORTU} yalnızca okul sunucusundan gelen bağlantılara açılacak."
 echo -e "  Sunucunun giden trafiği için ek kural gerekmez (varsayılan: açık)."
 echo ""
-echo -e "${SARI}Okul sunucusunun IP adresini girin (ör: 192.168.1.10):${SIFIRLA}"
-read -r -p "Sunucu IP: " SUNUCU_IP
+
+if [[ -n "$SUNUCU_IP" ]]; then
+    bilgi "Sunucu IP config.txt'den okundu: ${SARI}$SUNUCU_IP${SIFIRLA}"
+    echo -e "  Değiştirmek için Enter'a basın, onaylamak için doğrudan Enter'a basın:"
+    read -r -p "  Sunucu IP [$SUNUCU_IP]: " GIRDI
+    [[ -n "$GIRDI" ]] && SUNUCU_IP="$GIRDI"
+else
+    echo -e "${SARI}config.txt bulunamadı veya SUNUCU_IP tanımlı değil.${SIFIRLA}"
+    echo -e "${SARI}Okul sunucusunun IP adresini girin (ör: 192.168.1.10):${SIFIRLA}"
+    read -r -p "Sunucu IP: " SUNUCU_IP
+fi
 
 # Basit IPv4 format kontrolü
 if [[ ! "$SUNUCU_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
