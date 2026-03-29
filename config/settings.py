@@ -71,7 +71,7 @@ INSTALLED_APPS = [
 ]
 
 # ── Sınıf Tahtası Bildirim Ayarları ──────────────────────────
-BILDIRIM_ANAHTAR = "okul-bildirim-2024"   # Tahta ajanındaki GIZLI_ANAHTAR ile aynı olmalı
+BILDIRIM_ANAHTAR = os.getenv("BILDIRIM_ANAHTAR", "")
 BILDIRIM_TIMEOUT = 4                       # HTTP bağlantı zaman aşımı (saniye)
 
 MIDDLEWARE = [
