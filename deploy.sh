@@ -11,7 +11,7 @@ set -euo pipefail
 PROJE_DIZIN="/opt/akalyonetim"
 VENV="$PROJE_DIZIN/.venv"
 YEDEK_DIZIN="$PROJE_DIZIN/backups"
-SERVIS="akalyonetim"
+SERVIS="gunicorn"
 
 KIRMIZI='\033[0;31m'
 YESIL='\033[0;32m'
@@ -56,8 +56,26 @@ sudo systemctl stop "$SERVIS" || uyari "Servis zaten durmuş olabilir."
 
 # ── 3. Kodu güncelle ─────────────────────────────────────────
 bilgi "Kod çekiliyor (git pull)..."
+# Sunucuda izlenen dosyalarda yerel değişiklik varsa geçici olarak sakla
+if ! git diff --quiet HEAD; then
+    bilgi "Yerel değişiklikler stash'leniyor..."
+    git stash push -m "deploy-$(date +%Y%m%d_%H%M%S)"
+    GIT_STASH_YAPILDI=1
+else
+    GIT_STASH_YAPILDI=0
+fi
+
 git pull origin main
 basari "Kod güncellendi."
+
+# Stash'lenen değişiklikleri geri yükle (çakışma varsa uyar)
+if [[ "$GIT_STASH_YAPILDI" -eq 1 ]]; then
+    if git stash pop 2>/dev/null; then
+        bilgi "Yerel değişiklikler geri yüklendi."
+    else
+        uyari "Stash pop çakışmayla karşılaştı. Manuel kontrol gerekebilir: git stash list"
+    fi
+fi
 
 # ── 4. Paketleri güncelle ─────────────────────────────────────
 bilgi "Paketler güncelleniyor..."
@@ -107,9 +125,9 @@ python manage.py collectstatic --noinput --clear -v 0
 basari "Static dosyalar güncellendi."
 
 # ── 7. İzinleri düzelt ───────────────────────────────────────
-bilgi "Dosya izinleri düzenleniyor..."
-sudo chown -R www-data:www-data "$PROJE_DIZIN"
-sudo chmod -R 755 "$PROJE_DIZIN"
+#bilgi "Dosya izinleri düzenleniyor..."
+#sudo chown -R www-data:www-data "$PROJE_DIZIN"
+#sudo chmod -R 755 "$PROJE_DIZIN"
 sudo chmod 600 "$PROJE_DIZIN/.env"
 
 # ── 8. Servisi başlat ─────────────────────────────────────────
