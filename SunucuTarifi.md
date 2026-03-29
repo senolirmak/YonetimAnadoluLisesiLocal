@@ -127,7 +127,7 @@ python manage.py createsuperuser
 ### A8. Gunicorn Systemd Servisi
 
 ```bash
-sudo nano /etc/systemd/system/akalyonetim.service
+sudo nano /etc/systemd/system/gunicorn.service
 ```
 
 ```ini
@@ -141,14 +141,14 @@ Group=www-data
 WorkingDirectory=/opt/akalyonetim
 EnvironmentFile=/opt/akalyonetim/.env
 
-# systemd her başlatmada /run/akalyonetim/ dizinini otomatik oluşturur.
+# systemd her başlatmada /run/gunicorn/ dizinini otomatik oluşturur.
 # /run tmpfs olduğundan reboot sonrası dizin kaybolur — RuntimeDirectory bunu çözer.
-RuntimeDirectory=akalyonetim
+RuntimeDirectory=gunicorn
 RuntimeDirectoryMode=0755
 
-ExecStart=/opt/akalyonetim/.venv/bin/gunicorn \
+ExecStart=/opt/akalyonetim/venv/bin/gunicorn \
     --workers 3 \
-    --bind unix:/run/akalyonetim/akalyonetim.sock \
+    --bind unix:/run/gunicorn/gunicorn.sock \
     config.wsgi:application
 Restart=on-failure
 
@@ -159,9 +159,9 @@ WantedBy=multi-user.target
 ```bash
 sudo chown -R www-data:www-data /opt/akalyonetim
 sudo systemctl daemon-reload
-sudo systemctl enable akalyonetim
-sudo systemctl start akalyonetim
-sudo systemctl status akalyonetim
+sudo systemctl enable gunicorn
+sudo systemctl start gunicorn
+sudo systemctl status gunicorn
 ```
 
 ---
@@ -188,7 +188,7 @@ server {
     }
 
     location / {
-        proxy_pass http://unix:/run/akalyonetim/akalyonetim.sock;
+        proxy_pass http://unix:/run/gunicorn/gunicorn.sock;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -211,7 +211,7 @@ sudo systemctl restart nginx
 ### B1. Servisi Durdur
 
 ```bash
-sudo systemctl stop akalyonetim
+sudo systemctl stop gunicorn
 ```
 
 ---
@@ -269,8 +269,8 @@ python manage.py kullanici_gruplari_olustur
 
 ```bash
 sudo chown -R www-data:www-data /opt/akalyonetim
-sudo systemctl start akalyonetim
-sudo systemctl status akalyonetim
+sudo systemctl start gunicorn
+sudo systemctl status gunicorn
 ```
 
 ---
@@ -283,10 +283,10 @@ Servis dosyasını yukarıdaki yeni haliyle güncelledikten sonra:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl restart akalyonetim
+sudo systemctl restart gunicorn
 sudo systemctl restart nginx
 # Kontrol:
-ls -la /run/akalyonetim/   # dizin ve sock görünmeli
+ls -la /run/gunicorn/   # dizin ve sock görünmeli
 ```
 
 ---
@@ -295,13 +295,13 @@ ls -la /run/akalyonetim/   # dizin ve sock görünmeli
 
 | Komut | Amaç |
 |---|---|
-| `sudo systemctl status akalyonetim` | Gunicorn durumu |
-| `sudo journalctl -u akalyonetim -f` | Canlı loglar |
+| `sudo systemctl status gunicorn` | Gunicorn durumu |
+| `sudo journalctl -u gunicorn -f` | Canlı loglar |
 | `sudo systemctl status nginx` | Nginx durumu |
 | `sudo nginx -t` | Nginx config testi |
-| `sudo systemctl restart akalyonetim` | Gunicorn yeniden başlat |
+| `sudo systemctl restart gunicorn` | Gunicorn yeniden başlat |
 | `sudo systemctl restart nginx` | Nginx yeniden başlat |
-| `ls -la /run/akalyonetim/` | Socket dizini kontrolü |
+| `ls -la /run/gunicorn/` | Socket dizini kontrolü |
 
 ---
 
