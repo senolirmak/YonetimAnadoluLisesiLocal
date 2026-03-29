@@ -28,6 +28,9 @@ media/
 .env
 .env.*
 !.env.example
+
+# Tahta kurulum gizli yapılandırması (şablon: config.default)
+bildirim_gonderici/board_agent/config.txt
 SunucuTarifi.md
 
 # Veritabanı yedekleri

@@ -1,0 +1,12 @@
+# Tahta Kurulum Yapılandırması — Şablon
+# ─────────────────────────────────────
+# Kullanım:
+#   1. Bu dosyayı config.txt olarak kopyalayın:  cp config.default config.txt
+#   2. config.txt içindeki değerleri doldurun.
+#   3. config.txt asla git'e gönderilmez (.gitignore).
+
+# Okul sunucusunun (Django uygulamasının çalıştığı) IP adresi
+SUNUCU_IP=
+
+# Gizli anahtar — Django .env dosyasındaki BILDIRIM_ANAHTAR ile aynı olmalı
+GIZLI_ANAHTAR=
