@@ -13,5 +13,10 @@ StandardError=journal
 # Servis root olarak çalışır (notify-send için kullanıcı ortamına erişmek gerekir)
 User=root
 
+# Gizli anahtar bu dosyadan okunur.
+# Dosya izinleri: sudo chmod 600 /etc/tahta_agent/secrets
+# Dosya içeriği:  GIZLI_ANAHTAR=buraya-guclu-bir-anahtar-yazin
+EnvironmentFile=/etc/tahta_agent/secrets
+
 [Install]
 WantedBy=multi-user.target

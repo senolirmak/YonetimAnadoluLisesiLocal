@@ -7,8 +7,13 @@ masaüstü bildirimi (notify-send) olarak gösterir.
 
 Kurulum:
   1. Bu dosyayı tahtaya kopyalayın: /opt/tahta_agent/agent.py
-  2. GIZLI_ANAHTAR değişkenini settings.py'deki BILDIRIM_ANAHTAR ile eşleştirin
-  3. Systemd servisini kurun (aşağıdaki tahta_agent.service dosyasına bakın)
+  2. Gizli anahtarı oluşturun:
+       sudo mkdir -p /etc/tahta_agent
+       echo 'GIZLI_ANAHTAR=buraya-guclu-bir-anahtar-yazin' | sudo tee /etc/tahta_agent/secrets
+       sudo chmod 600 /etc/tahta_agent/secrets
+       sudo chown root:root /etc/tahta_agent/secrets
+  3. Django settings.py içindeki BILDIRIM_ANAHTAR ile aynı değeri kullanın.
+  4. Systemd servisini kurun (aşağıdaki tahta_agent.service dosyasına bakın)
 
 Gereksinimler:
   - Python 3.8+  (Pardus 23'te varsayılan olarak mevcut)
@@ -19,16 +24,24 @@ import json
 import logging
 import os
 import subprocess
+import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # ── Yapılandırma ──────────────────────────────────────────────
-DINLEME_PORTU = 8765
-GIZLI_ANAHTAR = "okul-bildirim-2024"   # settings.py BILDIRIM_ANAHTAR ile aynı olmalı
+DINLEME_PORTU  = int(os.environ.get("DINLEME_PORTU", 8765))
 BILDIRIM_SURESI_MS = 15000              # Bildirimin ekranda kalma süresi (ms)
-LOG_DOSYASI = "/var/log/tahta_agent.log"
+LOG_DOSYASI    = "/var/log/tahta_agent.log"
 
 # Tahtada oturum açık olan kullanıcının UID'si (genellikle 1000)
-MASAUSTU_KULLANICI_UID = "1000"
+MASAUSTU_KULLANICI_UID = os.environ.get("MASAUSTU_UID", "1000")
+
+# Gizli anahtar — systemd EnvironmentFile=/etc/tahta_agent/secrets üzerinden gelir
+GIZLI_ANAHTAR = os.environ.get("GIZLI_ANAHTAR", "")
+if not GIZLI_ANAHTAR:
+    print("HATA: GIZLI_ANAHTAR ortam değişkeni tanımlı değil.", file=sys.stderr)
+    print("  /etc/tahta_agent/secrets dosyasını oluşturun ve", file=sys.stderr)
+    print("  systemd servisine EnvironmentFile= ekleyin.", file=sys.stderr)
+    sys.exit(1)
 # ─────────────────────────────────────────────────────────────
 
 logging.basicConfig(
