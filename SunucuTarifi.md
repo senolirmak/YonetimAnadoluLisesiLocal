@@ -140,9 +140,15 @@ User=www-data
 Group=www-data
 WorkingDirectory=/opt/akalyonetim
 EnvironmentFile=/opt/akalyonetim/.env
+
+# systemd her başlatmada /run/akalyonetim/ dizinini otomatik oluşturur.
+# /run tmpfs olduğundan reboot sonrası dizin kaybolur — RuntimeDirectory bunu çözer.
+RuntimeDirectory=akalyonetim
+RuntimeDirectoryMode=0755
+
 ExecStart=/opt/akalyonetim/.venv/bin/gunicorn \
     --workers 3 \
-    --bind unix:/run/akalyonetim.sock \
+    --bind unix:/run/akalyonetim/akalyonetim.sock \
     config.wsgi:application
 Restart=on-failure
 
@@ -182,7 +188,7 @@ server {
     }
 
     location / {
-        proxy_pass http://unix:/run/akalyonetim.sock;
+        proxy_pass http://unix:/run/akalyonetim/akalyonetim.sock;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -271,6 +277,20 @@ sudo systemctl status akalyonetim
 
 ---
 
+## MEVCUT SUNUCUYU GÜNCELLEME (RuntimeDirectory geçişi)
+
+Servis dosyasını yukarıdaki yeni haliyle güncelledikten sonra:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart akalyonetim
+sudo systemctl restart nginx
+# Kontrol:
+ls -la /run/akalyonetim/   # dizin ve sock görünmeli
+```
+
+---
+
 ## KONTROL KOMUTLARI
 
 | Komut | Amaç |
@@ -281,6 +301,7 @@ sudo systemctl status akalyonetim
 | `sudo nginx -t` | Nginx config testi |
 | `sudo systemctl restart akalyonetim` | Gunicorn yeniden başlat |
 | `sudo systemctl restart nginx` | Nginx yeniden başlat |
+| `ls -la /run/akalyonetim/` | Socket dizini kontrolü |
 
 ---
 
