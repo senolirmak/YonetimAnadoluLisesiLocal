@@ -40,6 +40,38 @@ DINLEME_PORTU="8765"
 # ── Argüman işleme ───────────────────────────────────────────
 EYLEM="${1:-kur}"
 
+# ── UFW yardımcıları ─────────────────────────────────────────
+ufw_kur_ve_yapilandir() {
+    local sunucu_ip="$1"
+
+    bilgi "UFW kuruluyor..."
+    apt-get install -y -qq ufw 2>/dev/null
+    basari "UFW kuruldu."
+
+    # Mevcut port 8765 kurallarını temizle (yeniden çalıştırmaya karşı)
+    ufw delete allow "$DINLEME_PORTU/tcp" 2>/dev/null || true
+    ufw delete deny  "$DINLEME_PORTU/tcp" 2>/dev/null || true
+    ufw delete allow from "$sunucu_ip" to any port "$DINLEME_PORTU" proto tcp 2>/dev/null || true
+
+    # Yeni kuralları ekle
+    ufw allow from "$sunucu_ip" to any port "$DINLEME_PORTU" proto tcp comment "Okul sunucusu bildirim ajanı"
+    ufw deny "$DINLEME_PORTU/tcp" comment "Diğer tüm kaynaklardan kapat"
+
+    # UFW daha önce devre dışıysa etkinleştir
+    if ! ufw status | grep -q "Status: active"; then
+        # SSH kuralını ekle — bağlantı kesilmesin
+        ufw allow OpenSSH 2>/dev/null || ufw allow 22/tcp 2>/dev/null || true
+        echo "y" | ufw enable
+        basari "UFW etkinleştirildi."
+    else
+        ufw reload
+        basari "UFW kuralları güncellendi."
+    fi
+
+    bilgi "Aktif UFW kuralları:"
+    ufw status numbered
+}
+
 # ─────────────────────────────────────────────────────────────
 kaldir() {
     bilgi "Ajan kaldırılıyor..."
@@ -164,16 +196,35 @@ else
     exit 1
 fi
 
-# 9. Güvenlik duvarı hatırlatıcısı
+# 9. UFW yapılandırması
 echo ""
-echo -e "${SARI}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
-echo -e "${SARI}  Güvenlik Duvarı Notu${SIFIRLA}"
-echo -e "${SARI}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
-echo -e "  Port ${DINLEME_PORTU}'i yalnızca okul sunucusuna açın:"
-echo -e "  ${MAVI}sudo ufw allow from <SUNUCU_IP> to any port ${DINLEME_PORTU}${SIFIRLA}"
-echo -e "  ${MAVI}sudo ufw deny ${DINLEME_PORTU}${SIFIRLA}"
+echo -e "${MAVI}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
+echo -e "${MAVI}  Güvenlik Duvarı (UFW) Yapılandırması${SIFIRLA}"
+echo -e "${MAVI}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
 echo ""
+echo -e "  Port ${DINLEME_PORTU} yalnızca okul sunucusundan gelen bağlantılara açılacak."
+echo -e "  Sunucunun giden trafiği için ek kural gerekmez (varsayılan: açık)."
+echo ""
+echo -e "${SARI}Okul sunucusunun IP adresini girin (ör: 192.168.1.10):${SIFIRLA}"
+read -r -p "Sunucu IP: " SUNUCU_IP
 
+# Basit IPv4 format kontrolü
+if [[ ! "$SUNUCU_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    uyari "Geçersiz IP formatı. UFW yapılandırması atlandı."
+    uyari "Manuel yapılandırma için:"
+    echo "  sudo ufw allow from <SUNUCU_IP> to any port ${DINLEME_PORTU} proto tcp"
+    echo "  sudo ufw deny ${DINLEME_PORTU}/tcp"
+    echo "  sudo ufw enable"
+else
+    ufw_kur_ve_yapilandir "$SUNUCU_IP"
+    basari "UFW yapılandırması tamamlandı."
+    echo ""
+    echo -e "  ✓ ${YESIL}İzin verilen${SIFIRLA}: ${SUNUCU_IP} → port ${DINLEME_PORTU}/tcp"
+    echo -e "  ✗ ${KIRMIZI}Engellenen${SIFIRLA} : Diğer tüm kaynaklar → port ${DINLEME_PORTU}/tcp"
+    echo -e "  ℹ Sunucu gideni: Kural gerekmez (UFW varsayılan: izin)"
+fi
+
+echo ""
 echo -e "${YESIL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
 echo -e "${YESIL}  Kurulum tamamlandı!${SIFIRLA}"
 echo -e "${YESIL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
