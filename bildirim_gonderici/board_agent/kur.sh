@@ -38,9 +38,11 @@ CONFIG_DOSYA="$SCRIPT_DIZIN/config.txt"
 
 # ── USB'deki config.txt'den değerleri oku ────────────────────
 SUNUCU_IP=""
+GIZLI_ANAHTAR_DEGERI=""
 if [[ -f "$CONFIG_DOSYA" ]]; then
     SUNUCU_IP=$(grep -E "^SUNUCU_IP=" "$CONFIG_DOSYA" | cut -d'=' -f2 | xargs)
-    bilgi "config.txt okundu → SUNUCU_IP=$SUNUCU_IP" 2>/dev/null || true
+    GIZLI_ANAHTAR_DEGERI=$(grep -E "^GIZLI_ANAHTAR=" "$CONFIG_DOSYA" | cut -d'=' -f2 | xargs)
+    bilgi "config.txt okundu." 2>/dev/null || true
 fi
 
 # ── Root kontrolü ─────────────────────────────────────────────
@@ -143,11 +145,15 @@ if [[ -f "$SIFRELER_DOSYA" ]]; then
     uyari "$SIFRELER_DOSYA zaten mevcut, üzerine yazılmıyor."
     uyari "Anahtarı güncellemek için: sudo nano $SIFRELER_DOSYA"
 else
-    # Mevcut değer yoksa kullanıcıdan iste
-    echo ""
-    echo -e "${SARI}Gizli anahtar giriniz (Django settings.py'deki BILDIRIM_ANAHTAR ile aynı olmalı):${SIFIRLA}"
-    read -r -s -p "GIZLI_ANAHTAR= " GIZLI_ANAHTAR_DEGERI
-    echo ""
+    if [[ -n "$GIZLI_ANAHTAR_DEGERI" ]]; then
+        bilgi "Gizli anahtar config.txt'den okundu."
+    else
+        # config.txt'de yoksa klavyeden iste
+        echo ""
+        echo -e "${SARI}Gizli anahtar giriniz (Django settings.py'deki BILDIRIM_ANAHTAR ile aynı olmalı):${SIFIRLA}"
+        read -r -s -p "GIZLI_ANAHTAR= " GIZLI_ANAHTAR_DEGERI
+        echo ""
+    fi
     [[ -z "$GIZLI_ANAHTAR_DEGERI" ]] && hata "Gizli anahtar boş bırakılamaz."
 
     cat > "$SIFRELER_DOSYA" <<EOF

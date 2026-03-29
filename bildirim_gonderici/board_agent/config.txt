@@ -4,3 +4,6 @@
 
 # Okul sunucusunun (Django uygulamasının çalıştığı) IP adresi
 SUNUCU_IP=192.168.1.10
+
+# Gizli anahtar — Django settings.py'deki BILDIRIM_ANAHTAR ile aynı olmalı
+GIZLI_ANAHTAR=
