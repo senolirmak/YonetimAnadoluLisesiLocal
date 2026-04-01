@@ -6,8 +6,6 @@ CONFIG = {
     "eokul_ogrenci_dosya": "",
     "eokul_haftalik_program_dosya": "",
     "uygulama_tarihi": "2026-02-23",
-    # Cikti klasoru (view tarafindan MEDIA_ROOT/cikti olarak set edilir)
-    "cikti_klasor": "",
     # ILP / takvim parametreleri
     "HOLIDAYS": set(),
     "BASLANGIC_TARIH": datetime(2025, 1, 6),

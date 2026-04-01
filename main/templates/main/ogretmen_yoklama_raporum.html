@@ -1,0 +1,148 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container">
+
+  <a href="{% url 'ogretmen_sinav_gozetim' %}"
+     style="display:inline-flex;align-items:center;gap:.3rem;color:#6366f1;font-size:.85rem;text-decoration:none;margin-bottom:14px;">
+    ← Gözetim Listime Dön
+  </a>
+
+  <h2 class="page-title mb-20">Yoklama Raporlarım</h2>
+
+  {% if hata %}
+    <div style="padding:.8rem 1rem;background:#fef2f2;border:1px solid #fca5a5;border-radius:7px;color:#991b1b;font-size:.9rem;">
+      {{ hata }}
+    </div>
+
+  {% else %}
+
+  <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:center;padding:.6rem 1rem;
+              background:#f0f9ff;border:1px solid #bae6fd;border-radius:7px;
+              font-size:.88rem;color:#0369a1;margin-bottom:1.25rem;">
+    <span><strong>Öğretmen:</strong> {{ ogretmen_adi }}</span>
+    {% if aktif_sinav %}
+      <span><strong>Sınav:</strong> {{ aktif_sinav }}</span>
+    {% else %}
+      <span style="color:#b45309;"><strong>Aktif sınav bulunamadı.</strong></span>
+    {% endif %}
+    <span><strong>Ders sayısı:</strong> {{ ders_sayisi }}</span>
+  </div>
+
+  {% if not tarih_gruplari %}
+    <p style="color:#9ca3af;">
+      {% if not aktif_uretim %}
+        Aktif takvim üretimi bulunamadı.
+      {% else %}
+        Ders programınızdaki dersler için henüz yoklama kaydı bulunmuyor.
+      {% endif %}
+    </p>
+
+  {% else %}
+
+    {% for gun in tarih_gruplari %}
+    <div class="card mb-20" style="padding:0;overflow:hidden;">
+
+      {# Tarih başlığı #}
+      <div style="padding:.55rem 1rem;background:#f0f2f5;border-bottom:1px solid #e5e7eb;
+                  display:flex;align-items:center;gap:.75rem;">
+        <strong style="font-size:.95rem;color:#1f2937;">{{ gun.tarih|date:"d.m.Y" }}</strong>
+        <span style="font-size:.82rem;color:#6b7280;">{{ gun.tarih|date:"l" }}</span>
+      </div>
+
+      {% for girdi in gun.girdiler %}
+      {# Sınav satırı — tıklanabilir özet #}
+      <div style="border-bottom:1px solid #f3f4f6;">
+
+        <div style="padding:.6rem 1rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+                    cursor:pointer;user-select:none;"
+             onclick="toggleDetay('d-{{ gun.tarih|date:'Ymd' }}-{{ forloop.counter }}')">
+          <span style="font-weight:700;color:#1f2937;min-width:48px;">{{ girdi.saat }}</span>
+          <span style="background:#dbeafe;color:#1d4ed8;padding:.15rem .55rem;border-radius:10px;
+                       font-size:.78rem;font-weight:600;">{{ girdi.sinifsube }}</span>
+          <span style="font-size:.87rem;color:#374151;flex:1;">
+            {{ girdi.ders }}{% if girdi.sinav_turu %} <em style="color:#6b7280;font-size:.78rem;">({{ girdi.sinav_turu }})</em>{% endif %}
+          </span>
+          {% if girdi.yoklama_alindi %}
+            <span style="font-size:.8rem;font-weight:600;color:#16a34a;">
+              ✓ {{ girdi.mevcut }} mevcut
+            </span>
+            {% if girdi.yok %}
+            <span style="font-size:.8rem;font-weight:600;color:#dc2626;">
+              {{ girdi.yok }} yok
+            </span>
+            {% endif %}
+            {% if girdi.gec %}
+            <span style="font-size:.8rem;font-weight:600;color:#d97706;">
+              {{ girdi.gec }} geç
+            </span>
+            {% endif %}
+            <span style="font-size:.75rem;color:#9ca3af;">Toplam {{ girdi.toplam }}</span>
+            <span style="font-size:.75rem;color:#6366f1;">▼</span>
+          {% else %}
+            <span style="font-size:.8rem;color:#9ca3af;">Yoklama alınmadı</span>
+          {% endif %}
+        </div>
+
+        {% if girdi.yoklama_alindi %}
+        <div id="d-{{ gun.tarih|date:'Ymd' }}-{{ forloop.counter }}"
+             style="display:none;padding:0 1rem .75rem;">
+          <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+            <thead>
+              <tr style="background:#fafafa;border-bottom:1px solid #e5e7eb;
+                         color:#6b7280;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;">
+                <th style="padding:.35rem .6rem;text-align:left;">Sıra</th>
+                <th style="padding:.35rem .6rem;text-align:left;">Ad Soyad</th>
+                <th style="padding:.35rem .6rem;text-align:left;">Okul No</th>
+                <th style="padding:.35rem .6rem;text-align:left;">Salon</th>
+                <th style="padding:.35rem .6rem;text-align:center;">Durum</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for y in girdi.yoklamalar %}
+              <tr style="border-bottom:1px solid #f9fafb;">
+                <td style="padding:.3rem .6rem;color:#6b7280;font-family:monospace;">{{ y.sira_no }}</td>
+                <td style="padding:.3rem .6rem;font-weight:600;color:#1f2937;">{{ y.adi_soyadi }}</td>
+                <td style="padding:.3rem .6rem;font-family:monospace;color:#374151;">{{ y.okulno }}</td>
+                <td style="padding:.3rem .6rem;color:#6b7280;">{{ y.salon }}</td>
+                <td style="padding:.3rem .6rem;text-align:center;">
+                  {% if y.durum == "mevcut" %}
+                    <span style="background:#d1fae5;color:#065f46;padding:.1rem .5rem;border-radius:10px;font-size:.75rem;font-weight:600;">Mevcut</span>
+                  {% elif y.durum == "yok" %}
+                    <span style="background:#fee2e2;color:#991b1b;padding:.1rem .5rem;border-radius:10px;font-size:.75rem;font-weight:600;">Yok</span>
+                  {% elif y.durum == "gec" %}
+                    <span style="background:#fef9c3;color:#854d0e;padding:.1rem .5rem;border-radius:10px;font-size:.75rem;font-weight:600;">Geç</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+      </div>{# /sınav satırı #}
+      {% endfor %}{# /girdi #}
+
+    </div>{# /card #}
+    {% endfor %}{# /gun #}
+
+  {% endif %}
+  {% endif %}
+
+</div>
+
+<script>
+function toggleDetay(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+
+{% endblock %}

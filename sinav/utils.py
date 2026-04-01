@@ -31,9 +31,75 @@ def slot_aktif_mi(tarih, saat: str, bugun, simdi_str: str,
     return saat_offset(saat, baslangic_dk) <= simdi_str <= saat_offset(saat, bitis_dk)
 
 
+# ── Sınav slot erişim kuralları ──────────────────────────────────────────────
+# Her slot türü için geçerli saat penceresi (dakika cinsinden, sınav saatine göre).
+# Değiştirmek istediğinizde yalnızca bu sözlüğü güncellemek yeterlidir.
+SLOT_ERISIM_KURALLARI: dict[str, dict] = {
+    "gozetim":      {"baslangic_dk": -30, "bitis_dk": 120},  # Yoklama / Medya
+    "siniflistesi": {"baslangic_dk": -60, "bitis_dk":  30},  # Sınıf Listesi PDF
+}
+
+
+def slot_listesi_aktif_isle(slotlar: list, tur: str, bugun, simdi_str: str) -> None:
+    """
+    Slot listesini yerinde (in-place) işler; her slota 'aktif' bayrağı ekler.
+
+    Parametreler
+    ------------
+    slotlar   : [{"tarih": date, "saat": str, ...}, ...]
+    tur       : SLOT_ERISIM_KURALLARI'ndaki anahtar ("gozetim" | "siniflistesi")
+    bugun     : datetime.date — bugünün tarihi
+    simdi_str : "HH:MM" — şu anki saat
+    """
+    kural = SLOT_ERISIM_KURALLARI[tur]
+    for s in slotlar:
+        s["aktif"] = slot_aktif_mi(
+            s["tarih"], s["saat"], bugun, simdi_str,
+            baslangic_dk=kural["baslangic_dk"],
+            bitis_dk=kural["bitis_dk"],
+        )
+
+
 def salon_goster(salon_kodu: str) -> str:
     """'Salon-10_B' → 'Salon 10/B' formatına çevirir."""
     return salon_kodu.replace("-", " ", 1).replace("_", "/")
+
+
+class AdminOverride:
+    """
+    Yönetici için sınav saati koşulunu oturum süresince bypass eden mekanizma.
+
+    Kullanım:
+        force = AdminOverride.is_active(request)  # view'da tek satır
+        AdminOverride.toggle(request)              # toggle endpoint'te
+    """
+
+    _KEY = "sinav_admin_force_aktif"
+
+    @classmethod
+    def is_active(cls, request) -> bool:
+        """Yalnızca superuser ise ve oturumda açık ise True döner."""
+        if not request.user.is_superuser:
+            return False
+        return bool(request.session.get(cls._KEY, False))
+
+    @classmethod
+    def enable(cls, request) -> None:
+        request.session[cls._KEY] = True
+
+    @classmethod
+    def disable(cls, request) -> None:
+        request.session[cls._KEY] = False
+
+    @classmethod
+    def toggle(cls, request) -> bool:
+        """Toggle yapar, yeni durumu (True/False) döner."""
+        if cls.is_active(request):
+            cls.disable(request)
+            return False
+        else:
+            cls.enable(request)
+            return True
 
 
 def gozetmen_bul(aktif_sinav, tarih, saat: str, sinifsube: str) -> str | None:

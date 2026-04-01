@@ -144,6 +144,43 @@ class GunlukNobetCizelgesi(models.Model):
 from okul.models import EgitimOgretimYili, OkulBilgi, OkulDonem  # noqa: F401, E402
 
 
+MAZERET_SALON_CHOICES = [
+    ("Mazeret1", "Mazeret1"),
+    ("Mazeret2", "Mazeret2"),
+]
+MAZERET_DERSLER = [3, 4, 5, 6]
+
+
+class MazeretSalonGorevi(models.Model):
+    """
+    Mazeret1 / Mazeret2 salonları için günlük ders bazında nöbetçi ataması.
+    Salon o gün açık değilse kayıt oluşturulmaz.
+    """
+
+    tarih = models.DateField(verbose_name="Tarih")
+    salon = models.CharField(
+        max_length=20, choices=MAZERET_SALON_CHOICES, verbose_name="Salon"
+    )
+    saat = models.IntegerField(verbose_name="Ders Saati")  # 3, 4, 5, 6
+    ogretmen = models.ForeignKey(
+        NobetOgretmen,
+        on_delete=models.CASCADE,
+        related_name="mazeret_gorevleri",
+        verbose_name="Görevli Nöbetçi",
+    )
+    kayit_zamani = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "nobet_mazeret_salon_gorevi"
+        unique_together = ("tarih", "salon", "saat")
+        ordering = ["tarih", "salon", "saat"]
+        verbose_name = "Mazeret Salon Görevi"
+        verbose_name_plural = "Mazeret Salon Görevleri"
+
+    def __str__(self):
+        return f"{self.tarih} – {self.salon} – {self.saat}. Ders – {self.ogretmen}"
+
+
 class VeriYukleme(models.Model):
     """Admin panelinde veri yükleme arayüzü için kullanılan proxy model."""
 

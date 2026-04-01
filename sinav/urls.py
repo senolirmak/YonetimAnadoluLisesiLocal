@@ -25,9 +25,6 @@ urlpatterns = [
     path("gorev/<str:task_id>/", views.gorev_durumu, name="gorev_durumu"),
     path("gorev/<str:task_id>/iptal/", views.gorev_iptal, name="gorev_iptal"),
 
-    # Dosya indirme (rel_yol: takvim.xlsx veya salon/Oturma_Plani_...xlsx)
-    path("indir/<path:rel_yol>/", views.indir_dosya, name="indir_dosya"),
-
     # Okul Bilgileri
     path("okul-bilgileri/kaydet/", views.okul_bilgileri_kaydet, name="okul_bilgileri_kaydet"),
 
@@ -37,6 +34,8 @@ urlpatterns = [
     path("sinav-bilgisi/<int:pk>/aktif/", views.sinav_bilgisi_aktif_yap, name="sinav_bilgisi_aktif_yap"),
     path("sinav-bilgisi/<int:pk>/sil/", views.sinav_bilgisi_sil, name="sinav_bilgisi_sil"),
     path("takvim-uretim/<int:pk>/aktif/", views.takvim_uretim_aktif_yap, name="takvim_uretim_aktif_yap"),
+    path("slot/serbest-birak/",     views.slot_serbest_birak,          name="slot_serbest_birak"),
+    path("admin/force-aktif/",      views.admin_force_aktif_toggle,    name="admin_force_aktif_toggle"),
     path("gozetmen-ozet/", views.gozetmen_ozet, name="gozetmen_ozet"),
 
     # Ogrenci Yonetimi

@@ -14,6 +14,7 @@ Ozel metodlar:
   generate_all    – takvimdeki tum oturumlar icin calistirir
 """
 
+import hashlib
 import re
 import random
 from datetime import datetime
@@ -135,7 +136,10 @@ class OturmaPlanService(BaseService):
             self.log("Bu oturumda sinava girecek ogrenci bulunamadi.")
             return
 
-        ogr = df_o.sample(frac=1, random_state=42).reset_index(drop=True)
+        # Her oturum için farklı karıştırma — aynı öğrencinin her sınavda
+        # aynı salona düşmesini önler.
+        _seed = int(hashlib.md5(f"{tarih}{saat}{oturum}".encode()).hexdigest(), 16) % (2 ** 31)
+        ogr = df_o.sample(frac=1, random_state=_seed).reset_index(drop=True)
         salon_map = {name: [] for name in salon_adlari}
         for i, (_, row) in enumerate(ogr.iterrows()):
             salon_map[salon_adlari[i % len(salon_adlari)]].append(row.to_dict())

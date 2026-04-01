@@ -516,6 +516,13 @@ def ogretmen_sinav_gozetim(request):
     if not is_admin and not _ogretmen_menu_gorumu(request.user):
         raise PermissionDenied
 
+    is_preview = bool(preview_adi and is_admin)
+
+    from sinav.utils import AdminOverride, slot_listesi_aktif_isle
+    # force_aktif yalnızca superuser'ın aktif önizleme modunda geçerli;
+    # normal öğretmen sayfasını hiçbir şekilde etkilemez.
+    force_aktif = is_preview and AdminOverride.is_active(request)
+
     from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani
     from sinav.utils import onceki_ders_saati, salon_goster, slot_aktif_mi
 
@@ -582,9 +589,6 @@ def ogretmen_sinav_gozetim(request):
                 "saat":     saat,
                 "oturum":   oturum,
                 "salonlar": salonlar,
-                # Kelebek / Yoklama / Medya: saat−30dk … saat+120dk
-                "aktif":    slot_aktif_mi(tarih, saat, bugun, simdi_str,
-                                          baslangic_dk=-30, bitis_dk=120),
             })
 
     # ── Uygulama sınavı medyaları: gozetim slotlarına ekle ───────────────────
@@ -592,7 +596,7 @@ def ogretmen_sinav_gozetim(request):
         from sinav.models import Takvim as _Takvim
         from sinavmedia.models import SinavMedia as _SM
 
-        # (tarih, saat) → {seviye: SinavMedia.pk}
+        # (tarih, saat) → {seviye: {"pk": ..., "serbest": ...}}
         uygulama_map = {}
         for m in (
             _SM.objects
@@ -600,14 +604,19 @@ def ogretmen_sinav_gozetim(request):
             .select_related("takvim")
         ):
             key = (m.takvim.tarih, m.takvim.saat)
-            uygulama_map.setdefault(key, {})[m.seviye] = m.pk
+            uygulama_map.setdefault(key, {})[m.seviye] = {"pk": m.pk, "serbest": m.serbest}
 
         for slot in gozetim_slotlari:
             key = (slot["tarih"], slot["saat"])
             media_map = uygulama_map.get(key, {})
             if not media_map:
                 slot["medyalar"] = []
+                slot["medya_serbest"] = False
                 continue
+
+            # Seviye eşleşmesinden bağımsız: bu slotta herhangi bir serbest medya var mı?
+            slot_medya_serbest = any(v["serbest"] for v in media_map.values())
+
             # Salondaki seviye(ler)i bul
             sinifsubeler = (
                 OturmaPlani.objects
@@ -623,52 +632,59 @@ def ogretmen_sinav_gozetim(request):
                     seviyeler.add(int(str(ss).split("/")[0]))
                 except (ValueError, AttributeError):
                     pass
-            slot["medyalar"] = [
-                {"pk": media_map[sev], "seviye_adi": f"{sev}. Sınıf"}
+            medyalar = [
+                {"pk": media_map[sev]["pk"], "seviye_adi": f"{sev}. Sınıf",
+                 "serbest": media_map[sev]["serbest"]}
                 for sev in sorted(seviyeler)
                 if sev in media_map
             ]
+            # Seviye eşleşmesi olmasa bile serbest medya varsa link gösterilebilsin
+            if not medyalar and slot_medya_serbest:
+                medyalar = [
+                    {"pk": v["pk"], "seviye_adi": "", "serbest": True}
+                    for v in media_map.values()
+                    if v["serbest"]
+                ]
+            slot["medyalar"] = medyalar
+            slot["medya_serbest"] = slot_medya_serbest
 
     # ── Ders-Sınav eşleştirme (servis üzerinden) ─────────────────────────────
-    from sinav.services.ders_sinav_eslestir import ders_sinav_eslestir as _eslestir, tum_siniflistesi_eslestir
+    from sinav.services.ders_sinav_eslestir import tum_siniflistesi_eslestir
     from collections import defaultdict
-    _kw = dict(personel=personel, ogretmen_adi=ogretmen_adi, aktif_uretim=aktif_uretim,
-               bugun=bugun, simdi_str=simdi_str)
-
-    kelebek_slotlari = _eslestir(**_kw, dp_offset_dk=0)
-    for s in kelebek_slotlari:
-        s["aktif"] = slot_aktif_mi(s["tarih"], s["saat"], bugun, simdi_str,
-                                   baslangic_dk=-30, bitis_dk=120)
 
     # Sınıf Listesi PDF: ada göre toplu servisten al (personel FK gerektirmez)
     _siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim, dp_offset_dk=-50)
     siniflistesi_slotlari = _siniflistesi_map.get(ogretmen_adi, [])
-    for s in siniflistesi_slotlari:
-        # Liste sınav saatinden 60dk önce (ders başlangıcından 10dk önce) erişilebilir
-        s["aktif"] = slot_aktif_mi(s["tarih"], s["saat"], bugun, simdi_str,
-                                   baslangic_dk=-60, bitis_dk=30)
+
+    # Saat kısıtlarını uygula
+    slot_listesi_aktif_isle(gozetim_slotlari,     "gozetim",      bugun, simdi_str)
+    slot_listesi_aktif_isle(siniflistesi_slotlari, "siniflistesi", bugun, simdi_str)
+
+    # Önizleme modunda superuser tüm linkleri zorla aktif edebilir
+    if force_aktif:
+        for s in gozetim_slotlari + siniflistesi_slotlari:
+            s["aktif"] = True
 
     # Tüm slot tiplerini tarih bazında birleştir
-    _grp: dict = defaultdict(lambda: {"gozetim": [], "kelebek": [], "siniflistesi": []})
+    _grp: dict = defaultdict(lambda: {"gozetim": [], "siniflistesi": []})
     for s in gozetim_slotlari:
         _grp[s["tarih"]]["gozetim"].append(s)
-    for s in kelebek_slotlari:
-        _grp[s["tarih"]]["kelebek"].append(s)
     for s in siniflistesi_slotlari:
         _grp[s["tarih"]]["siniflistesi"].append(s)
     tarih_gruplari = [
-        {"tarih": t, "gozetim": g["gozetim"], "kelebek": g["kelebek"], "siniflistesi": g["siniflistesi"]}
+        {"tarih": t, "gozetim": g["gozetim"], "siniflistesi": g["siniflistesi"]}
         for t, g in sorted(_grp.items())
     ]
 
     title = f"Sınav Gözetim Listem — {ogretmen_adi}" if (preview_adi and is_admin) else "Sınav Gözetim Listem"
     return render(request, "main/ogretmen_sinav_gozetim.html", {
-        "title":           title,
-        "ogretmen_adi":    ogretmen_adi,
-        "aktif_sinav":     aktif_sinav,
-        "aktif_uretim":    aktif_uretim,
-        "tarih_gruplari":  tarih_gruplari,
-        "is_preview":      bool(preview_adi and is_admin),
+        "title":          title,
+        "ogretmen_adi":   ogretmen_adi,
+        "aktif_sinav":    aktif_sinav,
+        "aktif_uretim":   aktif_uretim,
+        "tarih_gruplari": tarih_gruplari,
+        "is_preview":     is_preview,
+        "force_aktif":    force_aktif,
     })
 
 
@@ -678,7 +694,7 @@ def ogretmen_sinav_gozetim(request):
 
 @login_required
 def ogretmen_sinav_medya(request):
-    if not _ogretmen_menu_gorumu(request.user):
+    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
         raise PermissionDenied
 
     from datetime import datetime as _dt, timedelta as _td
@@ -799,7 +815,7 @@ def ogretmen_sinav_medya(request):
 
 @login_required
 def ogretmen_gozetim_sinif_listesi(request):
-    if not _ogretmen_menu_gorumu(request.user):
+    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
         raise PermissionDenied
 
     from okul.models import SinifSube
@@ -867,7 +883,7 @@ def ogretmen_gozetim_sinif_listesi(request):
 # ─────────────────────────────────────────────────────────
 
 def sinav_salon_yoklama(request):
-    if not _ogretmen_menu_gorumu(request.user):
+    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
         raise PermissionDenied
 
     from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani, SinavSalonYoklama
@@ -1086,6 +1102,105 @@ def sinav_oturum_istatistik(request):
         "aktif_sinav":     aktif_sinav,
         "tarih_gruplari":  tarih_gruplari,
         "genel_toplam":    genel_toplam,
+    })
+
+
+# ─────────────────────────────────────────────────────────
+# Öğretmen — Yoklama Raporum
+# ─────────────────────────────────────────────────────────
+
+
+@login_required
+def ogretmen_yoklama_raporum(request):
+    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+        raise PermissionDenied
+
+    from collections import defaultdict
+    from sinav.models import SinavBilgisi, TakvimUretim, Takvim, SinavSalonYoklama
+    from dersprogrami.models import DersProgrami
+    from ortaksinav_engine.utils import normalize_sube_cell
+
+    personel = getattr(request.user, "personel", None)
+    if not personel:
+        return render(request, "main/ogretmen_yoklama_raporum.html", {
+            "title": "Yoklama Raporlarım",
+            "hata": "Kullanıcınıza bağlı öğretmen kaydı bulunamadı.",
+        })
+
+    aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
+    aktif_uretim = (
+        TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        if aktif_sinav else None
+    )
+
+    # Öğretmenin ders programından (ders_adi, sinifsube_str) çiftleri
+    dp_qs = (
+        DersProgrami.objects
+        .filter(ogretmen=personel)
+        .select_related("ders", "sinif_sube")
+    )
+    teacher_pairs = set()
+    for dp in dp_qs:
+        if dp.ders and dp.sinif_sube:
+            teacher_pairs.add((dp.ders.ders_adi, str(dp.sinif_sube)))
+
+    teacher_dersler = {p[0] for p in teacher_pairs}
+
+    girdi_listesi = []
+
+    if aktif_uretim and teacher_pairs:
+        takvimler = (
+            Takvim.objects
+            .filter(uretim=aktif_uretim, ders__ders_adi__in=teacher_dersler)
+            .select_related("ders")
+            .order_by("tarih", "saat", "ders__ders_adi")
+        )
+
+        for t in takvimler:
+            ders_adi  = t.ders.ders_adi
+            t_subeler = normalize_sube_cell(t.subeler)
+            matching  = [s for s in t_subeler if (ders_adi, s) in teacher_pairs]
+
+            for sinifsube in matching:
+                yoklamalar = list(
+                    SinavSalonYoklama.objects
+                    .filter(uretim=aktif_uretim, tarih=t.tarih, saat=t.saat, sinifsube=sinifsube)
+                    .order_by("salon", "sira_no")
+                )
+                mevcut = sum(1 for y in yoklamalar if y.durum == "mevcut")
+                yok    = sum(1 for y in yoklamalar if y.durum == "yok")
+                gec    = sum(1 for y in yoklamalar if y.durum == "gec")
+                girdi_listesi.append({
+                    "tarih":          t.tarih,
+                    "saat":           t.saat,
+                    "oturum":         t.oturum,
+                    "ders":           ders_adi,
+                    "sinav_turu":     t.sinav_turu,
+                    "sinifsube":      sinifsube,
+                    "yoklamalar":     yoklamalar,
+                    "mevcut":         mevcut,
+                    "yok":            yok,
+                    "gec":            gec,
+                    "toplam":         len(yoklamalar),
+                    "yoklama_alindi": bool(yoklamalar),
+                })
+
+    tarih_dict = defaultdict(list)
+    for g in girdi_listesi:
+        tarih_dict[g["tarih"]].append(g)
+    tarih_gruplari = [
+        {"tarih": tarih, "girdiler": girdiler}
+        for tarih, girdiler in sorted(tarih_dict.items())
+    ]
+
+    return render(request, "main/ogretmen_yoklama_raporum.html", {
+        "title":          "Yoklama Raporlarım",
+        "aktif_sinav":    aktif_sinav,
+        "aktif_uretim":   aktif_uretim,
+        "tarih_gruplari": tarih_gruplari,
+        "ogretmen_adi":   personel.adi_soyadi,
+        "ders_sayisi":    len(teacher_dersler),
+        "hata":           None if teacher_pairs else "Ders programında size atanmış ders bulunamadı.",
     })
 
 

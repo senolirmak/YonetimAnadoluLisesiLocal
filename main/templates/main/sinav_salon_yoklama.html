@@ -92,6 +92,7 @@
               <div class="koltuk-sira">{{ ogr.pdf_sira }}</div>
               {% if not ogr.bos %}
               <div class="koltuk-ad">{{ ogr.adi_soyadi }}</div>
+              <div class="koltuk-okulno">{{ ogr.okulno }}</div>
               <div class="koltuk-sinif">{{ ogr.sinifsube }}</div>
               <div class="koltuk-durumlar">
                 {% for val, lbl, renk in durum_secenekleri %}
@@ -145,8 +146,8 @@
   opacity: .5;
 }
 .koltuk-sira {
-  font-size: .65rem;
-  color: #9ca3af;
+  font-size: .82rem;
+  color: #111827;
   font-weight: 700;
   line-height: 1;
   text-align: right;
@@ -158,9 +159,17 @@
   line-height: 1.25;
   word-break: break-word;
 }
+.koltuk-okulno {
+  font-size: .68rem;
+  color: #111827;
+  font-family: monospace;
+  font-weight: 600;
+  letter-spacing: .03em;
+}
 .koltuk-sinif {
   font-size: .68rem;
-  color: #6b7280;
+  color: #111827;
+  font-weight: 600;
 }
 .koltuk-durumlar {
   display: flex;

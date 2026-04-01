@@ -7,13 +7,44 @@
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
 
 <div class="container">
-  <h2 class="page-title mb-20">Sınav Gözetim Listem</h2>
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+    <h2 class="page-title" style="margin:0;">Sınav Gözetim Listem</h2>
+    {% if not is_preview %}
+    <a href="{% url 'ogretmen_yoklama_raporum' %}"
+       style="background:#6366f1;color:#fff;text-decoration:none;font-size:.8rem;font-weight:600;
+              padding:.3rem .85rem;border-radius:6px;">
+      📊 Yoklama Raporlarım
+    </a>
+    {% endif %}
+  </div>
 
   {% if is_preview %}
   <div style="padding:.6rem 1rem;background:#fef9c3;border:1px solid #fbbf24;border-radius:6px;font-size:.85rem;color:#92400e;margin-bottom:1rem;">
     <strong>Yönetici Önizlemesi:</strong> {{ ogretmen_adi }} adlı öğretmenin sayfası gösteriliyor.
     <a href="{% url 'sinav:gozetmen_ozet' %}" style="margin-left:.75rem;color:#92400e;text-decoration:underline;">← Gözetmen Listesine Dön</a>
   </div>
+  {% endif %}
+
+  {% if is_preview %}
+  <form method="post" action="{% url 'sinav:admin_force_aktif_toggle' %}" style="margin:0 0 1rem;">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    {% if force_aktif %}
+    <button type="submit"
+            style="padding:.35rem .9rem;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:5px;font-size:.82rem;font-weight:600;cursor:pointer;"
+            title="Zaman koşulunu geri aç — oturum sonunda otomatik sıfırlanır">
+      🔒 Sınav Saati Koşulunu Geri Aç
+    </button>
+    <span style="font-size:.78rem;color:#b45309;margin-left:.5rem;">Tüm linkler şu an zorla aktif</span>
+    {% else %}
+    <button type="submit"
+            style="padding:.35rem .9rem;background:#16a34a;color:#fff;border:1px solid #15803d;border-radius:5px;font-size:.82rem;font-weight:600;cursor:pointer;"
+            title="Sınav saati koşulunu bypass et — oturum boyunca geçerli">
+      🔓 Linkleri Zorla Aç
+    </button>
+    <span style="font-size:.78rem;color:#6b7280;margin-left:.5rem;">Saate bakılmaksızın tüm linkler aktif olur</span>
+    {% endif %}
+  </form>
   {% endif %}
 
   {% if hata %}
@@ -78,21 +109,6 @@
                   {% if slot.salonlar and aktif_uretim %}
                     {% for salon in slot.salonlar %}
                     {% if slot.aktif %}
-                    <a href="{% url 'sinav:oturma_plani_pdf_view' %}?uretim={{ aktif_uretim.pk }}&tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&oturum={{ slot.oturum }}&salon={{ salon.ham }}"
-                       target="_blank" class="btn btn-sm"
-                       style="background:#6366f1;color:#fff;text-decoration:none;font-size:.78rem;padding:.2rem .55rem;">
-                      🦋 {{ salon.ad }} Kelebek
-                    </a>
-                    {% else %}
-                    <span class="btn btn-sm"
-                          style="background:#e5e7eb;color:#9ca3af;font-size:.78rem;padding:.2rem .55rem;cursor:not-allowed;"
-                          title="Sınav saatinde aktif olur">
-                      🦋 {{ salon.ad }} Kelebek
-                    </span>
-                    {% endif %}
-                    {% endfor %}
-                    {% for salon in slot.salonlar %}
-                    {% if slot.aktif %}
                     <a href="{% url 'sinav_salon_yoklama' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&salon={{ salon.ham }}"
                        class="btn btn-sm"
                        style="background:#059669;color:#fff;text-decoration:none;font-size:.78rem;padding:.2rem .55rem;">
@@ -108,11 +124,11 @@
                     {% endfor %}
                   {% endif %}
                   {% if slot.medyalar %}
-                    {% if slot.aktif %}
+                    {% if slot.aktif or slot.medya_serbest %}
                     <a href="{% url 'ogretmen_sinav_medya' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&oturum={{ slot.oturum }}"
                        class="btn btn-sm"
                        style="background:#dc2626;color:#fff;text-decoration:none;font-size:.78rem;padding:.2rem .55rem;">
-                      🔊 Sınav Medyası
+                      🔊 Sınav Medyası{% if slot.medya_serbest and not slot.aktif %} ✓{% endif %}
                     </a>
                     {% else %}
                     <span class="btn btn-sm"

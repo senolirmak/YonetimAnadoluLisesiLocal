@@ -3,15 +3,13 @@ import uuid
 import threading
 import traceback
 from datetime import datetime
-from pathlib import Path
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Subquery, OuterRef
 from .utils import gozetmen_bul, onceki_ders_saati
 
-from django.conf import settings
 from django.contrib import messages
-from django.http import HttpResponse, JsonResponse, FileResponse, Http404
+from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -71,14 +69,8 @@ def _apply_config(session_cfg: dict):
     if session_cfg.get("uygulama_tarihi"):
         CONFIG["uygulama_tarihi"] = session_cfg["uygulama_tarihi"]
 
-    # Her sınav için ayrı çıktı klasörü: media/cikti/sinav_{pk}/
-    aktif_sinav_cfg = SinavBilgisi.objects.filter(aktif=True).first()
-    if aktif_sinav_cfg:
-        CONFIG["cikti_klasor"] = str(Path(settings.MEDIA_ROOT) / "cikti" / f"sinav_{aktif_sinav_cfg.pk}")
-    else:
-        CONFIG["cikti_klasor"] = str(Path(settings.MEDIA_ROOT) / "cikti")
-
     # Algoritma parametreleri: DB birincil kaynak, yoksa session'a bak
+    aktif_sinav_cfg = SinavBilgisi.objects.filter(aktif=True).first()
     prm = AlgoritmaParametreleri.objects.filter(sinav=aktif_sinav_cfg).first() if aktif_sinav_cfg else None
     alg = prm.to_session_dict() if prm else session_cfg
 
@@ -188,41 +180,6 @@ def _db_ozeti():
     }
 
 
-def _sinav_cikti_dir(sinav=None) -> Path:
-    """Aktif (ya da verilen) sınavın çıktı klasörünü döndürür."""
-    base = Path(settings.MEDIA_ROOT) / "cikti"
-    s = sinav or _aktif_sinav()
-    if s:
-        return base / f"sinav_{s.pk}"
-    return base
-
-
-def _cikti_dosyalari(alt_klasor=None, sinav=None):
-    """
-    alt_klasor: None (hepsi), 'salon', 'raporlar', 'kok' (sadece kök)
-    sinav: None → aktif sınav kullanılır
-    """
-    cikti_root = Path(settings.MEDIA_ROOT) / "cikti"
-    sinav_dir  = _sinav_cikti_dir(sinav)
-    dosyalar   = []
-
-    if alt_klasor == "salon":
-        hedefler = [sinav_dir / "salon"]
-    elif alt_klasor == "raporlar":
-        hedefler = [sinav_dir / "raporlar"]
-    elif alt_klasor == "kok":
-        hedefler = [sinav_dir]
-    else:
-        hedefler = [sinav_dir, sinav_dir / "salon", sinav_dir / "raporlar"]
-
-    for d in hedefler:
-        if d.exists():
-            for f in sorted(d.iterdir()):
-                if f.suffix.lower() in {".xlsx", ".xls"} and f.is_file():
-                    rel = f.relative_to(cikti_root)
-                    dosyalar.append({"ad": f.name, "rel": str(rel)})
-    return dosyalar
-
 
 def _dosya_durumu(request):
     """DB-first modelde dosya durumu artık kullanılmamaktadır."""
@@ -259,6 +216,7 @@ def _alg_form_initial(request):
 # ---------------------------------------------------------------
 # Ana sayfa – dashboard
 # ---------------------------------------------------------------
+@login_required
 def index(request):
     # Aktif sinav yoksa en yenisini otomatik aktif yap
     aktif = _aktif_sinav()
@@ -275,7 +233,6 @@ def index(request):
         "aktif_sinav":   aktif,
         "sinav_listesi": SinavBilgisi.objects.all(),
         "db_ozeti":      db,
-        "ciktilar":      _cikti_dosyalari(),
         **kurulum,
         **dosya,
     })
@@ -297,6 +254,7 @@ def _veri_yukle_ctx(request):
     }
 
 
+@login_required
 def veri_yukle_sayfasi(request):
     okul = OkulBilgi.get()
     if not bool(okul.okul_adi.strip() and okul.okul_kodu.strip()):
@@ -377,6 +335,53 @@ def takvim_uretim_aktif_yap(request, pk: int):
     return redirect(f"{reverse('sinav:pdf_rapor')}?uretim_pk={pk}")
 
 
+@require_POST
+@login_required
+def admin_force_aktif_toggle(request):
+    """Admin: sınav saati koşulunu oturum boyunca aç/kapat."""
+    from sinav.utils import AdminOverride
+    if not request.user.is_superuser:
+        return JsonResponse({"error": "Yetkisiz işlem."}, status=403)
+    AdminOverride.toggle(request)
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "/"
+    return redirect(next_url)
+
+
+@require_POST
+@login_required
+def slot_serbest_birak(request):
+    """Superuser: belirtilen slot için OturmaUretim + OturmaPlani kayıtlarını sil."""
+    from sinav.models import OturmaUretim
+    if not request.user.is_superuser:
+        return JsonResponse({"error": "Yetkisiz işlem."}, status=403)
+
+    uretim_pk = request.POST.get("uretim_pk")
+    tarih     = request.POST.get("tarih")
+    saat      = request.POST.get("saat")
+    oturum    = request.POST.get("oturum")
+
+    if not all([uretim_pk, tarih, saat, oturum]):
+        return JsonResponse({"error": "Eksik parametre."}, status=400)
+
+    uretim = get_object_or_404(TakvimUretim, pk=uretim_pk)
+
+    sil_ou = OturmaUretim.objects.filter(
+        takvim_uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
+    )
+    sil_op = OturmaPlani.objects.filter(
+        uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
+    )
+    op_sayisi = sil_op.count()
+    sil_op.delete()
+    sil_ou.delete()
+
+    messages.success(
+        request,
+        f"Slot serbest bırakıldı ({tarih} {saat} Ot.{oturum}) — {op_sayisi} oturma planı silindi."
+    )
+    return redirect(f"{reverse('sinav:pdf_rapor')}?uretim_pk={uretim_pk}")
+
+
 @login_required
 def gozetmen_ozet(request):
     """Aktif TakvimUretim'deki tüm gözetmenler + Sınıf Listesi PDF öğretmenlerini listeler."""
@@ -452,10 +457,12 @@ def _takvim_ctx(request, alg_form=None):
     }
 
 
+@login_required
 def takvim_sayfasi(request):
     return render(request, "sinav/takvim.html", _takvim_ctx(request))
 
 
+@login_required
 def takvim_onizleme(request):
     from collections import defaultdict
     from sinav.models import Takvim, TakvimUretim
@@ -684,6 +691,7 @@ def parametre_kaydet(request):
 # ---------------------------------------------------------------
 # A4 Raporlar sayfasi
 # ---------------------------------------------------------------
+@login_required
 def takvim_gecmisi(request):
     """Üretilen takvimlerin listesi: hangi sınav, ne zaman, algoritma çıktısı."""
     from sinav.models import TakvimUretim
@@ -705,6 +713,7 @@ def takvim_gecmisi(request):
     })
 
 
+@login_required
 def pdf_rapor(request):
     """PDF rapor üretim sayfası: seçili TakvimUretim'e bağlı takvim verilerini gösterir."""
     from sinav.models import TakvimUretim, Takvim, OturmaUretim
@@ -788,6 +797,7 @@ def pdf_rapor(request):
         "gun_sayisi":       len(gunler),
         "takvim_degisti":   takvim_degisti,
         "diger_uretimler":  diger_uretimler,
+        "is_superuser":     request.user.is_superuser,
     })
 
 
@@ -835,6 +845,7 @@ def _run_oturma_secili(task_id: str, session_cfg: dict, sessions: list):
     _finish(task_id)
 
 
+@login_required
 def oturma_plani_pdf_view(request):
     """OturmaPlani DB'den Oturma Planı PDF'ini anlık üretip döner."""
     import io, re as _re
@@ -910,6 +921,7 @@ def oturma_plani_pdf_view(request):
                         headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 
+@login_required
 def sinav_takvimi_pdf_view(request):
     """Aktif TakvimUretim'e bağlı tek sayfalık öğrenci Sınav Takvimi PDF'i döner."""
     import io
@@ -936,6 +948,7 @@ def sinav_takvimi_pdf_view(request):
                         headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 
+@login_required
 def sinif_listesi_pdf_view(request):
     """OturmaPlani DB'den Sınıf Listesi PDF'ini anlık üretip döner."""
     import io
@@ -1098,6 +1111,7 @@ def calistir_oturma(request):
 # ---------------------------------------------------------------
 # Gorev durumu (polling) + iptal
 # ---------------------------------------------------------------
+@login_required
 def gorev_durumu(request, task_id: str):
     with _TASKS_LOCK:
         task = _TASKS.get(task_id)
@@ -1121,27 +1135,11 @@ def gorev_iptal(request, task_id: str):
     return JsonResponse({"ok": True})
 
 
-# ---------------------------------------------------------------
-# Cikti dosyasi indirme
-# ---------------------------------------------------------------
-def indir_dosya(request, rel_yol: str):
-    cikti_dir = Path(settings.MEDIA_ROOT) / "cikti"
-    candidate = (cikti_dir / rel_yol).resolve()
-    if not str(candidate).startswith(str(cikti_dir.resolve())):
-        raise Http404
-    if candidate.exists() and candidate.is_file():
-        inline = candidate.suffix.lower() == ".pdf"
-        return FileResponse(
-            open(candidate, "rb"),
-            as_attachment=not inline,
-            filename=candidate.name,
-        )
-    raise Http404("Dosya bulunamadi")
-
 
 # ---------------------------------------------------------------
 # Sinav Bilgisi CRUD
 # ---------------------------------------------------------------
+@login_required
 def sinav_bilgisi_listesi(request):
     okul = OkulBilgi.get()
     okul_tamam = bool(okul.okul_adi.strip())
@@ -1211,6 +1209,7 @@ def sinav_bilgisi_sil(request, pk: int):
 # ---------------------------------------------------------------
 # Ogrenci Yonetimi
 # ---------------------------------------------------------------
+@login_required
 def ogrenci_yonetim(request):
     aktif = _aktif_sinav()
     arama = request.GET.get("q", "").strip()
@@ -1282,6 +1281,7 @@ def _bolumle(tum_dersler: list, efektif: set) -> tuple[list, list]:
     return secili, diger
 
 
+@login_required
 def ders_ayarlari(request):
     from okul.models import DersHavuzu
     aktif = _aktif_sinav()

@@ -139,6 +139,20 @@
            class="link-pdf link-pdf-op" target="_blank">Oturma_Plani {{ ot.tarih_str }} {{ ot.saat }}</a>
         <a href="{% url 'sinav:sinif_listesi_pdf_view' %}?uretim={{ ot.uretim_pk }}&tarih={{ ot.tarih_str }}&saat={{ ot.saat }}&oturum={{ ot.oturum }}"
            class="link-pdf link-pdf-sl" target="_blank">Sinif_Listesi {{ ot.tarih_str }} {{ ot.saat }}</a>
+        {% if is_superuser %}
+        <form method="post" action="{% url 'sinav:slot_serbest_birak' %}" style="display:inline; margin:0;"
+              onsubmit="return confirm('{{ ot.tarih_str }} {{ ot.saat }} Ot.{{ ot.oturum }} slotu serbest bırakılsın mı?\nOturma planı silinecek.');">
+          {% csrf_token %}
+          <input type="hidden" name="uretim_pk" value="{{ ot.uretim_pk }}">
+          <input type="hidden" name="tarih"     value="{{ ot.tarih_str }}">
+          <input type="hidden" name="saat"      value="{{ ot.saat }}">
+          <input type="hidden" name="oturum"    value="{{ ot.oturum }}">
+          <button type="submit" class="link-pdf link-pdf-reset"
+                  title="Bu slotun oturma planını sil ve yeniden üretilebilir hale getir">
+            ✕ Serbest Bırak
+          </button>
+        </form>
+        {% endif %}
         {% endif %}
       </span>
     </label>
@@ -203,6 +217,12 @@
 .link-pdf-op:hover { background:#bfdbfe; }
 .link-pdf-sl { background:#fce7f3; color:#9d174d; border:1px solid #f9a8d4; }
 .link-pdf-sl:hover { background:#fbcfe8; }
+.link-pdf-reset {
+  background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5;
+  cursor:pointer; font-family:inherit;
+}
+.link-pdf-reset:hover { background:#fee2e2; }
+.oturum-satir.done form { pointer-events:auto; }
 </style>
 
 <script>

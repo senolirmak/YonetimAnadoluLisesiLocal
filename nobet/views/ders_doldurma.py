@@ -22,10 +22,64 @@ from ..models import (
     NobetGecmisi,
     NobetOgretmen,
     NobetPersonel,
+    MazeretSalonGorevi,
+    MAZERET_DERSLER,
 )
 from ..services.pdf_rapor import NobetPDFReport
 from .dagitim import _gun_adi_tr
 from .permissions import is_mudur_yardimcisi, is_yonetici
+
+
+# ─────────────────────────────────────────────
+# Mazeret Salon yardımcıları
+# ─────────────────────────────────────────────
+
+def _mazeret_ctx(target_date, gorev_date, day_name_en, absent_teacher_ids):
+    """
+    Mazeret1 / Mazeret2 için template'e gönderilecek veriyi döner.
+    gorev_date, day_name_en, absent_teacher_ids: hesapla/view bağlamından gelir.
+    """
+    from ..models import NobetGorevi
+
+    # O günün nöbetçi öğretmenleri (devamsız olmayanlar)
+    if gorev_date:
+        duty_qs = (
+            NobetGorevi.objects.filter(
+                uygulama_tarihi=gorev_date, nobet_gun=day_name_en
+            )
+            .select_related("ogretmen__personel")
+        )
+        nobetciler = [
+            {"id": r.ogretmen.pk, "adi_soyadi": r.ogretmen.personel.adi_soyadi}
+            for r in duty_qs
+            if r.ogretmen.personel.pk not in absent_teacher_ids
+        ]
+    else:
+        nobetciler = []
+
+    # Mevcut DB atamaları → {salon: {saat: ogretmen_pk}}
+    mevcut = {}
+    for g in MazeretSalonGorevi.objects.filter(tarih=target_date).select_related("ogretmen__personel"):
+        mevcut.setdefault(g.salon, {})[g.saat] = {
+            "ogretmen_pk": g.ogretmen.pk,
+            "adi_soyadi":  g.ogretmen.personel.adi_soyadi,
+        }
+
+    salonlar = []
+    for salon_ad in ("Mazeret1", "Mazeret2"):
+        salon_mevcut = mevcut.get(salon_ad, {})
+        acik = bool(salon_mevcut)  # DB'de kaydı varsa zaten açık sayılır
+        dersler = []
+        for d in MAZERET_DERSLER:
+            atama = salon_mevcut.get(d)
+            dersler.append({
+                "saat":        d,
+                "ogretmen_pk": atama["ogretmen_pk"] if atama else None,
+                "adi_soyadi":  atama["adi_soyadi"]  if atama else None,
+            })
+        salonlar.append({"ad": salon_ad, "acik": acik, "dersler": dersler})
+
+    return {"mazeret_salonlar": salonlar, "mazeret_nobetciler": nobetciler}
 
 
 # ─────────────────────────────────────────────
@@ -58,9 +112,11 @@ def nobet_ders_doldurma(request):
         return sorted(list(d1 | d2), reverse=True)[:5]
 
     if request.method == "POST":
-        if ("kaydet" in request.POST or "sil" in request.POST) and not is_mudur_yardimcisi(
-            request.user
-        ):
+        if (
+            "kaydet" in request.POST
+            or "sil" in request.POST
+            or "mazeret_kaydet" in request.POST
+        ) and not is_mudur_yardimcisi(request.user):
             raise PermissionDenied
         if "kaydet" in request.POST:
             assignments = request.session.get(SESS_KEY_ASSIGN, [])
@@ -205,6 +261,46 @@ def nobet_ders_doldurma(request):
                     return redirect(f"{request.path}?tarih={target_date.strftime('%Y-%m-%d')}")
                 else:
                     target_date = timezone.localdate()
+
+        elif "mazeret_kaydet" in request.POST:
+            date_str = request.POST.get("mazeret_tarih", "")
+            try:
+                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                target_date = timezone.localdate()
+
+            days_map = {0:"Monday",1:"Tuesday",2:"Wednesday",3:"Thursday",4:"Friday",5:"Saturday",6:"Sunday"}
+            day_name_en = days_map[target_date.weekday()]
+
+            for salon_ad in ("Mazeret1", "Mazeret2"):
+                acik = request.POST.get(f"mazeret_acik_{salon_ad}") == "1"
+                if not acik:
+                    # Salon kapalı → varsa kayıtları sil
+                    MazeretSalonGorevi.objects.filter(tarih=target_date, salon=salon_ad).delete()
+                    continue
+                for saat in MAZERET_DERSLER:
+                    ogr_pk = request.POST.get(f"mazeret_{salon_ad}_{saat}", "").strip()
+                    if ogr_pk:
+                        try:
+                            ogretmen = NobetOgretmen.objects.get(pk=int(ogr_pk))
+                            MazeretSalonGorevi.objects.update_or_create(
+                                tarih=target_date,
+                                salon=salon_ad,
+                                saat=saat,
+                                defaults={"ogretmen": ogretmen},
+                            )
+                        except (NobetOgretmen.DoesNotExist, ValueError):
+                            pass
+                    else:
+                        MazeretSalonGorevi.objects.filter(
+                            tarih=target_date, salon=salon_ad, saat=saat
+                        ).delete()
+
+            messages.success(
+                request,
+                f"{target_date.strftime('%d.%m.%Y')} tarihi için mazeret salon atamaları kaydedildi.",
+            )
+            return redirect(f"{request.path}?tarih={target_date.strftime('%Y-%m-%d')}")
 
         else:
             form = NobetDersDoldurmaForm(request.POST)
@@ -495,6 +591,23 @@ def nobet_ders_doldurma(request):
 
     history_records = get_history_records(target_date)
 
+    # Mazeret salon context
+    from ..models import NobetGorevi
+    days_map = {0:"Monday",1:"Tuesday",2:"Wednesday",3:"Thursday",4:"Friday",5:"Saturday",6:"Sunday"}
+    _day = days_map[target_date.weekday()]
+    _gorev_date = (
+        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date)
+        .order_by("-uygulama_tarihi")
+        .values_list("uygulama_tarihi", flat=True)
+        .first()
+    )
+    _absent_ids = list(
+        Devamsizlik.objects.filter(
+            baslangic_tarihi__lte=target_date, bitis_tarihi__gte=target_date
+        ).values_list("ogretmen__personel__pk", flat=True)
+    )
+    mazeret_ctx = _mazeret_ctx(target_date, _gorev_date, _day, _absent_ids)
+
     context = {
         "title": "Nöbetçi Öğretmen Ders Doldurma",
         "form": form,
@@ -505,6 +618,7 @@ def nobet_ders_doldurma(request):
         "history_records": history_records,
         "loaded_from_db": loaded_from_db,
         "current_view_datetime": current_view_datetime,
+        **mazeret_ctx,
     }
     return render(request, "nobet_ders_doldurma.html", context)
 

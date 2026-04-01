@@ -64,6 +64,90 @@
         </form>
     </div>
 
+    {# ── Mazeret Salonları ── #}
+    {% if mazeret_nobetciler is not None %}
+    <div class="card mb-20" style="margin-top:12px;">
+      <div class="card-header bg-primary" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Mazeret Salonları – {{ target_date }}</span>
+        <small style="opacity:.8;font-size:.82em;">3.–6. dersler · Açık salonlar için nöbetçi seçin ve kaydedin</small>
+      </div>
+
+      <form method="post" style="padding:12px 16px;">
+        {% csrf_token %}
+        <input type="hidden" name="mazeret_tarih" value="{{ target_date|date:'Y-m-d' }}">
+
+        <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        {% for salon in mazeret_salonlar %}
+        <div style="flex:1;min-width:280px;border:1px solid #e5e7eb;border-radius:7px;overflow:hidden;">
+
+          {# Salon başlığı + toggle #}
+          <div style="padding:.45rem .85rem;background:#f0f2f5;border-bottom:1px solid #e5e7eb;
+                      display:flex;align-items:center;gap:.75rem;">
+            <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;margin:0;">
+              <input type="checkbox" name="mazeret_acik_{{ salon.ad }}" value="1"
+                     {% if salon.acik %}checked{% endif %}
+                     onchange="toggleMazeret('{{ salon.ad }}', this.checked)">
+              <strong style="font-size:.9rem;">{{ salon.ad }}</strong>
+            </label>
+            <span id="badge-{{ salon.ad }}"
+                  style="font-size:.75rem;padding:.1rem .5rem;border-radius:10px;font-weight:600;
+                         {% if salon.acik %}background:#d1fae5;color:#065f46;{% else %}background:#f3f4f6;color:#9ca3af;{% endif %}">
+              {% if salon.acik %}Açık{% else %}Kapalı{% endif %}
+            </span>
+          </div>
+
+          {# Ders satırları #}
+          <div id="tablo-{{ salon.ad }}" style="{% if not salon.acik %}display:none;{% endif %}">
+            <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+              <thead>
+                <tr style="background:#fafafa;border-bottom:1px solid #e5e7eb;color:#6b7280;
+                            font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;">
+                  <th style="padding:.35rem .7rem;text-align:left;width:80px;">Ders</th>
+                  <th style="padding:.35rem .7rem;text-align:left;">Görevli Nöbetçi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ders in salon.dersler %}
+                <tr style="border-bottom:1px solid #f9fafb;">
+                  <td style="padding:.35rem .7rem;font-weight:700;color:#374151;">{{ ders.saat }}. Ders</td>
+                  <td style="padding:.35rem .7rem;">
+                    <select name="mazeret_{{ salon.ad }}_{{ ders.saat }}"
+                            class="form-control" style="font-size:.83rem;padding:3px 6px;height:auto;">
+                      <option value="">— Seçiniz —</option>
+                      {% for n in mazeret_nobetciler %}
+                      <option value="{{ n.id }}"
+                              {% if ders.ogretmen_pk == n.id %}selected{% endif %}>
+                        {{ n.adi_soyadi }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                    {% if ders.adi_soyadi %}
+                    <small style="color:#6b7280;font-size:.75rem;">✓ {{ ders.adi_soyadi }}</small>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+        {% endfor %}
+        </div>{# /flex #}
+
+        {% if is_mudur_yardimcisi %}
+        <div style="margin-top:10px;">
+          <button type="submit" name="mazeret_kaydet"
+                  class="btn btn-success"
+                  onclick="return confirm('Mazeret salon atamalarını kaydetmek istiyor musunuz?');">
+            Mazeret Kaydet
+          </button>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+    {% endif %}
+
     <div class="dashboard-grid">
         <div class="col-main">
             <div class="card">
@@ -184,4 +268,21 @@
     </div>
 </div>
 
+<script>
+function toggleMazeret(salon, acik) {
+  var tablo = document.getElementById('tablo-' + salon);
+  var badge = document.getElementById('badge-' + salon);
+  if (acik) {
+    tablo.style.display = '';
+    badge.textContent = 'Açık';
+    badge.style.background = '#d1fae5';
+    badge.style.color = '#065f46';
+  } else {
+    tablo.style.display = 'none';
+    badge.textContent = 'Kapalı';
+    badge.style.background = '#f3f4f6';
+    badge.style.color = '#9ca3af';
+  }
+}
+</script>
 {% endblock %}
