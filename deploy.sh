@@ -2,7 +2,7 @@
 # =============================================================================
 # Sunucu Güncelleme Scripti
 # =============================================================================
-# Sunucuda : bash deploy.sh
+# Sunucuda : bash /opt/akalyonetim/deploy.sh
 # Uzaktan  : ssh kullanici@sunucu "bash /opt/akalyonetim/deploy.sh"
 # =============================================================================
 
@@ -56,7 +56,7 @@ sudo systemctl stop "$SERVIS" || uyari "Servis zaten durmuş olabilir."
 
 # ── 3. Kodu güncelle ─────────────────────────────────────────
 bilgi "Kod çekiliyor (git pull)..."
-# Sunucuda izlenen dosyalarda yerel değişiklik varsa geçici olarak sakla
+
 if ! git diff --quiet HEAD; then
     bilgi "Yerel değişiklikler stash'leniyor..."
     git stash push -m "deploy-$(date +%Y%m%d_%H%M%S)"
@@ -68,12 +68,11 @@ fi
 git pull origin main
 basari "Kod güncellendi."
 
-# Stash'lenen değişiklikleri geri yükle (çakışma varsa uyar)
 if [[ "$GIT_STASH_YAPILDI" -eq 1 ]]; then
     if git stash pop 2>/dev/null; then
         bilgi "Yerel değişiklikler geri yüklendi."
     else
-        uyari "Stash pop çakışmayla karşılaştı. Manuel kontrol gerekebilir: git stash list"
+        uyari "Stash pop çakışmayla karşılaştı. Manuel kontrol: git stash list"
     fi
 fi
 
@@ -85,52 +84,25 @@ basari "Paketler güncellendi."
 
 # ── 5. Migration ──────────────────────────────────────────────
 bilgi "Migration çalıştırılıyor..."
+python manage.py migrate --run-syncdb
+basari "Migration tamamlandı."
 
-# Bu projede migration state sorunu olabileceğinden güvenli yöntem:
-# Önce standart migrate dene, hata alırsan tablolar doğrudan oluşturulur.
-if python manage.py migrate --run-syncdb 2>/dev/null; then
-    basari "Migration tamamlandı."
-else
-    uyari "Standart migrate başarısız. Tablo bazlı oluşturma yöntemi deneniyor..."
-    python - <<'PYEOF'
-import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-django.setup()
+# ── 6. Kullanıcı gruplarını güncelle ─────────────────────────
+bilgi "Kullanıcı grupları güncelleniyor..."
+python manage.py kullanici_gruplari_olustur
+basari "Kullanıcı grupları güncellendi."
 
-from django.db import connection
-from django.apps import apps
-from django.db.migrations.recorder import MigrationRecorder
-
-recorder = MigrationRecorder(connection)
-mevcut = {(m.app, m.name) for m in recorder.migration_qs.all()}
-tables = connection.introspection.table_names()
-
-for app_config in apps.get_app_configs():
-    for model in app_config.get_models():
-        tablo = model._meta.db_table
-        if tablo not in tables:
-            try:
-                with connection.schema_editor() as editor:
-                    editor.create_model(model)
-                print(f"  [+] Tablo oluşturuldu: {tablo}")
-            except Exception as e:
-                print(f"  [!] {tablo} atlandı: {e}")
-PYEOF
-    basari "Tablo oluşturma tamamlandı."
-fi
-
-# ── 6. Static dosyalar ────────────────────────────────────────
+# ── 7. Static dosyalar ────────────────────────────────────────
 bilgi "Static dosyalar toplanıyor..."
 python manage.py collectstatic --noinput --clear -v 0
 basari "Static dosyalar güncellendi."
 
-# ── 7. İzinleri düzelt ───────────────────────────────────────
-#bilgi "Dosya izinleri düzenleniyor..."
-#sudo chown -R www-data:www-data "$PROJE_DIZIN"
-#sudo chmod -R 755 "$PROJE_DIZIN"
+# ── 8. İzinleri düzelt ───────────────────────────────────────
 sudo chmod 600 "$PROJE_DIZIN/.env"
+sudo chown -R www-data:www-data "$PROJE_DIZIN/staticfiles" 2>/dev/null || true
+sudo chown -R www-data:www-data "$PROJE_DIZIN/media"       2>/dev/null || true
 
-# ── 8. Servisi başlat ─────────────────────────────────────────
+# ── 9. Servisi başlat ─────────────────────────────────────────
 bilgi "Servis başlatılıyor..."
 sudo systemctl start "$SERVIS"
 sleep 3
@@ -141,7 +113,7 @@ else
     hata "Servis başlatılamadı! Loglar: sudo journalctl -u $SERVIS -n 30"
 fi
 
-# ── 9. Kritik tablo özeti ─────────────────────────────────────
+# ── 10. Kritik tablo özeti ────────────────────────────────────
 echo ""
 bilgi "Kritik tablo kayıt sayıları:"
 python - <<'PYEOF'
@@ -151,21 +123,31 @@ django.setup()
 from django.db import connection
 
 tablolar = {
-    "sinav_sinavbilgisi":  "Sınav Bilgisi",
-    "sinav_takvim":        "Takvim",
-    "sinav_takvimüretim":  "Takvim Üretimi",
-    "sinav_oturmaplani":   "Oturma Planı",
-    "sinav_oturmaüretim":  "Oturma Üretimi",
+    "sinav_sinavbilgisi":           "Sınav Bilgisi",
+    "sinav_takvim":                 "Takvim",
+    "sinav_takvimuretim":           "Takvim Üretimi",
+    "sinav_oturmaplani":            "Oturma Planı",
+    "sinav_oturmauretim":           "Oturma Üretimi",
+    "sinav_sinavsalonyoklama":      "Salon Yoklama",
+    "nobet_mazeret_salon_gorevi":   "Mazeret Salon Görevi",
+    "nobet_gorevi":                 "Nöbet Görevi",
+    "nobet_gecmis":                 "Nöbet Geçmişi",
 }
 with connection.cursor() as cur:
     for tablo, ad in tablolar.items():
         try:
-            cur.execute(f"SELECT COUNT(*) FROM \"{tablo}\"")
+            cur.execute(f'SELECT COUNT(*) FROM "{tablo}"')
             sayi = cur.fetchone()[0]
-            print(f"  {ad:<20} : {sayi} kayıt")
+            print(f"  {ad:<26} : {sayi} kayıt")
         except Exception:
-            print(f"  {ad:<20} : tablo bulunamadı")
+            print(f"  {ad:<26} : tablo bulunamadı")
 PYEOF
+
+# ── 11. Eski yedekleri temizle (30 günden eski) ───────────────
+bilgi "30 günden eski yedekler temizleniyor..."
+find "$YEDEK_DIZIN" -name "*.dump" -mtime +30 -delete 2>/dev/null && \
+    basari "Eski yedekler temizlendi." || \
+    uyari "Yedek temizleme atlandı (dizin boş olabilir)."
 
 echo ""
 echo -e "${YESIL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
