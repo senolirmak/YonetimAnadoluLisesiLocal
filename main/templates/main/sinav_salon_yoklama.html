@@ -88,7 +88,8 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
             {% for ogr in grp %}
             <div class="koltuk {% if not ogr.bos %}koltuk-dolu durum-{{ ogr.durum }}{% else %}koltuk-bos{% endif %}"
-                 data-okulno="{{ ogr.okulno }}">
+                 data-okulno="{{ ogr.okulno }}"
+                 {% if not ogr.bos %}onclick="koltuguGenislet(this)"{% endif %}>
               <div class="koltuk-sira">{{ ogr.pdf_sira }}</div>
               {% if not ogr.bos %}
               <div class="koltuk-ad">{{ ogr.adi_soyadi }}</div>
@@ -203,6 +204,34 @@
 .d-btn-gec            { background: #fffbeb; color: #d97706; border-color: #fde68a; }
 .d-btn-gec.aktif      { background: #d97706; color: #fff; border-color: #d97706; }
 
+/* Genişletilmiş koltuk (dokunmatik seçim) */
+.koltuk-dolu { cursor: pointer; }
+
+.koltuk.genis {
+  position: relative;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0,0,0,.22);
+  border-width: 2px !important;
+  transform: scale(1.04);
+  transition: transform .15s, box-shadow .15s;
+}
+
+.koltuk.genis .koltuk-durumlar {
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.koltuk.genis .d-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 0;
+  font-size: .92rem;
+  border-radius: 7px;
+  text-align: center;
+  border-width: 2px;
+}
+
 /* Koridor */
 .koridor {
   background: repeating-linear-gradient(
@@ -213,13 +242,29 @@
 </style>
 
 <script>
+function koltuguGenislet(koltuk) {
+  const zatenGenis = koltuk.classList.contains("genis");
+  // Diğer açık kartları kapat
+  document.querySelectorAll(".koltuk.genis").forEach(k => k.classList.remove("genis"));
+  if (!zatenGenis) koltuk.classList.add("genis");
+}
+
 function koltuguGuncelle(input) {
   const koltuk = input.closest(".koltuk");
   koltuk.className = koltuk.className.replace(/durum-\w+/, "durum-" + input.value);
   koltuk.querySelectorAll(".d-btn").forEach(b => b.classList.remove("aktif"));
   input.nextElementSibling.classList.add("aktif");
+  // Seçim yapıldı → kartı küçült
+  setTimeout(() => koltuk.classList.remove("genis"), 200);
   sayilariGuncelle();
 }
+
+// Kart dışına dokunulunca kapat
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".koltuk")) {
+    document.querySelectorAll(".koltuk.genis").forEach(k => k.classList.remove("genis"));
+  }
+});
 
 function tumunuIsaretle(durum) {
   document.querySelectorAll(`.koltuk-dolu input[type=radio][value=${durum}]`).forEach(r => {

@@ -189,10 +189,38 @@
     </div>
     {% endif %}
 
-    <form method="post">
+    <form method="post" id="yoklama-form">
         {% csrf_token %}
         <input type="hidden" name="tarih" value="{{ secili_tarih|date:'Y-m-d' }}">
 
+        {# ── Görünüm toggle ── #}
+        {% if ogrenciler %}
+        <div style="display:flex;gap:.6rem;align-items:center;margin-bottom:.85rem;flex-wrap:wrap;">
+            <button type="button" id="btn-liste"
+                    onclick="gorunumDegistir('liste')"
+                    style="padding:.35rem .9rem;border-radius:6px;font-size:.83rem;font-weight:600;
+                           border:1px solid #6366f1;cursor:pointer;background:#6366f1;color:#fff;">
+                Liste Görünümü
+            </button>
+            <button type="button" id="btn-plan"
+                    onclick="gorunumDegistir('plan')"
+                    style="padding:.35rem .9rem;border-radius:6px;font-size:.83rem;font-weight:600;
+                           border:1px solid #6366f1;cursor:pointer;background:#fff;color:#6366f1;">
+                Oturma Planı
+            </button>
+            <span id="devamsiz-sayac" style="font-size:.82rem;color:#dc2626;font-weight:700;margin-left:.5rem;"></span>
+            {% if not oturma_var %}
+            <span style="font-size:.75rem;color:#9ca3af;margin-left:.25rem;">
+                (Oturma planı yapılmamış — okul numarasına göre otomatik sıralandı)
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {# ══════════════════════════════════════════════════
+           BÖLÜM A — Liste Görünümü (her zaman var)
+        ══════════════════════════════════════════════════ #}
+        <div id="bolum-liste">
         <div class="card">
             <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
                 <span>Öğrenci Listesi — Devamsız olanları işaretleyin</span>
@@ -215,10 +243,12 @@
                     </thead>
                     <tbody>
                         {% for ogr in ogrenciler %}
-                        <tr {% if ogr.pk in kayitli_devamsiz_ids %}style="background:#fff3cd;"{% endif %}>
+                        <tr id="liste-satir-{{ ogr.pk }}" {% if ogr.pk in kayitli_devamsiz_ids %}style="background:#fff3cd;"{% endif %}>
                             <td class="center">
                                 <input type="checkbox" name="devamsiz" value="{{ ogr.pk }}"
-                                    {% if ogr.pk in kayitli_devamsiz_ids %}checked{% endif %}>
+                                    id="chk-{{ ogr.pk }}"
+                                    {% if ogr.pk in kayitli_devamsiz_ids %}checked{% endif %}
+                                    onchange="checkDegisti(this)">
                             </td>
                             <td>{{ ogr.okulno }}</td>
                             <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
@@ -235,12 +265,196 @@
                 </table>
             </div>
         </div>
+        </div>{# /bolum-liste #}
+
+        {# ══════════════════════════════════════════════════
+           BÖLÜM B — Oturma Planı Görünümü
+        ══════════════════════════════════════════════════ #}
+        {% if ogrenciler %}
+        <div id="bolum-plan" style="display:none;">
+
+          {# TAHTA #}
+          <div style="text-align:center;background:#374151;color:#fff;font-size:.78rem;font-weight:600;
+                      letter-spacing:.1em;padding:.4rem;border-radius:5px;margin-bottom:.75rem;">
+            TAHTA
+          </div>
+
+          {# Grup başlıkları #}
+          <div class="yk-grid-satir" style="margin-bottom:4px;">
+            <div></div>
+            <div style="grid-column:span 2;text-align:center;font-size:.72rem;font-weight:700;
+                        color:#374151;background:#f3f4f6;border-radius:4px;padding:3px 0;">1. Grup</div>
+            <div></div>
+            <div style="grid-column:span 2;text-align:center;font-size:.72rem;font-weight:700;
+                        color:#374151;background:#f3f4f6;border-radius:4px;padding:3px 0;">2. Grup</div>
+            <div></div>
+            <div style="grid-column:span 2;text-align:center;font-size:.72rem;font-weight:700;
+                        color:#374151;background:#f3f4f6;border-radius:4px;padding:3px 0;">3. Grup</div>
+          </div>
+
+          {# Satırlar #}
+          {% for satir_gruplar in oturma_grid %}
+          <div class="yk-grid-satir">
+            <div class="yk-sira-no">{{ forloop.counter }}</div>
+            {% for grup in satir_gruplar %}
+            {% for hucre in grup %}
+            {% if hucre.ogr %}
+            <div class="yk-koltuk yk-dolu {% if hucre.ogr.pk in kayitli_devamsiz_ids %}yk-devamsiz{% endif %}"
+                 data-pk="{{ hucre.ogr.pk }}"
+                 onclick="koltuguToggle(this)">
+              <div class="yk-ad">{{ hucre.ogr.adi }}<br>{{ hucre.ogr.soyadi }}</div>
+              <div class="yk-durum-etiket"></div>
+            </div>
+            {% else %}
+            <div class="yk-koltuk yk-bos"></div>
+            {% endif %}
+            {% endfor %}
+            {% if not forloop.last %}<div class="yk-koridor"></div>{% endif %}
+            {% endfor %}
+          </div>
+          {% endfor %}
+
+          {# Planda olmayan öğrenciler #}
+          {% if planda_olmayan %}
+          <div style="margin-top:1rem;padding:8px 12px;background:#fef9c3;border:1px solid #fbbf24;
+                      border-radius:6px;font-size:.82rem;color:#92400e;">
+            <strong>Oturma planında yer almayan öğrenciler:</strong>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+              {% for ogr in planda_olmayan %}
+              <div class="yk-koltuk yk-dolu yk-kucuk {% if ogr.pk in kayitli_devamsiz_ids %}yk-devamsiz{% endif %}"
+                   data-pk="{{ ogr.pk }}"
+                   onclick="koltuguToggle(this)"
+                   style="min-width:90px;max-width:120px;">
+                <div class="yk-ad">{{ ogr.adi }} {{ ogr.soyadi }}</div>
+                <div class="yk-durum-etiket"></div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+        {% endif %}{# oturma_var #}
 
         <div class="form-actions mt-20">
             <a href="{% url 'devamsizlik:ogretmen_devamsizlik' %}?tarih={{ secili_tarih|date:'Y-m-d' }}" class="btn-cancel">Vazgeç</a>
             <button type="submit" class="btn btn-success">Kaydet</button>
         </div>
     </form>
+
+<style>
+.yk-grid-satir {
+  display: grid;
+  grid-template-columns: 24px 1fr 1fr 16px 1fr 1fr 16px 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 5px;
+  align-items: center;
+}
+.yk-sira-no {
+  font-size: .7rem; color: #9ca3af; font-weight: 700; text-align: center;
+}
+.yk-koridor {
+  background: repeating-linear-gradient(
+    180deg, #e5e7eb 0, #e5e7eb 3px, transparent 3px, transparent 8px
+  );
+  border-radius: 3px; align-self: stretch;
+}
+.yk-koltuk {
+  min-height: 66px;
+  border-radius: 7px;
+  border: 2px solid #e5e7eb;
+  background: #fafafa;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 4px; text-align: center;
+  transition: background .12s, border-color .12s;
+}
+.yk-bos { opacity: .35; }
+.yk-dolu { cursor: pointer; }
+.yk-dolu:active { transform: scale(.96); }
+.yk-ad {
+  font-size: .7rem; font-weight: 700; line-height: 1.25;
+  color: #1f2937; word-break: break-word;
+}
+.yk-durum-etiket {
+  font-size: .62rem; font-weight: 700; margin-top: 3px;
+  min-height: 14px; color: #dc2626;
+}
+/* Mevcut (varsayılan) */
+.yk-dolu:not(.yk-devamsiz) {
+  background: #f0fdf4; border-color: #86efac;
+}
+/* Devamsız */
+.yk-dolu.yk-devamsiz {
+  background: #fff1f2; border-color: #fca5a5;
+}
+.yk-kucuk { min-height: 48px; }
+</style>
+
+<script>
+// Devamsız sayacı güncelle
+function sayaciGuncelle() {
+  const sayi = document.querySelectorAll('input[name="devamsiz"]:checked').length;
+  const el = document.getElementById('devamsiz-sayac');
+  if (el) el.textContent = sayi > 0 ? sayi + ' devamsız' : '';
+}
+
+// Oturma planı koltuk tıklama
+function koltuguToggle(koltuk) {
+  const pk = koltuk.dataset.pk;
+  const chk = document.getElementById('chk-' + pk);
+  if (!chk) return;
+  chk.checked = !chk.checked;
+  // Görsel güncelle (hem bu koltuk hem listedeki satır)
+  guncellePkGorunumu(pk, chk.checked);
+  sayaciGuncelle();
+}
+
+// Checkbox değişince (liste görünümünden)
+function checkDegisti(chk) {
+  guncellePkGorunumu(chk.value, chk.checked);
+  sayaciGuncelle();
+}
+
+function guncellePkGorunumu(pk, devamsizMi) {
+  // Oturma planındaki koltuk(lar)
+  document.querySelectorAll(`.yk-dolu[data-pk="${pk}"]`).forEach(k => {
+    k.classList.toggle('yk-devamsiz', devamsizMi);
+    const etiket = k.querySelector('.yk-durum-etiket');
+    if (etiket) etiket.textContent = devamsizMi ? 'Devamsız' : '';
+  });
+  // Liste satırı
+  const satir = document.getElementById('liste-satir-' + pk);
+  if (satir) satir.style.background = devamsizMi ? '#fff3cd' : '';
+}
+
+// Görünüm toggle
+function gorunumDegistir(mod) {
+  const listeBolum = document.getElementById('bolum-liste');
+  const planBolum  = document.getElementById('bolum-plan');
+  const btnListe   = document.getElementById('btn-liste');
+  const btnPlan    = document.getElementById('btn-plan');
+  if (mod === 'plan') {
+    listeBolum.style.display = 'none';
+    planBolum.style.display  = '';
+    btnPlan.style.background   = '#6366f1'; btnPlan.style.color   = '#fff';
+    btnListe.style.background  = '#fff';    btnListe.style.color  = '#6366f1';
+  } else {
+    listeBolum.style.display = '';
+    planBolum.style.display  = 'none';
+    btnListe.style.background  = '#6366f1'; btnListe.style.color  = '#fff';
+    btnPlan.style.background   = '#fff';    btnPlan.style.color   = '#6366f1';
+  }
+}
+
+// Sayfa açılışında etiketi ve sayacı senkronize et
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input[name="devamsiz"]:checked').forEach(chk => {
+    guncellePkGorunumu(chk.value, true);
+  });
+  sayaciGuncelle();
+});
+</script>
     {% endif %}
 
 </div>

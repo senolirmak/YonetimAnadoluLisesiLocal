@@ -191,6 +191,61 @@ def ogretmen_devamsizlik(request, ders_saati=None):
             reverse("devamsizlik:ogretmen_devamsizlik") + f"?tarih={post_tarih.isoformat()}"
         )
 
+    # Oturma planı grid'i — SinifOturmaDuzeni varsa oluştur
+    from ogrenci.models import SinifOturmaDuzeni
+    from okul.models import SinifSube
+
+    N_GRUP = 3
+    N_KOLON_PER_GRUP = 2
+    N_SIRA = 6
+
+    try:
+        sinif_sube_obj = SinifSube.objects.get(
+            sinif=sinif_sube.sinif, sube=sinif_sube.sube
+        )
+        duzeni = list(
+            SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube_obj)
+            .select_related("ogrenci")
+        )
+    except Exception:
+        duzeni = []
+
+    oturma_var = bool(duzeni)
+
+    if oturma_var:
+        mevcut_plan = {(d.sira_no, d.kolon_no): d.ogrenci for d in duzeni}
+    else:
+        # Plan yok → öğrencileri okul numarasına göre sırala, koltuklara otomatik yerleştir
+        ogr_sirali = list(ogrenciler.order_by("okulno"))
+        mevcut_plan = {}
+        idx = 0
+        for sira in range(1, N_SIRA + 1):
+            for grup in range(1, N_GRUP + 1):
+                for k in range(1, N_KOLON_PER_GRUP + 1):
+                    if idx < len(ogr_sirali):
+                        kolon_no = (grup - 1) * N_KOLON_PER_GRUP + k
+                        mevcut_plan[(sira, kolon_no)] = ogr_sirali[idx]
+                        idx += 1
+
+    oturma_grid = []
+    for sira in range(1, N_SIRA + 1):
+        satir_gruplar = []
+        for grup in range(1, N_GRUP + 1):
+            hucreler = []
+            for k in range(1, N_KOLON_PER_GRUP + 1):
+                kolon_no = (grup - 1) * N_KOLON_PER_GRUP + k
+                hucreler.append({
+                    "ogr":   mevcut_plan.get((sira, kolon_no)),
+                    "sira":  sira,
+                    "kolon": kolon_no,
+                })
+            satir_gruplar.append(hucreler)
+        oturma_grid.append(satir_gruplar)
+
+    # Oturma planında yer almayan öğrenciler (grid kapasitesi aşıldıysa)
+    planda_pkler = {ogr.pk for ogr in mevcut_plan.values()}
+    planda_olmayan = [o for o in ogrenciler if o.pk not in planda_pkler]
+
     return render(
         request,
         "devamsizlik/ogretmen_devamsizlik.html",
@@ -205,6 +260,9 @@ def ogretmen_devamsizlik(request, ders_saati=None):
             "bugun": bugun,
             "secili_tarih": secili_tarih,
             "gun_navigasyon": gun_navigasyon,
+            "oturma_var": oturma_var,
+            "oturma_grid": oturma_grid,
+            "planda_olmayan": planda_olmayan,
         },
     )
 

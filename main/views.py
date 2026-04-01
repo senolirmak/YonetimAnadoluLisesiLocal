@@ -1205,6 +1205,132 @@ def ogretmen_yoklama_raporum(request):
 
 
 # ─────────────────────────────────────────────────────────
+# Sınıf Oturma Planı
+# ─────────────────────────────────────────────────────────
+
+@login_required
+def sinif_oturma_plani(request):
+    """Rehber öğretmenin sınıfının kalıcı oturma düzenini görüntüler ve kaydeder."""
+    from ogrenci.models import Ogrenci, SinifOturmaDuzeni
+    from okul.models import SinifSube
+
+    user = request.user
+
+    # Yetkili mi? Süper kullanıcı veya ders programında rehberlik dersi olan öğretmen
+    if not user.is_superuser:
+        if not hasattr(user, "personel"):
+            raise PermissionDenied
+        rehberlik_qs = DersProgrami.objects.filter(
+            ogretmen=user.personel,
+            ders__ders_adi__iexact="rehberlik ve yönlendirme",
+        ).select_related("sinif_sube")
+        if not rehberlik_qs.exists():
+            raise PermissionDenied
+
+    # Süper kullanıcı için sinif_sube parametresi ile çalışma
+    sinif_sube_id = request.GET.get("sinif_sube") or request.POST.get("sinif_sube")
+
+    if user.is_superuser and sinif_sube_id:
+        sinif_sube = get_object_or_404(SinifSube, pk=sinif_sube_id)
+    elif user.is_superuser:
+        # Süper kullanıcıya tüm şubeleri göster
+        tum_sinif_subeler = SinifSube.objects.all().order_by("sinif", "sube")
+        return render(request, "main/sinif_oturma_plani.html", {
+            "title": "Sınıf Oturma Planı",
+            "sinif_sec": True,
+            "tum_sinif_subeler": tum_sinif_subeler,
+        })
+    else:
+        rehberlik_ders = rehberlik_qs.first()
+        sinif_sube = rehberlik_ders.sinif_sube
+        if not sinif_sube:
+            raise PermissionDenied
+
+    # Sınıftaki tüm öğrenciler
+    ogrenciler = list(
+        Ogrenci.objects.filter(sinif=sinif_sube.sinif, sube=sinif_sube.sube)
+        .order_by("soyadi", "adi")
+    )
+
+    # Oturma düzeni yapılandırması — 3 grup × 2 sütun × 6 sıra
+    N_GRUP  = 3
+    N_KOLON_PER_GRUP = 2
+    N_KOLON = N_GRUP * N_KOLON_PER_GRUP   # toplam 6 sütun
+    N_SIRA  = 6
+
+    if request.method == "POST":
+        # Her hücre için: koltuk_<sira>_<kolon> = ogrenci_pk
+        # Önce bu sınıfın tüm kaydını sil, sonra yenisini yaz
+        SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube).delete()
+        yeni_kayitlar = []
+        for sira in range(1, N_SIRA + 1):
+            for kolon in range(1, N_KOLON + 1):
+                deger = request.POST.get(f"koltuk_{sira}_{kolon}", "").strip()
+                if deger:
+                    try:
+                        ogr_pk = int(deger)
+                        yeni_kayitlar.append(
+                            SinifOturmaDuzeni(
+                                sinif_sube=sinif_sube,
+                                ogrenci_id=ogr_pk,
+                                sira_no=sira,
+                                kolon_no=kolon,
+                                guncelleyen=user,
+                            )
+                        )
+                    except (ValueError, TypeError):
+                        pass
+        SinifOturmaDuzeni.objects.bulk_create(yeni_kayitlar)
+        messages.success(request, f"{sinif_sube} sınıfının oturma düzeni kaydedildi.")
+        qs = f"?sinif_sube={sinif_sube.pk}" if user.is_superuser else ""
+        return redirect(f"{request.path}{qs}")
+
+    # Mevcut oturma düzenini grid'e yerleştir
+    mevcut = {
+        (d.sira_no, d.kolon_no): d.ogrenci
+        for d in SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube)
+        .select_related("ogrenci")
+    }
+
+    # Grid: grid[sira][grup][kolon] = {"ogr": ogrenci|None, "sira": int, "kolon": int}
+    # kolon_no (DB) = (grup-1)*N_KOLON_PER_GRUP + kolon  (1-tabanlı)
+    grid = []
+    for sira in range(1, N_SIRA + 1):
+        satir_gruplar = []
+        for grup in range(1, N_GRUP + 1):
+            hucreler = []
+            for k in range(1, N_KOLON_PER_GRUP + 1):
+                kolon_no = (grup - 1) * N_KOLON_PER_GRUP + k
+                hucreler.append({
+                    "ogr":    mevcut.get((sira, kolon_no)),
+                    "sira":   sira,
+                    "kolon":  kolon_no,
+                })
+            satir_gruplar.append(hucreler)
+        grid.append(satir_gruplar)
+
+    # Yerleştirilmemiş öğrenciler
+    yerlesmis_pkler = {ogr.pk for ogr in mevcut.values()}
+    yerlestirilmemis = [o for o in ogrenciler if o.pk not in yerlesmis_pkler]
+
+    return render(request, "main/sinif_oturma_plani.html", {
+        "title":              f"Sınıf Oturma Planı – {sinif_sube}",
+        "sinif_sube":         sinif_sube,
+        "grid":               grid,           # grid[sira_idx][kolon_idx 0..5]
+        "n_grup":             N_GRUP,
+        "n_kolon_per_grup":   N_KOLON_PER_GRUP,
+        "n_kolon":            N_KOLON,
+        "n_sira":             N_SIRA,
+        "sira_range":         range(1, N_SIRA + 1),
+        "grup_range":         range(1, N_GRUP + 1),
+        "kolon_per_grup_range": range(1, N_KOLON_PER_GRUP + 1),
+        "ogrenciler":         ogrenciler,
+        "yerlestirilmemis":   yerlestirilmemis,
+        "sinif_sec":          False,
+    })
+
+
+# ─────────────────────────────────────────────────────────
 # Okul Yapılandırması
 # ─────────────────────────────────────────────────────────
 

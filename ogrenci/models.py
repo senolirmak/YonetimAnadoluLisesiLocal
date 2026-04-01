@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 CINSIYET_CHOICES = (
     ("E", "Erkek"),
@@ -73,3 +74,42 @@ class OgrenciAdres(models.Model):
 
     def __str__(self):
         return f"{self.ogrenci} - {self.il}/{self.ilce}"
+
+
+class SinifOturmaDuzeni(models.Model):
+    """Sınıfın kalıcı oturma düzeni — rehber öğretmen tarafından düzenlenir."""
+
+    sinif_sube = models.ForeignKey(
+        "okul.SinifSube",
+        on_delete=models.CASCADE,
+        related_name="oturma_duzeni",
+        verbose_name="Sınıf/Şube",
+    )
+    ogrenci = models.ForeignKey(
+        Ogrenci,
+        on_delete=models.CASCADE,
+        related_name="oturma_duzeni",
+        verbose_name="Öğrenci",
+    )
+    # Sıra: 1'den başlar (tahtaya en yakın = 1)
+    sira_no = models.PositiveSmallIntegerField(verbose_name="Sıra No")
+    # Kolon: 1 = sol, 2 = orta-sol, 3 = orta-sağ, 4 = sağ (max 4 sütun)
+    kolon_no = models.PositiveSmallIntegerField(verbose_name="Kolon No")
+    guncelleme = models.DateTimeField(auto_now=True, verbose_name="Son Güncelleme")
+    guncelleyen = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Güncelleyen",
+    )
+
+    class Meta:
+        db_table = "sinif_oturma_duzeni"
+        unique_together = [("sinif_sube", "sira_no", "kolon_no")]
+        verbose_name = "Sınıf Oturma Düzeni"
+        verbose_name_plural = "Sınıf Oturma Düzenleri"
+        ordering = ["sinif_sube", "sira_no", "kolon_no"]
+
+    def __str__(self):
+        return f"{self.sinif_sube} — Sıra {self.sira_no}/{self.kolon_no}: {self.ogrenci.adi} {self.ogrenci.soyadi}"

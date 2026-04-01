@@ -280,8 +280,13 @@
                         {% endif %}
                     </div>
                     {% if rehberlik_sinif_sube %}
-                    <div style="margin-top:10px;padding:8px 10px;background:#f0fff4;border:1px solid #c3e6cb;border-radius:6px;font-size:0.9em;color:#155724;">
-                        <strong>Sınıf Rehber Öğretmenliği:</strong> {{ rehberlik_sinif_sube }}
+                    <div style="margin-top:10px;padding:10px 12px;background:#f0fff4;border:1px solid #c3e6cb;border-radius:6px;font-size:0.9em;color:#155724;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <span><strong>Sınıf Rehber Öğretmenliği:</strong> {{ rehberlik_sinif_sube }}</span>
+                        <a href="{% url 'sinif_oturma_plani' %}"
+                           style="background:#16a34a;color:#fff;text-decoration:none;font-size:.82rem;font-weight:600;
+                                  padding:.3rem .9rem;border-radius:6px;white-space:nowrap;">
+                          Oturma Planı
+                        </a>
                     </div>
                     {% endif %}
                     <div style="margin-top:10px;padding:8px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;font-size:0.85em;color:#0369a1;">

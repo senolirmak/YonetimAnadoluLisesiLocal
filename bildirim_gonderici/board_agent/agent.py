@@ -27,13 +27,65 @@ import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+
+def masaustu_uid_bul() -> str:
+    """Masaüstünde aktif grafik oturumu açık olan kullanıcının UID'sini döndürür.
+
+    Öncelik sırası:
+      1. loginctl üzerinden x11/wayland oturumu olan kullanıcı
+      2. /run/user/ altındaki ilk UID >= 1000 dizini
+      3. MASAUSTU_UID ortam değişkeni veya sabit "1000"
+    """
+    # 1. loginctl ile grafik oturumunu bul
+    try:
+        cikti = subprocess.check_output(
+            ["loginctl", "list-sessions", "--no-legend"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+        for satir in cikti.splitlines():
+            parcalar = satir.split()
+            if len(parcalar) < 2:
+                continue
+            session_id, uid = parcalar[0], parcalar[1]
+            if not uid.isdigit() or int(uid) < 1000:
+                continue
+            try:
+                tip = subprocess.check_output(
+                    ["loginctl", "show-session", session_id, "-p", "Type", "--value"],
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                ).strip()
+                if tip in ("x11", "wayland", "mir"):
+                    return uid
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    # 2. /run/user/ altındaki aktif oturum dizinlerini tara
+    try:
+        adaylar = sorted(
+            e.name
+            for e in os.scandir("/run/user")
+            if e.is_dir() and e.name.isdigit() and int(e.name) >= 1000
+        )
+        if adaylar:
+            return adaylar[0]
+    except Exception:
+        pass
+
+    # 3. Ortam değişkeni veya varsayılan
+    return os.environ.get("MASAUSTU_UID", "1000")
+
+
 # ── Yapılandırma ──────────────────────────────────────────────
 DINLEME_PORTU  = int(os.environ.get("DINLEME_PORTU", 8765))
 BILDIRIM_SURESI_MS = 15000              # Bildirimin ekranda kalma süresi (ms)
 LOG_DOSYASI    = "/var/log/tahta_agent.log"
 
-# Tahtada oturum açık olan kullanıcının UID'si (genellikle 1000)
-MASAUSTU_KULLANICI_UID = os.environ.get("MASAUSTU_UID", "1000")
+# Tahtada oturum açık olan kullanıcının UID'si
+MASAUSTU_KULLANICI_UID = masaustu_uid_bul()
 
 # Gizli anahtar — systemd EnvironmentFile=/etc/tahta_agent/secrets üzerinden gelir
 GIZLI_ANAHTAR = os.environ.get("GIZLI_ANAHTAR", "")

@@ -1,0 +1,365 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container">
+
+  <a href="{% url 'index' %}"
+     style="display:inline-flex;align-items:center;gap:.3rem;color:#6366f1;font-size:.85rem;text-decoration:none;margin-bottom:14px;">
+    ← Ana Sayfaya Dön
+  </a>
+
+  <h2 class="page-title">{{ title }}</h2>
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div style="margin-bottom:12px;padding:.7rem 1rem;border-radius:6px;
+                background:#d1fae5;border:1px solid #6ee7b7;color:#065f46;font-size:.9rem;">
+      {{ msg }}
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  {# ── Süper kullanıcı şube seçim ekranı ── #}
+  {% if sinif_sec %}
+  <p style="color:#6b7280;font-size:.9rem;">Oturma planı düzenlenecek sınıfı seçin:</p>
+  <div style="display:flex;flex-wrap:wrap;gap:.6rem;">
+    {% for ss in tum_sinif_subeler %}
+    <a href="?sinif_sube={{ ss.pk }}"
+       style="padding:.45rem 1.1rem;background:#6366f1;color:#fff;border-radius:7px;
+              text-decoration:none;font-weight:600;font-size:.9rem;">
+      {{ ss }}
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+
+  {# ── Ana Düzen Editörü ── #}
+  <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start;">
+
+    {# ── Sol: Yerleştirilmemiş Öğrenciler Listesi ── #}
+    <div id="ogrenci-listesi" style="min-width:200px;max-width:220px;flex-shrink:0;">
+      <div style="font-size:.78rem;font-weight:700;color:#6b7280;text-transform:uppercase;
+                  letter-spacing:.06em;margin-bottom:.5rem;">
+        Yerleştirilmemiş ({{ yerlestirilmemis|length }})
+      </div>
+      <div id="bekleyenler" style="display:flex;flex-direction:column;gap:4px;min-height:40px;
+                                   border:2px dashed #e5e7eb;border-radius:8px;padding:6px;">
+        {% for ogr in yerlestirilmemis %}
+        <div class="ogr-kart" draggable="true"
+             data-pk="{{ ogr.pk }}"
+             data-ad="{{ ogr.adi }} {{ ogr.soyadi }}"
+             style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:5px;
+                    padding:5px 8px;font-size:.78rem;font-weight:600;color:#0369a1;
+                    cursor:grab;user-select:none;">
+          {{ ogr.adi }} {{ ogr.soyadi }}
+          <div style="font-size:.68rem;color:#6b7280;font-weight:400;">{{ ogr.okulno }}</div>
+        </div>
+        {% endfor %}
+        {% if not yerlestirilmemis %}
+        <div style="font-size:.78rem;color:#9ca3af;text-align:center;padding:.5rem;">
+          Tüm öğrenciler yerleştirildi
+        </div>
+        {% endif %}
+      </div>
+
+      {# Yerleştirilmiş tüm öğrenciler (gizli) — sıradan koltuktan buraya sürüklenince #}
+      <div style="margin-top:.75rem;font-size:.75rem;color:#9ca3af;">
+        Bir öğrenciyi kaldırmak için koltuktan bu alana sürükleyin.
+      </div>
+    </div>
+
+    {# ── Sağ: Sınıf Grid Editörü ── #}
+    <div style="flex:1;overflow-x:auto;">
+      <form method="post" id="oturma-form">
+        {% csrf_token %}
+        {% if request.GET.sinif_sube %}
+        <input type="hidden" name="sinif_sube" value="{{ request.GET.sinif_sube }}">
+        {% endif %}
+
+        {# TAHTA #}
+        <div style="text-align:center;background:#374151;color:#fff;font-size:.78rem;font-weight:600;
+                    letter-spacing:.1em;padding:.4rem;border-radius:5px;margin-bottom:.75rem;">
+          TAHTA
+        </div>
+
+        {# Başlık satırları — sabit 9 sütunlu grid #}
+        <div style="display:grid;grid-template-columns:28px 1fr 1fr 20px 1fr 1fr 20px 1fr 1fr;gap:5px;margin-bottom:4px;">
+          <div></div>
+          <div style="grid-column:span 2;text-align:center;font-size:.72rem;font-weight:700;
+                      color:#374151;background:#f3f4f6;border-radius:4px;padding:3px 0;">
+            1. Grup
+          </div>
+          <div></div>
+          <div style="grid-column:span 2;text-align:center;font-size:.72rem;font-weight:700;
+                      color:#374151;background:#f3f4f6;border-radius:4px;padding:3px 0;">
+            2. Grup
+          </div>
+          <div></div>
+          <div style="grid-column:span 2;text-align:center;font-size:.72rem;font-weight:700;
+                      color:#374151;background:#f3f4f6;border-radius:4px;padding:3px 0;">
+            3. Grup
+          </div>
+        </div>
+
+        {# Satırlar #}
+        {% for satir_gruplar in grid %}
+        <div class="sinif-grid-satir">
+          <div class="grid-sira-no">{{ forloop.counter }}</div>
+          {% for grup in satir_gruplar %}
+          {% for hucre in grup %}
+          <div class="koltuk-hucre {% if hucre.ogr %}koltuk-dolu{% endif %}"
+               data-sira="{{ hucre.sira }}"
+               data-kolon="{{ hucre.kolon }}">
+            <input type="hidden"
+                   name="koltuk_{{ hucre.sira }}_{{ hucre.kolon }}"
+                   value="{% if hucre.ogr %}{{ hucre.ogr.pk }}{% endif %}">
+            {% if hucre.ogr %}
+            <div class="koltuk-icerik" draggable="true"
+                 data-pk="{{ hucre.ogr.pk }}"
+                 data-ad="{{ hucre.ogr.adi }} {{ hucre.ogr.soyadi }}">
+              <div style="font-size:.72rem;font-weight:700;line-height:1.2;word-break:break-word;">
+                {{ hucre.ogr.adi }}<br>{{ hucre.ogr.soyadi }}
+              </div>
+              <div style="font-size:.63rem;color:#6b7280;margin-top:2px;">{{ hucre.ogr.okulno }}</div>
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {# Gruplar arası koridor #}
+          {% if not forloop.last %}
+          <div class="koridor-dikey"></div>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endfor %}
+
+        <div style="margin-top:1.25rem;display:flex;gap:.75rem;align-items:center;">
+          <button type="submit" class="btn btn-primary">Oturma Düzenini Kaydet</button>
+          <button type="button" onclick="duzeniBosalt()"
+                  style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;
+                         padding:.4rem 1rem;border-radius:6px;font-size:.85rem;cursor:pointer;font-weight:600;">
+            Düzeni Sıfırla
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% endif %}{# sinif_sec #}
+</div>
+
+<style>
+/*
+  Layout: [sıra-no 28px] [koltuk 1fr] [koltuk 1fr] [koridor 20px] [koltuk 1fr] [koltuk 1fr] [koridor 20px] [koltuk 1fr] [koltuk 1fr]
+  = 3 grup × 2 koltuk, gruplar arası 20px koridor
+*/
+.sinif-grid-satir {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr 20px 1fr 1fr 20px 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 5px;
+  align-items: center;
+}
+.grid-sira-no {
+  font-size: .7rem;
+  color: #9ca3af;
+  font-weight: 700;
+  text-align: center;
+}
+.koridor-dikey {
+  background: repeating-linear-gradient(
+    180deg, #e5e7eb 0, #e5e7eb 3px, transparent 3px, transparent 8px
+  );
+  border-radius: 3px;
+  align-self: stretch;
+}
+.koltuk-hucre {
+  min-height: 72px;
+  border-radius: 7px;
+  border: 2px dashed #e5e7eb;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  transition: border-color .15s, background .15s;
+  position: relative;
+}
+.koltuk-hucre.koltuk-dolu {
+  border: 2px solid #a5b4fc;
+  background: #eef2ff;
+}
+.koltuk-hucre.drag-over {
+  border-color: #6366f1;
+  background: #e0e7ff;
+}
+.koltuk-icerik {
+  width: 100%;
+  text-align: center;
+  cursor: grab;
+  user-select: none;
+  padding: 2px;
+}
+.ogr-kart:active, .koltuk-icerik:active { cursor: grabbing; }
+</style>
+
+<script>
+// ── Sürükle-Bırak ──────────────────────────────────────────
+let suruklenenPk  = null;
+let suruklenenAd  = null;
+let suruklenenKaynak = null;  // 'bekleyenler' | 'koltuk'
+
+function tumSuruklenenler() {
+  return document.querySelectorAll(".ogr-kart, .koltuk-icerik");
+}
+
+function suruklemeOlaylariniKur() {
+  tumSuruklenenler().forEach(el => {
+    el.addEventListener("dragstart", e => {
+      suruklenenPk     = el.dataset.pk;
+      suruklenenAd     = el.dataset.ad;
+      suruklenenKaynak = el.closest("#bekleyenler") ? "bekleyenler" : "koltuk";
+      e.dataTransfer.effectAllowed = "move";
+    });
+  });
+
+  // Koltuk hücreleri → drop hedefi
+  document.querySelectorAll(".koltuk-hucre").forEach(hucre => {
+    hucre.addEventListener("dragover", e => {
+      e.preventDefault();
+      hucre.classList.add("drag-over");
+    });
+    hucre.addEventListener("dragleave", () => hucre.classList.remove("drag-over"));
+    hucre.addEventListener("drop", e => {
+      e.preventDefault();
+      hucre.classList.remove("drag-over");
+      if (!suruklenenPk) return;
+
+      const mevcutIcerik = hucre.querySelector(".koltuk-icerik");
+      const mevcutPk     = mevcutIcerik ? mevcutIcerik.dataset.pk : null;
+
+      // Kaynak hücreyi veya bekleyenler listesini bul
+      const kaynakHucre = suruklenenKaynak === "koltuk"
+        ? document.querySelector(`.koltuk-icerik[data-pk="${suruklenenPk}"]`)?.closest(".koltuk-hucre")
+        : null;
+
+      if (mevcutPk && mevcutPk !== suruklenenPk) {
+        // Hedefte öğrenci var → yer değiştir
+        if (kaynakHucre) {
+          kaynakHucre.querySelector("input[type=hidden]").value = mevcutPk;
+          const eskiIcerik = kaynakHucre.querySelector(".koltuk-icerik");
+          mevcutIcerik.remove();
+          hucre.appendChild(eskiIcerik); // geçici — aşağıda yeniden render
+          hucre.querySelector("input[type=hidden]").value = suruklenenPk;
+          // DOM'u temizle ve yeniden kur
+          eskiIcerik.dataset.pk = mevcutPk;
+          // güncelle
+          kaynakHucre.classList.add("koltuk-dolu");
+          hucre.classList.add("koltuk-dolu");
+        }
+      } else {
+        // Hedef boş ya da aynı öğrenci → yerleştir
+        if (mevcutIcerik) mevcutIcerik.remove();
+
+        // Kaynaktan temizle
+        if (kaynakHucre) {
+          kaynakHucre.querySelector("input[type=hidden]").value = "";
+          kaynakHucre.classList.remove("koltuk-dolu");
+        } else {
+          // Bekleyenler listesinden geldi
+          const kaynakKart = document.querySelector(`#bekleyenler .ogr-kart[data-pk="${suruklenenPk}"]`);
+          if (kaynakKart) kaynakKart.remove();
+        }
+
+        const yeniIcerik = document.createElement("div");
+        yeniIcerik.className = "koltuk-icerik";
+        yeniIcerik.draggable = true;
+        yeniIcerik.dataset.pk = suruklenenPk;
+        yeniIcerik.dataset.ad = suruklenenAd;
+        const [ad, ...soyadParcalari] = suruklenenAd.split(" ");
+        const soyad = soyadParcalari.join(" ");
+        yeniIcerik.innerHTML = `
+          <div style="font-size:.72rem;font-weight:700;line-height:1.2;word-break:break-word;">
+            ${ad}<br>${soyad}
+          </div>`;
+        hucre.appendChild(yeniIcerik);
+        hucre.querySelector("input[type=hidden]").value = suruklenenPk;
+        hucre.classList.add("koltuk-dolu");
+      }
+
+      suruklemeOlaylariniKur();
+      suruklenenPk = null;
+    });
+  });
+
+  // Bekleyenler alanı → drop hedefi (koltuktan geri alma)
+  const bekleyenlerDiv = document.getElementById("bekleyenler");
+  if (bekleyenlerDiv) {
+    bekleyenlerDiv.addEventListener("dragover", e => {
+      e.preventDefault();
+      bekleyenlerDiv.style.borderColor = "#6366f1";
+    });
+    bekleyenlerDiv.addEventListener("dragleave", () => {
+      bekleyenlerDiv.style.borderColor = "#e5e7eb";
+    });
+    bekleyenlerDiv.addEventListener("drop", e => {
+      e.preventDefault();
+      bekleyenlerDiv.style.borderColor = "#e5e7eb";
+      if (!suruklenenPk || suruklenenKaynak !== "koltuk") return;
+
+      const kaynakHucre = document.querySelector(`.koltuk-icerik[data-pk="${suruklenenPk}"]`)?.closest(".koltuk-hucre");
+      if (kaynakHucre) {
+        kaynakHucre.querySelector("input[type=hidden]").value = "";
+        kaynakHucre.querySelector(".koltuk-icerik")?.remove();
+        kaynakHucre.classList.remove("koltuk-dolu");
+      }
+
+      // Bekleyenler listesine ekle
+      const kart = document.createElement("div");
+      kart.className = "ogr-kart";
+      kart.draggable = true;
+      kart.dataset.pk = suruklenenPk;
+      kart.dataset.ad = suruklenenAd;
+      kart.style = "background:#f0f9ff;border:1px solid #bae6fd;border-radius:5px;padding:5px 8px;font-size:.78rem;font-weight:600;color:#0369a1;cursor:grab;user-select:none;";
+      kart.textContent = suruklenenAd;
+      bekleyenlerDiv.appendChild(kart);
+
+      suruklemeOlaylariniKur();
+      suruklenenPk = null;
+    });
+  }
+}
+
+function duzeniBosalt() {
+  if (!confirm("Tüm oturma düzeni sıfırlanacak. Emin misiniz?")) return;
+  document.querySelectorAll(".koltuk-hucre").forEach(h => {
+    h.querySelector("input[type=hidden]").value = "";
+    const ic = h.querySelector(".koltuk-icerik");
+    if (ic) {
+      // bekleyenler listesine geri taşı
+      const bekleyenlerDiv = document.getElementById("bekleyenler");
+      const kart = document.createElement("div");
+      kart.className = "ogr-kart";
+      kart.draggable = true;
+      kart.dataset.pk = ic.dataset.pk;
+      kart.dataset.ad = ic.dataset.ad;
+      kart.style = "background:#f0f9ff;border:1px solid #bae6fd;border-radius:5px;padding:5px 8px;font-size:.78rem;font-weight:600;color:#0369a1;cursor:grab;user-select:none;";
+      kart.textContent = ic.dataset.ad;
+      bekleyenlerDiv.appendChild(kart);
+      ic.remove();
+    }
+    h.classList.remove("koltuk-dolu");
+  });
+  suruklemeOlaylariniKur();
+}
+
+document.addEventListener("DOMContentLoaded", suruklemeOlaylariniKur);
+</script>
+
+{% endblock %}

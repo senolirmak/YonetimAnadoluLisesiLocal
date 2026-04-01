@@ -18,4 +18,5 @@ urlpatterns = [
     path("sinav/istatistik/", views.sinav_oturum_istatistik, name="sinav_oturum_istatistik"),
     path("sinav/yoklama-raporum/", views.ogretmen_yoklama_raporum, name="ogretmen_yoklama_raporum"),
     path("okul-ayarlari/", views.okul_ayarlari, name="okul_ayarlari"),
+    path("sinif/oturma-plani/", views.sinif_oturma_plani, name="sinif_oturma_plani"),
 ]
