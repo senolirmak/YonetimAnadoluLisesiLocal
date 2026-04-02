@@ -76,8 +76,8 @@ def salon_gozetmen_bul(tarih, saat_veya_ders_saati, ss_map: dict) -> dict:
     }
     return {
         salon_adi: (
-            dp_map[ss.pk].ogretmen.adi_soyadi
-            if ss.pk in dp_map and dp_map[ss.pk].ogretmen else ""
+            dp_map[ss.pk].ogretmen
+            if ss.pk in dp_map and dp_map[ss.pk].ogretmen else None
         )
         for salon_adi, ss in ss_map.items()
     }

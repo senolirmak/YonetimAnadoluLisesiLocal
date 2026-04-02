@@ -1,0 +1,81 @@
+{% extends "layouts/base.html" %}
+{% block title %}Devamsız Öğrenciler – {{ ders_adi }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.yk-container { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+.yk-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.yk-btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .35rem .85rem; border: 1px solid #c7d2fe;
+  border-radius: 5px; font-size: .85rem; font-weight: 500;
+  cursor: pointer; text-decoration: none; background: #f8f9ff; color: #374151;
+}
+.yk-btn:hover { background: #e0e7ff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="yk-container">
+
+<!-- BAŞLIK -->
+<div class="yk-card" style="border-left:4px solid #dc2626; padding:1rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem;">
+  <div>
+    <h2 style="margin:0; color:#991b1b; font-size:1.15rem;">Devamsız Öğrenciler</h2>
+    <span style="font-size:.82rem; color:#6b7280;">
+      {{ seviye }}. Sınıf · {{ ders_adi }} · {{ tarih }}
+      {% if toplam_yok %} · <strong style="color:#991b1b;">{{ toplam_yok }} öğrenci</strong>{% endif %}
+    </span>
+  </div>
+  <a href="{% url 'sinav:sinav_yoklama_raporu' %}?seviye={{ seviye }}"
+     class="yk-btn">← Yoklama Listesi</a>
+</div>
+
+{% if not gruplar %}
+  <div class="yk-card" style="padding:2rem; text-align:center; color:#6b7280;">
+    Bu sınav için devamsız öğrenci kaydı bulunamadı.
+  </div>
+{% else %}
+  {% for g in gruplar %}
+  <div class="yk-card" style="padding:0; overflow:hidden; margin-bottom:.75rem;">
+    <div style="background:#fee2e2; padding:.5rem 1rem; display:flex;
+                justify-content:space-between; align-items:center;
+                border-bottom:1px solid #fca5a5;">
+      <span style="font-weight:700; color:#991b1b; font-size:.9rem;">{{ g.sinifsube }}</span>
+      <span style="font-size:.78rem; color:#b91c1c; font-weight:600;">{{ g.ogrenciler|length }} öğrenci</span>
+    </div>
+    <table style="width:100%; border-collapse:collapse; font-size:.85rem;">
+      <thead>
+        <tr style="background:#fff5f5; border-bottom:1px solid #fecaca;">
+          <th style="padding:.4rem .75rem; text-align:left; color:#7f1d1d; font-size:.75rem; width:140px;">Okul No</th>
+          <th style="padding:.4rem .75rem; text-align:left; color:#7f1d1d; font-size:.75rem;">Adı Soyadı</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in g.ogrenciler %}
+        <tr style="border-bottom:1px solid #fef2f2;">
+          <td style="padding:.4rem .75rem; font-family:monospace; color:#374151; font-size:.83rem;">{{ o.okulno }}</td>
+          <td style="padding:.4rem .75rem; color:#1a1a2e;">{{ o.adi_soyadi }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+
+  <div class="yk-card" style="padding:.75rem 1.5rem; font-size:.85rem; color:#374151;
+       display:flex; gap:1.5rem; flex-wrap:wrap;">
+    <span><strong>{{ gruplar|length }}</strong> şube</span>
+    <span style="color:#991b1b;"><strong>{{ toplam_yok }}</strong> devamsız öğrenci</span>
+  </div>
+{% endif %}
+
+</div>
+{% endblock %}

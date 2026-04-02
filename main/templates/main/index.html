@@ -118,6 +118,17 @@
                 <hr class="menu-divider">
                 {% endif %}
 
+                {% if is_tarih_degistirebilir and sinav_aktif_var %}
+                <div class="menu-section">
+                    <div class="menu-group-title">Sınav Yoklama</div>
+                    <div class="menu-button-group">
+                        <a href="{% url 'sinav:sinav_yoklama_raporu' %}" class="btn btn-lg"
+                           style="background-color:#0891b2; color:white;">Sınav Yoklama Listeleri</a>
+                    </div>
+                </div>
+                <hr class="menu-divider">
+                {% endif %}
+
                 <div class="menu-section">
                     <div class="menu-group-title">Devamsızlık ve Nöbet İşlemleri</div>
                     <div class="menu-button-group">
@@ -237,6 +248,10 @@
                         <a href="{% url 'sinav:index' %}" class="btn btn-lg" style="background-color: #4f46e5; color: white;">Ortak Sınav Yönetimi</a>
                         <a href="{% url 'sinavmedia:yonetim' %}" class="btn btn-lg" style="background-color: #6366f1; color: white;">Sınav Medya Yönetimi</a>
                         <a href="{% url 'sinav:ogrenci_sinav_yeri' %}" class="btn btn-lg" style="background-color: #7c3aed; color: white;">Öğrenci Sınav Yeri Sorgula</a>
+                        {% if sinav_aktif_var %}
+                        <a href="{% url 'sinav_oturum_istatistik' %}" class="btn btn-lg" style="background-color: #6366f1; color: white;">Sınav Oturum İstatistikleri</a>
+                        <a href="{% url 'sinav:sinav_yoklama_raporu' %}" class="btn btn-lg" style="background-color: #0891b2; color: white;">Sınav Yoklama Raporu</a>
+                        {% endif %}
                     </div>
                 </div>
                 <hr class="menu-divider">

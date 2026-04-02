@@ -41,7 +41,7 @@ def gorusme_liste(request):
 
     from django.db.models import Q
 
-    qs = MuduriyetGorusme.objects.select_related("ogrenci", "kayit_eden_kullanici")
+    qs = MuduriyetGorusme.objects.select_related("ogrenci", "kayit_eden_kullanici").prefetch_related("grup_ogrencileri")
 
     tarih_bas = request.GET.get("tarih_bas", "").strip()
     tarih_bit = request.GET.get("tarih_bit", "").strip()

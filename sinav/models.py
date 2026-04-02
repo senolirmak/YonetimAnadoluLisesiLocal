@@ -157,7 +157,10 @@ class OturmaPlani(models.Model):
     sinifsube = models.CharField(max_length=10)
     adi_soyadi = models.CharField(max_length=200)
     ders_adi = models.CharField(max_length=200)
-    gozetmen = models.CharField(max_length=200, blank=True, default="")
+    gozetmen_fk = models.ForeignKey(
+        "okul.Personel", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="gozetmen_planlari",
+    )
     salon_sinif_sube = models.ForeignKey(
         "okul.SinifSube", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="+",

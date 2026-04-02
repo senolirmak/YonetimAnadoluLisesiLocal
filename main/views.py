@@ -208,7 +208,7 @@ def index(request):
                 TakvimUretim as _TakvimUretim,
                 OturmaPlani as _OturmaPlani,
             )
-            _ogretmen_adi = request.user.personel.adi_soyadi
+            _personel = request.user.personel
             _aktif_sinav = _SinavBilgisi.objects.filter(aktif=True).first()
             if _aktif_sinav:
                 _aktif_uretim = _TakvimUretim.objects.filter(
@@ -218,7 +218,7 @@ def index(request):
                     sinav_aktif_var = True
                     sinav_gozetim_var = _OturmaPlani.objects.filter(
                         uretim=_aktif_uretim,
-                        gozetmen__iexact=_ogretmen_adi,
+                        gozetmen_fk=_personel,
                     ).exists()
         except Exception:
             pass
@@ -512,11 +512,11 @@ def ogretmen_ders_doldurma(request):
 @login_required
 def ogretmen_sinav_gozetim(request):
     is_admin = request.user.is_staff or request.user.is_superuser
-    preview_adi = request.GET.get("preview_ogretmen", "").strip()
+    preview_id = request.GET.get("preview_ogretmen_id", "").strip()
     if not is_admin and not _ogretmen_menu_gorumu(request.user):
         raise PermissionDenied
 
-    is_preview = bool(preview_adi and is_admin)
+    is_preview = bool(preview_id and is_admin)
 
     from sinav.utils import AdminOverride, slot_listesi_aktif_isle
     # force_aktif yalnızca superuser'ın aktif önizleme modunda geçerli;
@@ -526,16 +526,17 @@ def ogretmen_sinav_gozetim(request):
     from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani
     from sinav.utils import onceki_ders_saati, salon_goster, slot_aktif_mi
 
-    # Admin önizleme: ?preview_ogretmen=ADI parametresi yalnızca yöneticiler için geçerlidir
-    if preview_adi and is_admin:
-        ogretmen_adi = preview_adi
-        personel = None
+    # Admin önizleme: ?preview_ogretmen_id=PK parametresi yalnızca yöneticiler için geçerlidir
+    if preview_id and is_admin:
+        from okul.models import Personel as _Personel
+        personel = _Personel.objects.filter(pk=preview_id).first()
+        ogretmen_adi = personel.adi_soyadi if personel else None
     else:
+        personel = getattr(request.user, "personel", None)
         try:
-            ogretmen_adi = request.user.personel.adi_soyadi
+            ogretmen_adi = personel.adi_soyadi if personel else None
         except Exception:
             ogretmen_adi = None
-        personel = getattr(request.user, "personel", None)
 
     if not ogretmen_adi:
         return render(request, "main/ogretmen_sinav_gozetim.html", {
@@ -558,7 +559,7 @@ def ogretmen_sinav_gozetim(request):
         # 1. Öğretmenin gözetmen olduğu (tarih, saat, oturum) slotları
         slots = (
             OturmaPlani.objects
-            .filter(uretim=aktif_uretim, gozetmen__iexact=ogretmen_adi)
+            .filter(uretim=aktif_uretim, gozetmen_fk=personel)
             .values("tarih", "saat", "oturum")
             .distinct()
             .order_by("tarih", "saat", "oturum")
@@ -572,7 +573,7 @@ def ogretmen_sinav_gozetim(request):
             op_qs = (
                 OturmaPlani.objects
                 .filter(uretim=aktif_uretim, tarih=tarih, saat=saat, oturum=oturum,
-                        gozetmen__iexact=ogretmen_adi)
+                        gozetmen_fk=personel)
                 .values("salon")
                 .distinct()
                 .order_by("salon")
@@ -622,7 +623,7 @@ def ogretmen_sinav_gozetim(request):
                 OturmaPlani.objects
                 .filter(uretim=aktif_uretim, tarih=slot["tarih"],
                         saat=slot["saat"], oturum=slot["oturum"],
-                        gozetmen__iexact=ogretmen_adi)
+                        gozetmen_fk=personel)
                 .values_list("sinifsube", flat=True)
                 .distinct()
             )
@@ -676,7 +677,7 @@ def ogretmen_sinav_gozetim(request):
         for t, g in sorted(_grp.items())
     ]
 
-    title = f"Sınav Gözetim Listem — {ogretmen_adi}" if (preview_adi and is_admin) else "Sınav Gözetim Listem"
+    title = f"Sınav Gözetim Listem — {ogretmen_adi}" if (preview_id and is_admin) else "Sınav Gözetim Listem"
     return render(request, "main/ogretmen_sinav_gozetim.html", {
         "title":          title,
         "ogretmen_adi":   ogretmen_adi,
@@ -702,10 +703,7 @@ def ogretmen_sinav_medya(request):
     from sinavmedia.models import SinavMedia
     from sinavmedia.views import TOLERANS_DAKIKA
 
-    try:
-        ogretmen_adi = request.user.personel.adi_soyadi
-    except Exception:
-        ogretmen_adi = None
+    personel = getattr(request.user, "personel", None)
 
     aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
     aktif_uretim = (
@@ -719,11 +717,11 @@ def ogretmen_sinav_medya(request):
     filtre_oturum = request.GET.get("oturum", "").strip()
 
     medya_gruplari = []
-    if ogretmen_adi and aktif_uretim:
+    if personel and aktif_uretim:
         # Öğretmenin gözetmen olduğu (tarih, saat, oturum) slotları
         slots_qs = (
             OturmaPlani.objects
-            .filter(uretim=aktif_uretim, gozetmen__iexact=ogretmen_adi)
+            .filter(uretim=aktif_uretim, gozetmen_fk=personel)
             .values("tarih", "saat", "oturum")
             .distinct()
             .order_by("tarih", "saat", "oturum")
@@ -753,7 +751,7 @@ def ogretmen_sinav_medya(request):
             sinifsubeler = (
                 OturmaPlani.objects
                 .filter(uretim=aktif_uretim, tarih=tarih, saat=saat,
-                        oturum=oturum, gozetmen__iexact=ogretmen_adi)
+                        oturum=oturum, gozetmen_fk=personel)
                 .values_list("sinifsube", flat=True)
                 .distinct()
             )
@@ -883,7 +881,13 @@ def ogretmen_gozetim_sinif_listesi(request):
 # ─────────────────────────────────────────────────────────
 
 def sinav_salon_yoklama(request):
-    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+    gruplar = set(request.user.groups.values_list("name", flat=True))
+    if not (
+        request.user.is_superuser
+        or "mudur_yardimcisi" in gruplar
+        or "okul_muduru" in gruplar
+        or _ogretmen_menu_gorumu(request.user)
+    ):
         raise PermissionDenied
 
     from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani, SinavSalonYoklama

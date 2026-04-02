@@ -219,7 +219,8 @@ def oturum_plani_pdf(salon_grids: dict, out_path: str, baslik: str, okul,
         goz_st = ParagraphStyle(
             "goz", fontName="DejaVuSans-Oblique", fontSize=8, alignment=2,
         )
-        ogretmen = salon_ogretmen.get(salon_adi, "")
+        ogretmen_obj = salon_ogretmen.get(salon_adi)
+        ogretmen = ogretmen_obj.adi_soyadi if ogretmen_obj else ""
         goz_txt = f"Gözetmen: {ogretmen}" if ogretmen else "Gözetmen: ......................................................."
         footer_row = [[
             Paragraph("<u>YOKLAMA:</u>", yoklama_st),

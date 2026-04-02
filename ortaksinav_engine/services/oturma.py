@@ -191,7 +191,7 @@ class OturmaPlanService(BaseService):
 
         op_records = []
         for salon, grid in salon_grids.items():
-            gozetmen = salon_gozetmen.get(salon, "")
+            gozetmen_obj = salon_gozetmen.get(salon)
             salon_ss = ss_map.get(salon)
             n_blocks   = len(grid)
             n_rows_blk = len(grid[0]) if grid else 6
@@ -220,7 +220,7 @@ class OturmaPlanService(BaseService):
                                 sinifsube=str(s.get("sinifsube") or ""),
                                 adi_soyadi=f"{adi} {soyadi}".strip(),
                                 ders_adi=str(s.get("ders") or ""),
-                                gozetmen=gozetmen,
+                                gozetmen_fk=gozetmen_obj,
                                 salon_sinif_sube=salon_ss,
                             ))
         OturmaPlani.objects.bulk_create(op_records)

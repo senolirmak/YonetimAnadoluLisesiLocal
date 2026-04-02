@@ -186,14 +186,13 @@ def tum_siniflistesi_eslestir(aktif_uretim, *, dp_offset_dk: int = -50) -> dict[
             "salon_sinif_sube_id",
             "salon_sinif_sube__sinif",
             "salon_sinif_sube__sube",
-            "gozetmen",
         )
         .distinct()
         .order_by("tarih", "saat", "oturum")
     )
 
     # 2. Her slot için dp_saat hesapla → (dp_gun, dp_saat, sinif_sube_id) → slot bilgisi
-    #    slot_key → { "tarih", "saat", "oturum", "sinif", "sube", "salonlar": set, "gozetmenler": set }
+    #    slot_key → { "tarih", "saat", "oturum", "sinif", "sube", "salonlar": set }
     dp_key_map: dict[tuple, dict] = {}
     for row in op_rows:
         sid = row["salon_sinif_sube_id"]
@@ -219,12 +218,9 @@ def tum_siniflistesi_eslestir(aktif_uretim, *, dp_offset_dk: int = -50) -> dict[
             dp_key_map[dp_key] = {
                 "slot_key": slot_key,
                 "salonlar": set(),
-                "gozetmenler": set(),
             }
         if row["salon"]:
             dp_key_map[dp_key]["salonlar"].add(row["salon"])
-        if row["gozetmen"]:
-            dp_key_map[dp_key]["gozetmenler"].add(row["gozetmen"].upper())
 
     if not dp_key_map:
         return {}

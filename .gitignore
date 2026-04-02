@@ -32,7 +32,7 @@ media/
 # Tahta kurulum gizli yapılandırması (şablon: config.default)
 bildirim_gonderici/board_agent/config.txt
 SunucuTarifi.md
-
+config.txt
 # Veritabanı yedekleri
 backups/
 *.dump

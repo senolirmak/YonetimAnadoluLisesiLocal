@@ -65,6 +65,10 @@ urlpatterns = [
     path("takvim/onayla/", views.takvim_onayla, name="takvim_onayla"),
     path("takvim/iptal/", views.takvim_onizleme_iptal, name="takvim_onizleme_iptal"),
     path("takvim/guncelle/", views.takvim_guncelle, name="takvim_guncelle"),
+    path("takvim/onizleme/guncelle/", views.takvim_onizleme_guncelle, name="takvim_onizleme_guncelle"),
+    path("takvim/ders-duzenle/", views.takvim_ders_duzenle, name="takvim_ders_duzenle"),
+    path("yoklama-raporu/", views.sinav_yoklama_raporu, name="sinav_yoklama_raporu"),
+    path("yoklama-yok-detay/", views.sinav_yoklama_yok_detay, name="sinav_yoklama_yok_detay"),
 
     # Öğrenci Sınav Yeri Sorgulama
     path("ogrenci-sinav-yeri/", views.ogrenci_sinav_yeri, name="ogrenci_sinav_yeri"),

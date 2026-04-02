@@ -1,0 +1,90 @@
+{% extends "sinav/base.html" %}
+{% block title %}Ders Bazında Takvim Düzenleme{% endblock %}
+
+{% block sinav_content %}
+
+<div class="card" style="border-left:4px solid #6366f1; padding:1rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem;">
+  <div>
+    <h2 style="margin:0; color:#3730a3;">Ders Bazında Tarih / Saat Düzenleme</h2>
+    <span style="font-size:.82rem; color:#6b7280;">
+      {% if aktif_sinav %}{{ aktif_sinav }} · {% endif %}
+      {{ satirlar|length }} ders oturumu
+      {% if onaylandi %}<span style="color:#166534;"> · ✓ Onaylı</span>{% else %}<span style="color:#92400e;"> · Önizleme</span>{% endif %}
+    </span>
+  </div>
+  <div style="display:flex; gap:.5rem; align-items:center;">
+    <a href="{% url 'sinav:takvim_onizleme' %}" class="btn btn-secondary btn-sm">← Takvim Önizleme</a>
+    <button type="submit" form="ders-duzenle-form" class="btn btn-primary btn-sm">Kaydet</button>
+  </div>
+</div>
+
+<form method="post" action="{% url 'sinav:takvim_ders_duzenle' %}" id="ders-duzenle-form">
+{% csrf_token %}
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <table style="width:100%; border-collapse:collapse; font-size:.875rem;">
+    <thead>
+      <tr style="background:#f0f4ff; border-bottom:2px solid #c7d2fe;">
+        <th style="padding:.6rem .75rem; text-align:left; color:#374151; font-size:.78rem; white-space:nowrap;">Ders</th>
+        <th style="padding:.6rem .75rem; text-align:left; color:#374151; font-size:.78rem;">Şubeler</th>
+        <th style="padding:.6rem .75rem; text-align:left; color:#374151; font-size:.78rem; white-space:nowrap;">Mevcut Tarih</th>
+        <th style="padding:.6rem .75rem; text-align:left; color:#374151; font-size:.78rem; white-space:nowrap;">Mevcut Saat</th>
+        <th style="padding:.6rem .75rem; text-align:left; color:#6366f1; font-size:.78rem; white-space:nowrap;">Yeni Tarih</th>
+        <th style="padding:.6rem .75rem; text-align:left; color:#6366f1; font-size:.78rem; white-space:nowrap;">Yeni Saat</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in satirlar %}
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:.55rem .75rem; font-weight:600; color:#1a1a2e; white-space:nowrap;">{{ s.ders }}</td>
+        <td style="padding:.55rem .75rem; color:#6b7280; font-size:.8rem; word-break:break-word; max-width:220px;">{{ s.subeler }}</td>
+        <td style="padding:.55rem .75rem; color:#374151; white-space:nowrap;">{{ s.tarih }}</td>
+        <td style="padding:.55rem .75rem; color:#3730a3; font-weight:600; white-space:nowrap;">{{ s.saat }}</td>
+        <td style="padding:.55rem .75rem;">
+          {% if onaylandi %}
+            <input type="date" name="tarih_{{ s.pk }}" value="{{ s.tarih }}"
+                   class="dd-input dd-input-tarih">
+          {% else %}
+            <input type="date" name="tarih_idx_{{ s.idx }}" value="{{ s.tarih }}"
+                   class="dd-input dd-input-tarih">
+          {% endif %}
+        </td>
+        <td style="padding:.55rem .75rem;">
+          {% if onaylandi %}
+            <input type="time" name="saat_{{ s.pk }}" value="{{ s.saat }}"
+                   class="dd-input dd-input-saat">
+          {% else %}
+            <input type="time" name="saat_idx_{{ s.idx }}" value="{{ s.saat }}"
+                   class="dd-input dd-input-saat">
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" style="padding:2rem; text-align:center; color:#9ca3af;">Takvimde kayıt bulunamadı.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="display:flex; justify-content:flex-end; gap:.75rem; padding:1rem 1.5rem;">
+  <a href="{% url 'sinav:takvim_onizleme' %}" class="btn btn-secondary">İptal</a>
+  <button type="submit" form="ders-duzenle-form" class="btn btn-primary">Kaydet</button>
+</div>
+
+</form>
+
+<style>
+.dd-input {
+  border: 1px solid #c7d2fe; border-radius: 4px;
+  padding: .25rem .4rem; font-size: .83rem;
+  background: #f8f9ff; box-sizing: border-box;
+}
+.dd-input:focus { outline: none; border-color: #6366f1; background: #fff; }
+.dd-input-tarih { width: 140px; }
+.dd-input-saat  { width: 95px; color: #3730a3; font-weight: 600; }
+</style>
+
+{% endblock %}

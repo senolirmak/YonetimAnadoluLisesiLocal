@@ -53,15 +53,15 @@ def gorusme_liste(request):
 
     if kullanici_rehber and personel:
         # Rehber kendi kayıtlarını görür (gizliler dahil)
-        qs = Gorusme.objects.filter(rehber=personel).select_related("ogrenci", "rehber")
+        qs = Gorusme.objects.filter(rehber=personel).select_related("ogrenci", "rehber").prefetch_related("grup_ogrencileri")
     elif kullanici_mudur:
         # Müdür yardımcısı: gizli olmayanlar + kendi personel kaydıyla oluşturduğu gizliler
         if personel:
             qs = Gorusme.objects.filter(Q(gizli=False) | Q(rehber=personel)).select_related(
                 "ogrenci", "rehber"
-            )
+            ).prefetch_related("grup_ogrencileri")
         else:
-            qs = Gorusme.objects.filter(gizli=False).select_related("ogrenci", "rehber")
+            qs = Gorusme.objects.filter(gizli=False).select_related("ogrenci", "rehber").prefetch_related("grup_ogrencileri")
     else:
         qs = Gorusme.objects.none()
 

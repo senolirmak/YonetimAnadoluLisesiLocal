@@ -67,18 +67,18 @@ def gorusme_liste(request):
     if disiplin_sadece and personel:
         qs = DisiplinGorusme.objects.filter(kayit_eden=personel).select_related(
             "ogrenci", "kayit_eden"
-        )
+        ).prefetch_related("grup_ogrencileri")
     elif kullanici_mudur:
         if personel:
             qs = DisiplinGorusme.objects.filter(
                 Q(gizli=False) | Q(kayit_eden=personel)
-            ).select_related("ogrenci", "kayit_eden")
+            ).select_related("ogrenci", "kayit_eden").prefetch_related("grup_ogrencileri")
         else:
-            qs = DisiplinGorusme.objects.filter(gizli=False).select_related("ogrenci", "kayit_eden")
+            qs = DisiplinGorusme.objects.filter(gizli=False).select_related("ogrenci", "kayit_eden").prefetch_related("grup_ogrencileri")
     elif kullanici_disiplin and personel:
         qs = DisiplinGorusme.objects.filter(kayit_eden=personel).select_related(
             "ogrenci", "kayit_eden"
-        )
+        ).prefetch_related("grup_ogrencileri")
     else:
         qs = DisiplinGorusme.objects.none()
 

@@ -397,21 +397,23 @@ def gozetmen_ozet(request):
     siniflistesi_map: dict = {}
 
     if aktif_uretim:
-        # Gözetmen listesi + slot sayıları
-        rows = (
+        # Gözetmen listesi + slot sayıları (FK üzerinden)
+        personel_rows = (
             OturmaPlani.objects
-            .filter(uretim=aktif_uretim)
-            .exclude(gozetmen__isnull=True)
-            .exclude(gozetmen="")
-            .values_list("gozetmen", flat=True)
+            .filter(uretim=aktif_uretim, gozetmen_fk__isnull=False)
+            .values("gozetmen_fk_id", "gozetmen_fk__adi_soyadi")
             .distinct()
-            .order_by("gozetmen")
+            .order_by("gozetmen_fk__adi_soyadi")
         )
-        gozetmen_slot_sayisi = {}
-        for ad in rows:
+        gozetmen_slot_sayisi = {}  # ad → slot_sayisi
+        pk_map = {}               # ad → pk (önizleme linki için)
+        for row in personel_rows:
+            pk = row["gozetmen_fk_id"]
+            ad = row["gozetmen_fk__adi_soyadi"]
+            pk_map[ad] = pk
             gozetmen_slot_sayisi[ad] = (
                 OturmaPlani.objects
-                .filter(uretim=aktif_uretim, gozetmen__iexact=ad)
+                .filter(uretim=aktif_uretim, gozetmen_fk_id=pk)
                 .values("tarih", "saat", "oturum")
                 .distinct()
                 .count()
@@ -420,11 +422,12 @@ def gozetmen_ozet(request):
         # Sınıf Listesi PDF: dp_saat = saat - 50dk ile eşleşen tüm öğretmenler
         siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim, dp_offset_dk=-50)
 
-        # Tüm adları birleştir (gozetmen + siniflistesi sahibi)
+        # Tüm adları birleştir (gozetmen_fk + siniflistesi sahibi)
         tum_adlar = sorted(set(gozetmen_slot_sayisi) | set(siniflistesi_map))
         for ad in tum_adlar:
             gozetmenler.append({
                 "ad":               ad,
+                "pk":               pk_map.get(ad),
                 "slot_sayisi":      gozetmen_slot_sayisi.get(ad, 0),
                 "siniflistesi_adet": len(siniflistesi_map.get(ad, [])),
             })
@@ -479,6 +482,8 @@ def takvim_onizleme(request):
 
     if son_uretim and son_uretim.onizleme_verisi is not None:
         kayitlar = son_uretim.onizleme_verisi
+        for i, r in enumerate(kayitlar):
+            r["idx"] = i
         onaylandi = False
     elif aktif:
         # Takvim onaylanmış: önce aktif=True üretimi dene, yoksa en son üretimi kullan
@@ -579,6 +584,125 @@ def takvim_onayla(request):
     from django.urls import reverse
     url = reverse("sinav:takvim_onizleme") + (f"?from={from_param}" if from_param else "")
     return redirect(url)
+
+
+@require_POST
+def takvim_onizleme_guncelle(request):
+    """Onaylanmamış önizleme JSON'undaki tarih/saat değişikliklerini uygular."""
+    from datetime import datetime as dt
+    from sinav.models import TakvimUretim
+    aktif_sinav = _aktif_sinav()
+    uretim = TakvimUretim.objects.filter(sinav=aktif_sinav).order_by("-uretim_tarihi").first()
+    if not uretim or uretim.onizleme_verisi is None:
+        messages.error(request, "Önizleme verisi bulunamadı.")
+        return redirect("sinav:takvim_onizleme")
+
+    kayitlar = uretim.onizleme_verisi
+    guncellenen = 0
+    for i, r in enumerate(kayitlar):
+        tarih_str = request.POST.get(f"tarih_idx_{i}", "").strip()
+        saat_str  = request.POST.get(f"saat_idx_{i}", "").strip()
+        changed = False
+        try:
+            if tarih_str:
+                dt.strptime(tarih_str, "%Y-%m-%d")  # format kontrolü
+                if tarih_str != r.get("Tarih"):
+                    r["Tarih"] = tarih_str
+                    changed = True
+            if saat_str and saat_str != r.get("Saat"):
+                r["Saat"] = saat_str
+                changed = True
+        except (ValueError, TypeError):
+            continue
+        if changed:
+            guncellenen += 1
+
+    # Oturum numaralarını Tarih+Saat sıralamasına göre yeniden hesapla
+    from collections import defaultdict
+    gun_map = defaultdict(list)
+    for r in kayitlar:
+        gun_map[r["Tarih"]].append(r)
+    for gun_kayitlari in gun_map.values():
+        gun_kayitlari.sort(key=lambda x: x.get("Saat", ""))
+        slot_to_oturum: dict = {}
+        oturum_no = 1
+        for r in gun_kayitlari:
+            if r["Saat"] not in slot_to_oturum:
+                slot_to_oturum[r["Saat"]] = oturum_no
+                oturum_no += 1
+            r["Oturum"] = slot_to_oturum[r["Saat"]]
+
+    uretim.onizleme_verisi = kayitlar
+    uretim.save(update_fields=["onizleme_verisi"])
+    messages.success(request, f"{guncellenen} kayıt güncellendi." if guncellenen else "Güncelleme kaydedildi.")
+    from_param = request.POST.get("from", "")
+    from django.urls import reverse
+    url = reverse("sinav:takvim_onizleme") + (f"?from={from_param}" if from_param else "")
+    return redirect(url)
+
+
+def takvim_ders_duzenle(request):
+    """Ders bazında tarih/saat düzenleme ekranı.
+
+    GET  → formu göster (preview veya onaylı mod)
+    POST → modu tespit edip ilgili kaydetme view'ına yönlendir
+    """
+    from sinav.models import Takvim, TakvimUretim
+
+    aktif = _aktif_sinav()
+    son_uretim = TakvimUretim.objects.filter(sinav=aktif).order_by("-uretim_tarihi").first() if aktif else None
+
+    if not son_uretim:
+        messages.error(request, "Aktif sınav veya üretim bulunamadı.")
+        return redirect("sinav:takvim_sayfasi")
+
+    # ── Mod tespiti ─────────────────────────────────────────────────────────
+    if son_uretim.onizleme_verisi is not None:
+        onaylandi = False
+        kayitlar_raw = son_uretim.onizleme_verisi
+        satirlar = [
+            {
+                "idx":       i,
+                "ders":      r.get("Ders", ""),
+                "tarih":     r.get("Tarih", ""),
+                "saat":      r.get("Saat", ""),
+                "subeler":   r.get("Subeler", ""),
+            }
+            for i, r in enumerate(kayitlar_raw)
+        ]
+    else:
+        aktif_uretim = TakvimUretim.objects.filter(sinav=aktif, aktif=True).first()
+        if not aktif_uretim:
+            messages.error(request, "Onaylı aktif üretim bulunamadı.")
+            return redirect("sinav:takvim_onizleme")
+        onaylandi = True
+        qs = Takvim.objects.filter(uretim=aktif_uretim).select_related("ders").order_by("ders__ders_adi", "tarih", "saat")
+        satirlar = [
+            {
+                "pk":      t.pk,
+                "ders":    t.ders_tam_adi,
+                "tarih":   t.tarih.strftime("%Y-%m-%d"),
+                "saat":    t.saat,
+                "subeler": t.subeler,
+            }
+            for t in qs
+        ]
+
+    # Preview modunda ders adına göre sırala
+    if not onaylandi:
+        satirlar.sort(key=lambda x: x["ders"].lower())
+
+    if request.method == "POST":
+        if onaylandi:
+            return takvim_guncelle(request)
+        else:
+            return takvim_onizleme_guncelle(request)
+
+    return render(request, "sinav/takvim_ders_duzenle.html", {
+        "aktif_sinav": aktif,
+        "satirlar":    satirlar,
+        "onaylandi":   onaylandi,
+    })
 
 
 @require_POST
@@ -1587,4 +1711,217 @@ def ogrenci_sinav_yeri(request):
         "okulno":       okulno,
         "sonuclar":     sonuclar,
         "hata":         hata,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sınav Yoklama Raporu — Yönetim
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def sinav_yoklama_raporu(request):
+    """Seviye ve Ders filtreli sınav yoklama listesi — yöneticiler için."""
+    from okul.auth import is_mudur_yardimcisi as _mudur_mi
+    from django.core.exceptions import PermissionDenied
+
+    gruplar = set(request.user.groups.values_list("name", flat=True))
+    yetkili = (
+        request.user.is_superuser
+        or _mudur_mi(request.user)
+        or "okul_muduru" in gruplar
+    )
+    if not yetkili:
+        raise PermissionDenied
+
+    from django.db.models import Count, Q
+    from sinav.models import Takvim, TakvimUretim, OturmaPlani, SinavSalonYoklama
+
+    aktif_sinav  = _aktif_sinav()
+    aktif_uretim = (
+        TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        if aktif_sinav else None
+    )
+
+    # ── Filtre seçenekleri: Takvim FK üzerinden ders ID + adı ────────────────
+    dersler = []
+    if aktif_uretim:
+        dersler = list(
+            Takvim.objects
+            .filter(uretim=aktif_uretim, ders__isnull=False)
+            .select_related("ders")
+            .values("ders_id", "ders__ders_adi")
+            .distinct()
+            .order_by("ders__ders_adi")
+        )  # [{"ders_id": 3, "ders__ders_adi": "Matematik"}, ...]
+
+    SEVIYELER = [9, 10, 11, 12]
+
+    # ── Filtre değerleri ─────────────────────────────────────────────────────
+    filtre_seviye  = request.GET.get("seviye", "").strip()
+    filtre_ders_id = request.GET.get("ders_id", "").strip()
+
+    # ── Gruplama: (seviye, ders_adi, tarih) bazında salon bağımsız istatistik ──
+    satirlar = []
+    if aktif_uretim:
+        from collections import defaultdict
+
+        # Ders filtresi için DersHavuzu'ndan ders adı al
+        filtre_ders_adi_base = None
+        if filtre_ders_id:
+            from okul.models import DersHavuzu as _DH
+            _ders_obj = _DH.objects.filter(pk=filtre_ders_id).first()
+            filtre_ders_adi_base = _ders_obj.ders_adi if _ders_obj else None
+            if not filtre_ders_adi_base:
+                # Havuzda ders yoksa boş sonuç döndür
+                return render(request, "sinav/sinav_yoklama_raporu.html", {
+                    "aktif_sinav": aktif_sinav, "aktif_uretim": aktif_uretim,
+                    "dersler": dersler, "seviyeler": SEVIYELER,
+                    "filtre_seviye": filtre_seviye, "filtre_ders_id": filtre_ders_id,
+                    "satirlar": [],
+                })
+
+        # OturmaPlani filtrelemesi
+        op_q = Q(uretim=aktif_uretim) & ~Q(ders_adi="")
+        if filtre_seviye:
+            op_q &= Q(sinifsube__startswith=f"{filtre_seviye}/")
+        if filtre_ders_adi_base:
+            op_q &= Q(ders_adi__istartswith=filtre_ders_adi_base)
+
+        # (seviye, ders_adi, tarih) → okulno seti  (benzersiz öğrenci sayımı için)
+        # (seviye, ders_adi, tarih) → set of (saat, salon)  (yoklama linkleri için)
+        group_okulno: dict = defaultdict(set)
+        group_salonlar: dict = defaultdict(set)
+        for r in OturmaPlani.objects.filter(op_q).values(
+            "sinifsube", "ders_adi", "tarih", "saat", "salon", "okulno"
+        ):
+            seviye = r["sinifsube"].split("/")[0] if "/" in r["sinifsube"] else r["sinifsube"]
+            grp_key = (seviye, r["ders_adi"], r["tarih"])
+            group_okulno[grp_key].add(r["okulno"])
+            group_salonlar[grp_key].add((r["saat"], r["salon"]))
+
+        # (tarih, okulno) → (seviye, ders_adi)  — yoklama eşleştirmesi için ters indeks
+        okulno_to_group: dict = {}
+        for (seviye, ders_adi, tarih), okulno_set in group_okulno.items():
+            for okulno in okulno_set:
+                okulno_to_group[(tarih, okulno)] = (seviye, ders_adi)
+
+        # (seviye, ders_adi, tarih) → {durum: sayı}
+        yoklama_ozet: dict = defaultdict(lambda: defaultdict(int))
+        for y in SinavSalonYoklama.objects.filter(uretim=aktif_uretim).values("tarih", "okulno", "durum"):
+            grp = okulno_to_group.get((y["tarih"], y["okulno"]))
+            if grp:
+                seviye, ders_adi = grp
+                yoklama_ozet[(seviye, ders_adi, y["tarih"])][y["durum"]] += 1
+
+        # Sonuç listesi
+        for key in sorted(group_okulno.keys()):
+            seviye, ders_adi, tarih = key
+            toplam = len(group_okulno[key])
+            yk     = yoklama_ozet.get(key, {})
+            mevcut = yk.get("mevcut", 0)
+            yok    = yk.get("yok", 0)
+            gec    = yk.get("gec", 0)
+            satirlar.append({
+                "seviye":         seviye,
+                "ders_adi":       ders_adi,
+                "tarih":          tarih,
+                "toplam":         toplam,
+                "mevcut":         mevcut,
+                "yok":            yok,
+                "gec":            gec,
+                "yoklama_alindi": bool(yk),
+                "eksik":          toplam - (mevcut + yok + gec),
+                "salonlar":       sorted(group_salonlar.get(key, [])),
+            })
+
+    return render(request, "sinav/sinav_yoklama_raporu.html", {
+        "aktif_sinav":    aktif_sinav,
+        "aktif_uretim":   aktif_uretim,
+        "dersler":        dersler,
+        "seviyeler":      SEVIYELER,
+        "filtre_seviye":  filtre_seviye,
+        "filtre_ders_id": filtre_ders_id,
+        "satirlar":       satirlar,
+    })
+
+
+def sinav_yoklama_yok_detay(request):
+    """Belirli (seviye, ders_adi, tarih) için 'yok' durumundaki öğrencilerin listesi."""
+    from okul.auth import is_mudur_yardimcisi as _mudur_mi
+    from django.core.exceptions import PermissionDenied
+    from collections import defaultdict
+
+    gruplar = set(request.user.groups.values_list("name", flat=True))
+    yetkili = (
+        request.user.is_superuser
+        or _mudur_mi(request.user)
+        or "okul_muduru" in gruplar
+    )
+    if not yetkili:
+        raise PermissionDenied
+
+    from sinav.models import TakvimUretim, OturmaPlani, SinavSalonYoklama
+
+    seviye   = request.GET.get("seviye", "").strip()
+    ders_adi = request.GET.get("ders_adi", "").strip()
+    tarih    = request.GET.get("tarih", "").strip()
+
+    aktif_sinav  = _aktif_sinav()
+    aktif_uretim = (
+        TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        if aktif_sinav else None
+    )
+
+    gruplar_liste = []
+    if aktif_uretim and seviye and ders_adi and tarih:
+        # Seçili (seviye, ders_adi, tarih) için OturmaPlani okulno → satır bilgisi
+        op_q = (
+            OturmaPlani.objects
+            .filter(
+                uretim=aktif_uretim,
+                sinifsube__startswith=f"{seviye}/",
+                ders_adi=ders_adi,
+                tarih=tarih,
+            )
+            .values("okulno", "adi_soyadi", "sinifsube")
+            .distinct()
+            .order_by("sinifsube", "okulno")
+        )
+        okulno_bilgi = {r["okulno"]: r for r in op_q}
+
+        # Bu okulno'lar içinden "yok" olan yoklama kayıtları
+        yok_okulnolar = set(
+            SinavSalonYoklama.objects
+            .filter(
+                uretim=aktif_uretim,
+                tarih=tarih,
+                durum="yok",
+                okulno__in=list(okulno_bilgi.keys()),
+            )
+            .values_list("okulno", flat=True)
+            .distinct()
+        )
+
+        # Şube bazında grupla, okul no sıralı
+        sube_map: dict = defaultdict(list)
+        for okulno, bilgi in sorted(okulno_bilgi.items(),
+                                    key=lambda x: (x[1]["sinifsube"], x[0])):
+            if okulno in yok_okulnolar:
+                sube_map[bilgi["sinifsube"]].append({
+                    "okulno":    okulno,
+                    "adi_soyadi": bilgi["adi_soyadi"],
+                })
+
+        gruplar_liste = [
+            {"sinifsube": sube, "ogrenciler": ogrenciler}
+            for sube, ogrenciler in sorted(sube_map.items())
+        ]
+
+    return render(request, "sinav/sinav_yoklama_yok_detay.html", {
+        "aktif_sinav":   aktif_sinav,
+        "seviye":        seviye,
+        "ders_adi":      ders_adi,
+        "tarih":         tarih,
+        "gruplar":       gruplar_liste,
+        "toplam_yok":    sum(len(g["ogrenciler"]) for g in gruplar_liste),
     })

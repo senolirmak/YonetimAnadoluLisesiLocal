@@ -18,6 +18,8 @@
     <a href="{% url 'sinav:takvim_gecmisi' %}" class="btn btn-secondary btn-sm">← Geri Dön</a>
     {% else %}
     <a href="{% url 'sinav:takvim_sayfasi' %}" class="btn btn-secondary btn-sm">← Geri Dön</a>
+    <a href="{% url 'sinav:takvim_ders_duzenle' %}" class="btn btn-sm"
+       style="background:#ede9fe; color:#4f46e5; border:1px solid #c4b5fd;">Ders Bazında Düzenle</a>
     {% endif %}
     {% if onaylandi %}
       <span class="badge badge-done">✓ Onaylandı</span>
@@ -28,6 +30,8 @@
         <button type="submit" class="btn btn-sm"
                 style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;">İptal</button>
       </form>
+      <button type="submit" form="takvim-guncelle-form" class="btn btn-sm"
+              style="background:#f0fdf4; color:#166534; border:1px solid #86efac;">Tarihleri Güncelle</button>
       <form method="post" action="{% url 'sinav:takvim_onayla' %}">
         {% csrf_token %}
         <input type="hidden" name="from" value="{{ request.GET.from }}">
@@ -40,9 +44,11 @@
 <!-- ===== TAKVİM TABLOSU ===== -->
 {% if onaylandi %}
 <form method="post" action="{% url 'sinav:takvim_guncelle' %}" id="takvim-guncelle-form">
+{% else %}
+<form method="post" action="{% url 'sinav:takvim_onizleme_guncelle' %}" id="takvim-guncelle-form">
+{% endif %}
 {% csrf_token %}
 <input type="hidden" name="from" value="{{ request.GET.from }}">
-{% endif %}
 
 {% for gun in gunler %}
 <div class="card oniz-gun-kart">
@@ -85,7 +91,8 @@
             <input type="date" name="tarih_{{ s.pk }}" value="{{ s.Tarih }}"
                    class="oniz-input oniz-input-tarih-satir tarih-hidden" data-gun="{{ gun.tarih }}">
           {% else %}
-            {{ s.Tarih }}
+            <input type="date" name="tarih_idx_{{ s.idx }}" value="{{ s.Tarih }}"
+                   class="oniz-input oniz-input-tarih-satir tarih-hidden" data-gun="{{ gun.tarih }}">
           {% endif %}
         </td>
         <td class="oniz-saat">
@@ -93,7 +100,8 @@
             <input type="time" name="saat_{{ s.pk }}" value="{{ s.Saat }}"
                    class="oniz-input oniz-input-saat">
           {% else %}
-            {{ s.Saat }}
+            <input type="time" name="saat_idx_{{ s.idx }}" value="{{ s.Saat }}"
+                   class="oniz-input oniz-input-saat">
           {% endif %}
         </td>
         <td class="oniz-ders">{{ s.Ders }}</td>
@@ -116,6 +124,8 @@
       <button type="submit" class="btn"
               style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;">İptal</button>
     </form>
+    <button type="submit" form="takvim-guncelle-form" class="btn"
+            style="background:#f0fdf4; color:#166534; border:1px solid #86efac;">Tarihleri Güncelle</button>
     <form method="post" action="{% url 'sinav:takvim_onayla' %}">
       {% csrf_token %}
       <button type="submit" class="btn btn-primary">Onayla ve Kaydet</button>
@@ -123,9 +133,7 @@
   {% endif %}
 </div>
 
-{% if onaylandi %}
 </form>
-{% endif %}
 
 <script>
 function gunTarihGuncelle(inputEl, eskiGun) {
