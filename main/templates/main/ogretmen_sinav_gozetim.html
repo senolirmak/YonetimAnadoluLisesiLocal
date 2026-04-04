@@ -129,7 +129,7 @@
                   {% endif %}
                   {% if slot.medyalar %}
                     {% if slot.aktif or slot.medya_serbest %}
-                    <a href="{% url 'ogretmen_sinav_medya' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&oturum={{ slot.oturum }}"
+                    <a href="{% url 'ogretmen_sinav_medya' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&oturum={{ slot.oturum }}{% if is_preview %}&preview_ogretmen_id={{ request.GET.preview_ogretmen_id }}{% endif %}"
                        class="btn btn-sm"
                        style="background:#dc2626;color:#fff;text-decoration:none;font-size:.78rem;padding:.2rem .55rem;">
                       🔊 Sınav Medyası{% if slot.medya_serbest and not slot.aktif %} ✓{% endif %}

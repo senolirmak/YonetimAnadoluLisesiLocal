@@ -823,7 +823,8 @@ def ogretmen_sinav_gozetim(request):
 
 @login_required
 def ogretmen_sinav_medya(request):
-    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+    is_admin = request.user.is_staff or request.user.is_superuser
+    if not (is_admin or _ogretmen_menu_gorumu(request.user)):
         raise PermissionDenied
 
     from datetime import datetime as _dt, timedelta as _td
@@ -831,7 +832,13 @@ def ogretmen_sinav_medya(request):
     from sinavmedia.models import SinavMedia
     from sinavmedia.views import TOLERANS_DAKIKA
 
-    personel = getattr(request.user, "personel", None)
+    preview_id = request.GET.get("preview_ogretmen_id", "").strip()
+    if preview_id and is_admin:
+        from okul.models import Personel as _Personel
+        personel = _Personel.objects.filter(pk=preview_id).first()
+    else:
+        personel = getattr(request.user, "personel", None)
+    ogretmen_adi = personel.adi_soyadi if personel else None
 
     aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
     aktif_uretim = (
