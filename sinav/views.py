@@ -350,9 +350,9 @@ def admin_force_aktif_toggle(request):
 @require_POST
 @login_required
 def slot_serbest_birak(request):
-    """Superuser: belirtilen slot için OturmaUretim + OturmaPlani kayıtlarını sil."""
-    from sinav.models import OturmaUretim
-    if not request.user.is_superuser:
+    """Staff/Superuser: belirtilen slot için OturmaUretim + OturmaPlani + SinavSalonYoklama kayıtlarını sil."""
+    from sinav.models import OturmaUretim, SinavSalonYoklama
+    if not (request.user.is_staff or request.user.is_superuser):
         return JsonResponse({"error": "Yetkisiz işlem."}, status=403)
 
     uretim_pk = request.POST.get("uretim_pk")
@@ -365,19 +365,73 @@ def slot_serbest_birak(request):
 
     uretim = get_object_or_404(TakvimUretim, pk=uretim_pk)
 
-    sil_ou = OturmaUretim.objects.filter(
-        takvim_uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
-    )
-    sil_op = OturmaPlani.objects.filter(
+    op_sayisi = OturmaPlani.objects.filter(
         uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
-    )
-    op_sayisi = sil_op.count()
-    sil_op.delete()
-    sil_ou.delete()
+    ).count()
+    OturmaPlani.objects.filter(
+        uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
+    ).delete()
+    OturmaUretim.objects.filter(
+        takvim_uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
+    ).delete()
+    # Bu (tarih, saat) için başka oturum kalmadıysa yoklama kayıtlarını da sil
+    baska_oturum_var = OturmaPlani.objects.filter(
+        uretim=uretim, tarih=tarih, saat=saat
+    ).exists()
+    if not baska_oturum_var:
+        SinavSalonYoklama.objects.filter(
+            uretim=uretim, tarih=tarih, saat=saat
+        ).delete()
 
     messages.success(
         request,
         f"Slot serbest bırakıldı ({tarih} {saat} Ot.{oturum}) — {op_sayisi} oturma planı silindi."
+    )
+    return redirect(f"{reverse('sinav:pdf_rapor')}?uretim_pk={uretim_pk}")
+
+
+@require_POST
+@login_required
+def takvim_slot_sil(request):
+    """Staff/Superuser: belirtilen slotu takvimden tamamen sil
+    (OturmaPlani + OturmaUretim + Takvim + SinavSalonYoklama)."""
+    from sinav.models import OturmaUretim, Takvim, SinavSalonYoklama
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"error": "Yetkisiz işlem."}, status=403)
+
+    uretim_pk = request.POST.get("uretim_pk")
+    tarih     = request.POST.get("tarih")
+    saat      = request.POST.get("saat")
+    oturum    = request.POST.get("oturum")
+
+    if not all([uretim_pk, tarih, saat, oturum]):
+        return JsonResponse({"error": "Eksik parametre."}, status=400)
+
+    uretim = get_object_or_404(TakvimUretim, pk=uretim_pk)
+
+    OturmaPlani.objects.filter(
+        uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
+    ).delete()
+    OturmaUretim.objects.filter(
+        takvim_uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
+    ).delete()
+    takvim_sayisi, _ = Takvim.objects.filter(
+        uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
+    ).delete()
+    # Takvim.CASCADE ile SinavMedia otomatik silindi.
+    # SinavSalonYoklama'da oturum alanı yoktur; bu (tarih, saat) için başka
+    # oturum kalmadıysa yoklama kayıtlarını da temizle.
+    baska_oturum_var = Takvim.objects.filter(
+        uretim=uretim, tarih=tarih, saat=saat
+    ).exists()
+    if not baska_oturum_var:
+        SinavSalonYoklama.objects.filter(
+            uretim=uretim, tarih=tarih, saat=saat
+        ).delete()
+
+    messages.success(
+        request,
+        f"Slot takvimden silindi ({tarih} {saat} Ot.{oturum}) — {takvim_sayisi} takvim kaydı kaldırıldı."
     )
     return redirect(f"{reverse('sinav:pdf_rapor')}?uretim_pk={uretim_pk}")
 
@@ -922,6 +976,7 @@ def pdf_rapor(request):
         "takvim_degisti":   takvim_degisti,
         "diger_uretimler":  diger_uretimler,
         "is_superuser":     request.user.is_superuser,
+        "is_staff":         request.user.is_staff or request.user.is_superuser,
     })
 
 

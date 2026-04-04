@@ -95,11 +95,15 @@
           <tbody>
 
             {% for slot in gun.gozetim %}
-            <tr style="border-bottom:1px solid #f3f4f6;">
+            <tr style="border-bottom:1px solid #f3f4f6;{% if slot.nobet_devir %}background:#fdf4ff;{% endif %}">
               <td style="padding:.55rem .75rem;font-weight:600;color:#1f2937;white-space:nowrap;">{{ slot.saat }}</td>
               <td style="padding:.55rem .75rem;color:#6b7280;">{{ slot.oturum }}</td>
               <td style="padding:.55rem .75rem;">
+                {% if slot.nobet_devir %}
+                <span style="background:#f3e8ff;color:#7c3aed;padding:.15rem .55rem;border-radius:10px;font-size:.78rem;font-weight:600;white-space:nowrap;">Nöbet Devir</span>
+                {% else %}
                 <span style="background:#dbeafe;color:#1d4ed8;padding:.15rem .55rem;border-radius:10px;font-size:.78rem;font-weight:600;white-space:nowrap;">Gözetmen</span>
+                {% endif %}
               </td>
               <td style="padding:.55rem .75rem;color:#374151;">
                 {% for salon in slot.salonlar %}{{ salon.ad }}{% if not forloop.last %}, {% endif %}{% endfor %}

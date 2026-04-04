@@ -132,7 +132,7 @@ def gozetmen_bul(aktif_sinav, tarih, saat: str, sinifsube: str) -> str | None:
         DersProgrami.objects
         .filter(
             gun=gun,
-            giris_saat=giris,
+            ders_saati__derssaati_baslangic=giris,
             sinif_sube__sinif=sinif,
             sinif_sube__sube=sube,
             uygulama_tarihi__lte=tarih,

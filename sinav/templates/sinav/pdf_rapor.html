@@ -139,17 +139,44 @@
            class="link-pdf link-pdf-op" target="_blank">Oturma_Plani {{ ot.tarih_str }} {{ ot.saat }}</a>
         <a href="{% url 'sinav:sinif_listesi_pdf_view' %}?uretim={{ ot.uretim_pk }}&tarih={{ ot.tarih_str }}&saat={{ ot.saat }}&oturum={{ ot.oturum }}"
            class="link-pdf link-pdf-sl" target="_blank">Sinif_Listesi {{ ot.tarih_str }} {{ ot.saat }}</a>
-        {% if is_superuser %}
+        {% if is_staff %}
         <form method="post" action="{% url 'sinav:slot_serbest_birak' %}" style="display:inline; margin:0;"
-              onsubmit="return confirm('{{ ot.tarih_str }} {{ ot.saat }} Ot.{{ ot.oturum }} slotu serbest bırakılsın mı?\nOturma planı silinecek.');">
+              onsubmit="return confirm('{{ ot.tarih_str }} {{ ot.saat }} Ot.{{ ot.oturum }} slotu serbest bırakılsın mı?\nOturma planı silinecek, takvimde kalır.');">
           {% csrf_token %}
           <input type="hidden" name="uretim_pk" value="{{ ot.uretim_pk }}">
           <input type="hidden" name="tarih"     value="{{ ot.tarih_str }}">
           <input type="hidden" name="saat"      value="{{ ot.saat }}">
           <input type="hidden" name="oturum"    value="{{ ot.oturum }}">
           <button type="submit" class="link-pdf link-pdf-reset"
-                  title="Bu slotun oturma planını sil ve yeniden üretilebilir hale getir">
-            ✕ Serbest Bırak
+                  title="Oturma planını sil, yeniden üretilebilir hale getir">
+            ↺ Serbest Bırak
+          </button>
+        </form>
+        <form method="post" action="{% url 'sinav:takvim_slot_sil' %}" style="display:inline; margin:0;"
+              onsubmit="return confirm('{{ ot.tarih_str }} {{ ot.saat }} Ot.{{ ot.oturum }} slotu takvimden tamamen silinsin mi?\nBu işlem geri alınamaz.');">
+          {% csrf_token %}
+          <input type="hidden" name="uretim_pk" value="{{ ot.uretim_pk }}">
+          <input type="hidden" name="tarih"     value="{{ ot.tarih_str }}">
+          <input type="hidden" name="saat"      value="{{ ot.saat }}">
+          <input type="hidden" name="oturum"    value="{{ ot.oturum }}">
+          <button type="submit" class="link-pdf link-pdf-delete"
+                  title="Bu slotu oturma planıyla birlikte takvimden tamamen kaldır">
+            ✕ Takvimden Sil
+          </button>
+        </form>
+        {% endif %}
+        {% else %}
+        {% if is_staff %}
+        <form method="post" action="{% url 'sinav:takvim_slot_sil' %}" style="display:inline; margin:0;"
+              onsubmit="return confirm('{{ ot.tarih_str }} {{ ot.saat }} Ot.{{ ot.oturum }} slotu takvimden tamamen silinsin mi?\nBu işlem geri alınamaz.');">
+          {% csrf_token %}
+          <input type="hidden" name="uretim_pk" value="{{ ot.uretim_pk }}">
+          <input type="hidden" name="tarih"     value="{{ ot.tarih_str }}">
+          <input type="hidden" name="saat"      value="{{ ot.saat }}">
+          <input type="hidden" name="oturum"    value="{{ ot.oturum }}">
+          <button type="submit" class="link-pdf link-pdf-delete"
+                  title="Bu slotu takvimden tamamen kaldır">
+            ✕ Takvimden Sil
           </button>
         </form>
         {% endif %}
@@ -222,6 +249,11 @@
   cursor:pointer; font-family:inherit;
 }
 .link-pdf-reset:hover { background:#fee2e2; }
+.link-pdf-delete {
+  background:#7f1d1d; color:#fef2f2; border:1px solid #991b1b;
+  cursor:pointer; font-family:inherit;
+}
+.link-pdf-delete:hover { background:#991b1b; }
 .oturum-satir.done form { pointer-events:auto; }
 </style>
 
