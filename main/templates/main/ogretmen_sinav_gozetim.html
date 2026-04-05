@@ -25,6 +25,14 @@
   </div>
   {% endif %}
 
+  {% if sim_aktif %}
+  <div style="padding:.6rem 1rem;background:#fdf4ff;border:1px solid #d946ef;border-radius:6px;font-size:.85rem;color:#701a75;margin-bottom:1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <span>🕐 <strong>Simülasyon modu:</strong> Tarih <strong>{{ sim_bugun|date:"d.m.Y" }}</strong> — Saat <strong>{{ sim_saat }}</strong> olarak simüle ediliyor.</span>
+    <a href="{{ request.path }}{% if is_preview %}?preview_ogretmen_id={{ request.GET.preview_ogretmen_id }}{% endif %}"
+       style="font-size:.8rem;color:#701a75;text-decoration:underline;">Simülasyonu Kapat</a>
+  </div>
+  {% endif %}
+
   {% if is_preview %}
   <form method="post" action="{% url 'sinav:admin_force_aktif_toggle' %}" style="margin:0 0 1rem;">
     {% csrf_token %}

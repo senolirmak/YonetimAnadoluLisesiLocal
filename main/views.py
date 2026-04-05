@@ -671,6 +671,21 @@ def ogretmen_sinav_gozetim(request):
     bugun     = now_local.date()
     simdi_str = now_local.strftime("%H:%M")
 
+    # ── Superuser tarih/saat simülasyonu: ?sim_tarih=2026-04-06&sim_saat=08:30 ─
+    sim_aktif = False
+    if is_admin:
+        _sim_tarih = request.GET.get("sim_tarih", "").strip()
+        _sim_saat  = request.GET.get("sim_saat",  "").strip()
+        if _sim_tarih:
+            try:
+                bugun     = dt_date.fromisoformat(_sim_tarih)
+                sim_aktif = True
+            except ValueError:
+                pass
+        if _sim_saat and len(_sim_saat) == 5 and ":" in _sim_saat:
+            simdi_str = _sim_saat
+            sim_aktif = True
+
     gozetim_slotlari = []
     if aktif_uretim:
         # 1. Öğretmenin gözetmen olduğu (tarih, saat, oturum) slotları
@@ -814,6 +829,9 @@ def ogretmen_sinav_gozetim(request):
         "tarih_gruplari": tarih_gruplari,
         "is_preview":     is_preview,
         "force_aktif":    force_aktif,
+        "sim_aktif":      sim_aktif,
+        "sim_bugun":      bugun   if sim_aktif else None,
+        "sim_saat":       simdi_str if sim_aktif else None,
     })
 
 
