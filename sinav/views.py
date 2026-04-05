@@ -1910,14 +1910,47 @@ def sinav_yoklama_raporu(request):
                 "salonlar":       sorted(group_salonlar.get(key, [])),
             })
 
+    # ── Öğrenci detay listesi: her iki filtre de seçiliyse ───────────────────
+    ogrenci_listesi = []
+    if aktif_uretim and filtre_seviye and filtre_ders_id and filtre_ders_adi_base:
+        # Tüm öğrenciler (sinifsube, okulno, adi_soyadi)
+        op_rows = list(
+            OturmaPlani.objects
+            .filter(
+                uretim=aktif_uretim,
+                sinifsube__startswith=f"{filtre_seviye}/",
+                ders_adi__istartswith=filtre_ders_adi_base,
+            )
+            .values("sinifsube", "okulno", "adi_soyadi")
+            .distinct()
+            .order_by("sinifsube", "adi_soyadi")
+        )
+        # Yoklama durumları: okulno → durum
+        yoklama_durumu = dict(
+            SinavSalonYoklama.objects
+            .filter(
+                uretim=aktif_uretim,
+            )
+            .values_list("okulno", "durum")
+        )
+        for r in op_rows:
+            durum = yoklama_durumu.get(r["okulno"], "")
+            ogrenci_listesi.append({
+                "sinifsube":  r["sinifsube"],
+                "okulno":     r["okulno"],
+                "adi_soyadi": r["adi_soyadi"],
+                "durum":      durum,
+            })
+
     return render(request, "sinav/sinav_yoklama_raporu.html", {
-        "aktif_sinav":    aktif_sinav,
-        "aktif_uretim":   aktif_uretim,
-        "dersler":        dersler,
-        "seviyeler":      SEVIYELER,
-        "filtre_seviye":  filtre_seviye,
-        "filtre_ders_id": filtre_ders_id,
-        "satirlar":       satirlar,
+        "aktif_sinav":      aktif_sinav,
+        "aktif_uretim":     aktif_uretim,
+        "dersler":          dersler,
+        "seviyeler":        SEVIYELER,
+        "filtre_seviye":    filtre_seviye,
+        "filtre_ders_id":   filtre_ders_id,
+        "satirlar":         satirlar,
+        "ogrenci_listesi":  ogrenci_listesi,
     })
 
 
