@@ -151,7 +151,7 @@ def oynat(request, pk):
             datetime.combine(medya.takvim.tarih, sinav_saat)
         )
         simdi = timezone.now()
-        acilis = sinav_dt - timedelta(minutes=TOLERANS_DAKIKA)
+        acilis  = sinav_dt
         kapanis = sinav_dt + timedelta(minutes=TOLERANS_DAKIKA)
 
         if not (acilis <= simdi <= kapanis):

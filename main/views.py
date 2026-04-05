@@ -946,7 +946,7 @@ def ogretmen_sinav_medya(request):
                         _dt.combine(m.takvim.tarih, sinav_saat)
                     )
                     erisim_acik = (
-                        sinav_dt - _td(minutes=TOLERANS_DAKIKA)
+                        sinav_dt
                         <= simdi <=
                         sinav_dt + _td(minutes=TOLERANS_DAKIKA)
                     )
