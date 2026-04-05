@@ -1923,7 +1923,7 @@ def sinav_yoklama_raporu(request):
             )
             .values("sinifsube", "okulno", "adi_soyadi")
             .distinct()
-            .order_by("sinifsube", "adi_soyadi")
+            .order_by("sinifsube", "okulno")
         )
         # Yoklama durumları: okulno → durum
         yoklama_durumu = dict(

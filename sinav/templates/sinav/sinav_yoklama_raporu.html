@@ -160,43 +160,51 @@
 
 <!-- ÖĞRENCİ DETAY LİSTESİ -->
 {% if ogrenci_listesi %}
-<div class="yk-card" style="padding:0; overflow:hidden; margin-top:1.5rem;">
-  <div style="padding:.65rem 1rem; background:#f0fdf4; border-bottom:2px solid #86efac; display:flex; align-items:center; justify-content:space-between;">
+{% regroup ogrenci_listesi by sinifsube as sube_gruplari %}
+<div style="margin-top:1.5rem;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem;">
     <span style="font-weight:700; color:#166534; font-size:.9rem;">Öğrenci Listesi</span>
-    <span style="font-size:.8rem; color:#6b7280;">{{ ogrenci_listesi|length }} öğrenci</span>
+    <span style="font-size:.8rem; color:#6b7280;">{{ ogrenci_listesi|length }} öğrenci · {{ sube_gruplari|length }} şube</span>
   </div>
-  <table style="width:100%; border-collapse:collapse; font-size:.875rem;">
-    <thead>
-      <tr style="background:#f0fdf4; border-bottom:1px solid #bbf7d0;">
-        <th style="padding:.5rem .75rem; text-align:left; color:#166534; font-size:.78rem;">#</th>
-        <th style="padding:.5rem .75rem; text-align:left; color:#166534; font-size:.78rem;">Sınıf Şube</th>
-        <th style="padding:.5rem .75rem; text-align:left; color:#166534; font-size:.78rem;">Okul No</th>
-        <th style="padding:.5rem .75rem; text-align:left; color:#166534; font-size:.78rem;">Adı ve Soyadı</th>
-        <th style="padding:.5rem .75rem; text-align:center; color:#166534; font-size:.78rem;">Durum</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for o in ogrenci_listesi %}
-      <tr style="border-bottom:1px solid #f0fdf4; {% if forloop.even %}background:#fafffe;{% endif %}">
-        <td style="padding:.45rem .75rem; color:#9ca3af; font-size:.8rem;">{{ forloop.counter }}</td>
-        <td style="padding:.45rem .75rem; font-weight:600; color:#374151;">{{ o.sinifsube }}</td>
-        <td style="padding:.45rem .75rem; color:#374151; font-family:monospace;">{{ o.okulno }}</td>
-        <td style="padding:.45rem .75rem; color:#111827;">{{ o.adi_soyadi }}</td>
-        <td style="padding:.45rem .75rem; text-align:center;">
-          {% if o.durum == "mevcut" %}
-            <span style="background:#dcfce7; color:#166534; padding:.15rem .6rem; border-radius:10px; font-size:.78rem; font-weight:600;">Mevcut</span>
-          {% elif o.durum == "yok" %}
-            <span style="background:#fee2e2; color:#991b1b; padding:.15rem .6rem; border-radius:10px; font-size:.78rem; font-weight:600;">Yok</span>
-          {% elif o.durum == "gec" %}
-            <span style="background:#fef3c7; color:#92400e; padding:.15rem .6rem; border-radius:10px; font-size:.78rem; font-weight:600;">Geç</span>
-          {% else %}
-            <span style="background:#f3f4f6; color:#6b7280; padding:.15rem .6rem; border-radius:10px; font-size:.78rem;">—</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+
+  {% for grup in sube_gruplari %}
+  <div class="yk-card" style="padding:0; overflow:hidden; margin-bottom:1rem;">
+    <div style="padding:.5rem 1rem; background:#e0f2fe; border-bottom:1px solid #7dd3fc; display:flex; align-items:center; justify-content:space-between;">
+      <span style="font-weight:700; color:#0369a1; font-size:.88rem;">{{ grup.grouper }}</span>
+      <span style="font-size:.78rem; color:#6b7280;">{{ grup.list|length }} öğrenci</span>
+    </div>
+    <table style="width:100%; border-collapse:collapse; font-size:.875rem;">
+      <thead>
+        <tr style="background:#f0f9ff; border-bottom:1px solid #e0f2fe;">
+          <th style="padding:.45rem .75rem; text-align:left; color:#0369a1; font-size:.76rem; width:2rem;">#</th>
+          <th style="padding:.45rem .75rem; text-align:left; color:#0369a1; font-size:.76rem;">Okul No</th>
+          <th style="padding:.45rem .75rem; text-align:left; color:#0369a1; font-size:.76rem;">Adı ve Soyadı</th>
+          <th style="padding:.45rem .75rem; text-align:center; color:#0369a1; font-size:.76rem;">Durum</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in grup.list %}
+        <tr style="border-bottom:1px solid #f0f9ff; {% if forloop.even %}background:#fafffe;{% endif %}">
+          <td style="padding:.4rem .75rem; color:#9ca3af; font-size:.78rem;">{{ forloop.counter }}</td>
+          <td style="padding:.4rem .75rem; color:#374151; font-family:monospace;">{{ o.okulno }}</td>
+          <td style="padding:.4rem .75rem; color:#111827;">{{ o.adi_soyadi }}</td>
+          <td style="padding:.4rem .75rem; text-align:center;">
+            {% if o.durum == "mevcut" %}
+              <span style="background:#dcfce7; color:#166534; padding:.15rem .6rem; border-radius:10px; font-size:.78rem; font-weight:600;">Mevcut</span>
+            {% elif o.durum == "yok" %}
+              <span style="background:#fee2e2; color:#991b1b; padding:.15rem .6rem; border-radius:10px; font-size:.78rem; font-weight:600;">Yok</span>
+            {% elif o.durum == "gec" %}
+              <span style="background:#fef3c7; color:#92400e; padding:.15rem .6rem; border-radius:10px; font-size:.78rem; font-weight:600;">Geç</span>
+            {% else %}
+              <span style="background:#f3f4f6; color:#6b7280; padding:.15rem .6rem; border-radius:10px; font-size:.78rem;">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
 </div>
 {% endif %}
 
