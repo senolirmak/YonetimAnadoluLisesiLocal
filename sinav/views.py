@@ -2,7 +2,7 @@ import os
 import uuid
 import threading
 import traceback
-from datetime import datetime
+from datetime import datetime, date
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Subquery, OuterRef
@@ -1747,25 +1747,46 @@ def ogrenci_sinav_yeri(request):
     sonuclar = []
     hata     = None
 
+    bugun        = date.today()
+    gosterim_tarihi = None
+
     if okulno:
         if not aktif_uretim:
             hata = "Aktif sınav takvimi bulunamadı."
         else:
-            sonuclar = list(
+            tum_sonuclar = list(
                 OturmaPlani.objects
                 .filter(uretim=aktif_uretim, okulno=okulno)
                 .order_by("tarih", "saat", "oturum")
                 .values("tarih", "saat", "salon", "sira_no", "ders_adi", "sinifsube", "adi_soyadi")
             )
-            if not sonuclar:
+            if not tum_sonuclar:
                 hata = f"'{okulno}' okul numarasına ait kayıt bulunamadı."
+            else:
+                # Bugünkü oturumlar varsa onları, yoksa en yakın gelecek tarihi göster
+                bugun_sonuclar = [s for s in tum_sonuclar if s["tarih"] == bugun]
+                if bugun_sonuclar:
+                    sonuclar        = bugun_sonuclar
+                    gosterim_tarihi = bugun
+                else:
+                    yakin_tarih = next(
+                        (s["tarih"] for s in tum_sonuclar if s["tarih"] > bugun), None
+                    )
+                    if yakin_tarih:
+                        sonuclar        = [s for s in tum_sonuclar if s["tarih"] == yakin_tarih]
+                        gosterim_tarihi = yakin_tarih
+                    else:
+                        # Tüm sınavlar geçmiş
+                        hata = "Yaklaşan sınav oturumu bulunmuyor (tüm oturumlar geçmiş)."
 
     return render(request, "sinav/ogrenci_sinav_yeri.html", {
-        "aktif_sinav":  aktif_sinav,
-        "aktif_uretim": aktif_uretim,
-        "okulno":       okulno,
-        "sonuclar":     sonuclar,
-        "hata":         hata,
+        "aktif_sinav":      aktif_sinav,
+        "aktif_uretim":     aktif_uretim,
+        "okulno":           okulno,
+        "sonuclar":         sonuclar,
+        "hata":             hata,
+        "bugun":            bugun,
+        "gosterim_tarihi":  gosterim_tarihi,
     })
 
 

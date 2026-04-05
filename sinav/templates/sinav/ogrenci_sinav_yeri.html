@@ -77,6 +77,18 @@
           </span>
         </div>
 
+        <!-- Tarih bilgi bandı -->
+        {% if gosterim_tarihi == bugun %}
+          <div style="margin-bottom:.75rem; padding:.5rem .85rem; background:#d1fae5; border:1px solid #6ee7b7; border-radius:6px; font-size:.875rem; color:#065f46;">
+            Bugünkü sınav oturumu gösteriliyor — <strong>{{ gosterim_tarihi|date:"d.m.Y" }}</strong>
+          </div>
+        {% else %}
+          <div style="margin-bottom:.75rem; padding:.5rem .85rem; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; font-size:.875rem; color:#1e40af;">
+            En yakın sınav tarihi gösteriliyor — <strong>{{ gosterim_tarihi|date:"d.m.Y" }}</strong>
+            <span style="font-size:.8rem; color:#6b7280;">({{ gosterim_tarihi|date:"l" }})</span>
+          </div>
+        {% endif %}
+
         <p style="font-size:.85rem; color:#6b7280; margin-bottom:.75rem;">
           {{ sonuclar|length }} oturum listeleniyor.
         </p>
