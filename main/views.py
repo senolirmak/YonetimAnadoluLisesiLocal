@@ -782,7 +782,7 @@ def ogretmen_sinav_gozetim(request):
             slot["medya_serbest"] = slot_medya_serbest
 
     # ── Nöbet devir: nöbetçi öğretmenin üstlendiği sınav slotları ──────────────
-    if aktif_uretim and personel and not is_preview:
+    if aktif_uretim and personel:
         nobet_slotlari = _nobetci_gozetim_slotlari(personel, aktif_uretim)
         mevcut_gozetim_keyler = {(s["tarih"], s["saat"], s["oturum"]) for s in gozetim_slotlari}
         for s in nobet_slotlari:
