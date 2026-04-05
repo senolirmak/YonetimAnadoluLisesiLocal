@@ -35,7 +35,7 @@ def slot_aktif_mi(tarih, saat: str, bugun, simdi_str: str,
 # Her slot türü için geçerli saat penceresi (dakika cinsinden, sınav saatine göre).
 # Değiştirmek istediğinizde yalnızca bu sözlüğü güncellemek yeterlidir.
 SLOT_ERISIM_KURALLARI: dict[str, dict] = {
-    "gozetim":      {"baslangic_dk":  -5, "bitis_dk":  45},  # Yoklama / Medya (sınav 40 dk)
+    "gozetim":      {"baslangic_dk":  -5, "bitis_dk":  35},  # Yoklama / Medya (sınav 40 dk)
     "siniflistesi": {"baslangic_dk": -50, "bitis_dk": -10},  # Sınıf Listesi PDF (sınav -50dk → -10dk)
 }
 
