@@ -869,6 +869,22 @@ def ogretmen_sinav_medya(request):
     filtre_saat   = request.GET.get("saat", "").strip()
     filtre_oturum = request.GET.get("oturum", "").strip()
 
+    # ── Superuser simülasyonu: ?sim_tarih=2026-04-06&sim_saat=09:40 ─────────
+    sim_aktif = False
+    simdi_override = None
+    if is_admin:
+        _sim_tarih = request.GET.get("sim_tarih", "").strip()
+        _sim_saat  = request.GET.get("sim_saat",  "").strip()
+        if _sim_tarih and _sim_saat:
+            try:
+                from datetime import datetime as _dt2
+                simdi_override = timezone.make_aware(
+                    _dt2.strptime(f"{_sim_tarih} {_sim_saat}", "%Y-%m-%d %H:%M")
+                )
+                sim_aktif = True
+            except ValueError:
+                pass
+
     medya_gruplari = []
     if personel and aktif_uretim:
         # Öğretmenin gözetmen olduğu (tarih, saat, oturum) slotları
@@ -915,7 +931,7 @@ def ogretmen_sinav_medya(request):
                 except (ValueError, AttributeError):
                     pass
 
-            simdi = timezone.now()
+            simdi = simdi_override if simdi_override else timezone.now()
             medyalar = []
             for sev in sorted(seviyeler):
                 if sev not in media_map[key]:
@@ -956,6 +972,8 @@ def ogretmen_sinav_medya(request):
         "ogretmen_adi":   ogretmen_adi,
         "aktif_sinav":    aktif_sinav,
         "medya_gruplari": medya_gruplari,
+        "sim_aktif":      sim_aktif,
+        "sim_dt":         simdi_override,
     })
 
 

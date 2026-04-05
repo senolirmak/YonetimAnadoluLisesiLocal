@@ -13,6 +13,14 @@
        style="color:#6366f1;font-size:.85rem;text-decoration:none;">← Gözetim Listeme Dön</a>
   </div>
 
+  {% if sim_aktif %}
+  <div style="padding:.6rem 1rem;background:#fdf4ff;border:1px solid #d946ef;border-radius:6px;font-size:.85rem;color:#701a75;margin-bottom:1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <span>🕐 <strong>Simülasyon modu:</strong> <strong>{{ sim_dt|date:"d.m.Y H:i" }}</strong> olarak simüle ediliyor.</span>
+    <a href="{{ request.path }}{% if request.GET.preview_ogretmen_id %}?preview_ogretmen_id={{ request.GET.preview_ogretmen_id }}{% endif %}"
+       style="font-size:.8rem;color:#701a75;text-decoration:underline;">Simülasyonu Kapat</a>
+  </div>
+  {% endif %}
+
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:1.25rem;">
     <h2 class="page-title" style="margin:0;">Sınav Medyası</h2>
     {% if aktif_sinav %}
