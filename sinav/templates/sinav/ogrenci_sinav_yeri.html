@@ -2,6 +2,7 @@
 {% block title %}Öğrenci Sınav Yeri Sorgulama{% endblock %}
 
 {% block content %}
+<style>.row-even { background: #fdfcff; }</style>
 <div style="max-width:800px; margin:2rem auto; padding:0 1rem;">
 
   <div class="card" style="border-left:4px solid #7c3aed; padding:1rem 1.5rem; margin-bottom:1.5rem;">
@@ -106,7 +107,7 @@
           </thead>
           <tbody>
             {% for s in sonuclar %}
-            <tr style="border-bottom:1px solid #f3f4f6; {% if forloop.even %}background:#fdfcff;{% endif %}">
+            <tr class="{% if forloop.even %}row-even{% endif %}" style="border-bottom:1px solid #f3f4f6;">
               <td style="padding:.5rem .75rem; color:#9ca3af;">{{ forloop.counter }}</td>
               <td style="padding:.5rem .75rem; font-weight:600;">
                 {{ s.tarih|date:"d.m.Y" }}
