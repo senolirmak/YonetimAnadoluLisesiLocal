@@ -36,7 +36,7 @@ def slot_aktif_mi(tarih, saat: str, bugun, simdi_str: str,
 # Değiştirmek istediğinizde yalnızca bu sözlüğü güncellemek yeterlidir.
 SLOT_ERISIM_KURALLARI: dict[str, dict] = {
     "gozetim":      {"baslangic_dk":  -5, "bitis_dk":  45},  # Yoklama / Medya (sınav 40 dk)
-    "siniflistesi": {"baslangic_dk": -60, "bitis_dk":  30},  # Sınıf Listesi PDF
+    "siniflistesi": {"baslangic_dk":  -3, "bitis_dk":  40},  # Sınıf Listesi PDF
 }
 
 
