@@ -21,6 +21,11 @@ class Ogrenci(models.Model):
         verbose_name="Sürekli Devamsız",
         help_text="İşaretlenirse mazeret sınavına çağrılmaz.",
     )
+    muaf = models.BooleanField(
+        default=False,
+        verbose_name="Muaf",
+        help_text="İşaretlenirse mazeret sınavına alınmaz.",
+    )
 
     class Meta:
         db_table = "ogrenci"

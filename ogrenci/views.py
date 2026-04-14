@@ -229,7 +229,7 @@ def ogrenci_liste(request):
 
 @login_required
 def sureksiz_devamsiz_listesi(request):
-    """Sürekli devamsız öğrencileri listeler; toplu işaretleme/kaldırma sağlar."""
+    """Öğrenci özel durumları: sürekli devamsız ve muaf yönetimi."""
     from okul.auth import is_mudur_yardimcisi as _mudur_mi
     gruplar = set(request.user.groups.values_list("name", flat=True))
     yetkili = request.user.is_superuser or _mudur_mi(request.user) or "okul_muduru" in gruplar
@@ -237,8 +237,8 @@ def sureksiz_devamsiz_listesi(request):
         raise PermissionDenied
 
     if request.method == "POST":
-        # Formdan gelen okulno listesi: işaretlenenler sureksiz_devamsiz=True
-        isaretli = set(request.POST.getlist("sureksiz"))
+        sureksiz_isaretli = set(request.POST.getlist("sureksiz"))
+        muaf_isaretli     = set(request.POST.getlist("muaf"))
         sinifsube = request.POST.get("sinifsube_filtre", "")
         qs = Ogrenci.objects.all()
         if sinifsube:
@@ -249,10 +249,17 @@ def sureksiz_devamsiz_listesi(request):
                 pass
         guncellenen = 0
         for ogr in qs:
-            yeni_deger = ogr.okulno in isaretli
-            if ogr.sureksiz_devamsiz != yeni_deger:
-                ogr.sureksiz_devamsiz = yeni_deger
-                ogr.save(update_fields=["sureksiz_devamsiz"])
+            yeni_sureksiz = ogr.okulno in sureksiz_isaretli
+            yeni_muaf     = ogr.okulno in muaf_isaretli
+            fields = []
+            if ogr.sureksiz_devamsiz != yeni_sureksiz:
+                ogr.sureksiz_devamsiz = yeni_sureksiz
+                fields.append("sureksiz_devamsiz")
+            if ogr.muaf != yeni_muaf:
+                ogr.muaf = yeni_muaf
+                fields.append("muaf")
+            if fields:
+                ogr.save(update_fields=fields)
                 guncellenen += 1
         messages.success(request, f"{guncellenen} öğrenci kaydı güncellendi.")
         return redirect(
@@ -260,7 +267,7 @@ def sureksiz_devamsiz_listesi(request):
         )
 
     sinifsube = request.GET.get("sinifsube", "")
-    filtre = request.GET.get("filtre", "")  # "sureksiz" | "" (tümü)
+    filtre    = request.GET.get("filtre", "")  # "sureksiz" | "muaf" | "" (tümü)
 
     ogrenciler = Ogrenci.objects.all()
     if sinifsube:
@@ -271,6 +278,8 @@ def sureksiz_devamsiz_listesi(request):
             pass
     if filtre == "sureksiz":
         ogrenciler = ogrenciler.filter(sureksiz_devamsiz=True)
+    elif filtre == "muaf":
+        ogrenciler = ogrenciler.filter(muaf=True)
 
     sinifsube_secenekleri = [
         f"{s}/{sb}"
@@ -278,11 +287,12 @@ def sureksiz_devamsiz_listesi(request):
     ]
 
     return render(request, "ogrenci/sureksiz_devamsiz_listesi.html", {
-        "ogrenciler":          ogrenciler.order_by("sinif", "sube", "okulno"),
+        "ogrenciler":            ogrenciler.order_by("sinif", "sube", "okulno"),
         "sinifsube_secenekleri": sinifsube_secenekleri,
-        "secili_sinifsube":    sinifsube,
-        "filtre":              filtre,
-        "toplam_sureksiz":     Ogrenci.objects.filter(sureksiz_devamsiz=True).count(),
+        "secili_sinifsube":      sinifsube,
+        "filtre":                filtre,
+        "toplam_sureksiz":       Ogrenci.objects.filter(sureksiz_devamsiz=True).count(),
+        "toplam_muaf":           Ogrenci.objects.filter(muaf=True).count(),
     })
 
 

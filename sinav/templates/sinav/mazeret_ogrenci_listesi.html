@@ -25,14 +25,14 @@
   }
   .ders-icerik { border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 6px 6px; margin-bottom: .8rem; }
   .ogr-satir {
-    display: grid; grid-template-columns: 2rem 5rem 4rem 1fr 7rem 7rem;
+    display: grid; grid-template-columns: 2rem 5rem 4rem 1fr 7rem 7rem 5rem;
     align-items: center; gap: .5rem;
     padding: .3rem .8rem; font-size: .83rem; border-bottom: 1px solid #f8fafc;
   }
   .ogr-satir:last-child { border-bottom: none; }
-  .ogr-satir.sureksiz-satir { background: #fef2f2; }
+  .ogr-satir.haric-satir { background: #fef2f2; }
   .ogr-baslik {
-    display: grid; grid-template-columns: 2rem 5rem 4rem 1fr 7rem 7rem;
+    display: grid; grid-template-columns: 2rem 5rem 4rem 1fr 7rem 7rem 5rem;
     gap: .5rem; padding: .3rem .8rem; font-size: .75rem;
     font-weight: 600; color: #64748b; background: #f8fafc;
     border-bottom: 1px solid #e2e8f0;
@@ -60,8 +60,8 @@
     <div class="etiket">Belge Teslim</div>
   </div>
   <div class="ozet-kutu sureksiz">
-    <div class="sayi">{{ sureksiz_n }}</div>
-    <div class="etiket">Sürekli Devamsız</div>
+    <div class="sayi">{{ haric_n }}</div>
+    <div class="etiket">Hariç (Sürekli Dev. / Muaf)</div>
   </div>
   <div class="ozet-kutu uygun">
     <div class="sayi">{{ uygun_n }}</div>
@@ -97,16 +97,17 @@
       <span>Sınıf</span>
       <span>Adı Soyadı</span>
       <span style="text-align:center;">Belge Teslim</span>
-      <span style="text-align:center;">Sürekli Devamsız</span>
+      <span style="text-align:center;">Sürekli Dev.</span>
+      <span style="text-align:center;">Muaf</span>
     </div>
     {% for item in grp.ogrenciler %}
-    <div class="ogr-satir {% if item.sureksiz %}sureksiz-satir{% endif %}">
+    <div class="ogr-satir {% if item.sureksiz or item.muaf %}haric-satir{% endif %}">
       <span class="cb-center" style="color:#94a3b8; font-size:.75rem;">{{ forloop.counter }}</span>
       <span>{{ item.mo.okulno }}</span>
       <span>{{ item.mo.sinifsube }}</span>
       <span>{{ item.mo.adi_soyadi }}</span>
       <span class="cb-center">
-        {% if not item.sureksiz %}
+        {% if not item.sureksiz and not item.muaf %}
         <input type="checkbox" name="belge_teslim" value="{{ item.mo.pk }}"
                {% if item.mo.belge_teslim %}checked{% endif %}>
         {% else %}
@@ -116,6 +117,10 @@
       <span class="cb-center">
         <input type="checkbox" name="sureksiz_devamsiz" value="{{ item.mo.okulno }}"
                {% if item.sureksiz %}checked{% endif %}>
+      </span>
+      <span class="cb-center">
+        <input type="checkbox" name="muaf" value="{{ item.mo.okulno }}"
+               {% if item.muaf %}checked{% endif %}>
       </span>
     </div>
     {% endfor %}

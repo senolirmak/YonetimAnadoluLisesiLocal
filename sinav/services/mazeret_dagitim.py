@@ -275,16 +275,18 @@ def dagit(mazeret_sinav: MazeretSinav) -> Tuple[bool, str]:
     if not aktif_uretim:
         return False, "Aktif takvim üretimi bulunamadı. Önce bir takvim üretimi aktif yapın."
 
-    # Sürekli devamsız öğrencilerin okul numaraları
-    sureksiz_okulnolari = set(
+    # Sürekli devamsız veya muaf öğrencilerin okul numaraları → dağıtımdan hariç
+    hariç_okulnolari = set(
         Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+    ) | set(
+        Ogrenci.objects.filter(muaf=True).values_list("okulno", flat=True)
     )
 
-    # Belge teslim etmiş VE sürekli devamsız olmayan → uygun (ders_adi, sinav_turu) çiftleri
+    # Belge teslim etmiş VE hariç listesinde olmayan → uygun (ders_adi, sinav_turu) çiftleri
     uygun_qs = (
         MazeretOgrenci.objects
         .filter(mazeret_sinav=mazeret_sinav, belge_teslim=True)
-        .exclude(okulno__in=sureksiz_okulnolari)
+        .exclude(okulno__in=hariç_okulnolari)
         .values("ders_adi", "sinav_turu")
         .distinct()
     )

@@ -1,13 +1,15 @@
 {% extends 'layouts/base.html' %}
-{% block title %}Sürekli Devamsız Öğrenciler{% endblock %}
+{% block title %}Öğrenci Özel Durumları{% endblock %}
 
 {% block content %}
 <div class="container">
   <div class="flex-between mb-20">
-    <h2 class="page-title">Sürekli Devamsız Öğrenciler</h2>
-    <span style="font-size:.85rem; color:#6b7280;">
-      Toplam işaretli: <strong>{{ toplam_sureksiz }}</strong> öğrenci
-    </span>
+    <h2 class="page-title">Öğrenci Özel Durumları</h2>
+    <div style="display:flex; gap:.6rem; font-size:.83rem; color:#6b7280;">
+      <span>Sürekli Devamsız: <strong>{{ toplam_sureksiz }}</strong></span>
+      <span style="color:#d1d5db;">|</span>
+      <span>Muaf: <strong>{{ toplam_muaf }}</strong></span>
+    </div>
   </div>
 
   {% for message in messages %}
@@ -17,9 +19,9 @@
   {% endfor %}
 
   <div style="background:#fffbeb; border:1px solid #f59e0b; border-left:4px solid #f59e0b;
-              border-radius:6px; padding:.7rem 1rem; margin-bottom:1.2rem; font-size:.85rem; color:#78350f;">
-    İşaretlenen öğrenciler mazeret sınavına çağrılmaz. Sınıf/Şube seçip kaydet
-    butonuna bastığınızda <strong>yalnızca o sınıfa ait</strong> öğrencilerin durumu güncellenir.
+              border-radius:6px; padding:.7rem 1rem; margin-bottom:1.2rem; font-size:.84rem; color:#78350f;">
+    <strong>Sürekli Devamsız</strong> ve <strong>Muaf</strong> işaretlenen öğrenciler mazeret sınavına alınmaz.
+    Sınıf/Şube seçip kaydet butonuna bastığınızda <strong>yalnızca o sınıfa ait</strong> öğrenciler güncellenir.
   </div>
 
   <!-- Filtre -->
@@ -34,7 +36,8 @@
     <label style="margin-left:1rem;">Göster:</label>
     <select name="filtre">
       <option value="" {% if filtre == "" %}selected{% endif %}>Tümü</option>
-      <option value="sureksiz" {% if filtre == "sureksiz" %}selected{% endif %}>Yalnızca Sürekli Devamsızlar</option>
+      <option value="sureksiz" {% if filtre == "sureksiz" %}selected{% endif %}>Sürekli Devamsızlar</option>
+      <option value="muaf" {% if filtre == "muaf" %}selected{% endif %}>Muaflar</option>
     </select>
     <button type="submit" class="btn btn-primary">Filtrele</button>
     <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" class="btn-cancel">Temizle</a>
@@ -55,29 +58,29 @@
             <th>Sınıf/Şube</th>
             <th>Adı Soyadı</th>
             <th style="text-align:center;">Sürekli Devamsız</th>
+            <th style="text-align:center;">Muaf</th>
           </tr>
         </thead>
         <tbody>
           {% for ogr in ogrenciler %}
-          <tr {% if ogr.sureksiz_devamsiz %}style="background:#fef2f2;"{% endif %}>
+          <tr {% if ogr.sureksiz_devamsiz or ogr.muaf %}style="background:#fef2f2;"{% endif %}>
             <td style="text-align:center;">
-              <input type="checkbox" name="sureksiz" value="{{ ogr.okulno }}"
-                     {% if ogr.sureksiz_devamsiz %}checked{% endif %}>
+              <input type="checkbox" class="satir-sec" title="Satırı seç">
             </td>
             <td>{{ ogr.okulno }}</td>
             <td>{{ ogr.sinifsube }}</td>
             <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
             <td style="text-align:center;">
-              {% if ogr.sureksiz_devamsiz %}
-              <span style="background:#fee2e2; color:#b91c1c; font-size:.78rem;
-                           font-weight:600; padding:.15rem .5rem; border-radius:99px;">
-                Sürekli Devamsız
-              </span>
-              {% endif %}
+              <input type="checkbox" name="sureksiz" value="{{ ogr.okulno }}"
+                     {% if ogr.sureksiz_devamsiz %}checked{% endif %}>
+            </td>
+            <td style="text-align:center;">
+              <input type="checkbox" name="muaf" value="{{ ogr.okulno }}"
+                     {% if ogr.muaf %}checked{% endif %}>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-center text-muted">Kayıt bulunamadı.</td></tr>
+          <tr><td colspan="6" class="text-center text-muted">Kayıt bulunamadı.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -97,7 +100,7 @@
 
 <script>
 document.getElementById("tumu_sec").addEventListener("change", function () {
-  document.querySelectorAll("input[name='sureksiz']").forEach(cb => cb.checked = this.checked);
+  document.querySelectorAll(".satir-sec").forEach(cb => cb.checked = this.checked);
 });
 </script>
 {% endblock %}
