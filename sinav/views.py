@@ -19,7 +19,7 @@ from .models import (
     SinavBilgisi,
     DersAyarlariJSON,
     DisVeri, AlgoritmaParametreleri,
-    TakvimUretim, OturmaPlani, SinavSalonYoklama,
+    TakvimUretim, Takvim, OturmaPlani, SinavSalonYoklama,
     MazeretSinav, MazeretGun, MazeretOturum, MazeretOturumDers,
 )
 from okul.models import OkulBilgi
@@ -2133,25 +2133,90 @@ def mazeret_sinav_olustur(request):
 
 @login_required
 def mazeret_sinav_detay(request, pk):
-    """Mazeret sınav planının detayını gösterir (günler, oturumlar, dersler)."""
+    """Mazeret sınav planının detayını gösterir (günler, oturumlar, dersler, öğrenciler)."""
+    import re as _re
+    from django.db.models import Subquery, OuterRef as _OuterRef
+
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
+
+    aktif_uretim = TakvimUretim.objects.filter(
+        sinav=mazeret.sinav, aktif=True
+    ).first()
+
+    # Devamsız öğrencileri ders bazında önceden topla:
+    # {(ders_id, sinav_turu): [{"okulno", "adi_soyadi", "sinifsube"}, ...]}
+    ogrenci_map: dict[tuple, list] = {}
+    if aktif_uretim:
+        _sinav_turu_re = _re.compile(r'^(.*?)\s+\((Yazili|Uygulama)\)$')
+
+        ders_adi_subq = OturmaPlani.objects.filter(
+            uretim=aktif_uretim,
+            okulno=_OuterRef("okulno"),
+            tarih=_OuterRef("tarih"),
+            saat=_OuterRef("saat"),
+            salon=_OuterRef("salon"),
+        ).values("ders_adi")[:1]
+
+        absent_rows = list(
+            SinavSalonYoklama.objects.filter(uretim=aktif_uretim, durum="yok")
+            .annotate(ders_adi_full=Subquery(ders_adi_subq))
+            .values("okulno", "adi_soyadi", "sinifsube", "ders_adi_full")
+        )
+
+        # ders_adi_full → (ders_id, sinav_turu) çözümle
+        ders_adi_cache: dict[str, tuple | None] = {}
+        for row in absent_rows:
+            ders_adi_full = row.get("ders_adi_full") or ""
+            if not ders_adi_full:
+                continue
+            if ders_adi_full not in ders_adi_cache:
+                m = _sinav_turu_re.match(ders_adi_full)
+                base_adi = m.group(1).strip() if m else ders_adi_full
+                sinav_turu = m.group(2) if m else ""
+                tk = (
+                    Takvim.objects.filter(
+                        uretim=aktif_uretim,
+                        ders__ders_adi=base_adi,
+                        sinav_turu=sinav_turu,
+                    ).values("ders_id", "sinav_turu").first()
+                )
+                ders_adi_cache[ders_adi_full] = (tk["ders_id"], tk["sinav_turu"]) if tk else None
+
+            key = ders_adi_cache[ders_adi_full]
+            if key:
+                ogrenci_map.setdefault(key, []).append({
+                    "okulno":     row["okulno"],
+                    "adi_soyadi": row["adi_soyadi"],
+                    "sinifsube":  row["sinifsube"],
+                })
+
+        # Her ders için öğrencileri sınıf/okul no sırasına göre sırala
+        for key in ogrenci_map:
+            ogrenci_map[key].sort(key=lambda o: (o["sinifsube"], o["okulno"]))
+
     gunler = (
         mazeret.gunler
         .prefetch_related("oturumlar__dersler__ders")
         .order_by("tarih")
     )
 
-    # Oturum bazında ders listesini context için hazırla
+    # Oturum bazında ders + öğrenci listesini hazırla
     gunler_veri = []
     for gun in gunler:
         oturumlar_veri = []
         for oturum in gun.oturumlar.order_by("oturum_no"):
-            dersler = list(oturum.dersler.select_related("ders").order_by("ders__ders_adi"))
-            oturumlar_veri.append({"oturum": oturum, "dersler": dersler})
+            dersler_veri = []
+            for od in oturum.dersler.select_related("ders").order_by("ders__ders_adi"):
+                key = (od.ders_id, od.sinav_turu)
+                dersler_veri.append({
+                    "od":        od,
+                    "ogrenciler": ogrenci_map.get(key, []),
+                })
+            oturumlar_veri.append({"oturum": oturum, "dersler": dersler_veri})
         gunler_veri.append({"gun": gun, "oturumlar": oturumlar_veri})
 
     return render(request, "sinav/mazeret_detay.html", {
-        "mazeret": mazeret,
+        "mazeret":     mazeret,
         "gunler_veri": gunler_veri,
     })
 

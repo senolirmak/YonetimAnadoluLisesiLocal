@@ -41,6 +41,30 @@
     background: #fef3c7;
     color: #92400e;
   }
+  .ogrenci-listesi {
+    margin: .3rem 0 .5rem 0;
+    padding: .4rem .7rem;
+    background: #f8fafc;
+    border-radius: 4px;
+    font-size: .8rem;
+  }
+  .ogrenci-listesi-baslik {
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: .3rem;
+    font-size: .78rem;
+  }
+  .ogrenci-satir {
+    display: flex;
+    gap: .5rem;
+    padding: .1rem 0;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+  }
+  .ogrenci-satir:last-child { border-bottom: none; }
+  .ogrenci-no   { color: #94a3b8; min-width: 4.5rem; }
+  .ogrenci-sube { color: #94a3b8; min-width: 3rem; }
+  .ders-blok { border: 1px solid #e2e8f0; border-radius: 5px; margin: .4rem 0; overflow: hidden; }
   .gun-baslik {
     font-size: 1.05rem;
     font-weight: 700;
@@ -118,14 +142,35 @@
   </div>
 
   {% if ot_veri.dersler %}
-  <ul class="oturum-ders-listesi">
-    {% for od in ot_veri.dersler %}
-    <li class="{% if od.sinav_turu == 'Uygulama' %}uygulama-ders{% endif %}">
-      {{ od.ders.ders_adi }}
-      {% if od.sinav_turu %}<em style="opacity:.7;">({{ od.sinav_turu }})</em>{% endif %}
-    </li>
+  <div style="padding:.5rem .9rem;">
+    {% for ders_veri in ot_veri.dersler %}
+    <div class="ders-blok">
+      <div style="padding:.3rem .7rem; background:#f1f5f9; display:flex; align-items:center; gap:.5rem; font-size:.83rem; font-weight:600;">
+        <span class="{% if ders_veri.od.sinav_turu == 'Uygulama' %}uygulama-ders{% endif %}"
+              style="background:transparent; padding:0;">
+          {{ ders_veri.od.ders.ders_adi }}
+          {% if ders_veri.od.sinav_turu %}<em style="font-weight:400; opacity:.7;">({{ ders_veri.od.sinav_turu }})</em>{% endif %}
+        </span>
+        <span style="margin-left:auto; font-size:.76rem; font-weight:400; color:#64748b;">
+          {{ ders_veri.ogrenciler|length }} öğrenci
+        </span>
+      </div>
+      {% if ders_veri.ogrenciler %}
+      <div class="ogrenci-listesi">
+        {% for ogr in ders_veri.ogrenciler %}
+        <div class="ogrenci-satir">
+          <span class="ogrenci-no">{{ ogr.okulno }}</span>
+          <span class="ogrenci-sube">{{ ogr.sinifsube }}</span>
+          <span>{{ ogr.adi_soyadi }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="padding:.3rem .7rem; font-size:.78rem; color:#aaa; margin:0;">Devamsız öğrenci bulunamadı.</p>
+      {% endif %}
+    </div>
     {% endfor %}
-  </ul>
+  </div>
   {% else %}
   <p style="padding:.5rem .9rem; font-size:.82rem; color:#aaa; margin:0;">Bu oturuma ders atanmamış.</p>
   {% endif %}
@@ -147,6 +192,7 @@
           <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap;">Saat</th>
           <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap;">Tür</th>
           <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Dersler</th>
+          <th style="padding:.6rem .9rem; text-align:right; border-bottom:2px solid #e2e8f0; white-space:nowrap;">Öğrenci</th>
         </tr>
       </thead>
       <tbody>
@@ -164,11 +210,14 @@
               </span>
             </td>
             <td style="padding:.5rem .9rem;">
-              {% for od in ot_veri.dersler %}
-                {{ od.ders.ders_adi }}{% if od.sinav_turu %} <em style="color:#888;">({{ od.sinav_turu }})</em>{% endif %}{% if not forloop.last %}, {% endif %}
+              {% for ders_veri in ot_veri.dersler %}
+                {{ ders_veri.od.ders.ders_adi }}{% if ders_veri.od.sinav_turu %} <em style="color:#888;">({{ ders_veri.od.sinav_turu }})</em>{% endif %}{% if not forloop.last %}, {% endif %}
               {% empty %}
                 <span style="color:#ccc;">—</span>
               {% endfor %}
+            </td>
+            <td style="padding:.5rem .9rem; text-align:right; font-weight:600; color:#475569;">
+              {% for ders_veri in ot_veri.dersler %}{% with ders_veri.ogrenciler|length as n %}{% if n %}{{ n }}{% if not forloop.last %}+{% endif %}{% endif %}{% endwith %}{% endfor %}
             </td>
           </tr>
           {% endfor %}
