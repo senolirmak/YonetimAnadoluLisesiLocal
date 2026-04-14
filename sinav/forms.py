@@ -2,7 +2,7 @@ from django import forms
 from datetime import date
 import re
 
-from .models import SinavBilgisi
+from .models import SinavBilgisi, MazeretSinav
 
 
 class SinavBilgisiForm(forms.ModelForm):
@@ -108,3 +108,64 @@ class AlgoritmaForm(forms.Form):
                 f"Gecersiz tarih formati (YYYY-MM-DD olmali): {', '.join(hatali)}"
             )
         return raw
+
+
+class MazeretSinavForm(forms.ModelForm):
+    """Mazeret sınav planı oluşturma formu."""
+
+    # Virgülle veya yeni satırla ayrılmış tarih listesi
+    tarihler = forms.CharField(
+        label="Sınav Günleri",
+        widget=forms.Textarea(attrs={
+            "rows": 4,
+            "placeholder": "2026-05-12\n2026-05-13",
+        }),
+        help_text="Her satıra bir tarih, YYYY-AA-GG formatında. En az 1 gün girilmeli.",
+    )
+
+    oturum_saatleri = forms.CharField(
+        label="Oturum Saatleri",
+        initial="08:50,10:30,12:10,13:35,14:25",
+        help_text=(
+            "Virgülle ayrılmış, HH:MM formatında. "
+            "Yazılı oturumlar başa, Uygulama oturumları sona yerleştirilir. "
+            "En az 4 saat girilmeli."
+        ),
+    )
+
+    class Meta:
+        model = MazeretSinav
+        fields = ["aciklama"]
+        labels = {"aciklama": "Açıklama (opsiyonel)"}
+
+    def clean_tarihler(self):
+        raw = self.cleaned_data.get("tarihler", "")
+        hatali, gecerli = [], []
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                gecerli.append(date.fromisoformat(line))
+            except ValueError:
+                hatali.append(line)
+        if hatali:
+            raise forms.ValidationError(
+                f"Geçersiz tarih formatı (YYYY-AA-GG olmalı): {', '.join(hatali)}"
+            )
+        if not gecerli:
+            raise forms.ValidationError("En az bir sınav günü girilmeli.")
+        return gecerli
+
+    def clean_oturum_saatleri(self):
+        raw = self.cleaned_data.get("oturum_saatleri", "")
+        saatler = [s.strip() for s in raw.split(",") if s.strip()]
+        if len(saatler) < 4:
+            raise forms.ValidationError("En az 4 oturum saati girilmeli.")
+        pattern = re.compile(r"^\d{2}:\d{2}$")
+        hatali = [s for s in saatler if not pattern.match(s)]
+        if hatali:
+            raise forms.ValidationError(
+                f"Geçersiz saat formatı (HH:MM olmalı): {', '.join(hatali)}"
+            )
+        return ",".join(saatler)

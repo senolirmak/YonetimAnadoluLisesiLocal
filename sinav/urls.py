@@ -74,4 +74,10 @@ urlpatterns = [
     # Öğrenci Sınav Yeri Sorgulama
     path("ogrenci-sinav-yeri/", views.ogrenci_sinav_yeri, name="ogrenci_sinav_yeri"),
 
+    # Mazeret Sınavı
+    path("mazeret/",               views.mazeret_sinav_listesi, name="mazeret_listesi"),
+    path("mazeret/olustur/",       views.mazeret_sinav_olustur, name="mazeret_olustur"),
+    path("mazeret/<int:pk>/",      views.mazeret_sinav_detay,   name="mazeret_detay"),
+    path("mazeret/<int:pk>/dagit/", views.mazeret_sinav_dagit,  name="mazeret_dagit"),
+    path("mazeret/<int:pk>/sil/",  views.mazeret_sinav_sil,     name="mazeret_sil"),
 ]

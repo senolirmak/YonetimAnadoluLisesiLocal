@@ -1,0 +1,55 @@
+{% extends "sinav/base.html" %}
+{% block sinav_title %}Mazeret Sınavı Oluştur{% endblock %}
+
+{% block sinav_content %}
+<div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem;">
+  <a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary btn-sm">&#8592; Listeye Dön</a>
+  <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Yeni Mazeret Sınav Planı</h1>
+</div>
+
+<div class="card" style="max-width:640px;">
+  <h2>Plan Bilgileri</h2>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="form-group" style="margin-bottom:1rem;">
+      <label for="{{ form.aciklama.id_for_label }}">{{ form.aciklama.label }}</label>
+      {{ form.aciklama }}
+      {% if form.aciklama.errors %}
+        {% for e in form.aciklama.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="form-group" style="margin-bottom:1rem;">
+      <label for="{{ form.tarihler.id_for_label }}">{{ form.tarihler.label }}</label>
+      {{ form.tarihler }}
+      <div class="helptext">{{ form.tarihler.help_text }}</div>
+      {% if form.tarihler.errors %}
+        {% for e in form.tarihler.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="form-group" style="margin-bottom:1.5rem;">
+      <label for="{{ form.oturum_saatleri.id_for_label }}">{{ form.oturum_saatleri.label }}</label>
+      {{ form.oturum_saatleri }}
+      <div class="helptext">{{ form.oturum_saatleri.help_text }}</div>
+      {% if form.oturum_saatleri.errors %}
+        {% for e in form.oturum_saatleri.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+      {% endif %}
+    </div>
+
+    <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px;
+                padding:.75rem 1rem; font-size:.83rem; color:#0369a1; margin-bottom:1.2rem;">
+      <strong>Bilgi:</strong> Sistem aktif takvim üretimindeki tüm sınavları oturumlara
+      otomatik dağıtır. Yazılı sınavlar yazılı oturumlarına, Uygulama sınavları ayrı
+      oturumlara atanır.
+    </div>
+
+    <div style="display:flex; gap:.8rem;">
+      <button type="submit" class="btn btn-primary">Planı Oluştur ve Dağıt</button>
+      <a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary">İptal</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

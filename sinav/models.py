@@ -375,6 +375,101 @@ class SinavSalonYoklama(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Mazeret Sınav Modelleri
+# ---------------------------------------------------------------------------
+
+class MazeretSinav(models.Model):
+    """Bir sınav dönemine ait mazeret sınav planı."""
+    sinav = models.ForeignKey(
+        SinavBilgisi, on_delete=models.CASCADE,
+        related_name="mazeret_sinavlar",
+        verbose_name="Sınav",
+    )
+    aciklama = models.CharField(max_length=200, blank=True, verbose_name="Açıklama")
+    olusturma_tarihi = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-olusturma_tarihi"]
+        verbose_name = "Mazeret Sınav"
+        verbose_name_plural = "Mazeret Sınavları"
+
+    def __str__(self):
+        from django.utils import timezone
+        dt = timezone.localtime(self.olusturma_tarihi)
+        return f"Mazeret – {self.sinav} ({dt:%d.%m.%Y})"
+
+
+class MazeretGun(models.Model):
+    """Mazeret sınav planındaki her bir gün."""
+    mazeret_sinav = models.ForeignKey(
+        MazeretSinav, on_delete=models.CASCADE,
+        related_name="gunler", verbose_name="Mazeret Sınavı",
+    )
+    tarih = models.DateField(verbose_name="Tarih")
+
+    class Meta:
+        ordering = ["tarih"]
+        unique_together = [("mazeret_sinav", "tarih")]
+        verbose_name = "Mazeret Günü"
+        verbose_name_plural = "Mazeret Günleri"
+
+    def __str__(self):
+        return f"{self.mazeret_sinav} – {self.tarih:%d.%m.%Y}"
+
+
+class MazeretOturum(models.Model):
+    """Bir mazeret gününün oturumu (en az 4/gün)."""
+    SINAV_TURU_CHOICES = [("Yazili", "Yazılı"), ("Uygulama", "Uygulama")]
+
+    gun = models.ForeignKey(
+        MazeretGun, on_delete=models.CASCADE,
+        related_name="oturumlar", verbose_name="Gün",
+    )
+    oturum_no = models.PositiveSmallIntegerField(verbose_name="Oturum No")
+    saat_baslangic = models.TimeField(verbose_name="Başlangıç Saati")
+    saat_bitis = models.TimeField(verbose_name="Bitiş Saati")
+    sinav_turu = models.CharField(
+        max_length=20, choices=SINAV_TURU_CHOICES, default="Yazili",
+        verbose_name="Sınav Türü",
+    )
+
+    class Meta:
+        ordering = ["gun__tarih", "oturum_no"]
+        unique_together = [("gun", "oturum_no")]
+        verbose_name = "Mazeret Oturumu"
+        verbose_name_plural = "Mazeret Oturumları"
+
+    def __str__(self):
+        return f"{self.gun.tarih:%d.%m.%Y} – Ot.{self.oturum_no} ({self.saat_baslangic:%H:%M}, {self.get_sinav_turu_display()})"
+
+
+class MazeretOturumDers(models.Model):
+    """Hangi dersin hangi mazeret oturumunda yapılacağı."""
+    oturum = models.ForeignKey(
+        MazeretOturum, on_delete=models.CASCADE,
+        related_name="dersler", verbose_name="Oturum",
+    )
+    ders = models.ForeignKey(
+        "okul.DersHavuzu", on_delete=models.CASCADE,
+        related_name="+", verbose_name="Ders",
+    )
+    sinav_turu = models.CharField(
+        max_length=20, blank=True, default="",
+        choices=Takvim.SINAV_TURU_CHOICES,
+        verbose_name="Sınav Türü",
+    )
+
+    class Meta:
+        ordering = ["oturum__oturum_no", "ders"]
+        unique_together = [("oturum", "ders", "sinav_turu")]
+        verbose_name = "Mazeret Oturum Dersi"
+        verbose_name_plural = "Mazeret Oturum Dersleri"
+
+    def __str__(self):
+        return f"{self.oturum} – {self.ders}"
+
+
+# ---------------------------------------------------------------------------
 # Sinyaller
 # ---------------------------------------------------------------------------
 

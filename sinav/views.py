@@ -14,12 +14,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .forms import AlgoritmaForm, SinavBilgisiForm
+from .forms import AlgoritmaForm, SinavBilgisiForm, MazeretSinavForm
 from .models import (
     SinavBilgisi,
     DersAyarlariJSON,
     DisVeri, AlgoritmaParametreleri,
     TakvimUretim, OturmaPlani,
+    MazeretSinav, MazeretGun, MazeretOturum, MazeretOturumDers,
 )
 from okul.models import OkulBilgi
 from ogrenci.models import Ogrenci as OgrenciModel
@@ -473,8 +474,8 @@ def gozetmen_ozet(request):
                 .count()
             )
 
-        # Sınıf Listesi PDF: dp_saat = saat - 50dk ile eşleşen tüm öğretmenler
-        siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim, dp_offset_dk=-50)
+        # Sınıf Listesi PDF: sınav öncesi son dersin öğretmeni (bitis bazlı eşleşme)
+        siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim)
 
         # Tüm adları birleştir (gozetmen_fk + siniflistesi sahibi)
         tum_adlar = sorted(set(gozetmen_slot_sayisi) | set(siniflistesi_map))
@@ -2034,3 +2035,124 @@ def sinav_yoklama_yok_detay(request):
         "gruplar":       gruplar_liste,
         "toplam_yok":    sum(len(g["ogrenciler"]) for g in gruplar_liste),
     })
+
+
+# ===========================================================================
+# Mazeret Sınavı
+# ===========================================================================
+
+@login_required
+def mazeret_sinav_listesi(request):
+    """Aktif sınava ait mazeret sınav planlarını listeler."""
+    aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
+    planlar = (
+        MazeretSinav.objects.filter(sinav=aktif_sinav)
+        .prefetch_related("gunler__oturumlar__dersler__ders")
+        if aktif_sinav else []
+    )
+    return render(request, "sinav/mazeret_listesi.html", {
+        "aktif_sinav": aktif_sinav,
+        "planlar": planlar,
+    })
+
+
+@login_required
+def mazeret_sinav_olustur(request):
+    """Yeni mazeret sınav planı oluşturur: günleri ve oturumları kaydeder, sonra dağıtır."""
+    from .services.mazeret_dagitim import oturumlari_olustur, dagit
+
+    aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
+    if not aktif_sinav:
+        messages.error(request, "Aktif sınav bulunamadı.")
+        return redirect("sinav:mazeret_listesi")
+
+    if request.method == "POST":
+        form = MazeretSinavForm(request.POST)
+        if form.is_valid():
+            mazeret = form.save(commit=False)
+            mazeret.sinav = aktif_sinav
+            mazeret.save()
+
+            tarihler = form.cleaned_data["tarihler"]
+            oturum_saatleri = form.cleaned_data["oturum_saatleri"]
+
+            for tarih in sorted(set(tarihler)):
+                MazeretGun.objects.create(mazeret_sinav=mazeret, tarih=tarih)
+
+            oturumlari_olustur(mazeret, oturum_saatleri)
+            basarili, mesaj = dagit(mazeret)
+
+            if basarili:
+                messages.success(request, f"Mazeret sınav planı oluşturuldu. {mesaj}")
+            else:
+                messages.warning(request, f"Plan oluşturuldu fakat dağıtım hatası: {mesaj}")
+
+            return redirect("sinav:mazeret_detay", pk=mazeret.pk)
+    else:
+        # Varsayılan oturum saatlerini AlgoritmaParametreleri'nden al
+        varsayilan_saatler = "08:50,10:30,12:10,13:35,14:25"
+        try:
+            params = aktif_sinav.parametreler
+            varsayilan_saatler = params.oturum_saatleri
+        except Exception:
+            pass
+        form = MazeretSinavForm(initial={"oturum_saatleri": varsayilan_saatler})
+
+    return render(request, "sinav/mazeret_olustur.html", {
+        "aktif_sinav": aktif_sinav,
+        "form": form,
+    })
+
+
+@login_required
+def mazeret_sinav_detay(request, pk):
+    """Mazeret sınav planının detayını gösterir (günler, oturumlar, dersler)."""
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+    gunler = (
+        mazeret.gunler
+        .prefetch_related("oturumlar__dersler__ders")
+        .order_by("tarih")
+    )
+
+    # Oturum bazında ders listesini context için hazırla
+    gunler_veri = []
+    for gun in gunler:
+        oturumlar_veri = []
+        for oturum in gun.oturumlar.order_by("oturum_no"):
+            dersler = list(oturum.dersler.select_related("ders").order_by("ders__ders_adi"))
+            oturumlar_veri.append({"oturum": oturum, "dersler": dersler})
+        gunler_veri.append({"gun": gun, "oturumlar": oturumlar_veri})
+
+    return render(request, "sinav/mazeret_detay.html", {
+        "mazeret": mazeret,
+        "gunler_veri": gunler_veri,
+    })
+
+
+@login_required
+@require_POST
+def mazeret_sinav_dagit(request, pk):
+    """Dağıtımı yeniden çalıştırır (AJAX veya form POST)."""
+    from .services.mazeret_dagitim import dagit
+
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+    basarili, mesaj = dagit(mazeret)
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"ok": basarili, "mesaj": mesaj})
+
+    if basarili:
+        messages.success(request, mesaj)
+    else:
+        messages.error(request, mesaj)
+    return redirect("sinav:mazeret_detay", pk=pk)
+
+
+@login_required
+@require_POST
+def mazeret_sinav_sil(request, pk):
+    """Mazeret sınav planını siler."""
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+    mazeret.delete()
+    messages.success(request, "Mazeret sınav planı silindi.")
+    return redirect("sinav:mazeret_listesi")

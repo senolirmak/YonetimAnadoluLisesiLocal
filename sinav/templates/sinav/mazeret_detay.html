@@ -1,0 +1,180 @@
+{% extends "sinav/base.html" %}
+{% block sinav_title %}Mazeret Planı Detay{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .oturum-kart {
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    margin-bottom: .7rem;
+    overflow: hidden;
+  }
+  .oturum-baslik {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    padding: .55rem .9rem;
+    font-size: .88rem;
+    font-weight: 600;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .oturum-baslik.yazili  { border-left: 4px solid #3b82f6; }
+  .oturum-baslik.uygulama { border-left: 4px solid #f59e0b; }
+  .oturum-ders-listesi {
+    list-style: none;
+    padding: .5rem .9rem;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+  }
+  .oturum-ders-listesi li {
+    background: #f1f5f9;
+    border-radius: 4px;
+    padding: .2rem .55rem;
+    font-size: .82rem;
+    color: #334155;
+  }
+  .oturum-ders-listesi li.uygulama-ders {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  .gun-baslik {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e3a5f;
+    margin: 1.3rem 0 .6rem;
+    padding-bottom: .3rem;
+    border-bottom: 2px solid #dbeafe;
+  }
+  .ozet-satir {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    font-size: .83rem;
+    color: #475569;
+    margin-bottom: 1rem;
+  }
+  .ozet-satir span { display: flex; align-items: center; gap: .3rem; }
+</style>
+{% endblock %}
+
+{% block sinav_content %}
+<div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem; flex-wrap:wrap;">
+  <a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary btn-sm">&#8592; Listeye Dön</a>
+  <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">
+    Mazeret Planı #{{ mazeret.pk }}
+    {% if mazeret.aciklama %}<span style="font-weight:400; font-size:1rem; color:#555;">— {{ mazeret.aciklama }}</span>{% endif %}
+  </h1>
+  <div style="margin-left:auto; display:flex; gap:.5rem;">
+    <form method="post" action="{% url 'sinav:mazeret_dagit' mazeret.pk %}"
+          onsubmit="return confirm('Dağıtım yeniden çalıştırılsın mı? Mevcut atamalar silinecek.');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary btn-sm">Yeniden Dağıt</button>
+    </form>
+    <form method="post" action="{% url 'sinav:mazeret_sil' mazeret.pk %}"
+          onsubmit="return confirm('Bu mazeret planı silinsin mi?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm">Planı Sil</button>
+    </form>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+  <div class="ozet-satir">
+    <span>📅 <strong>Sınav:</strong> {{ mazeret.sinav }}</span>
+    <span>🗓 <strong>Oluşturulma:</strong> {{ mazeret.olusturma_tarihi|date:"d.m.Y H:i" }}</span>
+    <span>📆 <strong>Gün sayısı:</strong> {{ gunler_veri|length }}</span>
+  </div>
+</div>
+
+{% if not gunler_veri %}
+<div class="card">
+  <p style="color:#666; text-align:center;">Henüz gün tanımlanmamış.</p>
+</div>
+{% else %}
+{% for gun_veri in gunler_veri %}
+<div class="gun-baslik">{{ gun_veri.gun.tarih|date:"l, d F Y" }}</div>
+
+{% if not gun_veri.oturumlar %}
+<p style="color:#888; font-size:.85rem; padding-left:.5rem;">Bu gün için oturum tanımlanmamış.</p>
+{% else %}
+{% for ot_veri in gun_veri.oturumlar %}
+<div class="oturum-kart">
+  <div class="oturum-baslik {% if ot_veri.oturum.sinav_turu == 'Yazili' %}yazili{% else %}uygulama{% endif %}">
+    <span>Oturum {{ ot_veri.oturum.oturum_no }}</span>
+    <span style="font-weight:400; color:#64748b;">
+      {{ ot_veri.oturum.saat_baslangic|time:"H:i" }} – {{ ot_veri.oturum.saat_bitis|time:"H:i" }}
+    </span>
+    <span class="badge {% if ot_veri.oturum.sinav_turu == 'Yazili' %}badge-done{% else %}badge-running{% endif %}"
+          style="margin-left:.3rem;">
+      {{ ot_veri.oturum.get_sinav_turu_display }}
+    </span>
+    <span style="margin-left:auto; font-size:.78rem; font-weight:400; color:#94a3b8;">
+      {{ ot_veri.dersler|length }} ders
+    </span>
+  </div>
+
+  {% if ot_veri.dersler %}
+  <ul class="oturum-ders-listesi">
+    {% for od in ot_veri.dersler %}
+    <li class="{% if od.sinav_turu == 'Uygulama' %}uygulama-ders{% endif %}">
+      {{ od.ders.ders_adi }}
+      {% if od.sinav_turu %}<em style="opacity:.7;">({{ od.sinav_turu }})</em>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p style="padding:.5rem .9rem; font-size:.82rem; color:#aaa; margin:0;">Bu oturuma ders atanmamış.</p>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+<div style="margin-top:2rem;">
+  <h3 style="font-size:1rem; font-weight:600; margin-bottom:.7rem; color:#1a1a2e;">Özet Tablo</h3>
+  <div class="card" style="overflow-x:auto; padding:0;">
+    <table style="width:100%; border-collapse:collapse; font-size:.85rem;">
+      <thead style="background:#f1f5f9;">
+        <tr>
+          <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap;">Gün</th>
+          <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap;">Oturum</th>
+          <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap;">Saat</th>
+          <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap;">Tür</th>
+          <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Dersler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for gun_veri in gunler_veri %}
+          {% for ot_veri in gun_veri.oturumlar %}
+          <tr style="border-bottom:1px solid #f0f0f0;">
+            <td style="padding:.5rem .9rem; white-space:nowrap; color:#475569;">{{ gun_veri.gun.tarih|date:"d.m.Y" }}</td>
+            <td style="padding:.5rem .9rem; font-weight:600;">{{ ot_veri.oturum.oturum_no }}</td>
+            <td style="padding:.5rem .9rem; white-space:nowrap;">
+              {{ ot_veri.oturum.saat_baslangic|time:"H:i" }}–{{ ot_veri.oturum.saat_bitis|time:"H:i" }}
+            </td>
+            <td style="padding:.5rem .9rem;">
+              <span class="badge {% if ot_veri.oturum.sinav_turu == 'Yazili' %}badge-done{% else %}badge-running{% endif %}">
+                {{ ot_veri.oturum.get_sinav_turu_display }}
+              </span>
+            </td>
+            <td style="padding:.5rem .9rem;">
+              {% for od in ot_veri.dersler %}
+                {{ od.ders.ders_adi }}{% if od.sinav_turu %} <em style="color:#888;">({{ od.sinav_turu }})</em>{% endif %}{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                <span style="color:#ccc;">—</span>
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

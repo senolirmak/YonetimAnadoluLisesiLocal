@@ -1,0 +1,66 @@
+{% extends "sinav/base.html" %}
+{% block sinav_title %}Mazeret Sınavları{% endblock %}
+
+{% block sinav_content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem;">
+  <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e;">Mazeret Sınavı Planları</h1>
+  {% if aktif_sinav %}
+  <a href="{% url 'sinav:mazeret_olustur' %}" class="btn btn-primary">+ Yeni Plan</a>
+  {% endif %}
+</div>
+
+{% if not aktif_sinav %}
+<div class="card">
+  <p style="color:#666;">Aktif sınav seçilmedi. Önce bir sınav aktif yapın.</p>
+</div>
+{% elif not planlar %}
+<div class="card">
+  <p style="color:#666; text-align:center; padding:1rem 0;">
+    Bu sınav için henüz mazeret planı oluşturulmamış.
+  </p>
+  <div style="text-align:center;">
+    <a href="{% url 'sinav:mazeret_olustur' %}" class="btn btn-primary">Yeni Plan Oluştur</a>
+  </div>
+</div>
+{% else %}
+{% for plan in planlar %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.5rem;">
+    <div>
+      <div style="font-weight:600; font-size:1rem; margin-bottom:.3rem;">
+        Mazeret Planı #{{ plan.pk }}
+        {% if plan.aciklama %}<span style="font-weight:400; color:#666; font-size:.9rem;"> — {{ plan.aciklama }}</span>{% endif %}
+      </div>
+      <div style="font-size:.82rem; color:#888;">
+        Oluşturulma: {{ plan.olusturma_tarihi|date:"d.m.Y H:i" }}
+      </div>
+
+      <div style="margin-top:.7rem; display:flex; flex-wrap:wrap; gap:.5rem;">
+        {% for gun in plan.gunler.all %}
+        <span style="background:#e0f2fe; color:#0369a1; font-size:.8rem; font-weight:600;
+                     padding:.2rem .6rem; border-radius:99px;">
+          {{ gun.tarih|date:"d.m.Y" }}
+          ({{ gun.oturumlar.count }} oturum)
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div style="display:flex; gap:.5rem; align-items:flex-start;">
+      <a href="{% url 'sinav:mazeret_detay' plan.pk %}" class="btn btn-secondary btn-sm">Detay</a>
+      <form method="post" action="{% url 'sinav:mazeret_dagit' plan.pk %}"
+            onsubmit="return confirm('Dağıtım yeniden çalıştırılsın mı?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-sm">Yeniden Dağıt</button>
+      </form>
+      <form method="post" action="{% url 'sinav:mazeret_sil' plan.pk %}"
+            onsubmit="return confirm('Plan silinsin mi?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}
