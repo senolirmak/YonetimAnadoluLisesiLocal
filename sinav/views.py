@@ -19,7 +19,7 @@ from .models import (
     SinavBilgisi,
     DersAyarlariJSON,
     DisVeri, AlgoritmaParametreleri,
-    TakvimUretim, OturmaPlani,
+    TakvimUretim, OturmaPlani, SinavSalonYoklama,
     MazeretSinav, MazeretGun, MazeretOturum, MazeretOturumDers,
 )
 from okul.models import OkulBilgi
@@ -2044,15 +2044,42 @@ def sinav_yoklama_yok_detay(request):
 @login_required
 def mazeret_sinav_listesi(request):
     """Aktif sınava ait mazeret sınav planlarını listeler."""
-    aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
+    from django.db.models import Exists, OuterRef as _OuterRef
+
+    aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
+    aktif_uretim = (
+        TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        if aktif_sinav else None
+    )
     planlar = (
         MazeretSinav.objects.filter(sinav=aktif_sinav)
         .prefetch_related("gunler__oturumlar__dersler__ders")
         if aktif_sinav else []
     )
+
+    # Yoklaması hiç girilmemiş (tarih, saat, salon) slotları tespit et
+    eksik_yoklama = []
+    if aktif_uretim:
+        yoklama_var = SinavSalonYoklama.objects.filter(
+            uretim=aktif_uretim,
+            tarih=_OuterRef("tarih"),
+            saat=_OuterRef("saat"),
+            salon=_OuterRef("salon"),
+        )
+        eksik_yoklama = list(
+            OturmaPlani.objects
+            .filter(uretim=aktif_uretim)
+            .values("tarih", "saat", "salon")
+            .distinct()
+            .annotate(yoklama_var=Exists(yoklama_var))
+            .filter(yoklama_var=False)
+            .order_by("tarih", "saat", "salon")
+        )
+
     return render(request, "sinav/mazeret_listesi.html", {
-        "aktif_sinav": aktif_sinav,
-        "planlar": planlar,
+        "aktif_sinav":    aktif_sinav,
+        "planlar":        planlar,
+        "eksik_yoklama":  eksik_yoklama,
     })
 
 

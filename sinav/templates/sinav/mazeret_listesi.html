@@ -9,6 +9,45 @@
   {% endif %}
 </div>
 
+{% if eksik_yoklama %}
+<div style="background:#fffbeb; border:1px solid #f59e0b; border-left:4px solid #f59e0b;
+            border-radius:6px; padding:.9rem 1.1rem; margin-bottom:1.2rem;">
+  <div style="font-weight:700; color:#92400e; margin-bottom:.5rem;">
+    Yoklaması Girilmemiş Salon(lar)
+  </div>
+  <p style="font-size:.85rem; color:#78350f; margin:0 0 .7rem;">
+    Aşağıdaki salonların yoklaması sisteme girilmemiş. Mazeret listesinin doğru oluşturulması için
+    önce bu yoklamaların tamamlanması önerilir.
+  </p>
+  <table style="font-size:.83rem; border-collapse:collapse; width:100%;">
+    <thead>
+      <tr style="background:#fef3c7;">
+        <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #fcd34d;">Tarih</th>
+        <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #fcd34d;">Saat</th>
+        <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #fcd34d;">Salon</th>
+        <th style="padding:.35rem .7rem; border-bottom:1px solid #fcd34d;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for slot in eksik_yoklama %}
+      <tr style="border-bottom:1px solid #fef3c7;">
+        <td style="padding:.3rem .7rem; color:#78350f;">{{ slot.tarih|date:"d.m.Y" }}</td>
+        <td style="padding:.3rem .7rem; color:#78350f;">{{ slot.saat }}</td>
+        <td style="padding:.3rem .7rem; font-weight:600; color:#92400e;">{{ slot.salon }}</td>
+        <td style="padding:.3rem .7rem; text-align:right;">
+          <a href="{% url 'sinav_salon_yoklama' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&salon={{ slot.salon }}"
+             class="btn btn-sm"
+             style="background:#f59e0b; color:#fff; font-size:.78rem; padding:.2rem .6rem;">
+            Yoklama Gir
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 {% if not aktif_sinav %}
 <div class="card">
   <p style="color:#666;">Aktif sınav seçilmedi. Önce bir sınav aktif yapın.</p>
