@@ -35,7 +35,7 @@ def slot_aktif_mi(tarih, saat: str, bugun, simdi_str: str,
 # Her slot türü için geçerli saat penceresi (dakika cinsinden, sınav saatine göre).
 # Değiştirmek istediğinizde yalnızca bu sözlüğü güncellemek yeterlidir.
 SLOT_ERISIM_KURALLARI: dict[str, dict] = {
-    "gozetim":      {"baslangic_dk":   0, "bitis_dk":  40},  # Yoklama / Medya (sınav saati tam, 40 dk)
+    "gozetim":      {"baslangic_dk":  -8, "bitis_dk":  40},  # Yoklama / Medya (sınav saati -8 dk, 40 dk)
     "siniflistesi": {"baslangic_dk": -50, "bitis_dk": -10},  # Sınıf Listesi PDF (sınav -50dk → -10dk)
 }
 
@@ -50,14 +50,26 @@ def slot_listesi_aktif_isle(slotlar: list, tur: str, bugun, simdi_str: str) -> N
     tur       : SLOT_ERISIM_KURALLARI'ndaki anahtar ("gozetim" | "siniflistesi")
     bugun     : datetime.date — bugünün tarihi
     simdi_str : "HH:MM" — şu anki saat
+
+    Not: "siniflistesi" türünde slot'ta "onceki_saat" varsa baslangic_dk yerine
+    o saat doğrudan alt sınır olarak kullanılır (öğle arası gibi değişken molalarda
+    sabit offset yetersiz kalır).
     """
     kural = SLOT_ERISIM_KURALLARI[tur]
     for s in slotlar:
-        s["aktif"] = slot_aktif_mi(
-            s["tarih"], s["saat"], bugun, simdi_str,
-            baslangic_dk=kural["baslangic_dk"],
-            bitis_dk=kural["bitis_dk"],
-        )
+        # siniflistesi: gerçek önceki ders başlangıcı varsa onu kullan
+        if tur == "siniflistesi" and s.get("onceki_saat"):
+            if s["tarih"] != bugun:
+                s["aktif"] = False
+            else:
+                bitis = saat_offset(s["saat"], kural["bitis_dk"])
+                s["aktif"] = s["onceki_saat"] <= simdi_str <= bitis
+        else:
+            s["aktif"] = slot_aktif_mi(
+                s["tarih"], s["saat"], bugun, simdi_str,
+                baslangic_dk=kural["baslangic_dk"],
+                bitis_dk=kural["bitis_dk"],
+            )
 
 
 def salon_goster(salon_kodu: str) -> str:

@@ -796,8 +796,8 @@ def ogretmen_sinav_gozetim(request):
     from sinav.services.ders_sinav_eslestir import tum_siniflistesi_eslestir
     from collections import defaultdict
 
-    # Sınıf Listesi PDF: ada göre toplu servisten al (personel FK gerektirmez)
-    _siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim, dp_offset_dk=-50)
+    # Sınıf Listesi PDF: sınav öncesi son dersin öğretmeni bulunur (bitis bazlı eşleşme)
+    _siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim)
     siniflistesi_slotlari = _siniflistesi_map.get(ogretmen_adi, [])
 
     # Saat kısıtlarını uygula

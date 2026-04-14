@@ -165,17 +165,36 @@ def ders_sinav_eslestir(
     return result
 
 
-def tum_siniflistesi_eslestir(aktif_uretim, *, dp_offset_dk: int = -50) -> dict[str, list[dict]]:
+def tum_siniflistesi_eslestir(aktif_uretim, **_ignored) -> dict[str, list[dict]]:
     """
-    Aktif TakvimUretim'deki tüm OturmaPlani slotları için dp_saat = saat + dp_offset_dk
-    hesaplar ve DersProgrami'nde eşleşen tüm öğretmenleri döndürür.
+    Aktif TakvimUretim'deki her sınav slotu için, o sınav saatinden önce biten
+    son dersin öğretmenini bulur ve DersProgrami'nde eşleşen tüm öğretmenleri döndürür.
+
+    Eşleştirme mantığı:
+      - Her sınav saati için DersSaatleri.derssaati_bitis < sinav_saati şartını sağlayan
+        en geç biten dersin başlangıç saati (derssaati_baslangic) kullanılır.
+      - Bu yaklaşım, öğle arası gibi farklı uzunluktaki molalarda da doğru çalışır.
+        Örnek: 13:35 sınavı → 6. ders bitis 12:50 < 13:35 → baslangic 12:10 ile eşleşir.
 
     Döner: { ogretmen_adi_soyadi: [{"tarih", "saat", "oturum", "sinifsube", "salonlar"}, ...] }
     """
     from dersprogrami.models import DersProgrami
+    from okul.models import DersSaatleri as _DS
 
     if not aktif_uretim:
         return {}
+
+    # Ders saatlerini bir kez yükle (küçük liste, ~8 kayıt)
+    _ders_saatleri = list(_DS.objects.order_by("derssaati_baslangic"))
+
+    def _onceki_ders_baslangic(sinav_saat_str: str) -> str | None:
+        """Sınav saatinden önce biten son dersin başlangıç saatini döner."""
+        sinav_t = _dt.strptime(sinav_saat_str, "%H:%M").time()
+        onceki = None
+        for ds in _ders_saatleri:
+            if ds.derssaati_bitis < sinav_t:
+                onceki = ds
+        return onceki.derssaati_baslangic.strftime("%H:%M") if onceki else None
 
     # 1. Tüm OturmaPlani slotları: (tarih, saat, oturum, salon, sinif_sube_id, sinif, sube)
     op_rows = list(
@@ -191,8 +210,8 @@ def tum_siniflistesi_eslestir(aktif_uretim, *, dp_offset_dk: int = -50) -> dict[
         .order_by("tarih", "saat", "oturum")
     )
 
-    # 2. Her slot için dp_saat hesapla → (dp_gun, dp_saat, sinif_sube_id) → slot bilgisi
-    #    slot_key → { "tarih", "saat", "oturum", "sinif", "sube", "salonlar": set }
+    # 2. Her slot için sınav öncesi son dersin başlangıç saatini hesapla
+    #    (dp_gun, dp_saat, sinif_sube_id) → slot bilgisi
     dp_key_map: dict[tuple, dict] = {}
     for row in op_rows:
         sid = row["salon_sinif_sube_id"]
@@ -202,13 +221,9 @@ def tum_siniflistesi_eslestir(aktif_uretim, *, dp_offset_dk: int = -50) -> dict[
         tarih = row["tarih"]
         dp_gun = tarih.strftime("%A")
 
-        if dp_offset_dk == 0:
-            dp_saat = saat
-        else:
-            t = _dt.strptime(saat, "%H:%M")
-            dp_saat = (
-                _dt.combine(_date.today(), t.time()) + _td(minutes=dp_offset_dk)
-            ).strftime("%H:%M")
+        dp_saat = _onceki_ders_baslangic(saat)
+        if dp_saat is None:
+            continue
 
         dp_key = (dp_gun, dp_saat, sid)
         slot_key = (tarih, saat, row["oturum"], sid,
@@ -268,11 +283,12 @@ def tum_siniflistesi_eslestir(aktif_uretim, *, dp_offset_dk: int = -50) -> dict[
         mevcut_anahtarlar = {(s["tarih"], s["saat"], s["oturum"]) for s in result[ogr_adi]}
         if (tarih, saat, oturum) not in mevcut_anahtarlar:
             result[ogr_adi].append({
-                "tarih":     tarih,
-                "saat":      saat,
-                "oturum":    oturum,
-                "sinifsube": sinifsube,
-                "salonlar":  salonlar,
+                "tarih":      tarih,
+                "saat":       saat,
+                "oturum":     oturum,
+                "sinifsube":  sinifsube,
+                "salonlar":   salonlar,
+                "onceki_saat": saat_str,  # gerçek önceki ders başlangıcı (aktivasyon için)
             })
 
     for slots in result.values():
