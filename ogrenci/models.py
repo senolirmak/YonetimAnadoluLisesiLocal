@@ -16,6 +16,11 @@ class Ogrenci(models.Model):
     soyadi = models.CharField(max_length=150, verbose_name="Soyadı")
     dogumtarihi = models.DateField(verbose_name="Doğum Tarihi")
     cinsiyet = models.CharField(max_length=1, choices=CINSIYET_CHOICES, verbose_name="Cinsiyet")
+    sureksiz_devamsiz = models.BooleanField(
+        default=False,
+        verbose_name="Sürekli Devamsız",
+        help_text="İşaretlenirse mazeret sınavına çağrılmaz.",
+    )
 
     class Meta:
         db_table = "ogrenci"

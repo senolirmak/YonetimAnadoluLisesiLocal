@@ -1,0 +1,103 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Sürekli Devamsız Öğrenciler{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="flex-between mb-20">
+    <h2 class="page-title">Sürekli Devamsız Öğrenciler</h2>
+    <span style="font-size:.85rem; color:#6b7280;">
+      Toplam işaretli: <strong>{{ toplam_sureksiz }}</strong> öğrenci
+    </span>
+  </div>
+
+  {% for message in messages %}
+  <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+    {{ message }}
+  </div>
+  {% endfor %}
+
+  <div style="background:#fffbeb; border:1px solid #f59e0b; border-left:4px solid #f59e0b;
+              border-radius:6px; padding:.7rem 1rem; margin-bottom:1.2rem; font-size:.85rem; color:#78350f;">
+    İşaretlenen öğrenciler mazeret sınavına çağrılmaz. Sınıf/Şube seçip kaydet
+    butonuna bastığınızda <strong>yalnızca o sınıfa ait</strong> öğrencilerin durumu güncellenir.
+  </div>
+
+  <!-- Filtre -->
+  <form method="get" class="filter-box filter-form" style="margin-bottom:1rem;">
+    <label>Sınıf/Şube:</label>
+    <select name="sinifsube">
+      <option value="">Tümü</option>
+      {% for ss in sinifsube_secenekleri %}
+      <option value="{{ ss }}" {% if secili_sinifsube == ss %}selected{% endif %}>{{ ss }}</option>
+      {% endfor %}
+    </select>
+    <label style="margin-left:1rem;">Göster:</label>
+    <select name="filtre">
+      <option value="" {% if filtre == "" %}selected{% endif %}>Tümü</option>
+      <option value="sureksiz" {% if filtre == "sureksiz" %}selected{% endif %}>Yalnızca Sürekli Devamsızlar</option>
+    </select>
+    <button type="submit" class="btn btn-primary">Filtrele</button>
+    <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" class="btn-cancel">Temizle</a>
+  </form>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="sinifsube_filtre" value="{{ secili_sinifsube }}">
+
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:3rem; text-align:center;">
+              <input type="checkbox" id="tumu_sec" title="Tümünü seç/kaldır">
+            </th>
+            <th>Okul No</th>
+            <th>Sınıf/Şube</th>
+            <th>Adı Soyadı</th>
+            <th style="text-align:center;">Sürekli Devamsız</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ogr in ogrenciler %}
+          <tr {% if ogr.sureksiz_devamsiz %}style="background:#fef2f2;"{% endif %}>
+            <td style="text-align:center;">
+              <input type="checkbox" name="sureksiz" value="{{ ogr.okulno }}"
+                     {% if ogr.sureksiz_devamsiz %}checked{% endif %}>
+            </td>
+            <td>{{ ogr.okulno }}</td>
+            <td>{{ ogr.sinifsube }}</td>
+            <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+            <td style="text-align:center;">
+              {% if ogr.sureksiz_devamsiz %}
+              <span style="background:#fee2e2; color:#b91c1c; font-size:.78rem;
+                           font-weight:600; padding:.15rem .5rem; border-radius:99px;">
+                Sürekli Devamsız
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted">Kayıt bulunamadı.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if ogrenciler %}
+    <div style="margin-top:.8rem; display:flex; gap:.7rem; align-items:center;">
+      <button type="submit" class="btn btn-primary">Kaydet</button>
+      <span style="font-size:.82rem; color:#6b7280;">
+        {{ ogrenciler|length }} öğrenci gösteriliyor
+        {% if secili_sinifsube %}({{ secili_sinifsube }}){% endif %}
+      </span>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<script>
+document.getElementById("tumu_sec").addEventListener("change", function () {
+  document.querySelectorAll("input[name='sureksiz']").forEach(cb => cb.checked = this.checked);
+});
+</script>
+{% endblock %}

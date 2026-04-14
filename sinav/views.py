@@ -20,7 +20,7 @@ from .models import (
     DersAyarlariJSON,
     DisVeri, AlgoritmaParametreleri,
     TakvimUretim, Takvim, OturmaPlani, SinavSalonYoklama,
-    MazeretSinav, MazeretGun, MazeretOturum, MazeretOturumDers,
+    MazeretSinav, MazeretGun, MazeretOturum, MazeretOturumDers, MazeretOgrenci,
 )
 from okul.models import OkulBilgi
 from ogrenci.models import Ogrenci as OgrenciModel
@@ -2086,7 +2086,7 @@ def mazeret_sinav_listesi(request):
 @login_required
 def mazeret_sinav_olustur(request):
     """Yeni mazeret sınav planı oluşturur: günleri ve oturumları kaydeder, sonra dağıtır."""
-    from .services.mazeret_dagitim import oturumlari_olustur, dagit
+    from .services.mazeret_dagitim import oturumlari_olustur, populate_ogrenciler, dagit
 
     aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
     if not aktif_sinav:
@@ -2107,6 +2107,7 @@ def mazeret_sinav_olustur(request):
                 MazeretGun.objects.create(mazeret_sinav=mazeret, tarih=tarih)
 
             oturumlari_olustur(mazeret, oturum_saatleri)
+            populate_ogrenciler(mazeret)
             basarili, mesaj = dagit(mazeret)
 
             if basarili:
@@ -2222,12 +2223,103 @@ def mazeret_sinav_detay(request, pk):
 
 
 @login_required
-@require_POST
-def mazeret_sinav_dagit(request, pk):
-    """Dağıtımı yeniden çalıştırır (AJAX veya form POST)."""
-    from .services.mazeret_dagitim import dagit
+def mazeret_ogrenci_listesi(request, pk):
+    """
+    Mazeret sınavına aday öğrencilerin listesi:
+    - Sürekli devamsız işaretleme (Ogrenci.sureksiz_devamsiz)
+    - Belge teslim işaretleme (MazeretOgrenci.belge_teslim)
+    """
+    from ogrenci.models import Ogrenci as OgrenciModel
 
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
+
+    if request.method == "POST":
+        # belge_teslim: gelen id listesi işaretli, geri kalanlar False
+        belge_isaretli = set(map(int, request.POST.getlist("belge_teslim")))
+        # sureksiz_devamsiz: gelen okulno listesi işaretli
+        sureksiz_isaretli = set(request.POST.getlist("sureksiz_devamsiz"))
+
+        guncellenen_belge = guncellenen_sureksiz = 0
+
+        for mo in MazeretOgrenci.objects.filter(mazeret_sinav=mazeret):
+            yeni_belge = mo.pk in belge_isaretli
+            if mo.belge_teslim != yeni_belge:
+                mo.belge_teslim = yeni_belge
+                mo.save(update_fields=["belge_teslim"])
+                guncellenen_belge += 1
+
+        for ogr in OgrenciModel.objects.filter(
+            okulno__in=MazeretOgrenci.objects.filter(
+                mazeret_sinav=mazeret
+            ).values("okulno")
+        ):
+            yeni_sureksiz = ogr.okulno in sureksiz_isaretli
+            if ogr.sureksiz_devamsiz != yeni_sureksiz:
+                ogr.sureksiz_devamsiz = yeni_sureksiz
+                ogr.save(update_fields=["sureksiz_devamsiz"])
+                guncellenen_sureksiz += 1
+
+        messages.success(
+            request,
+            f"{guncellenen_belge} belge teslim, {guncellened_sureksiz} sürekli devamsız kaydı güncellendi."
+            if False else
+            f"Güncellendi: {guncellenen_belge} belge teslim, {guncellenen_sureksiz} sürekli devamsız."
+        )
+        return redirect("sinav:mazeret_ogrenci_listesi", pk=pk)
+
+    # Sürekli devamsız öğrencilerin okulno seti
+    sureksiz_okulnolari = set(
+        OgrenciModel.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+    )
+
+    # Öğrencileri ders bazında grupla
+    tum_ogrenciler = list(
+        MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
+        .order_by("ders_adi", "sinav_turu", "sinifsube", "okulno")
+    )
+
+    # Ders bazında gruplama
+    ders_map: dict[tuple, dict] = {}
+    for mo in tum_ogrenciler:
+        key = (mo.ders_adi, mo.sinav_turu)
+        if key not in ders_map:
+            ders_map[key] = {
+                "ders_adi":   mo.ders_adi,
+                "sinav_turu": mo.sinav_turu,
+                "ogrenciler": [],
+            }
+        ders_map[key]["ogrenciler"].append({
+            "mo":              mo,
+            "sureksiz":        mo.okulno in sureksiz_okulnolari,
+        })
+
+    # Özet sayılar
+    toplam          = len(tum_ogrenciler)
+    belge_teslim_n  = sum(1 for mo in tum_ogrenciler if mo.belge_teslim)
+    sureksiz_n      = sum(1 for mo in tum_ogrenciler if mo.okulno in sureksiz_okulnolari)
+    uygun_n         = sum(
+        1 for mo in tum_ogrenciler
+        if mo.belge_teslim and mo.okulno not in sureksiz_okulnolari
+    )
+
+    return render(request, "sinav/mazeret_ogrenci_listesi.html", {
+        "mazeret":        mazeret,
+        "ders_gruplar":   list(ders_map.values()),
+        "toplam":         toplam,
+        "belge_teslim_n": belge_teslim_n,
+        "sureksiz_n":     sureksiz_n,
+        "uygun_n":        uygun_n,
+    })
+
+
+@login_required
+@require_POST
+def mazeret_sinav_dagit(request, pk):
+    """Öğrenci listesini günceller ve dağıtımı yeniden çalıştırır (AJAX veya form POST)."""
+    from .services.mazeret_dagitim import populate_ogrenciler, dagit
+
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+    populate_ogrenciler(mazeret)
     basarili, mesaj = dagit(mazeret)
 
     if request.headers.get("x-requested-with") == "XMLHttpRequest":

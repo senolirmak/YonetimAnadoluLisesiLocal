@@ -22,11 +22,14 @@ from typing import List, Tuple
 
 from django.db.models import Subquery, OuterRef
 
+from ogrenci.models import Ogrenci
+
 from sinav.models import (
     MazeretSinav,
     MazeretGun,
     MazeretOturum,
     MazeretOturumDers,
+    MazeretOgrenci,
     TakvimUretim,
     Takvim,
     OturmaPlani,
@@ -137,6 +140,66 @@ def oturumlari_olustur(mazeret_sinav: MazeretSinav, oturum_saatleri_str: str | N
             oturum_no += 1
 
 
+def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> int:
+    """
+    SinavSalonYoklama(durum="yok") kayıtlarından MazeretOgrenci tablosunu doldurur.
+    Mevcut belge_teslim değerlerini korur; yeni kayıtlar için belge_teslim=False.
+
+    Returns: eklenen kayıt sayısı
+    """
+    aktif_uretim = TakvimUretim.objects.filter(
+        sinav=mazeret_sinav.sinav, aktif=True
+    ).first()
+    if not aktif_uretim:
+        return 0
+
+    ders_adi_subq = OturmaPlani.objects.filter(
+        uretim=aktif_uretim,
+        okulno=OuterRef("okulno"),
+        tarih=OuterRef("tarih"),
+        saat=OuterRef("saat"),
+        salon=OuterRef("salon"),
+    ).values("ders_adi")[:1]
+
+    absent_rows = list(
+        SinavSalonYoklama.objects.filter(uretim=aktif_uretim, durum="yok")
+        .annotate(ders_adi_full=Subquery(ders_adi_subq))
+        .values("okulno", "adi_soyadi", "sinifsube", "ders_adi_full")
+        .distinct()
+    )
+
+    # Mevcut kayıtları koru (belge_teslim değeri kaybolmasın)
+    mevcut = {
+        (r.okulno, r.ders_adi, r.sinav_turu)
+        for r in MazeretOgrenci.objects.filter(mazeret_sinav=mazeret_sinav)
+        .only("okulno", "ders_adi", "sinav_turu")
+    }
+
+    yeni = []
+    for row in absent_rows:
+        ders_adi_full = (row.get("ders_adi_full") or "").strip()
+        if not ders_adi_full:
+            continue
+        m = _SINAV_TURU_RE.match(ders_adi_full)
+        ders_adi  = m.group(1).strip() if m else ders_adi_full
+        sinav_turu = m.group(2) if m else ""
+        key = (row["okulno"], ders_adi, sinav_turu)
+        if key not in mevcut:
+            yeni.append(MazeretOgrenci(
+                mazeret_sinav=mazeret_sinav,
+                okulno=row["okulno"],
+                adi_soyadi=row["adi_soyadi"],
+                sinifsube=row["sinifsube"],
+                ders_adi=ders_adi,
+                sinav_turu=sinav_turu,
+                belge_teslim=False,
+            ))
+
+    if yeni:
+        MazeretOgrenci.objects.bulk_create(yeni, ignore_conflicts=True)
+    return len(yeni)
+
+
 def _absent_ders_listesi(aktif_uretim) -> list[dict]:
     """
     SinavSalonYoklama(durum="yok") → OturmaPlani → Takvim zinciri ile
@@ -194,7 +257,8 @@ def _absent_ders_listesi(aktif_uretim) -> list[dict]:
 
 def dagit(mazeret_sinav: MazeretSinav) -> Tuple[bool, str]:
     """
-    Devamsız öğrencilerin girdiği dersleri MazeretOturum'lara round-robin ile dağıtır.
+    Belge teslim etmiş VE sürekli devamsız olmayan öğrencilerin derslerini
+    MazeretOturum'lara round-robin ile dağıtır.
     Mevcut MazeretOturumDers kayıtlarını siler ve yeniden oluşturur.
 
     Returns: (basarili: bool, mesaj: str)
@@ -211,10 +275,48 @@ def dagit(mazeret_sinav: MazeretSinav) -> Tuple[bool, str]:
     if not aktif_uretim:
         return False, "Aktif takvim üretimi bulunamadı. Önce bir takvim üretimi aktif yapın."
 
-    # Sadece devamsız öğrencisi olan (ders_id, sinav_turu) çiftleri
-    takvim_kayitlar = _absent_ders_listesi(aktif_uretim)
+    # Sürekli devamsız öğrencilerin okul numaraları
+    sureksiz_okulnolari = set(
+        Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+    )
+
+    # Belge teslim etmiş VE sürekli devamsız olmayan → uygun (ders_adi, sinav_turu) çiftleri
+    uygun_qs = (
+        MazeretOgrenci.objects
+        .filter(mazeret_sinav=mazeret_sinav, belge_teslim=True)
+        .exclude(okulno__in=sureksiz_okulnolari)
+        .values("ders_adi", "sinav_turu")
+        .distinct()
+    )
+    uygun_ders_adileri: set[tuple[str, str]] = {
+        (r["ders_adi"], r["sinav_turu"]) for r in uygun_qs
+    }
+
+    if not uygun_ders_adileri:
+        return False, (
+            "Belge teslim etmiş uygun öğrenci bulunamadı. "
+            "Önce öğrencilerin belge teslim durumunu güncelleyin."
+        )
+
+    # (ders_adi, sinav_turu) → (ders_id, sinav_turu) çözümle
+    takvim_kayitlar = []
+    seen: set[tuple] = set()
+    for ders_adi, sinav_turu in uygun_ders_adileri:
+        tk = Takvim.objects.filter(
+            uretim=aktif_uretim,
+            ders__ders_adi=ders_adi,
+            sinav_turu=sinav_turu,
+        ).values("ders_id", "sinav_turu").first()
+        if tk:
+            key = (tk["ders_id"], tk["sinav_turu"])
+            if key not in seen:
+                seen.add(key)
+                takvim_kayitlar.append(tk)
+
+    takvim_kayitlar.sort(key=lambda r: (r["sinav_turu"], r["ders_id"]))
+
     if not takvim_kayitlar:
-        return False, "Yoklama kayıtlarında devamsız öğrenci bulunamadı."
+        return False, "Uygun dersler takvimde bulunamadı."
 
     yazili_dersler = [r for r in takvim_kayitlar if r["sinav_turu"] != "Uygulama"]
     uygulama_dersler = [r for r in takvim_kayitlar if r["sinav_turu"] == "Uygulama"]

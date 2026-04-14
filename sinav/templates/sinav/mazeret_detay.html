@@ -92,7 +92,10 @@
     Mazeret Planı #{{ mazeret.pk }}
     {% if mazeret.aciklama %}<span style="font-weight:400; font-size:1rem; color:#555;">— {{ mazeret.aciklama }}</span>{% endif %}
   </h1>
-  <div style="margin-left:auto; display:flex; gap:.5rem;">
+  <div style="margin-left:auto; display:flex; gap:.5rem; flex-wrap:wrap;">
+    <a href="{% url 'sinav:mazeret_ogrenci_listesi' mazeret.pk %}" class="btn btn-secondary btn-sm">
+      Öğrenci Listesi
+    </a>
     <form method="post" action="{% url 'sinav:mazeret_dagit' mazeret.pk %}"
           onsubmit="return confirm('Dağıtım yeniden çalıştırılsın mı? Mevcut atamalar silinecek.');">
       {% csrf_token %}

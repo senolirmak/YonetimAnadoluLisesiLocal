@@ -7,7 +7,10 @@
     <div class="flex-between mb-20">
         <h2 class="page-title">Öğrenci Listesi</h2>
         {% if is_mudur_yardimcisi %}
-        <a href="{% url 'ogrenci:excel_yukle' %}" class="btn btn-success">Excel Yükle</a>
+        <div style="display:flex; gap:.5rem;">
+          <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" class="btn btn-secondary">Sürekli Devamsız</a>
+          <a href="{% url 'ogrenci:excel_yukle' %}" class="btn btn-success">Excel Yükle</a>
+        </div>
         {% endif %}
     </div>
 

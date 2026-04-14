@@ -3,7 +3,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from dersprogrami.models import DersProgrami
 
@@ -223,6 +225,81 @@ def ogrenci_liste(request):
             "sinif_filtre_gizli": False,
         },
     )
+
+
+@login_required
+def sureksiz_devamsiz_listesi(request):
+    """Sürekli devamsız öğrencileri listeler; toplu işaretleme/kaldırma sağlar."""
+    from okul.auth import is_mudur_yardimcisi as _mudur_mi
+    gruplar = set(request.user.groups.values_list("name", flat=True))
+    yetkili = request.user.is_superuser or _mudur_mi(request.user) or "okul_muduru" in gruplar
+    if not yetkili:
+        raise PermissionDenied
+
+    if request.method == "POST":
+        # Formdan gelen okulno listesi: işaretlenenler sureksiz_devamsiz=True
+        isaretli = set(request.POST.getlist("sureksiz"))
+        sinifsube = request.POST.get("sinifsube_filtre", "")
+        qs = Ogrenci.objects.all()
+        if sinifsube:
+            try:
+                sinif, sube = sinifsube.split("/")
+                qs = qs.filter(sinif=sinif.strip(), sube__iexact=sube.strip())
+            except ValueError:
+                pass
+        guncellenen = 0
+        for ogr in qs:
+            yeni_deger = ogr.okulno in isaretli
+            if ogr.sureksiz_devamsiz != yeni_deger:
+                ogr.sureksiz_devamsiz = yeni_deger
+                ogr.save(update_fields=["sureksiz_devamsiz"])
+                guncellenen += 1
+        messages.success(request, f"{guncellenen} öğrenci kaydı güncellendi.")
+        return redirect(
+            request.path + (f"?sinifsube={sinifsube}" if sinifsube else "")
+        )
+
+    sinifsube = request.GET.get("sinifsube", "")
+    filtre = request.GET.get("filtre", "")  # "sureksiz" | "" (tümü)
+
+    ogrenciler = Ogrenci.objects.all()
+    if sinifsube:
+        try:
+            sinif, sube = sinifsube.split("/")
+            ogrenciler = ogrenciler.filter(sinif=sinif.strip(), sube__iexact=sube.strip())
+        except ValueError:
+            pass
+    if filtre == "sureksiz":
+        ogrenciler = ogrenciler.filter(sureksiz_devamsiz=True)
+
+    sinifsube_secenekleri = [
+        f"{s}/{sb}"
+        for s, sb in Ogrenci.objects.values_list("sinif", "sube").distinct().order_by("sinif", "sube")
+    ]
+
+    return render(request, "ogrenci/sureksiz_devamsiz_listesi.html", {
+        "ogrenciler":          ogrenciler.order_by("sinif", "sube", "okulno"),
+        "sinifsube_secenekleri": sinifsube_secenekleri,
+        "secili_sinifsube":    sinifsube,
+        "filtre":              filtre,
+        "toplam_sureksiz":     Ogrenci.objects.filter(sureksiz_devamsiz=True).count(),
+    })
+
+
+@login_required
+@require_POST
+def sureksiz_devamsiz_toggle(request, pk):
+    """Tek öğrencinin sureksiz_devamsiz bayrağını tersine çevirir (AJAX)."""
+    from okul.auth import is_mudur_yardimcisi as _mudur_mi
+    gruplar = set(request.user.groups.values_list("name", flat=True))
+    yetkili = request.user.is_superuser or _mudur_mi(request.user) or "okul_muduru" in gruplar
+    if not yetkili:
+        return JsonResponse({"ok": False, "hata": "Yetkisiz"}, status=403)
+
+    ogr = get_object_or_404(Ogrenci, pk=pk)
+    ogr.sureksiz_devamsiz = not ogr.sureksiz_devamsiz
+    ogr.save(update_fields=["sureksiz_devamsiz"])
+    return JsonResponse({"ok": True, "sureksiz": ogr.sureksiz_devamsiz})
 
 
 @login_required

@@ -469,6 +469,42 @@ class MazeretOturumDers(models.Model):
         return f"{self.oturum} – {self.ders}"
 
 
+class MazeretOgrenci(models.Model):
+    """
+    Mazeret sınavına aday her öğrenci-ders kaydı.
+    SinavSalonYoklama(durum="yok") kayıtlarından populate edilir.
+    İki bayrak ile eleme yapılır:
+      - sureksiz_devamsiz (Ogrenci modelinden): sınava çağrılmaz
+      - belge_teslim: geçerli mazeret belgesi idareye teslim edildi
+    """
+    mazeret_sinav = models.ForeignKey(
+        MazeretSinav, on_delete=models.CASCADE,
+        related_name="ogrenciler", verbose_name="Mazeret Sınav",
+    )
+    okulno = models.CharField(max_length=20, verbose_name="Okul No")
+    adi_soyadi = models.CharField(max_length=200, verbose_name="Adı Soyadı")
+    sinifsube = models.CharField(max_length=10, verbose_name="Sınıf/Şube")
+    ders_adi = models.CharField(max_length=200, verbose_name="Ders Adı")
+    sinav_turu = models.CharField(
+        max_length=20, blank=True, default="",
+        choices=Takvim.SINAV_TURU_CHOICES,
+        verbose_name="Sınav Türü",
+    )
+    belge_teslim = models.BooleanField(
+        default=False, verbose_name="Belge Teslim",
+        help_text="Geçerli mazeret belgesi idareye teslim edildi.",
+    )
+
+    class Meta:
+        ordering = ["sinifsube", "okulno", "ders_adi"]
+        unique_together = [("mazeret_sinav", "okulno", "ders_adi", "sinav_turu")]
+        verbose_name = "Mazeret Öğrenci"
+        verbose_name_plural = "Mazeret Öğrencileri"
+
+    def __str__(self):
+        return f"{self.mazeret_sinav} – {self.okulno} {self.adi_soyadi} – {self.ders_adi}"
+
+
 # ---------------------------------------------------------------------------
 # Sinyaller
 # ---------------------------------------------------------------------------
