@@ -21,12 +21,6 @@ class Ogrenci(models.Model):
         verbose_name="Sürekli Devamsız",
         help_text="İşaretlenirse mazeret sınavına çağrılmaz.",
     )
-    muaf = models.BooleanField(
-        default=False,
-        verbose_name="Muaf",
-        help_text="İşaretlenirse mazeret sınavına alınmaz.",
-    )
-
     class Meta:
         db_table = "ogrenci"
         verbose_name = "Öğrenci"
@@ -84,6 +78,27 @@ class OgrenciAdres(models.Model):
 
     def __str__(self):
         return f"{self.ogrenci} - {self.il}/{self.ilce}"
+
+
+class OgrenciMuaf(models.Model):
+    """Öğrencinin belirli bir dersten muaf olduğunu kaydeder."""
+    ogrenci = models.ForeignKey(
+        Ogrenci, on_delete=models.CASCADE,
+        related_name="muaf_dersler", verbose_name="Öğrenci",
+    )
+    ders = models.ForeignKey(
+        "okul.DersHavuzu", on_delete=models.CASCADE,
+        related_name="+", verbose_name="Ders",
+    )
+
+    class Meta:
+        unique_together = [("ogrenci", "ders")]
+        ordering = ["ogrenci", "ders__ders_adi"]
+        verbose_name = "Öğrenci Muaf Ders"
+        verbose_name_plural = "Öğrenci Muaf Dersleri"
+
+    def __str__(self):
+        return f"{self.ogrenci} — {self.ders.ders_adi} (Muaf)"
 
 
 class SinifOturmaDuzeni(models.Model):

@@ -291,6 +291,7 @@
                         <a href="{% url 'devamsizlik:ogrenci_devamsizlik_pdf' %}" class="btn btn-lg" style="background-color: #dc3545; color: white;">Yoklama PDF Raporu</a>
                         {% endif %}
                         {% if is_mudur_yardimcisi %}
+                        <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" class="btn btn-lg" style="background-color: #dc3545; color: white;">Öğrenci Özel Durumları</a>
                         <a href="{% url 'ogrenci:excel_yukle' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Excel Yükle</a>
                         {% endif %}
                     </div>

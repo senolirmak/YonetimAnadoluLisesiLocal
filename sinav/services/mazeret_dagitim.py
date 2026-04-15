@@ -22,7 +22,7 @@ from typing import List, Tuple
 
 from django.db.models import Subquery, OuterRef
 
-from ogrenci.models import Ogrenci
+from ogrenci.models import Ogrenci, OgrenciMuaf
 
 from sinav.models import (
     MazeretSinav,
@@ -30,6 +30,7 @@ from sinav.models import (
     MazeretOturum,
     MazeretOturumDers,
     MazeretOgrenci,
+    MazeretBelgeTeslim,
     TakvimUretim,
     Takvim,
     OturmaPlani,
@@ -40,9 +41,10 @@ _SINAV_TURU_RE = re.compile(r'^(.*?)\s+\((Yazili|Uygulama)\)$')
 
 
 # Varsayılan oturum başlangıç saatleri (AlgoritmaParametreleri yoksa kullanılır)
-VARSAYILAN_SAATLER = ["08:50", "10:30", "12:10", "13:35", "14:25"]
-# Her oturumun süresi (dakika)
-OTURUM_SURESI_DK = 80
+# 40 dk sınav + 10 dk ara = 50 dk aralık
+VARSAYILAN_SAATLER = ["08:50", "09:40", "10:30", "11:20", "13:00", "13:50", "14:40"]
+# Her oturumun süresi (dakika) — mazeret sınavı 40 dk
+OTURUM_SURESI_DK = 40
 
 
 def _str_to_time(s: str) -> time:
@@ -74,8 +76,8 @@ def oturumlari_olustur(mazeret_sinav: MazeretSinav, oturum_saatleri_str: str | N
         except Exception:
             saatler = VARSAYILAN_SAATLER
 
-    # En az 4 oturum garantisi
-    if len(saatler) < 4:
+    # En az 1 oturum garantisi
+    if len(saatler) < 1:
         saatler = VARSAYILAN_SAATLER
 
     # Aktif TakvimUretim'den Uygulama ders sayısını bul
@@ -95,7 +97,7 @@ def oturumlari_olustur(mazeret_sinav: MazeretSinav, oturum_saatleri_str: str | N
     # Kaç Uygulama slotu gerekiyor?
     # Uygulama oturumları en sona yerleştirilir, her biri ayrı zaman diliminde
     uygulama_slot_sayisi = uygulama_sayisi  # her Uygulama dersi ayrı slot
-    yazili_slot_sayisi = max(4, len(saatler)) - uygulama_slot_sayisi
+    yazili_slot_sayisi = len(saatler) - uygulama_slot_sayisi
     if yazili_slot_sayisi < 1:
         yazili_slot_sayisi = 1
 
@@ -161,11 +163,22 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> int:
         salon=OuterRef("salon"),
     ).values("ders_adi")[:1]
 
+    sureksiz_okulnolari = set(
+        Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+    )
+
     absent_rows = list(
         SinavSalonYoklama.objects.filter(uretim=aktif_uretim, durum="yok")
+        .exclude(okulno__in=sureksiz_okulnolari)
         .annotate(ders_adi_full=Subquery(ders_adi_subq))
         .values("okulno", "adi_soyadi", "sinifsube", "ders_adi_full")
         .distinct()
+    )
+
+    # Kalıcı belge teslim kayıtları — bu sınava ait (MazeretSinav'dan bağımsız)
+    belge_teslim_keys = set(
+        MazeretBelgeTeslim.objects.filter(sinav=mazeret_sinav.sinav)
+        .values_list("okulno", "ders_adi", "sinav_turu")
     )
 
     # Mevcut kayıtları koru (belge_teslim değeri kaybolmasın)
@@ -181,7 +194,7 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> int:
         if not ders_adi_full:
             continue
         m = _SINAV_TURU_RE.match(ders_adi_full)
-        ders_adi  = m.group(1).strip() if m else ders_adi_full
+        ders_adi   = m.group(1).strip() if m else ders_adi_full
         sinav_turu = m.group(2) if m else ""
         key = (row["okulno"], ders_adi, sinav_turu)
         if key not in mevcut:
@@ -192,7 +205,7 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> int:
                 sinifsube=row["sinifsube"],
                 ders_adi=ders_adi,
                 sinav_turu=sinav_turu,
-                belge_teslim=False,
+                belge_teslim=key in belge_teslim_keys,
             ))
 
     if yeni:
@@ -275,24 +288,30 @@ def dagit(mazeret_sinav: MazeretSinav) -> Tuple[bool, str]:
     if not aktif_uretim:
         return False, "Aktif takvim üretimi bulunamadı. Önce bir takvim üretimi aktif yapın."
 
-    # Sürekli devamsız veya muaf öğrencilerin okul numaraları → dağıtımdan hariç
-    hariç_okulnolari = set(
+    # Sürekli devamsız öğrenciler → tüm derslerden hariç
+    sureksiz_okulnolari = set(
         Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
-    ) | set(
-        Ogrenci.objects.filter(muaf=True).values_list("okulno", flat=True)
     )
 
-    # Belge teslim etmiş VE hariç listesinde olmayan → uygun (ders_adi, sinav_turu) çiftleri
-    uygun_qs = (
-        MazeretOgrenci.objects
-        .filter(mazeret_sinav=mazeret_sinav, belge_teslim=True)
-        .exclude(okulno__in=hariç_okulnolari)
-        .values("ders_adi", "sinav_turu")
-        .distinct()
+    # Muaf (ders bazında): (okulno, ders_adi) çiftleri → o ders için hariç
+    # OgrenciMuaf.ders → DersHavuzu.ders_adi ile eşleştir
+    muaf_okulno_ders: set[tuple[str, str]] = set(
+        OgrenciMuaf.objects.filter(
+            ogrenci__okulno__in=MazeretOgrenci.objects.filter(
+                mazeret_sinav=mazeret_sinav
+            ).values("okulno")
+        ).values_list("ogrenci__okulno", "ders__ders_adi")
     )
-    uygun_ders_adileri: set[tuple[str, str]] = {
-        (r["ders_adi"], r["sinav_turu"]) for r in uygun_qs
-    }
+
+    # Belge teslim etmiş öğrencilerden uygun (ders_adi, sinav_turu) çiftlerini bul
+    # Her (okulno, ders_adi, sinav_turu) triple için: sureksiz değil VE muaf değil
+    uygun_ders_adileri: set[tuple[str, str]] = set()
+    for mo in MazeretOgrenci.objects.filter(mazeret_sinav=mazeret_sinav, belge_teslim=True):
+        if mo.okulno in sureksiz_okulnolari:
+            continue
+        if (mo.okulno, mo.ders_adi) in muaf_okulno_ders:
+            continue
+        uygun_ders_adileri.add((mo.ders_adi, mo.sinav_turu))
 
     if not uygun_ders_adileri:
         return False, (

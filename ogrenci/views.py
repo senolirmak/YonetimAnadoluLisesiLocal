@@ -9,8 +9,10 @@ from django.views.decorators.http import require_POST
 
 from dersprogrami.models import DersProgrami
 
+from okul.models import DersHavuzu
+
 from .forms import OgrenciAdresForm, OgrenciDetayForm
-from .models import Ogrenci, OgrenciAdres, OgrenciDetay
+from .models import Ogrenci, OgrenciAdres, OgrenciDetay, OgrenciMuaf
 
 
 def _rehberlik_sinif_sube(user):
@@ -229,7 +231,7 @@ def ogrenci_liste(request):
 
 @login_required
 def sureksiz_devamsiz_listesi(request):
-    """Öğrenci özel durumları: sürekli devamsız ve muaf yönetimi."""
+    """Öğrenci özel durumları: sürekli devamsız yönetimi."""
     from okul.auth import is_mudur_yardimcisi as _mudur_mi
     gruplar = set(request.user.groups.values_list("name", flat=True))
     yetkili = request.user.is_superuser or _mudur_mi(request.user) or "okul_muduru" in gruplar
@@ -238,7 +240,6 @@ def sureksiz_devamsiz_listesi(request):
 
     if request.method == "POST":
         sureksiz_isaretli = set(request.POST.getlist("sureksiz"))
-        muaf_isaretli     = set(request.POST.getlist("muaf"))
         sinifsube = request.POST.get("sinifsube_filtre", "")
         qs = Ogrenci.objects.all()
         if sinifsube:
@@ -250,16 +251,9 @@ def sureksiz_devamsiz_listesi(request):
         guncellenen = 0
         for ogr in qs:
             yeni_sureksiz = ogr.okulno in sureksiz_isaretli
-            yeni_muaf     = ogr.okulno in muaf_isaretli
-            fields = []
             if ogr.sureksiz_devamsiz != yeni_sureksiz:
                 ogr.sureksiz_devamsiz = yeni_sureksiz
-                fields.append("sureksiz_devamsiz")
-            if ogr.muaf != yeni_muaf:
-                ogr.muaf = yeni_muaf
-                fields.append("muaf")
-            if fields:
-                ogr.save(update_fields=fields)
+                ogr.save(update_fields=["sureksiz_devamsiz"])
                 guncellenen += 1
         messages.success(request, f"{guncellenen} öğrenci kaydı güncellendi.")
         return redirect(
@@ -279,20 +273,31 @@ def sureksiz_devamsiz_listesi(request):
     if filtre == "sureksiz":
         ogrenciler = ogrenciler.filter(sureksiz_devamsiz=True)
     elif filtre == "muaf":
-        ogrenciler = ogrenciler.filter(muaf=True)
+        ogrenciler = ogrenciler.filter(muaf_dersler__isnull=False).distinct()
+
+    # Muaf ders sayısı per öğrenci (tek sorguda)
+    from django.db.models import Count
+    muaf_sayilari = {
+        r["ogrenci_id"]: r["n"]
+        for r in OgrenciMuaf.objects.values("ogrenci_id").annotate(n=Count("id"))
+    }
 
     sinifsube_secenekleri = [
         f"{s}/{sb}"
         for s, sb in Ogrenci.objects.values_list("sinif", "sube").distinct().order_by("sinif", "sube")
     ]
 
+    ogr_listesi = list(ogrenciler.order_by("sinif", "sube", "okulno"))
+    for ogr in ogr_listesi:
+        ogr.muaf_ders_sayisi = muaf_sayilari.get(ogr.pk, 0)
+
     return render(request, "ogrenci/sureksiz_devamsiz_listesi.html", {
-        "ogrenciler":            ogrenciler.order_by("sinif", "sube", "okulno"),
+        "ogrenciler":            ogr_listesi,
         "sinifsube_secenekleri": sinifsube_secenekleri,
         "secili_sinifsube":      sinifsube,
         "filtre":                filtre,
         "toplam_sureksiz":       Ogrenci.objects.filter(sureksiz_devamsiz=True).count(),
-        "toplam_muaf":           Ogrenci.objects.filter(muaf=True).count(),
+        "toplam_muaf":           OgrenciMuaf.objects.values("ogrenci").distinct().count(),
     })
 
 
@@ -344,5 +349,66 @@ def ogrenci_detay_duzenle(request, pk):
             "ogrenci": ogrenci,
             "detay_form": detay_form,
             "adres_form": adres_form,
+        },
+    )
+
+
+@login_required
+def ogrenci_muaf_duzenle(request, pk):
+    """Öğrencinin muaf olduğu dersleri (per-ders) düzenler."""
+    from okul.auth import is_mudur_yardimcisi as _mudur_mi
+    gruplar = set(request.user.groups.values_list("name", flat=True))
+    yetkili = request.user.is_superuser or _mudur_mi(request.user) or "okul_muduru" in gruplar
+    if not yetkili:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+
+    ogrenci = get_object_or_404(Ogrenci, pk=pk)
+
+    # Aktif sınavdan ders havuzunu çek; yoksa tüm DersHavuzu
+    try:
+        from sinav.models import TakvimUretim, Takvim
+        aktif_uretim = TakvimUretim.objects.filter(aktif=True).first()
+        if aktif_uretim:
+            ders_qs = (
+                DersHavuzu.objects.filter(
+                    takvim__uretim=aktif_uretim
+                ).distinct().order_by("ders_adi")
+            )
+        else:
+            ders_qs = DersHavuzu.objects.all().order_by("ders_adi")
+    except Exception:
+        ders_qs = DersHavuzu.objects.all().order_by("ders_adi")
+
+    if request.method == "POST":
+        secili_ids = set(map(int, request.POST.getlist("muaf_ders")))
+        # Önce tüm mevcut muafları sil, sonra seçilileri kaydet
+        OgrenciMuaf.objects.filter(ogrenci=ogrenci).delete()
+        yeniler = [
+            OgrenciMuaf(ogrenci=ogrenci, ders_id=ders_id)
+            for ders_id in secili_ids
+        ]
+        if yeniler:
+            OgrenciMuaf.objects.bulk_create(yeniler, ignore_conflicts=True)
+        messages.success(
+            request,
+            f"{ogrenci} için muaf ders listesi güncellendi ({len(yeniler)} ders).",
+        )
+        redirect_to = request.POST.get("next")
+        if redirect_to:
+            return redirect(redirect_to)
+        return redirect("ogrenci:sureksiz_devamsiz_listesi")
+
+    mevcut_ders_ids = set(
+        OgrenciMuaf.objects.filter(ogrenci=ogrenci).values_list("ders_id", flat=True)
+    )
+
+    return render(
+        request,
+        "ogrenci/ogrenci_muaf_duzenle.html",
+        {
+            "ogrenci": ogrenci,
+            "dersler": ders_qs,
+            "mevcut_ders_ids": mevcut_ders_ids,
         },
     )

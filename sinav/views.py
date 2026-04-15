@@ -21,6 +21,7 @@ from .models import (
     DisVeri, AlgoritmaParametreleri,
     TakvimUretim, Takvim, OturmaPlani, SinavSalonYoklama,
     MazeretSinav, MazeretGun, MazeretOturum, MazeretOturumDers, MazeretOgrenci,
+    MazeretBelgeTeslim,
 )
 from okul.models import OkulBilgi
 from ogrenci.models import Ogrenci as OgrenciModel
@@ -2135,65 +2136,39 @@ def mazeret_sinav_olustur(request):
 @login_required
 def mazeret_sinav_detay(request, pk):
     """Mazeret sınav planının detayını gösterir (günler, oturumlar, dersler, öğrenciler)."""
-    import re as _re
-    from django.db.models import Subquery, OuterRef as _OuterRef
-
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
 
     aktif_uretim = TakvimUretim.objects.filter(
         sinav=mazeret.sinav, aktif=True
     ).first()
 
-    # Devamsız öğrencileri ders bazında önceden topla:
+    # Öğrenci listesini MazeretOgrenci'den oluştur:
     # {(ders_id, sinav_turu): [{"okulno", "adi_soyadi", "sinifsube"}, ...]}
+    # MazeretOgrenci zaten sureksiz_devamsiz filtreli ve tekildir.
     ogrenci_map: dict[tuple, list] = {}
     if aktif_uretim:
-        _sinav_turu_re = _re.compile(r'^(.*?)\s+\((Yazili|Uygulama)\)$')
+        # ders_adi → ders_id çözümlemesi için cache
+        ders_id_cache: dict[tuple[str, str], int | None] = {}
 
-        ders_adi_subq = OturmaPlani.objects.filter(
-            uretim=aktif_uretim,
-            okulno=_OuterRef("okulno"),
-            tarih=_OuterRef("tarih"),
-            saat=_OuterRef("saat"),
-            salon=_OuterRef("salon"),
-        ).values("ders_adi")[:1]
+        for mo in MazeretOgrenci.objects.filter(mazeret_sinav=mazeret).order_by("sinifsube", "okulno"):
+            cache_key = (mo.ders_adi, mo.sinav_turu)
+            if cache_key not in ders_id_cache:
+                tk = Takvim.objects.filter(
+                    uretim=aktif_uretim,
+                    ders__ders_adi=mo.ders_adi,
+                    sinav_turu=mo.sinav_turu,
+                ).values("ders_id").first()
+                ders_id_cache[cache_key] = tk["ders_id"] if tk else None
 
-        absent_rows = list(
-            SinavSalonYoklama.objects.filter(uretim=aktif_uretim, durum="yok")
-            .annotate(ders_adi_full=Subquery(ders_adi_subq))
-            .values("okulno", "adi_soyadi", "sinifsube", "ders_adi_full")
-        )
-
-        # ders_adi_full → (ders_id, sinav_turu) çözümle
-        ders_adi_cache: dict[str, tuple | None] = {}
-        for row in absent_rows:
-            ders_adi_full = row.get("ders_adi_full") or ""
-            if not ders_adi_full:
+            ders_id = ders_id_cache[cache_key]
+            if ders_id is None:
                 continue
-            if ders_adi_full not in ders_adi_cache:
-                m = _sinav_turu_re.match(ders_adi_full)
-                base_adi = m.group(1).strip() if m else ders_adi_full
-                sinav_turu = m.group(2) if m else ""
-                tk = (
-                    Takvim.objects.filter(
-                        uretim=aktif_uretim,
-                        ders__ders_adi=base_adi,
-                        sinav_turu=sinav_turu,
-                    ).values("ders_id", "sinav_turu").first()
-                )
-                ders_adi_cache[ders_adi_full] = (tk["ders_id"], tk["sinav_turu"]) if tk else None
-
-            key = ders_adi_cache[ders_adi_full]
-            if key:
-                ogrenci_map.setdefault(key, []).append({
-                    "okulno":     row["okulno"],
-                    "adi_soyadi": row["adi_soyadi"],
-                    "sinifsube":  row["sinifsube"],
-                })
-
-        # Her ders için öğrencileri sınıf/okul no sırasına göre sırala
-        for key in ogrenci_map:
-            ogrenci_map[key].sort(key=lambda o: (o["sinifsube"], o["okulno"]))
+            key = (ders_id, mo.sinav_turu)
+            ogrenci_map.setdefault(key, []).append({
+                "okulno":     mo.okulno,
+                "adi_soyadi": mo.adi_soyadi,
+                "sinifsube":  mo.sinifsube,
+            })
 
     gunler = (
         mazeret.gunler
@@ -2236,31 +2211,45 @@ def mazeret_ogrenci_listesi(request, pk):
     if request.method == "POST":
         belge_isaretli    = set(map(int, request.POST.getlist("belge_teslim")))
         sureksiz_isaretli = set(request.POST.getlist("sureksiz_devamsiz"))
-        muaf_isaretli     = set(request.POST.getlist("muaf"))
-
         guncellenen_belge = 0
+        belge_ekle = []
+        belge_sil_keys = []
         for mo in MazeretOgrenci.objects.filter(mazeret_sinav=mazeret):
             yeni_belge = mo.pk in belge_isaretli
             if mo.belge_teslim != yeni_belge:
                 mo.belge_teslim = yeni_belge
                 mo.save(update_fields=["belge_teslim"])
                 guncellenen_belge += 1
+            # Kalıcı tabloya da yansıt
+            if yeni_belge:
+                belge_ekle.append(
+                    MazeretBelgeTeslim(
+                        okulno=mo.okulno,
+                        ders_adi=mo.ders_adi,
+                        sinav_turu=mo.sinav_turu,
+                    )
+                )
+            else:
+                belge_sil_keys.append((mo.okulno, mo.ders_adi, mo.sinav_turu))
+
+        sinav = mazeret.sinav
+        if belge_ekle:
+            for b in belge_ekle:
+                b.sinav = sinav
+            MazeretBelgeTeslim.objects.bulk_create(belge_ekle, ignore_conflicts=True)
+        for okulno, ders_adi, sinav_turu in belge_sil_keys:
+            MazeretBelgeTeslim.objects.filter(
+                sinav=sinav, okulno=okulno, ders_adi=ders_adi, sinav_turu=sinav_turu
+            ).delete()
 
         guncellenen_ogr = 0
         for ogr in OgrenciModel.objects.filter(
             okulno__in=MazeretOgrenci.objects.filter(mazeret_sinav=mazeret).values("okulno")
         ):
-            fields = []
             yeni_sureksiz = ogr.okulno in sureksiz_isaretli
-            yeni_muaf     = ogr.okulno in muaf_isaretli
             if ogr.sureksiz_devamsiz != yeni_sureksiz:
                 ogr.sureksiz_devamsiz = yeni_sureksiz
-                fields.append("sureksiz_devamsiz")
-            if ogr.muaf != yeni_muaf:
-                ogr.muaf = yeni_muaf
-                fields.append("muaf")
-            if fields:
-                ogr.save(update_fields=fields)
+                ogr.save(update_fields=["sureksiz_devamsiz"])
                 guncellenen_ogr += 1
 
         messages.success(
@@ -2269,17 +2258,19 @@ def mazeret_ogrenci_listesi(request, pk):
         )
         return redirect("sinav:mazeret_ogrenci_listesi", pk=pk)
 
-    # Hariç tutulacak okulno seti (sürekli devamsız veya muaf)
-    haric_okulnolari = set(
-        OgrenciModel.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
-    ) | set(
-        OgrenciModel.objects.filter(muaf=True).values_list("okulno", flat=True)
-    )
+    # Sürekli devamsız okulnoları
     sureksiz_okulnolari = set(
         OgrenciModel.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
     )
-    muaf_okulnolari = set(
-        OgrenciModel.objects.filter(muaf=True).values_list("okulno", flat=True)
+
+    # Muaf (ders bazında): (okulno, ders_adi) çiftleri
+    from ogrenci.models import OgrenciMuaf
+    muaf_okulno_ders: set[tuple[str, str]] = set(
+        OgrenciMuaf.objects.filter(
+            ogrenci__okulno__in=MazeretOgrenci.objects.filter(
+                mazeret_sinav=mazeret
+            ).values("okulno")
+        ).values_list("ogrenci__okulno", "ders__ders_adi")
     )
 
     tum_ogrenciler = list(
@@ -2292,18 +2283,25 @@ def mazeret_ogrenci_listesi(request, pk):
         key = (mo.ders_adi, mo.sinav_turu)
         if key not in ders_map:
             ders_map[key] = {"ders_adi": mo.ders_adi, "sinav_turu": mo.sinav_turu, "ogrenciler": []}
+        sureksiz = mo.okulno in sureksiz_okulnolari
+        muaf = (mo.okulno, mo.ders_adi) in muaf_okulno_ders
         ders_map[key]["ogrenciler"].append({
             "mo":       mo,
-            "sureksiz": mo.okulno in sureksiz_okulnolari,
-            "muaf":     mo.okulno in muaf_okulnolari,
+            "sureksiz": sureksiz,
+            "muaf":     muaf,
         })
 
     toplam         = len(tum_ogrenciler)
     belge_teslim_n = sum(1 for mo in tum_ogrenciler if mo.belge_teslim)
-    haric_n        = sum(1 for mo in tum_ogrenciler if mo.okulno in haric_okulnolari)
-    uygun_n        = sum(
+    haric_n = sum(
         1 for mo in tum_ogrenciler
-        if mo.belge_teslim and mo.okulno not in haric_okulnolari
+        if mo.okulno in sureksiz_okulnolari or (mo.okulno, mo.ders_adi) in muaf_okulno_ders
+    )
+    uygun_n = sum(
+        1 for mo in tum_ogrenciler
+        if mo.belge_teslim
+        and mo.okulno not in sureksiz_okulnolari
+        and (mo.okulno, mo.ders_adi) not in muaf_okulno_ders
     )
 
     return render(request, "sinav/mazeret_ogrenci_listesi.html", {

@@ -20,8 +20,9 @@
 
   <div style="background:#fffbeb; border:1px solid #f59e0b; border-left:4px solid #f59e0b;
               border-radius:6px; padding:.7rem 1rem; margin-bottom:1.2rem; font-size:.84rem; color:#78350f;">
-    <strong>Sürekli Devamsız</strong> ve <strong>Muaf</strong> işaretlenen öğrenciler mazeret sınavına alınmaz.
-    Sınıf/Şube seçip kaydet butonuna bastığınızda <strong>yalnızca o sınıfa ait</strong> öğrenciler güncellenir.
+    <strong>Sürekli Devamsız</strong> işaretlenen öğrenciler tüm mazeret sınavlarına alınmaz.
+    <strong>Muaf</strong> öğrenciler yalnızca muaf oldukları ders için sınav dışında tutulur.
+    Sınıf/Şube seçip kaydet butonuna bastığınızda <strong>yalnızca o sınıfa ait</strong> sürekli devamsız bilgisi güncellenir.
   </div>
 
   <!-- Filtre -->
@@ -58,12 +59,12 @@
             <th>Sınıf/Şube</th>
             <th>Adı Soyadı</th>
             <th style="text-align:center;">Sürekli Devamsız</th>
-            <th style="text-align:center;">Muaf</th>
+            <th style="text-align:center;">Muaf Ders</th>
           </tr>
         </thead>
         <tbody>
           {% for ogr in ogrenciler %}
-          <tr {% if ogr.sureksiz_devamsiz or ogr.muaf %}style="background:#fef2f2;"{% endif %}>
+          <tr {% if ogr.sureksiz_devamsiz or ogr.muaf_ders_sayisi %}style="background:#fef2f2;"{% endif %}>
             <td style="text-align:center;">
               <input type="checkbox" class="satir-sec" title="Satırı seç">
             </td>
@@ -75,8 +76,14 @@
                      {% if ogr.sureksiz_devamsiz %}checked{% endif %}>
             </td>
             <td style="text-align:center;">
-              <input type="checkbox" name="muaf" value="{{ ogr.okulno }}"
-                     {% if ogr.muaf %}checked{% endif %}>
+              <a href="{% url 'ogrenci:ogrenci_muaf_duzenle' ogr.pk %}"
+                 style="font-size:.82rem; color:{% if ogr.muaf_ders_sayisi %}#dc2626{% else %}#6b7280{% endif %};">
+                {% if ogr.muaf_ders_sayisi %}
+                  {{ ogr.muaf_ders_sayisi }} ders
+                {% else %}
+                  Ekle
+                {% endif %}
+              </a>
             </td>
           </tr>
           {% empty %}

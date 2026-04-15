@@ -1,0 +1,81 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Muaf Dersler — {{ ogrenci }}{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="flex-between mb-20">
+    <h2 class="page-title">Muaf Ders Düzenle</h2>
+    <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" class="btn btn-secondary btn-sm">&#8592; Geri</a>
+  </div>
+
+  {% for message in messages %}
+  <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+    {{ message }}
+  </div>
+  {% endfor %}
+
+  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+              padding:.8rem 1.1rem; margin-bottom:1.2rem; font-size:.88rem;">
+    <strong>{{ ogrenci.sinif }}/{{ ogrenci.sube }}</strong> —
+    <strong>{{ ogrenci.okulno }}</strong>
+    {{ ogrenci.adi }} {{ ogrenci.soyadi }}
+  </div>
+
+  <div style="background:#fffbeb; border:1px solid #f59e0b; border-left:4px solid #f59e0b;
+              border-radius:6px; padding:.7rem 1rem; margin-bottom:1.2rem; font-size:.84rem; color:#78350f;">
+    İşaretlenen dersler için öğrenci <strong>mazeret sınavına alınmaz</strong>.
+    Diğer derslerdeki mazeret durumu etkilenmez.
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}">
+
+    <div style="margin-bottom:.6rem; display:flex; gap:.5rem; align-items:center;">
+      <button type="button" id="tumunu_sec" class="btn btn-secondary btn-sm">Tümünü Seç</button>
+      <button type="button" id="tumunu_kaldir" class="btn btn-secondary btn-sm">Tümünü Kaldır</button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:3rem; text-align:center;">Muaf</th>
+            <th>Ders Adı</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ders in dersler %}
+          <tr {% if ders.pk in mevcut_ders_ids %}style="background:#fef2f2;"{% endif %}>
+            <td style="text-align:center;">
+              <input type="checkbox" name="muaf_ders" value="{{ ders.pk }}"
+                     class="muaf-cb"
+                     {% if ders.pk in mevcut_ders_ids %}checked{% endif %}>
+            </td>
+            <td>{{ ders.ders_adi }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="2" class="text-center text-muted">Ders bulunamadı.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if dersler %}
+    <div style="margin-top:.8rem; display:flex; gap:.7rem; align-items:center;">
+      <button type="submit" class="btn btn-primary">Kaydet</button>
+      <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" class="btn-cancel">İptal</a>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<script>
+document.getElementById("tumunu_sec").addEventListener("click", function() {
+  document.querySelectorAll(".muaf-cb").forEach(cb => cb.checked = true);
+});
+document.getElementById("tumunu_kaldir").addEventListener("click", function() {
+  document.querySelectorAll(".muaf-cb").forEach(cb => cb.checked = false);
+});
+</script>
+{% endblock %}

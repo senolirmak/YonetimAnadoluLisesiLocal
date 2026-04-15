@@ -73,6 +73,7 @@
             padding:.7rem 1rem; margin-bottom:1.2rem; font-size:.84rem; color:#1e40af;">
   <strong>Kaydet</strong> butonuna bastığınızda belge teslim ve sürekli devamsız durumları güncellenir.
   Ardından <strong>Yeniden Dağıt</strong> ile takvimi yenileyin.
+  <br>Muaf bilgisi ders bazında <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" style="color:#1d4ed8;">Öğrenci Özel Durumları</a> sayfasından yönetilir.
 </div>
 
 {% if not ders_gruplar %}
@@ -119,8 +120,11 @@
                {% if item.sureksiz %}checked{% endif %}>
       </span>
       <span class="cb-center">
-        <input type="checkbox" name="muaf" value="{{ item.mo.okulno }}"
-               {% if item.muaf %}checked{% endif %}>
+        {% if item.muaf %}
+        <span style="font-size:.75rem; color:#dc2626;" title="Bu ders için muaf">✓</span>
+        {% else %}
+        <span style="font-size:.72rem; color:#94a3b8;">—</span>
+        {% endif %}
       </span>
     </div>
     {% endfor %}

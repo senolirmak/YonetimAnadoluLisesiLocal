@@ -505,6 +505,33 @@ class MazeretOgrenci(models.Model):
         return f"{self.mazeret_sinav} – {self.okulno} {self.adi_soyadi} – {self.ders_adi}"
 
 
+class MazeretBelgeTeslim(models.Model):
+    """
+    Öğrencinin belirli bir ders için mazeret belgesi teslim ettiğini kalıcı olarak saklar.
+    MazeretSinav'dan bağımsızdır; plan silinse/yeniden oluşturulsa bile korunur.
+    Sınav bazında damgalanır; farklı dönemlerin kayıtları birbirine karışmaz.
+    """
+    sinav = models.ForeignKey(
+        SinavBilgisi, on_delete=models.CASCADE,
+        related_name="belge_teslimler", verbose_name="Sınav",
+    )
+    okulno = models.CharField(max_length=20, verbose_name="Okul No")
+    ders_adi = models.CharField(max_length=200, verbose_name="Ders Adı")
+    sinav_turu = models.CharField(
+        max_length=20, blank=True, default="",
+        choices=Takvim.SINAV_TURU_CHOICES,
+        verbose_name="Sınav Türü",
+    )
+
+    class Meta:
+        unique_together = [("sinav", "okulno", "ders_adi", "sinav_turu")]
+        verbose_name = "Mazeret Belge Teslim"
+        verbose_name_plural = "Mazeret Belge Teslimleri"
+
+    def __str__(self):
+        return f"{self.sinav} – {self.okulno} – {self.ders_adi} ({self.sinav_turu or 'Yazılı'})"
+
+
 # ---------------------------------------------------------------------------
 # Sinyaller
 # ---------------------------------------------------------------------------
