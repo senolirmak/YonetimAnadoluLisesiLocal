@@ -730,6 +730,39 @@ def gorevlendirme(request, sinav_pk):
         if gz.gozetmen_id and gz.gozetmen_id in gorev_sayac:
             gorev_sayac[gz.gozetmen_id]["gozetmen"] += 1
 
+    # Kümülatif görev sayısı — tüm SorumluSinav kayıtları
+    kumulatif_sayac = {p.pk: {"komisyon": 0, "gozetmen": 0} for p in personel_listesi}
+
+    kum_komisyon_kayitlar: dict = {}  # personel_pk → [(sinav_id, ders_adi, tarih, oturum_no)]
+    for ku in SorumluKomisyonUyesi.objects.all():
+        for pid in (ku.uye1_id, ku.uye2_id):
+            if pid and pid in kumulatif_sayac:
+                kum_komisyon_kayitlar.setdefault(pid, []).append(
+                    (ku.sinav_id, ku.ders_adi, ku.tarih, ku.oturum_no)
+                )
+    for pid, kayitlar in kum_komisyon_kayitlar.items():
+        n = len(kayitlar)
+        parent = list(range(n))
+        for i in range(n):
+            for j in range(i + 1, n):
+                s_i, d_i, t_i, o_i = kayitlar[i]
+                s_j, d_j, t_j, o_j = kayitlar[j]
+                if s_i == s_j and ((t_i == t_j and o_i == o_j) or d_i == d_j):
+                    ri, rj = i, j
+                    while parent[ri] != ri: ri = parent[ri]
+                    while parent[rj] != rj: rj = parent[rj]
+                    if ri != rj: parent[ri] = rj
+        roots = set()
+        for i in range(n):
+            r = i
+            while parent[r] != r: r = parent[r]
+            roots.add(r)
+        kumulatif_sayac[pid]["komisyon"] = len(roots)
+
+    for gz in SorumluGozetmen.objects.all():
+        if gz.gozetmen_id and gz.gozetmen_id in kumulatif_sayac:
+            kumulatif_sayac[gz.gozetmen_id]["gozetmen"] += 1
+
     # Branş → satır listesi şeklinde grupla, branş içinde ada göre sırala
     from itertools import groupby as iGroupBy
     tum_satirlar = sorted(
@@ -740,8 +773,11 @@ def gorevlendirme(request, sinav_pk):
                 "komisyon": v["komisyon"],
                 "gozetmen": v["gozetmen"],
                 "toplam": v["komisyon"] + v["gozetmen"],
+                "kum_komisyon": kumulatif_sayac[pk]["komisyon"],
+                "kum_gozetmen": kumulatif_sayac[pk]["gozetmen"],
+                "kum_toplam": kumulatif_sayac[pk]["komisyon"] + kumulatif_sayac[pk]["gozetmen"],
             }
-            for v in gorev_sayac.values()
+            for pk, v in gorev_sayac.items()
         ],
         key=lambda x: (x["brans"], x["adi_soyadi"]),
     )
