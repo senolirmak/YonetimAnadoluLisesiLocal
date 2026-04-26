@@ -23,6 +23,8 @@ from sorumluluk.models import (
     SALON_SAYISI,
     SorumluDers,
     SorumluDersHavuzu,
+    SorumluGozetmen,
+    SorumluKomisyonUyesi,
     SorumluOgrenci,
     SorumluOturmaPlani,
     SorumluSinav,
@@ -296,6 +298,9 @@ def takvim_olustur(request, sinav_pk):
                 en_iyi_takvim = motor.optimize_edilmis_takvim(
                     max_iter=max_iter, max_daily_exams=max_sinav, slot_max_ders=slot_max_ders
                 )
+                # Takvim yeniden oluşturulduğunda eski görevlendirmeler de temizlenir
+                SorumluKomisyonUyesi.objects.filter(sinav=sinav).delete()
+                SorumluGozetmen.objects.filter(sinav=sinav).delete()
                 motor.veritabanina_kaydet(en_iyi_takvim, saatler_dict)
                 oturma_plani_olustur(sinav)
 
@@ -398,17 +403,14 @@ def takvim_olustur(request, sinav_pk):
     return redirect("sorumluluk:sinav_detay", pk=sinav_pk)
 
 
-@login_required
-def takvim_detay(request, sinav_pk):
-    sinav = get_object_or_404(SorumluSinav.objects.select_related("egitim_yili"), pk=sinav_pk)
-
+def _get_oturumlar_veri(sinav):
+    """Sınava ait takvim ve oturma planı kayıtlarını birleştirerek görünümler için ortak veri yapısı üretir."""
     takvim_rows = list(
         SorumluTakvim.objects
         .filter(sinav=sinav)
         .order_by("tarih", "oturum_no", "ders_adi")
     )
 
-    # Oturma planını tek seferde çek, (tarih, oturum_no) anahtarıyla grupla
     oturma_dict = {}
     for op in SorumluOturmaPlani.objects.filter(sinav=sinav).order_by("salon", "sira_no"):
         oturma_dict.setdefault((op.tarih, op.oturum_no), []).append(op)
@@ -423,9 +425,19 @@ def takvim_detay(request, sinav_pk):
             "saat_baslangic": rows[0].saat_baslangic,
             "saat_bitis":     rows[0].saat_bitis,
             "dersler":        [r.ders_adi for r in rows],
+            "ders_sayisi":    len(rows),
             "salon1":         [k for k in kayitlar if k.salon == "Sorumluluk1"],
             "salon2":         [k for k in kayitlar if k.salon == "Sorumluluk2"],
+            "salon3":         [k for k in kayitlar if k.salon == "Sorumluluk3"],
         })
+    return oturumlar_veri
+
+
+@login_required
+def takvim_detay(request, sinav_pk):
+    sinav = get_object_or_404(SorumluSinav.objects.select_related("egitim_yili"), pk=sinav_pk)
+
+    oturumlar_veri = _get_oturumlar_veri(sinav)
 
     return render(request, "sorumluluk/takvim_detay.html", {
         "sinav": sinav,
@@ -462,29 +474,7 @@ def rapor(request, sinav_pk):
         messages.error(request, "Rapor için önce onaylayın.")
         return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
 
-    takvim_rows = list(
-        SorumluTakvim.objects
-        .filter(sinav=sinav)
-        .order_by("tarih", "oturum_no", "ders_adi")
-    )
-
-    oturma_dict = {}
-    for op in SorumluOturmaPlani.objects.filter(sinav=sinav).order_by("salon", "sira_no"):
-        oturma_dict.setdefault((op.tarih, op.oturum_no), []).append(op)
-
-    oturumlar_veri = []
-    for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
-        rows = list(rows)
-        kayitlar = oturma_dict.get((tarih, oturum_no), [])
-        oturumlar_veri.append({
-            "tarih":          tarih,
-            "oturum_no":      oturum_no,
-            "saat_baslangic": rows[0].saat_baslangic,
-            "saat_bitis":     rows[0].saat_bitis,
-            "dersler":        [r.ders_adi for r in rows],
-            "salon1":         [k for k in kayitlar if k.salon == "Sorumluluk1"],
-            "salon2":         [k for k in kayitlar if k.salon == "Sorumluluk2"],
-        })
+    oturumlar_veri = _get_oturumlar_veri(sinav)
 
     okul = OkulBilgi.get()
     return render(request, "sorumluluk/rapor.html", {
@@ -504,28 +494,7 @@ def rapor_pdf(request, sinav_pk):
         messages.error(request, "PDF için önce takvimi onaylamalısınız.")
         return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
 
-    takvim_rows = list(
-        SorumluTakvim.objects
-        .filter(sinav=sinav)
-        .order_by("tarih", "oturum_no", "ders_adi")
-    )
-    oturma_dict = {}
-    for op in SorumluOturmaPlani.objects.filter(sinav=sinav).order_by("salon", "sira_no"):
-        oturma_dict.setdefault((op.tarih, op.oturum_no), []).append(op)
-
-    oturumlar_veri = []
-    for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
-        rows = list(rows)
-        kayitlar = oturma_dict.get((tarih, oturum_no), [])
-        oturumlar_veri.append({
-            "tarih":          tarih,
-            "oturum_no":      oturum_no,
-            "saat_baslangic": rows[0].saat_baslangic,
-            "saat_bitis":     rows[0].saat_bitis,
-            "dersler":        [r.ders_adi for r in rows],
-            "salon1":         [k for k in kayitlar if k.salon == "Sorumluluk1"],
-            "salon2":         [k for k in kayitlar if k.salon == "Sorumluluk2"],
-        })
+    oturumlar_veri = _get_oturumlar_veri(sinav)
 
     okul = OkulBilgi.get()
     buf  = io.BytesIO()
@@ -551,28 +520,7 @@ def rapor_imza_pdf(request, sinav_pk):
         messages.error(request, "PDF için önce takvimi onaylamalısınız.")
         return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
 
-    takvim_rows = list(
-        SorumluTakvim.objects
-        .filter(sinav=sinav)
-        .order_by("tarih", "oturum_no", "ders_adi")
-    )
-    oturma_dict = {}
-    for op in SorumluOturmaPlani.objects.filter(sinav=sinav).order_by("salon", "sira_no"):
-        oturma_dict.setdefault((op.tarih, op.oturum_no), []).append(op)
-
-    oturumlar_veri = []
-    for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
-        rows = list(rows)
-        kayitlar = oturma_dict.get((tarih, oturum_no), [])
-        oturumlar_veri.append({
-            "tarih":          tarih,
-            "oturum_no":      oturum_no,
-            "saat_baslangic": rows[0].saat_baslangic,
-            "saat_bitis":     rows[0].saat_bitis,
-            "dersler":        [r.ders_adi for r in rows],
-            "salon1":         [k for k in kayitlar if k.salon == "Sorumluluk1"],
-            "salon2":         [k for k in kayitlar if k.salon == "Sorumluluk2"],
-        })
+    oturumlar_veri = _get_oturumlar_veri(sinav)
 
     okul = OkulBilgi.get()
     buf  = io.BytesIO()
@@ -597,27 +545,7 @@ def rapor_genel_takvim_pdf(request, sinav_pk):
         messages.error(request, "PDF için önce takvimi onaylamalısınız.")
         return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
 
-    takvim_rows = list(
-        SorumluTakvim.objects
-        .filter(sinav=sinav)
-        .order_by("tarih", "oturum_no", "ders_adi")
-    )
-    oturma_dict = {}
-    for op in SorumluOturmaPlani.objects.filter(sinav=sinav).order_by("salon", "sira_no"):
-        oturma_dict.setdefault((op.tarih, op.oturum_no), []).append(op)
-
-    oturumlar_veri = []
-    for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
-        rows = list(rows)
-        kayitlar = oturma_dict.get((tarih, oturum_no), [])
-        oturumlar_veri.append({
-            "tarih":          tarih,
-            "oturum_no":      oturum_no,
-            "saat_baslangic": rows[0].saat_baslangic,
-            "saat_bitis":     rows[0].saat_bitis,
-            "salon1":         [k for k in kayitlar if k.salon == "Sorumluluk1"],
-            "salon2":         [k for k in kayitlar if k.salon == "Sorumluluk2"],
-        })
+    oturumlar_veri = _get_oturumlar_veri(sinav)
 
     okul = OkulBilgi.get()
     buf  = io.BytesIO()
@@ -631,6 +559,204 @@ def rapor_genel_takvim_pdf(request, sinav_pk):
         buf.read(), content_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{fname}"'},
     )
+
+@login_required
+def gorevlendirme(request, sinav_pk):
+    sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
+
+    takvim_rows = list(
+        SorumluTakvim.objects
+        .filter(sinav=sinav)
+        .order_by("tarih", "oturum_no", "ders_adi")
+    )
+
+    if not takvim_rows:
+        messages.error(request, "Önce sınav takvimini oluşturun.")
+        return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
+
+    # Hangi (tarih, oturum_no) çiftinde hangi salonlar aktif?
+    active_salons: dict = {}
+    for op in (
+        SorumluOturmaPlani.objects
+        .filter(sinav=sinav)
+        .values("tarih", "oturum_no", "salon")
+        .distinct()
+    ):
+        key = (op["tarih"], op["oturum_no"])
+        active_salons.setdefault(key, set()).add(op["salon"])
+
+    # Mevcut atamaları önceden yükle — anahtar takvim PK'sına değil içeriğe bağlı
+    komisyon_dict = {
+        (ku.tarih, ku.oturum_no, ku.ders_adi): ku
+        for ku in SorumluKomisyonUyesi.objects.filter(sinav=sinav).select_related("uye1", "uye2")
+    }
+    gozetmen_dict = {
+        (gz.tarih, gz.oturum_no, gz.salon): gz
+        for gz in SorumluGozetmen.objects.filter(sinav=sinav).select_related("gozetmen")
+    }
+
+    if request.method == "POST":
+        from okul.models import Personel
+
+        def get_personel(field_name):
+            val = request.POST.get(field_name, "").strip()
+            if val:
+                try:
+                    return Personel.objects.get(pk=int(val))
+                except (Personel.DoesNotExist, ValueError):
+                    pass
+            return None
+
+        for row in takvim_rows:
+            SorumluKomisyonUyesi.objects.update_or_create(
+                sinav=sinav, tarih=row.tarih, oturum_no=row.oturum_no, ders_adi=row.ders_adi,
+                defaults={
+                    "uye1": get_personel(f"komisyon_{row.pk}_uye1"),
+                    "uye2": get_personel(f"komisyon_{row.pk}_uye2"),
+                },
+            )
+
+        # Çift oturumlu sınav komisyon senkronizasyonu:
+        # Yazılı veya Uygulama kısmına atama yapılmışsa, diğer kısım(lar) otomatik doldurulur.
+        komisyon_map_fresh = {
+            (ku.tarih, ku.oturum_no, ku.ders_adi): ku
+            for ku in SorumluKomisyonUyesi.objects.filter(sinav=sinav).select_related("uye1", "uye2")
+        }
+        from collections import defaultdict as _dd
+        cift_gruplar = _dd(list)
+        for row in takvim_rows:
+            ders = row.ders_adi
+            if ders.endswith(" (Yazılı)"):
+                base = ders[:-9]
+            elif ders.endswith(" (Uygulama)"):
+                base = ders[:-11]
+            else:
+                continue
+            cift_gruplar[base].append(row)
+        for base, rows in cift_gruplar.items():
+            source_ku = None
+            for row in rows:
+                ku = komisyon_map_fresh.get((row.tarih, row.oturum_no, row.ders_adi))
+                if ku and (ku.uye1_id or ku.uye2_id):
+                    source_ku = ku
+                    break
+            if source_ku is None:
+                continue
+            for row in rows:
+                ku = komisyon_map_fresh.get((row.tarih, row.oturum_no, row.ders_adi))
+                if ku is None or (not ku.uye1_id and not ku.uye2_id):
+                    SorumluKomisyonUyesi.objects.update_or_create(
+                        sinav=sinav, tarih=row.tarih, oturum_no=row.oturum_no, ders_adi=row.ders_adi,
+                        defaults={"uye1": source_ku.uye1, "uye2": source_ku.uye2},
+                    )
+
+        for (tarih, oturum_no), salons in active_salons.items():
+            for salon in salons:
+                SorumluGozetmen.objects.update_or_create(
+                    sinav=sinav, tarih=tarih, oturum_no=oturum_no, salon=salon,
+                    defaults={"gozetmen": get_personel(f"gozetmen_{tarih}_{oturum_no}_{salon}")},
+                )
+
+        messages.success(request, "Görevlendirmeler kaydedildi.")
+        return redirect("sorumluluk:gorevlendirme", sinav_pk=sinav_pk)
+
+    from okul.models import Personel as OkulPersonel
+    personel_listesi = list(OkulPersonel.objects.order_by("adi_soyadi"))
+
+    oturumlar = []
+    for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
+        rows = list(rows)
+        dersler_data = [
+            {"takvim": row, "komisyon": komisyon_dict.get((row.tarih, row.oturum_no, row.ders_adi))}
+            for row in rows
+        ]
+        salons_data = [
+            {
+                "salon": salon,
+                "salon_label": dict(
+                    [("Sorumluluk1", "Mazeret 1"), ("Sorumluluk2", "Mazeret 2"), ("Sorumluluk3", "Mazeret 3")]
+                ).get(salon, salon),
+                "gozetmen": gozetmen_dict.get((tarih, oturum_no, salon)),
+            }
+            for salon in sorted(active_salons.get((tarih, oturum_no), []))
+        ]
+        oturumlar.append({
+            "tarih": tarih,
+            "oturum_no": oturum_no,
+            "saat_baslangic": rows[0].saat_baslangic,
+            "saat_bitis": rows[0].saat_bitis,
+            "dersler_data": dersler_data,
+            "ders_sayisi": len(rows),
+            "salons_data": salons_data,
+        })
+
+    # Görev sayısı özeti — tüm personel dahil, branş bazında gruplu
+    gorev_sayac: dict = {p.pk: {"adi_soyadi": p.adi_soyadi, "brans": p.brans, "komisyon": 0, "gozetmen": 0} for p in personel_listesi}
+
+    # Komisyon sayımı (union-find):
+    #  - Aynı (tarih, oturum_no) slotundaki farklı dersler → 1 görev
+    #  - Farklı slotlarda aynı ders_adi (çok günlü sınav) → 1 görev
+    komisyon_kayitlar: dict = {}  # personel_pk → [(ders_adi, tarih, oturum_no), ...]
+    for ku in komisyon_dict.values():
+        for pid in (ku.uye1_id, ku.uye2_id):
+            if pid and pid in gorev_sayac:
+                komisyon_kayitlar.setdefault(pid, []).append(
+                    (ku.ders_adi, ku.tarih, ku.oturum_no)
+                )
+    for pid, kayitlar in komisyon_kayitlar.items():
+        n = len(kayitlar)
+        parent = list(range(n))
+        for i in range(n):
+            for j in range(i + 1, n):
+                d_i, t_i, o_i = kayitlar[i]
+                d_j, t_j, o_j = kayitlar[j]
+                if (t_i == t_j and o_i == o_j) or d_i == d_j:
+                    ri, rj = i, j
+                    while parent[ri] != ri:
+                        ri = parent[ri]
+                    while parent[rj] != rj:
+                        rj = parent[rj]
+                    if ri != rj:
+                        parent[ri] = rj
+        roots = set()
+        for i in range(n):
+            r = i
+            while parent[r] != r:
+                r = parent[r]
+            roots.add(r)
+        gorev_sayac[pid]["komisyon"] = len(roots)
+
+    for gz in gozetmen_dict.values():
+        if gz.gozetmen_id and gz.gozetmen_id in gorev_sayac:
+            gorev_sayac[gz.gozetmen_id]["gozetmen"] += 1
+
+    # Branş → satır listesi şeklinde grupla, branş içinde ada göre sırala
+    from itertools import groupby as iGroupBy
+    tum_satirlar = sorted(
+        [
+            {
+                "adi_soyadi": v["adi_soyadi"],
+                "brans": v["brans"] or "—",
+                "komisyon": v["komisyon"],
+                "gozetmen": v["gozetmen"],
+                "toplam": v["komisyon"] + v["gozetmen"],
+            }
+            for v in gorev_sayac.values()
+        ],
+        key=lambda x: (x["brans"], x["adi_soyadi"]),
+    )
+    gorev_ozet_gruplu = [
+        {"brans": brans, "satirlar": list(satirlar)}
+        for brans, satirlar in iGroupBy(tum_satirlar, key=lambda x: x["brans"])
+    ]
+
+    return render(request, "sorumluluk/gorevlendirme.html", {
+        "sinav": sinav,
+        "oturumlar": oturumlar,
+        "personel_listesi": personel_listesi,
+        "gorev_ozet_gruplu": gorev_ozet_gruplu,
+    })
+
 
 @login_required
 def ogrenci_takvim_pdf(request, sinav_pk):

@@ -24,6 +24,7 @@
       {% csrf_token %}
       <button type="submit" class="btn btn-primary btn-sm">Yeniden Oluştur</button>
     </form>
+    <a href="{% url 'sorumluluk:gorevlendirme' sinav.pk %}" class="btn btn-primary btn-sm">Görevlendirme</a>
     {% if sinav.onaylandi %}
     <form method="post" action="{% url 'sorumluluk:takvim_onay_iptal' sinav.pk %}"
           onsubmit="return confirm('Onay kaldırılsın mı?');">

@@ -73,7 +73,7 @@ def sorumluluk_excel_aktar(dosya_yolu: str, sinav: SorumluSinav) -> dict:
         # Gönderdiğiniz algoritmada olduğu gibi 8. ve 11. sütunlar arasını
         # Sınıf -> Ders eşleşmesi şeklinde dinamik olarak tarıyoruz.
         if son_okulno and son_okulno in ogrenciler:
-            for col_idx in range(8, min(12, len(cols) - 1)):
+            for col_idx in range(8, len(cols) - 1):
                 cell_value = str(cols[col_idx]).strip()
                 if not cell_value or cell_value == "nan":
                     continue

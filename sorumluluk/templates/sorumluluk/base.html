@@ -57,6 +57,8 @@
   {% if sinav and sinav.pk %}
   <a href="{% url 'sorumluluk:ogr_liste' sinav.pk %}">Sınav Öğrencileri</a>
   <a href="{% url 'sorumluluk:ogr_aktar' sinav.pk %}">Dış Veri Al (Excel)</a>
+  <a href="{% url 'sorumluluk:takvim_detay' sinav.pk %}">Oturma Planı</a>
+  <a href="{% url 'sorumluluk:gorevlendirme' sinav.pk %}">Görevlendirme</a>
   {% endif %}
 </nav>
 <div class="sor-content">

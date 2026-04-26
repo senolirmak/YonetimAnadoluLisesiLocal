@@ -24,6 +24,9 @@ urlpatterns = [
     path("ders/<int:pk>/duzenle/",            views.ogr_ders_duzenle,  name="ogr_ders_duzenle"),
     path("ders/<int:pk>/sil/",               views.ogr_ders_sil,      name="ogr_ders_sil"),
 
+    # Görevlendirme
+    path("<int:sinav_pk>/gorevlendirme/",     views.gorevlendirme,     name="gorevlendirme"),
+
     # Takvim & Rapor
     path("<int:sinav_pk>/takvim/",            views.takvim_detay,      name="takvim_detay"),
     path("<int:sinav_pk>/takvim/olustur/",    views.takvim_olustur,    name="takvim_olustur"),

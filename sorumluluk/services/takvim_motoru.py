@@ -1,12 +1,11 @@
-import time
 import random
 from itertools import combinations
 from collections import defaultdict
 from datetime import datetime, timedelta, date
+from typing import Optional
 
 import networkx as nx
 from django.db import transaction
-from django.utils import timezone
 
 from sorumluluk.models import (
     SALON_KAPASITESI,
@@ -16,7 +15,6 @@ from sorumluluk.models import (
     SorumluOgrenci,
     SorumluDersHavuzu,
 )
-from sorumluluk.services.takvim_service import oturma_plani_olustur
 
 
 class DjangoSinavTakvimiMotoru:
@@ -28,10 +26,10 @@ class DjangoSinavTakvimiMotoru:
         sinav: SorumluSinav,
         baslangic_tarihi: date,
         time_slots: list,
-        tatil_tarihleri: list = None,
+        tatil_tarihleri: Optional[list] = None,
         exclude_weekends: bool = True,
         seed: int = 42,
-        cift_oturumlu_dersler: list = None,
+        cift_oturumlu_dersler: Optional[list] = None,
     ):
         self.sinav = sinav
         self.TIME_SLOTS = time_slots  # Örn: [1, 2, 3, 4] (Oturum Numaraları)
@@ -146,6 +144,149 @@ class DjangoSinavTakvimiMotoru:
         # Sadece öğrencisi olan dersleri bırak
         self.ders_bilgileri = {k: v for k, v in self.ders_bilgileri.items() if v["OgrenciSayisi"] > 0}
 
+        # Aynı ders adı + farklı sınıf seviyesi → toplam ≤ SALON_KAPASITESI ise birleştir
+        self._birlesim_olustur()
+
+    def _birlesim_olustur(self):
+        """Aynı ders adı, farklı sınıf seviyesi için iki kural:
+
+        - Toplam öğrenci ≤ SALON_KAPASITESI → aynı slota zorla (sanal cid ile birleştir)
+        - Toplam öğrenci > SALON_KAPASITESI → farklı slota zorla (çakışma grafiğine kenar)
+
+        Çift oturumlu dersler (P1/P2) da aynı gruplamayı kullanır:
+        birleşebilen seviyelerin Uygulama'ları da, Yazılı'ları da birleşir.
+        Birleşik P1+P2 çiftleri ortak BaseCid alarak aynı-gün yasağı korunur.
+        """
+        havuz_gruplari: dict = defaultdict(list)
+        for hd in SorumluDersHavuzu.objects.filter(sinav=self.sinav):
+            havuz_gruplari[hd.ders_adi].append(hd.id)
+
+        # Çakışma grafiğine eklenecek "kesinlikle farklı slot" çiftleri
+        self._zorunlu_cakisma: list = []
+
+        for ders_adi, havuz_ids in havuz_gruplari.items():
+            if len(havuz_ids) < 2:
+                continue
+
+            # Öğrenci sayısı: normal cid'den al, çift-oturumlu ise P1'den al
+            def ogrenci_sayisi(hid: int) -> int:
+                cid = str(hid)
+                if cid in self.ders_bilgileri:
+                    return self.ders_bilgileri[cid]["OgrenciSayisi"]
+                p1 = f"{cid}_P1"
+                if p1 in self.ders_bilgileri:
+                    return self.ders_bilgileri[p1]["OgrenciSayisi"]
+                return 0
+
+            # Grupların öğrenci listelerini bulmak için yardımcı fonksiyon
+            def get_students(hid: int) -> set:
+                cid = str(hid)
+                if cid in self.ders_bilgileri:
+                    return set(self.ders_ogrenci_dict.get(cid, []))
+                p1 = f"{cid}_P1"
+                if p1 in self.ders_bilgileri:
+                    return set(self.ders_ogrenci_dict.get(p1, []))
+                return set()
+
+            # Açgözlü merge planı: havuz_id düzeyinde grupla
+            remaining = sorted(havuz_ids, key=ogrenci_sayisi)
+            merge_groups: list = []   # birleştirilecek gruplar (≥2 havuz_id)
+            solo_ids: list = []       # tek kalan havuz_id'ler
+
+            while remaining:
+                anchor = remaining.pop(0)
+                group = [anchor]
+                total = ogrenci_sayisi(anchor)
+                group_students = get_students(anchor)
+
+                leftovers = []
+                for hid in remaining:
+                    count = ogrenci_sayisi(hid)
+                    hid_students = get_students(hid)
+
+                    # Aynı öğrenci her iki sınıfta da bu dersten sorumluysa birleştirme (çakışmayı önle)
+                    if not group_students.isdisjoint(hid_students):
+                        leftovers.append(hid)
+                        continue
+
+                    if total + count <= SALON_KAPASITESI:
+                        group.append(hid)
+                        total += count
+                        group_students.update(hid_students)
+                    else:
+                        leftovers.append(hid)
+                remaining = leftovers
+
+                if len(group) >= 2:
+                    merge_groups.append(group)
+                else:
+                    solo_ids.append(anchor)
+
+            # Her merge grubu için paylaşılan BaseCid (P1+P2 aynı-gün yasağını korur)
+            group_base = {
+                tuple(sorted(g)): "mergebase_" + "_".join(str(h) for h in sorted(g))
+                for g in merge_groups
+            }
+
+            # Normal, P1, P2 sırасıyla işle
+            for part_type, suffix, label in [
+                (None, "",    ""),
+                ("P1", "_P1", " (Uygulama)"),
+                ("P2", "_P2", " (Yazılı)"),
+            ]:
+                part_cids: list = []   # bu parttaki tüm sonuç cid'ler (çakışma kontrolü için)
+
+                for group in merge_groups:
+                    base_cid = group_base[tuple(sorted(group))]
+                    cids = [f"{hid}{suffix}" for hid in group if f"{hid}{suffix}" in self.ders_bilgileri]
+
+                    if len(cids) < 2:
+                        part_cids.extend(cids)
+                        continue
+
+                    merged_cid = f"merge{suffix}_" + "_".join(str(h) for h in sorted(group))
+
+                    seen: set = set()
+                    students: list = []
+                    for c in cids:
+                        for okulno in self.ders_ogrenci_dict[c]:
+                            if okulno not in seen:
+                                seen.add(okulno)
+                                students.append(okulno)
+
+                    self.ders_bilgileri[merged_cid] = {
+                        "Sinif": 0,
+                        "Ders": f"{ders_adi}{label}",
+                        "GercekDersAdi": ders_adi,
+                        "OgrenciSayisi": len(students),
+                        "BaseCid": base_cid,
+                        "PartType": part_type,
+                        "MergedComponents": {c: dict(self.ders_bilgileri[c]) for c in cids},
+                    }
+                    self.ders_ogrenci_dict[merged_cid] = students
+
+                    for okulno in students:
+                        updated = [cx for cx in self.ogrenci_ders_dict[okulno] if cx not in cids]
+                        if merged_cid not in updated:
+                            updated.append(merged_cid)
+                        self.ogrenci_ders_dict[okulno] = updated
+
+                    for old_cid in cids:
+                        self.ders_bilgileri.pop(old_cid, None)
+                        self.ders_ogrenci_dict.pop(old_cid, None)
+
+                    part_cids.append(merged_cid)
+
+                # Solo havuz_id'lerin cid'lerini de ekle
+                for hid in solo_ids:
+                    cid = f"{hid}{suffix}"
+                    if cid in self.ders_bilgileri:
+                        part_cids.append(cid)
+
+                # Birden fazla sonuç cid varsa → kesinlikle farklı slotta olmalı
+                for c1, c2 in combinations(part_cids, 2):
+                    self._zorunlu_cakisma.append((c1, c2))
+
     def cakisma_grafigi_olustur(self):
         G = nx.Graph()
         all_courses = set().union(*self.ogrenci_ders_dict.values()) if self.ogrenci_ders_dict else set()
@@ -166,7 +307,12 @@ class DjangoSinavTakvimiMotoru:
         for groups in base_to_groups.values():
             for c1, c2 in combinations(groups, 2):
                 G.add_edge(c1, c2, weight=999)
-                
+
+        # Birleştirilemeyecek kadar büyük aynı-isim farklı-seviye dersleri farklı slota zorla
+        for c1, c2 in getattr(self, "_zorunlu_cakisma", []):
+            if G.has_node(c1) and G.has_node(c2):
+                G.add_edge(c1, c2, weight=999)
+
         return G
 
     def _schedule_penalty(self, schedule, max_daily_exams=2):
@@ -243,8 +389,13 @@ class DjangoSinavTakvimiMotoru:
                     )
 
                     for course in candidates:
-                        if slot_max_ders is not None and len(schedule[day_str][slot]) >= slot_max_ders:
-                            break
+                        if slot_max_ders is not None:
+                            # Mevcut slotta ve yeni eklenecek blokta toplam kaç GERÇEK alt ders var hesapla
+                            current_count = sum(len(self.ders_bilgileri[sc].get("MergedComponents", [1])) for sc in schedule[day_str][slot])
+                            new_count = len(self.ders_bilgileri[course].get("MergedComponents", [1]))
+                            # Eğer bu dersi eklediğimizde ayarlanan limiti aşıyorsak, atla (daha küçük bir ders arayabilir)
+                            if current_count + new_count > slot_max_ders:
+                                continue
 
                         if any(other in neighbor_map[course] for other in schedule[day_str][slot]):
                             continue
@@ -353,15 +504,31 @@ class DjangoSinavTakvimiMotoru:
                 bit = datetime.strptime(bit_str, "%H:%M").time()
                 for cid in courses:
                     info = self.ders_bilgileri[cid]
-                    part = info.get("PartType")
-                    sinav_turu = "Uygulama" if part == "P1" else ("Yazili" if part == "P2" else "")
-                    yeni_rows.append(SorumluTakvim(
-                        sinav=self.sinav,
-                        tarih=tarih_obj,
-                        oturum_no=slot_no,
-                        saat_baslangic=bas,
-                        saat_bitis=bit,
-                        sinav_turu=sinav_turu,
-                        ders_adi=info["Ders"],
-                    ))
+                    merged = info.get("MergedComponents")
+                    if merged:
+                        # Birleşik kayıt → her orijinal bileşen için ayrı satır
+                        for comp_info in merged.values():
+                            part = comp_info.get("PartType")
+                            sinav_turu = "Uygulama" if part == "P1" else ("Yazili" if part == "P2" else "")
+                            yeni_rows.append(SorumluTakvim(
+                                sinav=self.sinav,
+                                tarih=tarih_obj,
+                                oturum_no=slot_no,
+                                saat_baslangic=bas,
+                                saat_bitis=bit,
+                                sinav_turu=sinav_turu,
+                                ders_adi=comp_info["Ders"],
+                            ))
+                    else:
+                        part = info.get("PartType")
+                        sinav_turu = "Uygulama" if part == "P1" else ("Yazili" if part == "P2" else "")
+                        yeni_rows.append(SorumluTakvim(
+                            sinav=self.sinav,
+                            tarih=tarih_obj,
+                            oturum_no=slot_no,
+                            saat_baslangic=bas,
+                            saat_bitis=bit,
+                            sinav_turu=sinav_turu,
+                            ders_adi=info["Ders"],
+                        ))
         SorumluTakvim.objects.bulk_create(yeni_rows, ignore_conflicts=True)

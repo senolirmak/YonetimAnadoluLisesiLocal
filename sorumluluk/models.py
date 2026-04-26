@@ -191,6 +191,64 @@ class SorumluTakvim(models.Model):
         )
 
 
+class SorumluKomisyonUyesi(models.Model):
+    """Bir oturumdaki ders için atanan iki komisyon üyesi.
+
+    Takvim yeniden üretildiğinde (tarih/oturum/ders_adi aynı kalıyorsa) atamalar korunur.
+    """
+    sinav = models.ForeignKey(
+        SorumluSinav, on_delete=models.CASCADE,
+        related_name="komisyon_uyeler", verbose_name="Sınav",
+    )
+    tarih = models.DateField(verbose_name="Tarih")
+    oturum_no = models.PositiveSmallIntegerField(verbose_name="Oturum No")
+    ders_adi = models.CharField(max_length=200, verbose_name="Ders Adı")
+    uye1 = models.ForeignKey(
+        "okul.Personel", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="+", verbose_name="1. Komisyon Üyesi",
+    )
+    uye2 = models.ForeignKey(
+        "okul.Personel", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="+", verbose_name="2. Komisyon Üyesi",
+    )
+
+    class Meta:
+        unique_together = [("sinav", "tarih", "oturum_no", "ders_adi")]
+        ordering = ["tarih", "oturum_no", "ders_adi"]
+        verbose_name = "Komisyon Üyesi"
+        verbose_name_plural = "Komisyon Üyeleri"
+
+    def __str__(self):
+        return f"{self.tarih:%d.%m.%Y} Ot.{self.oturum_no} – {self.ders_adi} — {self.uye1}, {self.uye2}"
+
+
+class SorumluGozetmen(models.Model):
+    """Bir oturumdaki her aktif salon için atanan gözetmen."""
+    sinav = models.ForeignKey(
+        SorumluSinav, on_delete=models.CASCADE,
+        related_name="gozetmenler", verbose_name="Sınav",
+    )
+    tarih = models.DateField(verbose_name="Tarih")
+    oturum_no = models.PositiveSmallIntegerField(verbose_name="Oturum No")
+    salon = models.CharField(max_length=20, choices=SALON_CHOICES, verbose_name="Salon")
+    gozetmen = models.ForeignKey(
+        "okul.Personel", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="+", verbose_name="Gözetmen",
+    )
+
+    class Meta:
+        unique_together = [("sinav", "tarih", "oturum_no", "salon")]
+        ordering = ["tarih", "oturum_no", "salon"]
+        verbose_name = "Gözetmen"
+        verbose_name_plural = "Gözetmenler"
+
+    def __str__(self):
+        return (
+            f"{self.tarih:%d.%m.%Y} Ot.{self.oturum_no} "
+            f"– {self.salon} – {self.gozetmen}"
+        )
+
+
 class SorumluOturmaPlani(models.Model):
     """Öğrencilerin salon ve sıra numarasına göre oturma düzeni."""
     sinav          = models.ForeignKey(
