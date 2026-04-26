@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "dersdefteri",
     "sinavmedia",
     "bildirim_gonderici",
+    "sorumluluk",
 ]
 
 # ── Sınıf Tahtası Bildirim Ayarları ──────────────────────────

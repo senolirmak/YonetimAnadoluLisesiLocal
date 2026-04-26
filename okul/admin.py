@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import OkulYonetici, VeriAktarimGecmisi
+from .models import AktifVeriKonfigurasyonu, OkulYonetici, VeriAktarimGecmisi
 
 
 @admin.register(OkulYonetici)
@@ -26,3 +26,9 @@ class VeriAktarimGecmisiAdmin(admin.ModelAdmin):
         "otomatik_eklenen", "durum", "notlar",
     )
     date_hierarchy = "yukleme_tarihi"
+
+
+@admin.register(AktifVeriKonfigurasyonu)
+class AktifVeriKonfigurasyonuAdmin(admin.ModelAdmin):
+    list_display = ("veri_turu", "uygulama_tarihi", "guncelleme_tarihi")
+    readonly_fields = ("guncelleme_tarihi",)

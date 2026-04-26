@@ -366,3 +366,39 @@ class OkulYonetici(models.Model):
         if self.personel_id:
             return self.personel.adi_soyadi
         return self.user.get_full_name() or self.user.username
+
+
+# ---------------------------------------------------------------------------
+# Aktif veri konfigürasyonu
+# ---------------------------------------------------------------------------
+
+class AktifVeriKonfigurasyonu(models.Model):
+    """
+    Her veri türü için hangi uygulama_tarihi'nin aktif (geçerli) olduğunu tutar.
+    Import servisleri başarılı yüklemede bu tabloyu günceller.
+    Tarihsiz DersProgrami sorguları bu tablodan aktif tarihi okur.
+    """
+
+    VERI_TURU_CHOICES = [
+        ("ders_programi", "Haftalık Ders Programı"),
+        ("personel_listesi", "Personel Listesi"),
+        ("nobet_listesi", "Nöbet Listesi"),
+    ]
+
+    veri_turu = models.CharField(
+        max_length=20,
+        choices=VERI_TURU_CHOICES,
+        unique=True,
+        verbose_name="Veri Türü",
+    )
+    uygulama_tarihi = models.DateField(verbose_name="Aktif Uygulama Tarihi")
+    guncelleme_tarihi = models.DateTimeField(auto_now=True, verbose_name="Güncellenme Tarihi")
+
+    class Meta:
+        db_table = "okul_aktif_veri_konfigurasyonu"
+        verbose_name = "Aktif Veri Konfigürasyonu"
+        verbose_name_plural = "Aktif Veri Konfigürasyonları"
+
+    def __str__(self):
+        turu = dict(self.VERI_TURU_CHOICES).get(self.veri_turu, self.veri_turu)
+        return f"{turu} → {self.uygulama_tarihi}"

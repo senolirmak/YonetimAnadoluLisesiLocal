@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci
+from okul.utils import get_aktif_dp_tarihi
 
 from .models import OgrenciDevamsizlik
 
@@ -89,9 +90,12 @@ def ogretmen_devamsizlik(request, ders_saati=None):
         for i in range(5)  # Pazartesi–Cuma
     ]
 
+    aktif_tarih = get_aktif_dp_tarihi()
+    dp_filter = {"ogretmen": personel, "gun": gun_adi}
+    if aktif_tarih:
+        dp_filter["uygulama_tarihi"] = aktif_tarih
     bugun_dersleri = DersProgrami.objects.filter(
-        ogretmen=personel,
-        gun=gun_adi,
+        **dp_filter
     ).select_related("ders_saati").order_by("ders_saati__derssaati_no")
 
     if not bugun_dersleri.exists():

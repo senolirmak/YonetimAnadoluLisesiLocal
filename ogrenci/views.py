@@ -8,8 +8,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from dersprogrami.models import DersProgrami
-
 from okul.models import DersHavuzu
+from okul.utils import get_aktif_dp_tarihi
 
 from .forms import OgrenciAdresForm, OgrenciDetayForm
 from .models import Ogrenci, OgrenciAdres, OgrenciDetay, OgrenciMuaf
@@ -21,10 +21,12 @@ def _rehberlik_sinif_sube(user):
         personel = user.personel
     except Exception:
         return None
+    _at = get_aktif_dp_tarihi()
     ders = (
         DersProgrami.objects.filter(
             ogretmen=personel,
             ders__ders_adi__iexact="rehberlik ve yönlendirme",
+            **({"uygulama_tarihi": _at} if _at else {}),
         )
         .select_related("sinif_sube", "ders")
         .first()

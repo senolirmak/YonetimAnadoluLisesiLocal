@@ -21,7 +21,7 @@ from .models import (
     DisVeri, AlgoritmaParametreleri,
     TakvimUretim, Takvim, OturmaPlani, SinavSalonYoklama,
     MazeretSinav, MazeretGun, MazeretOturum, MazeretOturumDers, MazeretOgrenci,
-    MazeretBelgeTeslim,
+    MazeretBelgeTeslim, MazeretOturmaPlani,
 )
 from okul.models import OkulBilgi
 from ogrenci.models import Ogrenci as OgrenciModel
@@ -1977,6 +1977,21 @@ def sinav_yoklama_yok_detay(request):
     ders_adi = request.GET.get("ders_adi", "").strip()
     tarih    = request.GET.get("tarih", "").strip()
 
+    # "10 Nisan 2026" → datetime.date normalleştir
+    _TR_AYLAR = {
+        "ocak": 1, "şubat": 2, "mart": 3, "nisan": 4,
+        "mayıs": 5, "haziran": 6, "temmuz": 7, "ağustos": 8,
+        "eylül": 9, "ekim": 10, "kasım": 11, "aralık": 12,
+    }
+    import datetime as _dt
+    if tarih and not tarih[:4].isdigit():
+        try:
+            parcalar = tarih.split()
+            gun, ay_str, yil = int(parcalar[0]), parcalar[1].lower(), int(parcalar[2])
+            tarih = _dt.date(yil, _TR_AYLAR[ay_str], gun)
+        except (ValueError, KeyError, IndexError):
+            tarih = None
+
     aktif_sinav  = _aktif_sinav()
     aktif_uretim = (
         TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
@@ -2125,11 +2140,48 @@ def mazeret_sinav_olustur(request):
             varsayilan_saatler = params.oturum_saatleri
         except Exception:
             pass
-        form = MazeretSinavForm(initial={"oturum_saatleri": varsayilan_saatler})
+
+        # Aktif takvim üretiminden mazeret tarihlerini hesapla:
+        # Ana takvimin son günü + 5 takvim günü sonrasından başlayarak
+        # ana takvimle aynı gün sayısı kadar hafta içi gün öner.
+        aktif_uretim = TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        ana_takvim_tarihleri = []
+        mazeret_onerileri = []
+        if aktif_uretim:
+            ana_takvim_tarihleri = sorted(
+                Takvim.objects.filter(uretim=aktif_uretim)
+                .values_list("tarih", flat=True)
+                .distinct()
+            )
+        if ana_takvim_tarihleri:
+            from datetime import timedelta
+            son_gun = ana_takvim_tarihleri[-1]
+            gun_sayisi = len(ana_takvim_tarihleri)
+            aday = son_gun + timedelta(days=5)
+            while len(mazeret_onerileri) < gun_sayisi:
+                if aday.weekday() < 5:  # Pazartesi–Cuma
+                    mazeret_onerileri.append(aday)
+                aday += timedelta(days=1)
+
+        varsayilan_tarihler = "\n".join(str(t) for t in mazeret_onerileri)
+        form = MazeretSinavForm(initial={
+            "oturum_saatleri": varsayilan_saatler,
+            "tarihler": varsayilan_tarihler,
+        })
+
+    # Ana takvim tarihlerini ve mazeret önerilerini template'e gönder
+    aktif_uretim = TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+    ana_takvim_tarihleri_ctx = sorted(
+        Takvim.objects.filter(uretim=aktif_uretim)
+        .values_list("tarih", flat=True)
+        .distinct()
+    ) if aktif_uretim else []
 
     return render(request, "sinav/mazeret_olustur.html", {
         "aktif_sinav": aktif_sinav,
         "form": form,
+        "ana_takvim_tarihleri": ana_takvim_tarihleri_ctx,
+        "aktif_uretim": aktif_uretim,
     })
 
 
@@ -2342,3 +2394,154 @@ def mazeret_sinav_sil(request, pk):
     mazeret.delete()
     messages.success(request, "Mazeret sınav planı silindi.")
     return redirect("sinav:mazeret_listesi")
+
+
+# ---------------------------------------------------------------------------
+# Mazeret Sınav Takvimi
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_POST
+def mazeret_takvim_olustur(request, pk):
+    """Mazeret oturma planını oluşturur (Mazeret1/Mazeret2 salon ataması)."""
+    from .services.mazeret_takvim import oturma_plani_olustur
+
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+    sonuc = oturma_plani_olustur(mazeret)
+
+    if sonuc["toplam"] == 0:
+        messages.warning(request, "Takvime yerleştirilecek uygun öğrenci bulunamadı. "
+                         "Öğrencilerin belge teslim durumunu kontrol edin.")
+    else:
+        msg = (f"Takvim oluşturuldu: {sonuc['toplam']} öğrenci — "
+               f"Mazeret1: {sonuc['salonlar'].get('Mazeret1', 0)}, "
+               f"Mazeret2: {sonuc['salonlar'].get('Mazeret2', 0)}.")
+        if sonuc["uyari"]:
+            messages.warning(request, msg + " " + sonuc["uyari"])
+        else:
+            messages.success(request, msg)
+
+    return redirect("sinav:mazeret_takvim", pk=pk)
+
+
+@login_required
+def mazeret_takvim_detay(request, pk):
+    """Mazeret oturma planını gösterir ve düzenleme imkânı sunar."""
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+
+    # POST: salon/sıra değişikliği
+    if request.method == "POST" and not mazeret.onaylandi:
+        kayit_id = request.POST.get("kayit_id")
+        yeni_salon = request.POST.get("salon", "").strip()
+        yeni_sira = request.POST.get("sira_no", "").strip()
+        if kayit_id and yeni_salon and yeni_sira:
+            try:
+                kayit = MazeretOturmaPlani.objects.get(pk=kayit_id, mazeret_sinav=mazeret)
+                kayit.salon = yeni_salon
+                kayit.sira_no = int(yeni_sira)
+                kayit.save()
+                return JsonResponse({"ok": True})
+            except (MazeretOturmaPlani.DoesNotExist, ValueError):
+                return JsonResponse({"ok": False, "hata": "Kayıt bulunamadı."}, status=400)
+        return JsonResponse({"ok": False, "hata": "Eksik parametre."}, status=400)
+
+    # Takvim verisi: oturum → salon → [kayıtlar]
+    oturumlar_qs = (
+        MazeretOturum.objects
+        .filter(gun__mazeret_sinav=mazeret)
+        .prefetch_related("oturma_plani")
+        .select_related("gun")
+        .order_by("gun__tarih", "oturum_no")
+    )
+
+    oturumlar_veri = []
+    for oturum in oturumlar_qs:
+        kayitlar = list(oturum.oturma_plani.order_by("salon", "sira_no"))
+        salon1 = [k for k in kayitlar if k.salon == "Mazeret1"]
+        salon2 = [k for k in kayitlar if k.salon == "Mazeret2"]
+        dersler = list(
+            MazeretOturumDers.objects
+            .filter(oturum=oturum)
+            .select_related("ders")
+            .order_by("ders__ders_adi")
+        )
+        oturumlar_veri.append({
+            "oturum": oturum,
+            "dersler": dersler,
+            "salon1": salon1,
+            "salon2": salon2,
+            "toplam": len(kayitlar),
+        })
+
+    return render(request, "sinav/mazeret_takvim.html", {
+        "mazeret": mazeret,
+        "oturumlar_veri": oturumlar_veri,
+    })
+
+
+@login_required
+@require_POST
+def mazeret_takvim_onayla(request, pk):
+    """Mazeret takvimini onaylar; onaydan sonra düzenleme devre dışı kalır."""
+    from django.utils import timezone as tz
+
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+    if not MazeretOturmaPlani.objects.filter(mazeret_sinav=mazeret).exists():
+        messages.error(request, "Önce takvimi oluşturun.")
+        return redirect("sinav:mazeret_takvim", pk=pk)
+
+    mazeret.onaylandi = True
+    mazeret.onay_tarihi = tz.now()
+    mazeret.save(update_fields=["onaylandi", "onay_tarihi"])
+    messages.success(request, "Mazeret takvimi onaylandı. Artık rapor alınabilir.")
+    return redirect("sinav:mazeret_takvim", pk=pk)
+
+
+@login_required
+@require_POST
+def mazeret_takvim_onayli_iptal(request, pk):
+    """Onayı geri alır (düzenleme için)."""
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+    mazeret.onaylandi = False
+    mazeret.onay_tarihi = None
+    mazeret.save(update_fields=["onaylandi", "onay_tarihi"])
+    messages.info(request, "Onay kaldırıldı. Takvim tekrar düzenlenebilir.")
+    return redirect("sinav:mazeret_takvim", pk=pk)
+
+
+@login_required
+def mazeret_rapor(request, pk):
+    """Onaylanmış mazeret takviminin yazdırılabilir raporu."""
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+
+    oturumlar_qs = (
+        MazeretOturum.objects
+        .filter(gun__mazeret_sinav=mazeret)
+        .select_related("gun")
+        .order_by("gun__tarih", "oturum_no")
+    )
+
+    oturumlar_veri = []
+    for oturum in oturumlar_qs:
+        kayitlar = list(oturum.oturma_plani.order_by("salon", "sira_no"))
+        salon1 = [k for k in kayitlar if k.salon == "Mazeret1"]
+        salon2 = [k for k in kayitlar if k.salon == "Mazeret2"]
+        dersler = list(
+            MazeretOturumDers.objects
+            .filter(oturum=oturum)
+            .select_related("ders")
+            .order_by("ders__ders_adi")
+        )
+        oturumlar_veri.append({
+            "oturum": oturum,
+            "dersler": dersler,
+            "salon1": salon1,
+            "salon2": salon2,
+        })
+
+    okul = OkulBilgi.get()
+    return render(request, "sinav/mazeret_rapor.html", {
+        "mazeret": mazeret,
+        "oturumlar_veri": oturumlar_veri,
+        "okul": okul,
+    })

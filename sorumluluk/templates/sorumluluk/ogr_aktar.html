@@ -1,0 +1,49 @@
+{% extends "sorumluluk/base.html" %}
+{% block sor_title %}Dış Veri Al - {{ sinav.sinav_adi }}{% endblock %}
+
+{% block sor_content %}
+<div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem;">
+  <a href="{% url 'sorumluluk:sinav_detay' sinav.pk %}" class="btn btn-secondary btn-sm">&#8592; Sınava Dön</a>
+  <h1 style="font-size:1.3rem; font-weight:700; margin:0; color:#1a1a2e;">
+    Dış Veri Al (Excel Aktar) — {{ sinav.sinav_adi }}
+  </h1>
+</div>
+
+<div class="card" style="max-width:600px;">
+  <div style="padding:1rem; background:#eff6ff; border-radius:6px; border:1px solid #bfdbfe; margin-bottom:1.2rem;">
+    <h3 style="color:#1e3a8a; font-size:1rem; margin-top:0; margin-bottom:.5rem;">e-Okul Dosyasını Yükle</h3>
+    <p style="font-size:.85rem; color:#1e3a8a; margin:0;">
+      e-Okul'dan aldığınız <strong>OOK12001R010</strong> (Sorumluluk Sınavlarına Girecek Öğrenci Listesi) raporunu aşağıdan yükleyebilirsiniz.
+      <br><br><strong>Uyarı:</strong> Bu işlem, <em>{{ sinav.sinav_adi }}</em> sınavına ait mevcut tüm öğrenci ve ders kayıtlarını silerek dosyadan güncel haliyle yeniden oluşturur.
+    </p>
+  </div>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div style="margin-bottom:1rem;">
+      {{ form.dosya }}
+    </div>
+    <button type="submit" class="btn btn-primary"
+            onclick="return confirm('Mevcut tüm kayıtlar silinecek. Devam edilsin mi?');">
+      Dosyayı Yükle ve Aktar
+    </button>
+  </form>
+
+  {% if sonuc %}
+  <div style="margin-top:1.2rem; padding:.8rem; background:#f0fdf4; border-radius:6px; border:1px solid #bbf7d0;">
+    <strong style="color:#166534;">Aktarım Tamamlandı</strong>
+    <p style="margin:.4rem 0 0; font-size:.85rem; color:#166534;">
+      {{ sonuc.ogrenci }} öğrenci · {{ sonuc.ders }} ders kaydı oluşturuldu.
+    </p>
+    {% if sonuc.hatalar %}
+    <details style="margin-top:.5rem;">
+      <summary style="font-size:.8rem; color:#991b1b; cursor:pointer;">{{ sonuc.hatalar|length }} hata</summary>
+      <ul style="font-size:.78rem; color:#991b1b; margin:.4rem 0 0 1rem;">
+        {% for h in sonuc.hatalar %}<li>{{ h }}</li>{% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

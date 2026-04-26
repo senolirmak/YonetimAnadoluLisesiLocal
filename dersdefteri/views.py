@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from nobet.models import NobetPersonel
+from okul.utils import get_aktif_dp_tarihi
 from utility.constants import WEEKDAY_TO_DB
 
 from .forms import DersDefterForm
@@ -62,8 +63,12 @@ def ders_listesi(request):
 
     ders_durumu = []
     if personel:
+        aktif_tarih = get_aktif_dp_tarihi()
+        dp_filter = {"ogretmen": personel, "gun": gun_db}
+        if aktif_tarih:
+            dp_filter["uygulama_tarihi"] = aktif_tarih
         dersler = (
-            DersProgrami.objects.filter(ogretmen=personel, gun=gun_db)
+            DersProgrami.objects.filter(**dp_filter)
             .select_related("sinif_sube", "ders_saati")
             .order_by("ders_saati__derssaati_no")
         )

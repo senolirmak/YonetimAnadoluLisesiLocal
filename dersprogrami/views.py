@@ -8,6 +8,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from nobet.models import NobetAtanamayan, NobetGecmisi, NobetOgretmen, NobetPersonel
+from okul.utils import get_aktif_dp_tarihi
 from personeldevamsizlik.models import Devamsizlik
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
 from veriaktar.forms import DersProgramiImportForm
@@ -160,8 +161,10 @@ def ogretmen_program(request):
     today = secilen_tarih if secilen_tarih else now.date()
     current_day_db = _WEEKDAY_TO_DB.get(today.weekday(), "Monday")
 
+    aktif_tarih = get_aktif_dp_tarihi()
+    dp_tarih_filter = {"uygulama_tarihi": aktif_tarih} if aktif_tarih else {}
     gun_saatleri_qs = (
-        DersProgrami.objects.filter(gun=current_day_db)
+        DersProgrami.objects.filter(gun=current_day_db, **dp_tarih_filter)
         .select_related("ders_saati")
         .order_by("ders_saati__derssaati_no")
     )
@@ -201,14 +204,15 @@ def ogretmen_program(request):
     if current_ders_saati:
         derste_personel_ids = set(
             DersProgrami.objects.filter(
-                gun=current_day_db, ders_saati__derssaati_no=current_ders_saati
+                gun=current_day_db, ders_saati__derssaati_no=current_ders_saati,
+                **dp_tarih_filter,
             ).values_list("ogretmen_id", flat=True)
         )
     else:
         derste_personel_ids = set()
 
     bugun_dersi_olan_ids = set(
-        DersProgrami.objects.filter(gun=current_day_db).values_list("ogretmen_id", flat=True)
+        DersProgrami.objects.filter(gun=current_day_db, **dp_tarih_filter).values_list("ogretmen_id", flat=True)
     )
 
     devamsiz_personel_ids = set(

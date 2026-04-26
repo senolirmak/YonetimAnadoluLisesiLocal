@@ -219,6 +219,10 @@ class DersProgramiIsleyici:
             notlar="\n".join(uyarilar),
         )
 
+        if durum != "hatali" and uygulama_tarihi:
+            from okul.utils import set_aktif_tarih
+            set_aktif_tarih("ders_programi", uygulama_tarihi)
+
     def calistir(self, program_listesi="hz_duzenlenmis_program.xlsx"):
         self.parse_program()
         self.ekle_ders_saati()

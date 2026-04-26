@@ -1,0 +1,45 @@
+{% extends "sorumluluk/base.html" %}
+{% block sor_title %}Sorumlu Öğrenciler{% endblock %}
+
+{% block sor_content %}
+<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+  <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Sorumlu Öğrenciler</h1>
+  <span class="badge badge-secondary" style="font-size:.85rem;">{{ ogrenciler|length }} öğrenci</span>
+  <a href="{% url 'sorumluluk:ogr_aktar' sinav.pk %}" class="btn btn-secondary btn-sm" style="margin-left:auto;">Dış Veri Al (Excel)</a>
+</div>
+
+{% if not ogrenciler %}
+<div class="card">
+  <p style="color:#888; text-align:center;">Henüz öğrenci kaydı yok. Excel'den aktarın.</p>
+</div>
+{% else %}
+<div class="card" style="overflow-x:auto; padding:0;">
+  <table style="width:100%; border-collapse:collapse; font-size:.85rem;">
+    <thead style="background:#f1f5f9;">
+      <tr>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Okul No</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Adı Soyadı</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Sınıf/Şube</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Sorumlu Dersler</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ogr in ogrenciler %}
+      <tr style="border-bottom:1px solid #f0f0f0;">
+        <td style="padding:.45rem .9rem; color:#94a3b8; font-size:.8rem;">{{ ogr.okulno }}</td>
+        <td style="padding:.45rem .9rem; font-weight:600;">{{ ogr.adi_soyadi }}</td>
+        <td style="padding:.45rem .9rem; color:#475569;">{{ ogr.sinifsube }}</td>
+        <td style="padding:.45rem .9rem;">
+          {% for d in ogr.dersler.all %}
+          <span style="display:inline-block; background:#dbeafe; color:#1d4ed8; border-radius:3px; padding:.1rem .4rem; font-size:.75rem; margin:.1rem;">
+            {{ d.ders_adi }}{% if d.onceki_sinif %} <em style="opacity:.7;">({{ d.onceki_sinif }}. sınıf)</em>{% endif %}
+          </span>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

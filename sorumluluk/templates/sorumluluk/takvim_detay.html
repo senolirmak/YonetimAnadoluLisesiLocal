@@ -1,0 +1,130 @@
+{% extends "sorumluluk/base.html" %}
+{% block sor_title %}Oturma Planı{% endblock %}
+
+{% block extra_css_child %}
+<style>
+  .salon-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+  @media(max-width:700px) { .salon-grid { grid-template-columns:1fr; } }
+  .salon-baslik { font-size:.88rem; font-weight:700; color:#1d4ed8; margin-bottom:.4rem; background:#dbeafe; padding:.4rem .7rem; border-radius:4px; }
+  .salon-tablo { width:100%; border-collapse:collapse; font-size:.8rem; }
+  .salon-tablo th { background:#1e3a5f; color:#fff; padding:.35rem .6rem; text-align:left; }
+  .salon-tablo td { padding:.3rem .6rem; border-bottom:1px solid #f0f0f0; }
+  .oturum-ust { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px 6px 0 0; padding:.55rem .9rem; font-size:.88rem; display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+  .oturum-blok { margin-bottom:1.5rem; }
+</style>
+{% endblock %}
+
+{% block sor_content %}
+<div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem; flex-wrap:wrap;">
+  <a href="{% url 'sorumluluk:sinav_detay' sinav.pk %}" class="btn btn-secondary btn-sm">&#8592; Detaya Dön</a>
+  <h1 style="font-size:1.25rem; font-weight:700; color:#1a1a2e; margin:0;">{{ sinav.sinav_adi }} — Oturma Planı</h1>
+  <div style="margin-left:auto; display:flex; gap:.5rem; flex-wrap:wrap;">
+    <form method="post" action="{% url 'sorumluluk:takvim_olustur' sinav.pk %}"
+          onsubmit="return confirm('Plan yeniden oluşturulsun mu?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary btn-sm">Yeniden Oluştur</button>
+    </form>
+    {% if sinav.onaylandi %}
+    <form method="post" action="{% url 'sorumluluk:takvim_onay_iptal' sinav.pk %}"
+          onsubmit="return confirm('Onay kaldırılsın mı?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-warning btn-sm">Onayı Kaldır</button>
+    </form>
+    <a href="{% url 'sorumluluk:rapor' sinav.pk %}" class="btn btn-success btn-sm" target="_blank">Rapor Al</a>
+    {% else %}
+    <form method="post" action="{% url 'sorumluluk:takvim_onayla' sinav.pk %}"
+          onsubmit="return confirm('Plan onaylansın mı?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-success btn-sm">Onayla</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if sinav.onaylandi %}
+<div style="padding:.7rem 1rem; margin-bottom:1rem; background:#d1fae5; border-radius:6px; border:1px solid #6ee7b7; color:#065f46; font-size:.88rem; font-weight:600;">
+  ✓ Plan onaylandı — {{ sinav.onay_tarihi|date:"d.m.Y H:i" }}
+</div>
+{% endif %}
+
+{% if not oturumlar_veri %}
+<div class="card">
+  <p style="color:#888; text-align:center;">Oturma planı oluşturulmamış. "Yeniden Oluştur" butonuna tıklayın.</p>
+</div>
+{% else %}
+{% for ot_veri in oturumlar_veri %}
+<div class="oturum-blok">
+  <div class="oturum-ust">
+    <strong>{{ ot_veri.tarih|date:"d F Y" }}</strong>
+    &nbsp;|&nbsp; Oturum {{ ot_veri.oturum_no }}
+    &nbsp;|&nbsp; {{ ot_veri.saat_baslangic|time:"H:i" }} – {{ ot_veri.saat_bitis|time:"H:i" }}
+    <span style="color:#475569; font-weight:400; font-size:.8rem;">
+      — {% for d in ot_veri.dersler %}{{ d }}{% if not forloop.last %}, {% endif %}{% endfor %}
+    </span>
+    <span style="margin-left:auto; font-size:.78rem; color:#94a3b8;">
+      {{ ot_veri.salon1|length }} + {{ ot_veri.salon2|length }} + {{ ot_veri.salon3|length }} öğrenci
+    </span>
+  </div>
+  <div class="salon-grid" style="border:1px solid #e2e8f0; border-top:none; padding:.7rem; border-radius:0 0 6px 6px;">
+    <div>
+      <div class="salon-baslik">Mazeret 1 ({{ ot_veri.salon1|length }})</div>
+      {% if ot_veri.salon1 %}
+      <table class="salon-tablo">
+        <thead><tr><th>#</th><th>Okul No</th><th>Adı Soyadı</th><th>Şube</th><th>Ders</th></tr></thead>
+        <tbody>
+          {% for k in ot_veri.salon1 %}
+          <tr>
+            <td>{{ k.sira_no }}</td>
+            <td style="color:#94a3b8; font-size:.76rem;">{{ k.okulno }}</td>
+            <td>{{ k.adi_soyadi }}</td>
+            <td>{{ k.sinifsube }}</td>
+            <td style="font-size:.76rem;">{{ k.ders_adi }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p style="color:#aaa; font-size:.8rem;">Öğrenci yok.</p>{% endif %}
+    </div>
+    <div>
+      <div class="salon-baslik" style="background:#fef3c7; color:#92400e;">Mazeret 2 ({{ ot_veri.salon2|length }})</div>
+      {% if ot_veri.salon2 %}
+      <table class="salon-tablo">
+        <thead><tr><th>#</th><th>Okul No</th><th>Adı Soyadı</th><th>Şube</th><th>Ders</th></tr></thead>
+        <tbody>
+          {% for k in ot_veri.salon2 %}
+          <tr>
+            <td>{{ k.sira_no }}</td>
+            <td style="color:#94a3b8; font-size:.76rem;">{{ k.okulno }}</td>
+            <td>{{ k.adi_soyadi }}</td>
+            <td>{{ k.sinifsube }}</td>
+            <td style="font-size:.76rem;">{{ k.ders_adi }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p style="color:#aaa; font-size:.8rem;">Öğrenci yok.</p>{% endif %}
+    </div>
+    <div>
+      <div class="salon-baslik" style="background:#dcfce7; color:#166534;">Mazeret 3 ({{ ot_veri.salon3|length }})</div>
+      {% if ot_veri.salon3 %}
+      <table class="salon-tablo">
+        <thead><tr><th>#</th><th>Okul No</th><th>Adı Soyadı</th><th>Şube</th><th>Ders</th></tr></thead>
+        <tbody>
+          {% for k in ot_veri.salon3 %}
+          <tr>
+            <td>{{ k.sira_no }}</td>
+            <td style="color:#94a3b8; font-size:.76rem;">{{ k.okulno }}</td>
+            <td>{{ k.adi_soyadi }}</td>
+            <td>{{ k.sinifsube }}</td>
+            <td style="font-size:.76rem;">{{ k.ders_adi }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p style="color:#aaa; font-size:.8rem;">Öğrenci yok.</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

@@ -27,6 +27,7 @@ from nobet.models import (
 from .forms import EgitimOgretimYiliForm, OkulBilgiAyarForm, OkulDonemForm
 from ogrencinobet.models import OgrenciNobetGorevi
 from personeldevamsizlik.models import Devamsizlik
+from okul.utils import get_aktif_dp_tarihi
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
 
 
@@ -152,10 +153,13 @@ def index(request):
     ogretmen_nobetleri = []
     atanan_dersler = []
     if personel_bagli:
+        _aktif_tarih = get_aktif_dp_tarihi()
+        _dp_f = {"uygulama_tarihi": _aktif_tarih} if _aktif_tarih else {}
         rehberlik_ders = (
             DersProgrami.objects.filter(
                 ogretmen=request.user.personel,
                 ders__ders_adi__iexact="rehberlik ve yönlendirme",
+                **_dp_f,
             )
             .select_related("sinif_sube", "ders")
             .first()
@@ -1310,9 +1314,11 @@ def ogretmen_yoklama_raporum(request):
     )
 
     # Öğretmenin ders programından (ders_adi, sinifsube_str) çiftleri
+    _aktif_tarih_dp = get_aktif_dp_tarihi()
+    _dp_tarih_f = {"uygulama_tarihi": _aktif_tarih_dp} if _aktif_tarih_dp else {}
     dp_qs = (
         DersProgrami.objects
-        .filter(ogretmen=personel)
+        .filter(ogretmen=personel, **_dp_tarih_f)
         .select_related("ders", "sinif_sube")
     )
     teacher_pairs = set()
@@ -1396,9 +1402,11 @@ def sinif_oturma_plani(request):
     if not user.is_superuser:
         if not hasattr(user, "personel"):
             raise PermissionDenied
+        _at = get_aktif_dp_tarihi()
         rehberlik_qs = DersProgrami.objects.filter(
             ogretmen=user.personel,
             ders__ders_adi__iexact="rehberlik ve yönlendirme",
+            **({"uygulama_tarihi": _at} if _at else {}),
         ).select_related("sinif_sube")
         if not rehberlik_qs.exists():
             raise PermissionDenied

@@ -1,0 +1,27 @@
+{% extends "sorumluluk/base.html" %}
+{% block sor_title %}Ders Ekle{% endblock %}
+
+{% block sor_content %}
+<div style="max-width:500px;">
+  <h1 style="font-size:1.2rem; font-weight:700; margin-bottom:1rem; color:#1a1a2e;">
+    Ders Ekle — Oturum {{ oturum.oturum_no }}
+    ({{ oturum.gun.tarih|date:"d F Y" }})
+  </h1>
+  <div class="card">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+      <div style="margin-bottom:.9rem;">
+        <label style="display:block; font-size:.85rem; font-weight:600; margin-bottom:.3rem;">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<div style="color:#dc2626; font-size:.78rem;">{{ field.errors }}</div>{% endif %}
+      </div>
+      {% endfor %}
+      <div style="display:flex; gap:.6rem; margin-top:1rem;">
+        <button type="submit" class="btn btn-primary">Ekle</button>
+        <a href="{% url 'sorumluluk:sinav_detay' oturum.gun.sinav_id %}" class="btn btn-secondary">İptal</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

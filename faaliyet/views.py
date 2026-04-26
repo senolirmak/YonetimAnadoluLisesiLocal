@@ -24,15 +24,19 @@ def _personel(request):
 
 
 from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
+from okul.utils import get_aktif_dp_tarihi
 
 
 def _ogrenci_verileri():
     sinifsube_listesi = (
         Ogrenci.objects.values_list("sinif", "sube").distinct().order_by("sinif", "sube")
     )
-    # Ders programı lookup için SinifSube kayıtları (sinif + sube ayrı ayrı)
+    aktif_tarih = get_aktif_dp_tarihi()
+    dp_filter = {"sinif_sube__isnull": False}
+    if aktif_tarih:
+        dp_filter["uygulama_tarihi"] = aktif_tarih
     dp_sinifsube = (
-        DersProgrami.objects.filter(sinif_sube__isnull=False)
+        DersProgrami.objects.filter(**dp_filter)
         .values_list("sinif_sube__sinif", "sinif_sube__sube")
         .distinct()
         .order_by("sinif_sube__sinif", "sinif_sube__sube")
@@ -221,12 +225,16 @@ def faaliyet_sil(request, pk):
             messages.error(request, "Devamsızlığı girilmiş faaliyet silinemez.")
             return redirect("faaliyet:faaliyet_detay", pk=pk)
 
+    next_url = request.POST.get("next") or request.GET.get("next", "")
+
     if request.method == "POST":
         faaliyet.delete()
         messages.success(request, "Faaliyet silindi.")
+        if next_url:
+            return redirect(next_url)
         return redirect("faaliyet:faaliyet_liste")
 
-    return render(request, "faaliyet/faaliyet_sil.html", {"faaliyet": faaliyet})
+    return render(request, "faaliyet/faaliyet_sil.html", {"faaliyet": faaliyet, "next": next_url})
 
 
 # ─────────────────────────────────────────────
@@ -247,12 +255,12 @@ def ders_programi_getir(request):
     if not (gun and sinif and sube):
         return JsonResponse({"dersler": []})
 
+    aktif_tarih = get_aktif_dp_tarihi()
+    dp_filter = {"gun": gun, "sinif_sube__sinif": sinif, "sinif_sube__sube__iexact": sube}
+    if aktif_tarih:
+        dp_filter["uygulama_tarihi"] = aktif_tarih
     qs = (
-        DersProgrami.objects.filter(
-            gun=gun,
-            sinif_sube__sinif=sinif,
-            sinif_sube__sube__iexact=sube,
-        )
+        DersProgrami.objects.filter(**dp_filter)
         .select_related("sinif_sube", "ders_saati")
         .order_by("ders_saati__derssaati_no")
     )
@@ -267,6 +275,57 @@ def ders_programi_getir(request):
         for d in qs
     ]
     return JsonResponse({"dersler": dersler})
+
+
+# ─────────────────────────────────────────────
+# Müdür Yardımcısı: tüm faaliyetler yönetim listesi
+# ─────────────────────────────────────────────
+
+
+@login_required
+def faaliyet_yonetim_listesi(request):
+    if not _mudur_yardimcisi_mi(request.user):
+        messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
+        return redirect("index")
+
+    from okul.models import Personel
+
+    qs = (
+        Faaliyet.objects.select_related("ogretmen")
+        .prefetch_related("ders_saatleri", "ogrenciler")
+        .order_by("-tarih", "-olusturma_zamani")
+    )
+
+    # Filtreler
+    ogretmen_id = request.GET.get("ogretmen", "").strip()
+    durum = request.GET.get("durum", "").strip()
+    tarih_bas = request.GET.get("tarih_bas", "").strip()
+    tarih_bit = request.GET.get("tarih_bit", "").strip()
+
+    if ogretmen_id:
+        qs = qs.filter(ogretmen_id=ogretmen_id)
+    if durum:
+        qs = qs.filter(durum=durum)
+    if tarih_bas:
+        qs = qs.filter(tarih__gte=tarih_bas)
+    if tarih_bit:
+        qs = qs.filter(tarih__lte=tarih_bit)
+
+    ogretmenler = Personel.objects.filter(faaliyetler__isnull=False).distinct().order_by("adi_soyadi")
+
+    return render(
+        request,
+        "faaliyet/faaliyet_yonetim_listesi.html",
+        {
+            "faaliyetler": qs,
+            "ogretmenler": ogretmenler,
+            "secili_ogretmen": ogretmen_id,
+            "secili_durum": durum,
+            "tarih_bas": tarih_bas,
+            "tarih_bit": tarih_bit,
+            "DURUM_CHOICES": Faaliyet.DURUM_CHOICES,
+        },
+    )
 
 
 # ─────────────────────────────────────────────

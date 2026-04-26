@@ -1,0 +1,130 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Tüm Faaliyetler{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Tüm Faaliyetler</h2>
+        <span style="background:#417690;color:#fff;padding:4px 14px;border-radius:10px;font-weight:bold;">
+            {{ faaliyetler|length }} kayıt
+        </span>
+    </div>
+
+    {# Filtre Formu #}
+    <div class="card mb-20" style="padding:16px 20px;">
+        <form method="get" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+            <div style="display:flex;flex-direction:column;gap:4px;min-width:180px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Öğretmen</label>
+                <select name="ogretmen" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                    <option value="">— Tümü —</option>
+                    {% for p in ogretmenler %}
+                    <option value="{{ p.pk }}" {% if secili_ogretmen == p.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ p.adi_soyadi }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;min-width:150px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Durum</label>
+                <select name="durum" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                    <option value="">— Tümü —</option>
+                    {% for val, label in DURUM_CHOICES %}
+                    <option value="{{ val }}" {% if secili_durum == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Tarih Başlangıç</label>
+                <input type="date" name="tarih_bas" value="{{ tarih_bas }}"
+                       style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Tarih Bitiş</label>
+                <input type="date" name="tarih_bit" value="{{ tarih_bit }}"
+                       style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding:6px 18px;">Filtrele</button>
+                <a href="{% url 'faaliyet:faaliyet_yonetim_listesi' %}" class="btn" style="padding:6px 14px;background:#6c757d;color:#fff;">Temizle</a>
+            </div>
+        </form>
+    </div>
+
+    {% if faaliyetler %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Konu</th>
+                    <th>Yer</th>
+                    <th>Öğretmen</th>
+                    <th class="center">Ders</th>
+                    <th class="center">Öğrenci</th>
+                    <th class="center">Durum</th>
+                    <th class="center">İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in faaliyetler %}
+                <tr>
+                    <td style="white-space:nowrap;">{{ f.tarih|date:"d.m.Y" }}</td>
+                    <td>
+                        <a href="{% url 'faaliyet:faaliyet_detay' f.pk %}" style="color:#417690;text-decoration:none;">
+                            {{ f.konu }}
+                        </a>
+                    </td>
+                    <td>{{ f.yer }}</td>
+                    <td style="white-space:nowrap;">{{ f.ogretmen.adi_soyadi }}</td>
+                    <td class="center">
+                        {% for ds in f.ders_saatleri.all %}
+                        <span class="badge badge-info" style="font-size:0.8em;">{{ ds.ders_no }}.</span>
+                        {% empty %}—{% endfor %}
+                    </td>
+                    <td class="center">{{ f.ogrenci_sayisi }}</td>
+                    <td class="center">
+                        {% if f.durum == 'beklemede' %}
+                        <span class="badge" style="background:#ffc107;color:#212529;">Onay Bekliyor</span>
+                        {% elif f.durum == 'onaylandi' %}
+                            {% if f.devamsizlik_girildi %}
+                            <span class="badge" style="background:#28a745;">Tamamlandı</span>
+                            {% else %}
+                            <span class="badge" style="background:#17a2b8;">Onaylandı</span>
+                            {% endif %}
+                        {% elif f.durum == 'reddedildi' %}
+                        <span class="badge" style="background:#dc3545;">Reddedildi</span>
+                        {% endif %}
+                    </td>
+                    <td class="center" style="white-space:nowrap;">
+                        <a href="{% url 'faaliyet:faaliyet_detay' f.pk %}"
+                           class="btn btn-info" style="padding:3px 10px;font-size:0.82em;">Detay</a>
+                        {% if f.durum != 'onaylandi' or not f.devamsizlik_girildi %}
+                        <a href="{% url 'faaliyet:faaliyet_duzenle' f.pk %}"
+                           class="btn btn-warning" style="padding:3px 10px;font-size:0.82em;">Düzenle</a>
+                        {% endif %}
+                        <a href="{% url 'faaliyet:faaliyet_sil' f.pk %}?next={% url 'faaliyet:faaliyet_yonetim_listesi' %}"
+                           class="btn btn-danger" style="padding:3px 10px;font-size:0.82em;">Sil</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card">
+        <div style="padding:40px;text-align:center;color:#6c757d;">
+            Seçilen kriterlere uygun faaliyet bulunamadı.
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,154 @@
+{% extends "sinav/base.html" %}
+{% block sinav_title %}Mazeret Sınav Raporu{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  @media print {
+    .no-print { display:none !important; }
+    body { font-size:11pt; }
+    .sayfa-kesim { page-break-after:always; }
+  }
+  .rapor-baslik {
+    text-align:center; margin-bottom:1.2rem;
+  }
+  .rapor-baslik h1 { font-size:1.15rem; font-weight:700; margin:0 0 .2rem; }
+  .rapor-baslik p  { margin:0; font-size:.85rem; color:#555; }
+  .oturum-blok { margin-bottom:2rem; }
+  .oturum-ust {
+    display:flex; justify-content:space-between; align-items:flex-start;
+    flex-wrap:wrap; gap:.4rem;
+    background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px 6px 0 0;
+    padding:.55rem .9rem; font-size:.85rem;
+  }
+  .oturum-ust strong { font-size:.95rem; }
+  .salon-tablo { width:100%; border-collapse:collapse; font-size:.8rem; margin-top:0; }
+  .salon-tablo th {
+    background:#1e3a5f; color:#fff; padding:.4rem .6rem;
+    text-align:left; font-size:.78rem; font-weight:600;
+  }
+  .salon-tablo td { padding:.3rem .6rem; border-bottom:1px solid #e2e8f0; }
+  .salon-tablo tr:nth-child(even) td { background:#f8fafc; }
+  .salon-adi-sutun {
+    background:#dbeafe; text-align:center; font-weight:700; font-size:.82rem;
+    writing-mode:horizontal-tb; padding:.5rem .4rem; color:#1d4ed8;
+    border-bottom:1px solid #bfdbfe;
+  }
+  .ders-etiket {
+    display:inline-block; background:#dbeafe; color:#1d4ed8;
+    border-radius:3px; padding:.1rem .4rem; font-size:.72rem; margin:.1rem;
+  }
+  .ders-etiket.uygulama { background:#fef3c7; color:#92400e; }
+  .imza-alani {
+    margin-top:1.5rem; display:flex; gap:2rem; justify-content:flex-end;
+    font-size:.78rem; color:#555;
+  }
+  .imza-kutu { text-align:center; min-width:120px; }
+  .imza-cizgi { border-top:1px solid #333; margin-top:2rem; padding-top:.3rem; }
+</style>
+{% endblock %}
+
+{% block sinav_content %}
+<div class="no-print" style="margin-bottom:1rem; display:flex; gap:.6rem;">
+  <a href="{% url 'sinav:mazeret_takvim' mazeret.pk %}" class="btn btn-secondary btn-sm">&#8592; Takvime Dön</a>
+  <button onclick="window.print()" class="btn btn-primary btn-sm">Yazdır</button>
+</div>
+
+<div class="rapor-baslik">
+  {% if okul %}<p>{{ okul }}</p>{% endif %}
+  <h1>Mazeret Sınavı — Salon ve Öğrenci Listesi</h1>
+  <p>
+    {{ mazeret.sinav }}
+    {% if mazeret.aciklama %} · {{ mazeret.aciklama }}{% endif %}
+    · Onay: {{ mazeret.onay_tarihi|date:"d.m.Y H:i" }}
+  </p>
+</div>
+
+{% for ot_veri in oturumlar_veri %}
+<div class="oturum-blok">
+  <div class="oturum-ust">
+    <div>
+      <strong>{{ ot_veri.oturum.gun.tarih|date:"l, d F Y" }}</strong>
+      &nbsp;|&nbsp; Oturum {{ ot_veri.oturum.oturum_no }}
+      &nbsp;|&nbsp; {{ ot_veri.oturum.saat_baslangic|time:"H:i" }} – {{ ot_veri.oturum.saat_bitis|time:"H:i" }}
+      &nbsp;|&nbsp; {{ ot_veri.oturum.get_sinav_turu_display }}
+    </div>
+    <div>
+      {% for od in ot_veri.dersler %}
+        <span class="ders-etiket {% if od.sinav_turu == 'Uygulama' %}uygulama{% endif %}">
+          {{ od.ders.ders_adi }}{% if od.sinav_turu %} ({{ od.sinav_turu }}){% endif %}
+        </span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Mazeret1 -->
+  {% if ot_veri.salon1 %}
+  <table class="salon-tablo">
+    <thead>
+      <tr>
+        <th style="width:2.5rem;">#</th>
+        <th style="width:5rem;">Okul No</th>
+        <th>Adı Soyadı</th>
+        <th style="width:4rem;">Şube</th>
+        <th>Ders</th>
+        <th style="width:6rem; text-align:center;">Mazeret1</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for k in ot_veri.salon1 %}
+      <tr>
+        <td>{{ k.sira_no }}</td>
+        <td>{{ k.okulno }}</td>
+        <td>{{ k.adi_soyadi }}</td>
+        <td>{{ k.sinifsube }}</td>
+        <td style="font-size:.75rem;">{{ k.ders_adi }}{% if k.sinav_turu %} ({{ k.sinav_turu }}){% endif %}</td>
+        <td style="text-align:center; color:#ccc;">__________</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <!-- Mazeret2 -->
+  {% if ot_veri.salon2 %}
+  <table class="salon-tablo" style="margin-top:.5rem;">
+    <thead>
+      <tr>
+        <th style="width:2.5rem;">#</th>
+        <th style="width:5rem;">Okul No</th>
+        <th>Adı Soyadı</th>
+        <th style="width:4rem;">Şube</th>
+        <th>Ders</th>
+        <th style="width:6rem; text-align:center;">Mazeret2</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for k in ot_veri.salon2 %}
+      <tr>
+        <td>{{ k.sira_no }}</td>
+        <td>{{ k.okulno }}</td>
+        <td>{{ k.adi_soyadi }}</td>
+        <td>{{ k.sinifsube }}</td>
+        <td style="font-size:.75rem;">{{ k.ders_adi }}{% if k.sinav_turu %} ({{ k.sinav_turu }}){% endif %}</td>
+        <td style="text-align:center; color:#ccc;">__________</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if not ot_veri.salon1 and not ot_veri.salon2 %}
+  <p style="padding:.5rem .9rem; font-size:.8rem; color:#aaa; border:1px solid #e2e8f0; border-top:none; margin:0;">
+    Bu oturumda öğrenci yok.
+  </p>
+  {% endif %}
+
+  <div class="imza-alani no-print"><!-- ekrana imza alanı gerekli değil --></div>
+</div>
+
+{% if not forloop.last %}
+<hr style="border:none; border-top:1px dashed #ccc; margin:1.5rem 0;">
+{% endif %}
+{% endfor %}
+{% endblock %}

@@ -106,3 +106,7 @@ class NobetIsleyici:
             durum=durum,
             notlar="\n".join(uyarilar),
         )
+
+        if durum != "hatali" and uygulama_tarihi:
+            from okul.utils import set_aktif_tarih
+            set_aktif_tarih("nobet_listesi", uygulama_tarihi)

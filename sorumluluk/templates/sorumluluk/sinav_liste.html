@@ -1,0 +1,129 @@
+{% extends "sorumluluk/base.html" %}
+{% block sor_title %}Sorumluluk Başlangıç Paneli{% endblock %}
+
+{% block extra_css_child %}
+<style>
+  .dash-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:1rem; margin-top:1.5rem; }
+  .dash-card { background:#f8fafc; border:1px solid #e2e8f0; padding:1rem; border-radius:6px; text-align:center; }
+  .dash-card .sayi { font-size:1.8rem; font-weight:700; color:#1d4ed8; margin-bottom:.2rem; }
+  .dash-card .etiket { font-size:.85rem; color:#475569; font-weight:600; text-transform:uppercase; }
+  .adim-listesi { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1.5rem; }
+  .adim-btn { flex:1; min-width:150px; text-align:center; padding:1rem .5rem; background:#fff; border:1px solid #cbd5e1; border-radius:6px; color:#334155; text-decoration:none; font-weight:600; font-size:.85rem; transition:all .2s; }
+  .adim-btn:hover { background:#f1f5f9; border-color:#94a3b8; color:#0f172a; }
+  .adim-btn i { display:block; font-size:1.4rem; margin-bottom:.4rem; color:#3b82f6; }
+</style>
+{% endblock %}
+
+{% block sor_content %}
+<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
+  <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Başlangıç Paneli</h1>
+  <a href="{% url 'sorumluluk:sinav_olustur' %}" class="btn btn-primary btn-sm" style="margin-left:auto;">+ Yeni Sınav Dönemi Aç</a>
+</div>
+
+{% if aktif_sinav %}
+<div class="card" style="border-left:4px solid #3b82f6; padding:1.5rem;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+    <div>
+      <h2 style="margin:0 0 .3rem; color:#1e3a8a; font-size:1.25rem;">Aktif Dönem: {{ aktif_sinav.sinav_adi }}</h2>
+      <p style="margin:0; font-size:.85rem; color:#64748b;">En son oluşturulan sınav dönemi üzerinde işlem yapıyorsunuz.</p>
+    </div>
+    {% if aktif_sinav.onaylandi %}
+    <span class="badge badge-success" style="font-size:.85rem; padding:.4rem .8rem;">✓ Takvim Onaylandı</span>
+    {% else %}
+    <span class="badge badge-warning" style="font-size:.85rem; padding:.4rem .8rem; background:#fef3c7; color:#92400e;">⚠ Planlama Aşamasında</span>
+    {% endif %}
+  </div>
+
+  <div class="dash-grid">
+    <div class="dash-card">
+      <div class="sayi">{{ stats.ogrenci }}</div>
+      <div class="etiket">Sorumlu Öğrenci</div>
+    </div>
+    <div class="dash-card">
+      <div class="sayi">{{ stats.ders }}</div>
+      <div class="etiket">Farklı Ders</div>
+    </div>
+    <div class="dash-card">
+      <div class="sayi">{{ stats.oturum }}</div>
+      <div class="etiket">Planlanan Oturum</div>
+    </div>
+  </div>
+
+  <div class="adim-listesi">
+    <a href="{% url 'sorumluluk:sinav_detay' aktif_sinav.pk %}" class="adim-btn"><i class="fas fa-calendar-alt"></i>1. Gün & Oturum<br>Ayarları</a>
+    <a href="{% url 'sorumluluk:ogr_aktar' aktif_sinav.pk %}" class="adim-btn"><i class="fas fa-file-excel"></i>2. Dış Veri Al<br>(e-Okul)</a>
+    <a href="{% url 'sorumluluk:takvim_detay' aktif_sinav.pk %}" class="adim-btn"><i class="fas fa-magic"></i>3. Algoritma &<br>Oturma Planı</a>
+    <a href="{% url 'sorumluluk:rapor' aktif_sinav.pk %}" target="_blank" class="adim-btn"><i class="fas fa-print"></i>4. PDF Raporlar<br>ve Çıktılar</a>
+  </div>
+</div>
+{% else %}
+<div class="card" style="padding:3rem 1rem; text-align:center; background:#f8fafc;">
+  <h2 style="color:#334155; margin-bottom:.5rem;">Sorumluluk Sınavları Modülüne Hoş Geldiniz</h2>
+  <p style="color:#64748b; font-size:.9rem; max-width:500px; margin:0 auto 1.5rem;">
+    Sistemde kayıtlı bir sınav dönemi bulunmuyor. Yeni bir Sorumluluk Sınavı dönemi (Eylül, Şubat veya Haziran) oluşturarak işlemlere başlayabilirsiniz.
+  </p>
+  <a href="{% url 'sorumluluk:sinav_olustur' %}" class="btn btn-primary" style="padding:.6rem 1.5rem; font-size:1rem;">Sınav Dönemi Oluşturarak Başla</a>
+</div>
+{% endif %}
+
+{% if onaylanan_sinavlar %}
+<h3 style="font-size:1.1rem; font-weight:700; color:#15803d; margin:2rem 0 1rem;"><i class="fas fa-check-circle" style="color:#16a34a;"></i> Onaylanan Takvimler</h3>
+<div style="display:flex; flex-direction:column; gap:.75rem;">
+  {% for s in onaylanan_sinavlar %}
+  <div class="card" style="padding:1rem 1.25rem; border-left:4px solid #16a34a;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.75rem;">
+      <div>
+        <a href="{% url 'sorumluluk:rapor' s.pk %}" style="font-weight:700; font-size:1rem; color:#15803d; text-decoration:none;">{{ s.sinav_adi }}</a>
+        <div style="font-size:.82rem; color:#64748b; margin-top:.2rem;">
+          {{ s.get_donem_turu_display }} — {{ s.egitim_yili }}
+          {% if s.aciklama %}&nbsp;·&nbsp;{{ s.aciklama }}{% endif %}
+        </div>
+      </div>
+      <div style="display:flex; gap:.4rem; flex-wrap:wrap; align-items:center;">
+        <a href="{% url 'sorumluluk:rapor_pdf' s.pk %}" target="_blank" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:.78rem;"><i class="fas fa-file-pdf"></i> Oturma Planı</a>
+        <a href="{% url 'sorumluluk:rapor_imza_pdf' s.pk %}" target="_blank" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:.78rem;"><i class="fas fa-file-pdf"></i> İmza Listesi</a>
+        <a href="{% url 'sorumluluk:rapor_genel_takvim_pdf' s.pk %}" target="_blank" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:.78rem;"><i class="fas fa-file-pdf"></i> İlan Takvimi</a>
+        <a href="{% url 'sorumluluk:ogrenci_takvim_pdf' s.pk %}" target="_blank" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:.78rem;"><i class="fas fa-file-pdf"></i> Öğrenci Takvimi</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if sinavlar|length > 1 or not aktif_sinav and sinavlar %}
+<h3 style="font-size:1.1rem; font-weight:700; color:#334155; margin:2rem 0 1rem;">Geçmiş Sınav Dönemleri (Arşiv)</h3>
+<div class="card" style="overflow-x:auto; padding:0; border:1px solid #e2e8f0;">
+  <table style="width:100%; border-collapse:collapse; font-size:.88rem;">
+    <thead style="background:#f1f5f9;">
+      <tr>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Sınav Adı</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Açıklama</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Durum</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Oluşturma</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sinavlar %}
+      {% if s.pk != aktif_sinav.pk %}
+      <tr style="border-bottom:1px solid #f0f0f0;">
+        <td style="padding:.45rem .9rem; font-weight:600;">
+          <a href="{% url 'sorumluluk:sinav_detay' s.pk %}" style="color:#1d4ed8; text-decoration:none;">{{ s.sinav_adi }}</a>
+        </td>
+        <td style="padding:.45rem .9rem; color:#475569;">{{ s.aciklama|default:"—" }}</td>
+        <td style="padding:.45rem .9rem;">
+          {% if s.onaylandi %}
+          <span class="badge badge-success">Onaylı</span>
+          {% else %}
+          <span class="badge badge-secondary">Taslak</span>
+          {% endif %}
+        </td>
+        <td style="padding:.45rem .9rem; color:#475569; white-space:nowrap;">{{ s.olusturma_tarihi|date:"d.m.Y" }}</td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

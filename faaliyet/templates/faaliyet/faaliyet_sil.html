@@ -28,7 +28,10 @@
             </div>
             <form method="post" style="display:flex;gap:12px;justify-content:flex-end;">
                 {% csrf_token %}
-                <a href="{% url 'faaliyet:faaliyet_detay' faaliyet.pk %}" class="btn-cancel">Vazgeç</a>
+                {% if next %}
+                <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+                <a href="{{ next|default:'' }}{% if not next %}{% url 'faaliyet:faaliyet_detay' faaliyet.pk %}{% endif %}" class="btn-cancel">Vazgeç</a>
                 <button type="submit" class="btn btn-danger">Evet, Sil</button>
             </form>
         </div>

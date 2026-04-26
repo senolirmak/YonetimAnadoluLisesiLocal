@@ -387,6 +387,8 @@ class MazeretSinav(models.Model):
     )
     aciklama = models.CharField(max_length=200, blank=True, verbose_name="Açıklama")
     olusturma_tarihi = models.DateTimeField(auto_now_add=True)
+    onaylandi = models.BooleanField(default=False, verbose_name="Onaylandı")
+    onay_tarihi = models.DateTimeField(null=True, blank=True, verbose_name="Onay Tarihi")
 
     class Meta:
         ordering = ["-olusturma_tarihi"]
@@ -530,6 +532,45 @@ class MazeretBelgeTeslim(models.Model):
 
     def __str__(self):
         return f"{self.sinav} – {self.okulno} – {self.ders_adi} ({self.sinav_turu or 'Yazılı'})"
+
+
+class MazeretOturmaPlani(models.Model):
+    """
+    Mazeret sınavı oturma planı — OturmaPlani'nin mazeret karşılığı.
+    Öğrenciler Mazeret1 ve Mazeret2 salonlarına (kapasitesi 40) yerleştirilir.
+    """
+    SALON_CHOICES = [("Mazeret1", "Mazeret1"), ("Mazeret2", "Mazeret2")]
+
+    mazeret_sinav = models.ForeignKey(
+        MazeretSinav, on_delete=models.CASCADE,
+        related_name="oturma_plani", verbose_name="Mazeret Sınav",
+    )
+    oturum = models.ForeignKey(
+        MazeretOturum, on_delete=models.CASCADE,
+        related_name="oturma_plani", verbose_name="Oturum",
+    )
+    salon = models.CharField(
+        max_length=20, choices=SALON_CHOICES, verbose_name="Salon",
+    )
+    sira_no = models.PositiveSmallIntegerField(verbose_name="Sıra No")
+    okulno = models.CharField(max_length=20, verbose_name="Okul No")
+    adi_soyadi = models.CharField(max_length=200, verbose_name="Adı Soyadı")
+    sinifsube = models.CharField(max_length=10, verbose_name="Sınıf/Şube")
+    ders_adi = models.CharField(max_length=200, verbose_name="Ders Adı")
+    sinav_turu = models.CharField(
+        max_length=20, blank=True, default="",
+        choices=Takvim.SINAV_TURU_CHOICES,
+        verbose_name="Sınav Türü",
+    )
+
+    class Meta:
+        ordering = ["oturum__gun__tarih", "oturum__oturum_no", "salon", "sira_no"]
+        unique_together = [("oturum", "salon", "sira_no")]
+        verbose_name = "Mazeret Oturma Planı"
+        verbose_name_plural = "Mazeret Oturma Planları"
+
+    def __str__(self):
+        return f"{self.oturum} – {self.salon}/{self.sira_no} – {self.adi_soyadi}"
 
 
 # ---------------------------------------------------------------------------

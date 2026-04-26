@@ -1,0 +1,74 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{% block sor_title %}Sorumluluk Sınavı{% endblock %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .sor-nav {
+    background: #3d5a80;
+    padding: .6rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+  }
+  .sor-nav a {
+    color: #e0eaf4;
+    font-size: .9rem;
+    font-weight: 600;
+    text-decoration: none;
+    padding: .35rem .8rem;
+    border-radius: 4px;
+    transition: background .15s;
+  }
+  .sor-nav a:hover { background: rgba(255,255,255,.15); }
+  .sor-content { padding: 1.5rem 2rem; }
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 1rem;
+  }
+  .badge {
+    display: inline-block;
+    padding: .2rem .5rem;
+    border-radius: 4px;
+    font-size: .75rem;
+    font-weight: 600;
+  }
+  .badge-success { background: #d1fae5; color: #065f46; }
+  .badge-secondary { background: #e2e8f0; color: #475569; }
+  .btn { display: inline-block; padding: .4rem .9rem; border-radius: 5px; font-size: .85rem; font-weight: 600; text-decoration: none; cursor: pointer; border: 1px solid transparent; }
+  .btn-sm { padding: .25rem .65rem; font-size: .8rem; }
+  .btn-primary { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+  .btn-secondary { background: #e2e8f0; color: #334155; border-color: #cbd5e1; }
+  .btn-success { background: #22c55e; color: #fff; border-color: #22c55e; }
+  .btn-danger { background: #ef4444; color: #fff; border-color: #ef4444; }
+  .btn-warning { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+</style>
+{% block extra_css_child %}{% endblock %}
+{% endblock %}
+
+{% block content %}
+<nav class="sor-nav">
+  <a href="{% url 'sorumluluk:sinav_liste' %}">Ana Sayfa / Başlangıç</a>
+  {% if sinav and sinav.pk %}
+  <a href="{% url 'sorumluluk:ogr_liste' sinav.pk %}">Sınav Öğrencileri</a>
+  <a href="{% url 'sorumluluk:ogr_aktar' sinav.pk %}">Dış Veri Al (Excel)</a>
+  {% endif %}
+</nav>
+<div class="sor-content">
+  {% if messages %}
+    {% for msg in messages %}
+    <div style="padding:.6rem 1rem; margin-bottom:.8rem; border-radius:6px;
+                background:{% if msg.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};
+                color:{% if msg.tags == 'error' %}#991b1b{% else %}#166534{% endif %};">
+      {{ msg }}
+    </div>
+    {% endfor %}
+  {% endif %}
+  {% block sor_content %}{% endblock %}
+</div>
+{% endblock %}

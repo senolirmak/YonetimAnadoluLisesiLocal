@@ -96,6 +96,15 @@
     <a href="{% url 'sinav:mazeret_ogrenci_listesi' mazeret.pk %}" class="btn btn-secondary btn-sm">
       Öğrenci Listesi
     </a>
+    <a href="{% url 'sinav:mazeret_takvim' mazeret.pk %}" class="btn btn-info btn-sm"
+       style="background:#0ea5e9; color:#fff; border-color:#0ea5e9;">
+      {% if mazeret.onaylandi %}Takvimi Görüntüle{% else %}Takvim Oluştur{% endif %}
+    </a>
+    {% if mazeret.onaylandi %}
+    <a href="{% url 'sinav:mazeret_rapor' mazeret.pk %}" class="btn btn-success btn-sm" target="_blank">
+      Rapor Al
+    </a>
+    {% endif %}
     <form method="post" action="{% url 'sinav:mazeret_dagit' mazeret.pk %}"
           onsubmit="return confirm('Dağıtım yeniden çalıştırılsın mı? Mevcut atamalar silinecek.');">
       {% csrf_token %}

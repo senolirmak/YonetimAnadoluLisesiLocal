@@ -79,6 +79,11 @@ urlpatterns = [
     path("mazeret/olustur/",                views.mazeret_sinav_olustur,    name="mazeret_olustur"),
     path("mazeret/<int:pk>/",               views.mazeret_sinav_detay,      name="mazeret_detay"),
     path("mazeret/<int:pk>/ogrenciler/",    views.mazeret_ogrenci_listesi,  name="mazeret_ogrenci_listesi"),
-    path("mazeret/<int:pk>/dagit/",         views.mazeret_sinav_dagit,      name="mazeret_dagit"),
-    path("mazeret/<int:pk>/sil/",           views.mazeret_sinav_sil,        name="mazeret_sil"),
+    path("mazeret/<int:pk>/dagit/",              views.mazeret_sinav_dagit,          name="mazeret_dagit"),
+    path("mazeret/<int:pk>/sil/",                views.mazeret_sinav_sil,            name="mazeret_sil"),
+    path("mazeret/<int:pk>/takvim/",             views.mazeret_takvim_detay,         name="mazeret_takvim"),
+    path("mazeret/<int:pk>/takvim/olustur/",     views.mazeret_takvim_olustur,       name="mazeret_takvim_olustur"),
+    path("mazeret/<int:pk>/takvim/onayla/",      views.mazeret_takvim_onayla,        name="mazeret_takvim_onayla"),
+    path("mazeret/<int:pk>/takvim/iptal/",       views.mazeret_takvim_onayli_iptal,  name="mazeret_takvim_iptal"),
+    path("mazeret/<int:pk>/rapor/",              views.mazeret_rapor,                name="mazeret_rapor"),
 ]

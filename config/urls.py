@@ -53,6 +53,7 @@ urlpatterns = [
     path("dersdefteri/", include("dersdefteri.urls")),
     path("sinavmedia/", include("sinavmedia.urls")),
     path("bildirim/", include("bildirim_gonderici.urls")),
+    path("sorumluluk/", include("sorumluluk.urls")),
     path("", include("main.urls")),
     path("", include("nobet.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

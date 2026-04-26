@@ -76,6 +76,10 @@ class PersonelIsleyici:
             notlar="\n".join(uyarilar),
         )
 
+        if durum != "hatali" and uygulama_tarihi:
+            from okul.utils import set_aktif_tarih
+            set_aktif_tarih("personel_listesi", uygulama_tarihi)
+
     def calistir(self, personel_listesi="hz_personel_listesi.xlsx"):
         self.personel_data()
         self.kaydet(personel_listesi)

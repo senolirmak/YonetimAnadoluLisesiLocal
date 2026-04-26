@@ -7,10 +7,10 @@
   <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Yeni Mazeret Sınav Planı</h1>
 </div>
 
-<div class="card" style="max-width:640px;">
+<div class="card" style="max-width:680px;">
   <h2>Plan Bilgileri</h2>
 
-  <form method="post">
+  <form method="post" id="mazeret-form">
     {% csrf_token %}
 
     <div class="form-group" style="margin-bottom:1rem;">
@@ -21,8 +21,46 @@
       {% endif %}
     </div>
 
+    {# ── Sınav Günleri ── #}
     <div class="form-group" style="margin-bottom:1rem;">
       <label for="{{ form.tarihler.id_for_label }}">{{ form.tarihler.label }}</label>
+
+      {% if takvim_tarihleri %}
+      <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px;
+                  padding:.75rem 1rem; margin-bottom:.6rem;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem;">
+          <span style="font-size:.82rem; font-weight:600; color:#0369a1;">
+            Sınav Takviminden ({{ takvim_tarihleri|length }} gün)
+          </span>
+          <div style="display:flex; gap:.5rem;">
+            <button type="button" class="btn btn-sm"
+                    style="padding:2px 10px; font-size:.78rem; background:#0369a1; color:#fff;"
+                    onclick="tumunuSec(true)">Tümünü Seç</button>
+            <button type="button" class="btn btn-sm"
+                    style="padding:2px 10px; font-size:.78rem; background:#6c757d; color:#fff;"
+                    onclick="tumunuSec(false)">Temizle</button>
+          </div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:.4rem .8rem;">
+          {% for tarih in takvim_tarihleri %}
+          <label style="display:flex; align-items:center; gap:.3rem; font-size:.88rem;
+                        cursor:pointer; white-space:nowrap;">
+            <input type="checkbox" class="takvim-cb"
+                   value="{{ tarih|date:'Y-m-d' }}"
+                   checked
+                   onchange="cbDegisti()">
+            {{ tarih|date:"d.m.Y" }} ({{ tarih|date:"l" }})
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px;
+                  padding:.6rem 1rem; font-size:.83rem; color:#856404; margin-bottom:.6rem;">
+        Aktif takvim üretimi bulunamadı. Tarihleri aşağıya elle giriniz.
+      </div>
+      {% endif %}
+
       {{ form.tarihler }}
       <div class="helptext">{{ form.tarihler.help_text }}</div>
       {% if form.tarihler.errors %}
@@ -52,4 +90,42 @@
     </div>
   </form>
 </div>
+
+{% if takvim_tarihleri %}
+<script>
+const textarea = document.getElementById("{{ form.tarihler.id_for_label }}");
+
+function cbDegisti() {
+  const secili = [...document.querySelectorAll(".takvim-cb:checked")]
+    .map(cb => cb.value)
+    .sort();
+
+  // Textarea'daki satırları al; checkbox'ta olmayan satırları koru (elle girilmiş)
+  const mevcutSatirlar = textarea.value.split("\n").map(s => s.trim()).filter(Boolean);
+  const takvimTumDegerler = [...document.querySelectorAll(".takvim-cb")].map(cb => cb.value);
+  const takvimSet = new Set(takvimTumDegerler);
+
+  // Elle girilmiş tarihleri koru (takvim listesinde olmayanlar)
+  const elleGirilmis = mevcutSatirlar.filter(s => !takvimSet.has(s));
+
+  const birlesik = [...new Set([...secili, ...elleGirilmis])].sort();
+  textarea.value = birlesik.join("\n");
+}
+
+function tumunuSec(durum) {
+  document.querySelectorAll(".takvim-cb").forEach(cb => { cb.checked = durum; });
+  cbDegisti();
+}
+
+// Textarea değişince checkbox'ları güncelle
+textarea.addEventListener("input", function () {
+  const satirlar = new Set(
+    textarea.value.split("\n").map(s => s.trim()).filter(Boolean)
+  );
+  document.querySelectorAll(".takvim-cb").forEach(cb => {
+    cb.checked = satirlar.has(cb.value);
+  });
+});
+</script>
+{% endif %}
 {% endblock %}
