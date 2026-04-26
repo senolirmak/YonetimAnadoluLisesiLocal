@@ -132,6 +132,9 @@ tablolar = {
     "nobet_mazeret_salon_gorevi":   "Mazeret Salon Görevi",
     "nobet_gorevi":                 "Nöbet Görevi",
     "nobet_gecmis":                 "Nöbet Geçmişi",
+    "sorumluluk_sorumlusinav":      "Sorumlu Sınav",
+    "sorumluluk_sorumluogrenci":    "Sorumlu Öğrenci",
+    "sorumluluk_sorumlutakvim":     "Sorumlu Takvim",
 }
 with connection.cursor() as cur:
     for tablo, ad in tablolar.items():
