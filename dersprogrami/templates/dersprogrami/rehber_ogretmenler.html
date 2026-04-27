@@ -1,0 +1,122 @@
+{% extends "layouts/base.html" %}
+{% load static okul_extras %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .rehber-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .rehber-table th {
+        background: #198754;
+        color: white;
+        padding: 9px 12px;
+        text-align: center;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .rehber-table th.col-left { text-align: left; }
+    .rehber-table td {
+        padding: 8px 12px;
+        border-bottom: 1px solid #dee2e6;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .rehber-table td.col-left { text-align: left; }
+    .rehber-table tbody tr:nth-child(even) { background: #f8f9fa; }
+    .rehber-table tbody tr:hover { background: #e8f5e9; }
+    .sinif-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        background: #d1fae5;
+        color: #065f46;
+        font-weight: 700;
+        font-size: 0.92em;
+        min-width: 48px;
+    }
+    .ders-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 8px;
+        background: #dbeafe;
+        color: #1e40af;
+        font-size: 0.82em;
+        font-weight: 600;
+    }
+    .empty-cell { color: #adb5bd; }
+</style>
+
+<div class="container">
+    <div class="mb-20">
+        <h2 class="page-title mb-20">{{ title }}</h2>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
+            <a href="{% url 'ogretmen_program' %}" class="btn btn-secondary">Öğretmen Durum Bilgisi</a>
+            <a href="{% url 'haftalik_ders_programi' %}" class="btn btn-secondary">Öğretmen Ders Programı</a>
+        </div>
+        <hr class="hr-divider">
+    </div>
+
+    {% if not rehberlik_ders %}
+    <div class="card">
+        <div class="card-header bg-danger">Ders Bulunamadı</div>
+        <div style="padding:20px; color:#721c24;">
+            Ders havuzunda <strong>REHBERLİK VE YÖNLENDİRME</strong> dersi bulunamadı.
+            Ders programı verisinin yüklenmiş olduğundan emin olun.
+        </div>
+    </div>
+    {% elif not rows %}
+    <div class="card">
+        <div class="card-header bg-warning">Kayıt Yok</div>
+        <div style="padding:20px;">
+            Aktif ders programında <strong>{{ rehberlik_ders.ders_adi }}</strong> dersi atanmış öğretmen bulunamadı.
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-header bg-primary" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Rehberlik Dersi Öğretmenleri — Aktif Program</span>
+            <small style="opacity:.85;">Toplam {{ rows|length }} sınıf</small>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="rehber-table">
+                <thead>
+                    <tr>
+                        <th class="col-left" style="width:220px;">Adı Soyadı</th>
+                        <th class="col-left" style="width:140px;">Branşı</th>
+                        <th style="width:80px;">Sınıf/Şube</th>
+                        {% for gun in gunler %}
+                        <th>{{ gun_tr|get_item:gun|default:gun }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td class="col-left"><strong>{{ row.ogretmen.adi_soyadi }}</strong></td>
+                        <td class="col-left" style="color:#6c757d; font-size:0.88em;">{{ row.ogretmen.brans }}</td>
+                        <td><span class="sinif-badge">{{ row.sinif_sube }}</span></td>
+                        {% for gun in gunler %}
+                        <td>
+                            {% with deger=row.gunler|get_item:gun %}
+                            {% if deger %}
+                                <span class="ders-badge">{{ deger }}</span>
+                            {% else %}
+                                <span class="empty-cell">—</span>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

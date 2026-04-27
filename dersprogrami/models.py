@@ -12,7 +12,16 @@ GUNLER = (
 )
 
 
+class DersProgramiQuerySet(models.QuerySet):
+    def aktif(self):
+        from okul.utils import get_aktif_dp_tarihi
+
+        tarih = get_aktif_dp_tarihi()
+        return self.filter(uygulama_tarihi=tarih) if tarih else self
+
+
 class DersProgrami(models.Model):
+    objects = DersProgramiQuerySet.as_manager()
     gun = models.CharField(max_length=10, choices=GUNLER)
     ders = models.ForeignKey(
         "okul.DersHavuzu",

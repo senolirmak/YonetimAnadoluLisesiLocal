@@ -1,5 +1,6 @@
 import json
 
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
@@ -111,6 +112,28 @@ def etkinlikler(request):
         "LESSON_MIN": lesson_min,
     }
     return render(request, "pano/etkinlikler.html", context)
+
+
+@xframe_options_sameorigin
+def config_api(request):
+    """Duyuru ve medya listesini JSON olarak döner — pano.js her 60s'de çeker."""
+    now = timezone.now()
+    duyurular_qs = Duyuru.objects.filter(aktif=True).order_by("sira")
+    announcements = [d.metin for d in duyurular_qs if d.yayinda_mi(now)]
+
+    medya_qs = MedyaIcerik.objects.filter(aktif=True).order_by("sira")
+    media_playlist = [
+        {
+            "url": m.dosya.url,
+            "type": m.tur,
+            "duration": m.sure,
+            "title": m.baslik,
+            "description": m.aciklama,
+        }
+        for m in medya_qs
+    ]
+
+    return JsonResponse({"announcements": announcements, "media_playlist": media_playlist})
 
 
 def kiosk(request):

@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -402,7 +403,9 @@ def download_unassigned_ders_png(request):
             if saved_unassigns.exists():
                 query_date = target_date
                 absent_records = Devamsizlik.objects.filter(
-                    baslangic_tarihi__lte=query_date, bitis_tarihi__gte=query_date
+                    baslangic_tarihi__lte=query_date,
+                ).filter(
+                    Q(bitis_tarihi__gte=query_date) | Q(bitis_tarihi__isnull=True)
                 ).select_related("ogretmen__personel")
                 absent_map = {
                     r.ogretmen.personel.pk: r.get_devamsiz_tur_display() for r in absent_records

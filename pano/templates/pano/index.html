@@ -22,19 +22,36 @@
 
             <!-- SAĞ PANEL -->
             <div class="panel">
-                <!-- MEDYA BAŞLIK -->
                 <div id="mediaTitle" class="media-title"></div>
 
-                <!-- MEDYA ALANI -->
                 <div class="media-frame">
                     <div class="posterBigFrame">
-                        <img id="mediaImage" style="display:none;">
-                        <video id="mediaVideo" muted playsinline style="display:none;"></video>
+                        <!-- Katman A -->
+                        <div id="mediaLayerA" class="media-layer active">
+                            <img id="mediaImageA">
+                            <video id="mediaVideoA" muted playsinline></video>
+                        </div>
+                        <!-- Katman B -->
+                        <div id="mediaLayerB" class="media-layer">
+                            <img id="mediaImageB">
+                            <video id="mediaVideoB" muted playsinline></video>
+                        </div>
+                        <!-- Boş durum -->
+                        <div id="mediaEmpty" class="media-empty">
+                            <div class="media-empty-icon">▶</div>
+                            <div>Medya içeriği bekleniyor…</div>
+                        </div>
+                    </div>
+                    <!-- İlerleme çubuğu -->
+                    <div class="media-progress-wrap">
+                        <div id="mediaProgress" class="media-progress-fill"></div>
                     </div>
                 </div>
 
-                <!-- MEDYA AÇIKLAMA -->
-                <div id="mediaDesc" class="media-desc"></div>
+                <div class="media-footer">
+                    <div id="mediaDesc" class="media-desc"></div>
+                    <div id="slideCounter" class="slide-counter"></div>
+                </div>
             </div>
 
         </div>

@@ -76,7 +76,7 @@ def duyuru_listesi(request):
 
     ders_programlari = defaultdict(list)
     if program_q_objects:
-        program_results = DersProgrami.objects.filter(program_q_objects).select_related(
+        program_results = DersProgrami.objects.aktif().filter(program_q_objects).select_related(
             "ogretmen", "sinif_sube"
         )
         for dp in program_results:

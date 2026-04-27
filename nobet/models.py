@@ -57,7 +57,17 @@ class NobetOgretmen(models.Model):
         return self.personel.adi_soyadi
 
 
+class NobetGoreviQuerySet(models.QuerySet):
+    def aktif(self):
+        from okul.utils import get_aktif_nobet_tarihi
+
+        tarih = get_aktif_nobet_tarihi()
+        return self.filter(uygulama_tarihi=tarih) if tarih else self
+
+
 class NobetGorevi(models.Model):
+    objects = NobetGoreviQuerySet.as_manager()
+
     nobet_gun = models.CharField(max_length=10, choices=GUNLER)
     nobet_yeri = models.ForeignKey(
         "NobetYerleri",

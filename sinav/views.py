@@ -175,7 +175,7 @@ def _db_ozeti():
     aktif = _aktif_sinav()
     return {
         "ogrenci":      OgrenciModel.objects.count(),
-        "ders_program": DersProgrami.objects.count(),
+        "ders_program": DersProgrami.objects.aktif().count(),
         "sube_ders":    SubeDers.objects.count(),
         "takvim":       Takvim.objects.filter(sinav=aktif).count(),
         "oturma_plani": OturmaPlani.objects.filter(sinav=aktif).count(),

@@ -28,6 +28,23 @@ def set_aktif_tarih(veri_turu: str, uygulama_tarihi: datetime.date) -> None:
     )
 
 
+def get_aktif_nobet_tarihi() -> datetime.date | None:
+    """
+    Aktif nöbet listesi uygulama_tarihi'ni döner.
+    Konfigürasyon yoksa DB'deki en son NobetOgretmen tarihine fall-back yapar.
+    """
+    tarih = get_aktif_tarih("nobet_listesi")
+    if tarih is None:
+        from nobet.models import NobetGorevi
+        tarih = (
+            NobetGorevi.objects
+            .order_by("-uygulama_tarihi")
+            .values_list("uygulama_tarihi", flat=True)
+            .first()
+        )
+    return tarih
+
+
 def get_aktif_dp_tarihi() -> datetime.date | None:
     """
     Aktif ders programı uygulama_tarihi'ni döner.

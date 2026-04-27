@@ -51,8 +51,8 @@
                 {% endif %}
                 <div style="display: inline-flex; align-items: center; margin-left: 10px;">
                     <select class="form-control rapor-select" style="width: auto; margin-right: 6px;">
-                        <option value="{% url 'download_ders_doldurma_pdf' %}">PDF</option>
-                        <option value="{% url 'download_ders_doldurma_png' %}">PNG (Resim)</option>
+                        <option value="{% url 'download_ders_doldurma_pdf' %}{% if current_view_datetime %}?tarih={{ current_view_datetime|date:'Y-m-d H:i:s' }}{% endif %}">PDF</option>
+                        <option value="{% url 'download_ders_doldurma_png' %}{% if current_view_datetime %}?tarih={{ current_view_datetime|date:'Y-m-d H:i:s' }}{% endif %}">PNG (Resim)</option>
                     </select>
                     <button type="button" class="btn btn-info"
                             onclick="var s=this.previousElementSibling; window.open(s.value, '_blank')">
@@ -235,7 +235,7 @@
                     {% if unassigned %}
                     <div style="display: inline-flex; align-items: center;">
                         <select class="form-control rapor-select" style="width: auto; margin-right: 5px; font-size: 0.8em; padding: 2px 6px; height: auto;">
-                            <option value="{% url 'download_unassigned_ders_png' %}">PNG (Resim)</option>
+                            <option value="{% url 'download_unassigned_ders_png' %}{% if current_view_datetime %}?tarih={{ current_view_datetime|date:'Y-m-d H:i:s' }}{% endif %}">PNG (Resim)</option>
                         </select>
                         <button type="button"
                                 class="btn btn-sm"

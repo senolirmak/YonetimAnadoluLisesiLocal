@@ -79,7 +79,7 @@ def nobet_dagitim(request):
             }
             for gun in gun_map.keys():
                 gunluk_gorevler = list(
-                    NobetGorevi.objects.filter(nobet_gun=gun)
+                    NobetGorevi.objects.aktif().filter(nobet_gun=gun)
                     .select_related("nobet_yeri")
                     .order_by("nobet_yeri__ad")
                 )
@@ -131,9 +131,7 @@ def nobet_dagitim(request):
 
     cuma = pazartesi + timedelta(days=4)
 
-    nobetler = NobetGorevi.objects.filter(
-        uygulama_tarihi__range=[pazartesi, cuma]
-    ).select_related("nobet_yeri", "ogretmen__personel")
+    nobetler = NobetGorevi.objects.aktif().select_related("nobet_yeri", "ogretmen__personel")
 
     nobet_yerleri = sorted(list(set(nobetler.values_list("nobet_yeri__ad", flat=True))))
 

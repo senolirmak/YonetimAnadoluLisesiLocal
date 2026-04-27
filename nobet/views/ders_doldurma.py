@@ -7,6 +7,7 @@ from reportlab.platypus import Paragraph, TableStyle
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -133,13 +134,9 @@ def nobet_ders_doldurma(request):
 
                 for item in assignments:
                     try:
-                        ogretmen = (
-                            NobetOgretmen.objects.filter(
-                                personel_id=item["teacher_id"], uygulama_tarihi__lte=target_date
-                            )
-                            .order_by("-uygulama_tarihi")
-                            .first()
-                        )
+                        ogretmen = NobetOgretmen.objects.filter(
+                            personel_id=item["teacher_id"]
+                        ).first()
 
                         if ogretmen:
                             NobetGecmisi.objects.create(
@@ -155,14 +152,9 @@ def nobet_ders_doldurma(request):
 
                 for item in unassigned:
                     try:
-                        ogretmen = (
-                            NobetOgretmen.objects.filter(
-                                personel_id=item["absent_teacher_id"],
-                                uygulama_tarihi__lte=target_date,
-                            )
-                            .order_by("-uygulama_tarihi")
-                            .first()
-                        )
+                        ogretmen = NobetOgretmen.objects.filter(
+                            personel_id=item["absent_teacher_id"]
+                        ).first()
 
                         if ogretmen:
                             NobetAtanamayan.objects.create(
@@ -392,7 +384,9 @@ def nobet_ders_doldurma(request):
 
             query_date = view_dt.date() if view_dt else target_date
             absent_records = Devamsizlik.objects.filter(
-                baslangic_tarihi__lte=query_date, bitis_tarihi__gte=query_date
+                baslangic_tarihi__lte=query_date,
+            ).filter(
+                Q(bitis_tarihi__gte=query_date) | Q(bitis_tarihi__isnull=True)
             ).select_related("ogretmen__personel")
             absent_map = {
                 r.ogretmen.personel.pk: r.get_devamsiz_tur_display() for r in absent_records
@@ -476,8 +470,9 @@ def nobet_ders_doldurma(request):
 
         absent_records = Devamsizlik.objects.filter(
             baslangic_tarihi__lte=target_date,
-            bitis_tarihi__gte=target_date,
             gorevlendirme_yapilsin=True,
+        ).filter(
+            Q(bitis_tarihi__gte=target_date) | Q(bitis_tarihi__isnull=True)
         ).select_related("ogretmen__personel")
 
         absent_teacher_ids = [r.ogretmen.personel.pk for r in absent_records]
@@ -603,7 +598,9 @@ def nobet_ders_doldurma(request):
     )
     _absent_ids = list(
         Devamsizlik.objects.filter(
-            baslangic_tarihi__lte=target_date, bitis_tarihi__gte=target_date
+            baslangic_tarihi__lte=target_date,
+        ).filter(
+            Q(bitis_tarihi__gte=target_date) | Q(bitis_tarihi__isnull=True)
         ).values_list("ogretmen__personel__pk", flat=True)
     )
     mazeret_ctx = _mazeret_ctx(target_date, _gorev_date, _day, _absent_ids)
@@ -684,7 +681,9 @@ def _generate_pdf_bytes(request, dynamic_height=False):
             if saved_assigns.exists():
                 query_date = target_date
                 absent_records = Devamsizlik.objects.filter(
-                    baslangic_tarihi__lte=query_date, bitis_tarihi__gte=query_date
+                    baslangic_tarihi__lte=query_date,
+                ).filter(
+                    Q(bitis_tarihi__gte=query_date) | Q(bitis_tarihi__isnull=True)
                 ).select_related("ogretmen__personel")
                 absent_map = {
                     r.ogretmen.personel.pk: r.get_devamsiz_tur_display() for r in absent_records
@@ -822,6 +821,7 @@ def download_ders_doldurma_png(request):
         return redirect("nobet_ders_doldurma")
 
     try:
+        from PIL import Image as PILImage
         images = convert_from_bytes(pdf_bytes, dpi=150)
         if images:
             response = HttpResponse(content_type="image/png")
@@ -829,7 +829,17 @@ def download_ders_doldurma_png(request):
                 f'attachment; filename="ders_doldurma_{target_date.strftime("%Y-%m-%d")}.png"'
             )
             img_buffer = BytesIO()
-            images[0].save(img_buffer, format="PNG")
+            if len(images) == 1:
+                images[0].save(img_buffer, format="PNG")
+            else:
+                total_width = max(img.width for img in images)
+                total_height = sum(img.height for img in images)
+                combined = PILImage.new("RGB", (total_width, total_height), "white")
+                y_offset = 0
+                for img in images:
+                    combined.paste(img, (0, y_offset))
+                    y_offset += img.height
+                combined.save(img_buffer, format="PNG")
             response.write(img_buffer.getvalue())
             img_buffer.close()
             return response

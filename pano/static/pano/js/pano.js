@@ -30,7 +30,7 @@
     (cfg.LESSON_STARTS && cfg.LESSON_STARTS.length) ? cfg.LESSON_STARTS :
     (safeJSONParse(window.DERSLER_JSON) || ["08:30","09:20","10:10","11:00","11:50","12:40","13:30","14:20"]);
 
-  const ANNOUNCEMENTS =
+  let ANNOUNCEMENTS =
     (cfg.ANNOUNCEMENTS && cfg.ANNOUNCEMENTS.length) ? cfg.ANNOUNCEMENTS :
     (safeJSONParse(window.DUYURULAR_JSON) || [
       "📢 Hoş geldiniz",
@@ -45,7 +45,7 @@
   const BLINK_ACTIVE_LESSON = (cfg.BLINK_ACTIVE_LESSON !== false);
 
   // Medya oynatma listesini al
-  const MEDIA_PLAYLIST =
+  let MEDIA_PLAYLIST =
     (cfg.MEDIA_PLAYLIST && cfg.MEDIA_PLAYLIST.length) ? cfg.MEDIA_PLAYLIST : [];
 
   /* ======================================================
@@ -84,8 +84,19 @@
   const schoolEl = document.getElementById("schoolName");
   if (schoolEl) schoolEl.textContent = SCHOOL_NAME;
 
-  const tickerText = document.getElementById("tickerText");
-  if (tickerText) tickerText.textContent = ANNOUNCEMENTS.join("   |   ");
+  function updateTicker() {
+    const tickerText = document.getElementById("tickerText");
+    if (!tickerText) return;
+    tickerText.textContent = ANNOUNCEMENTS.join("   |   ");
+    // Animasyonu sıfırla — yeni metin hemen akışa girer
+    const inner = tickerText.closest(".ticker-inner");
+    if (inner) {
+      inner.style.animation = "none";
+      void inner.offsetWidth;
+      inner.style.animation = "";
+    }
+  }
+  updateTicker();
 
   updateScale();
 
@@ -301,62 +312,88 @@
   /* ======================================================
      MEDIA PLAYER (SAĞ PANEL)
   ====================================================== */
-  function setupMediaPlayer() {
+  let _mediaIndex   = -1;
+  let _mediaTimer   = null;
+  let _mediaRunning = false;
+
+  function _playNext() {
     const mediaImageEl = document.getElementById("mediaImage");
     const mediaVideoEl = document.getElementById("mediaVideo");
     const mediaTitleEl = document.getElementById("mediaTitle");
     const mediaDescEl  = document.getElementById("mediaDesc");
+    if (!mediaImageEl || !mediaVideoEl) return;
 
-    if (!mediaImageEl || !mediaVideoEl || MEDIA_PLAYLIST.length === 0) {
-      if (mediaImageEl) mediaImageEl.style.display = 'none';
-      if (mediaVideoEl) mediaVideoEl.style.display = 'none';
-      // İsteğe bağlı: İçerik olmadığında bir mesaj gösterilebilir
-      // const frame = document.querySelector(".posterBigFrame");
-      // if(frame) frame.innerHTML = `<div class="posterBigEmpty">MEDYA İÇERİĞİ YOK</div>`;
+    if (MEDIA_PLAYLIST.length === 0) {
+      mediaImageEl.style.display = 'none';
+      mediaVideoEl.style.display = 'none';
       return;
     }
 
-    let currentIndex = -1;
+    _mediaIndex = (_mediaIndex + 1) % MEDIA_PLAYLIST.length;
+    const item = MEDIA_PLAYLIST[_mediaIndex];
 
-    function playNext() {
-      // Bir sonraki içeriğe geç
-      currentIndex = (currentIndex + 1) % MEDIA_PLAYLIST.length;
-      const item = MEDIA_PLAYLIST[currentIndex];
+    if (mediaTitleEl) mediaTitleEl.textContent = item.title || "";
+    if (mediaDescEl)  mediaDescEl.textContent  = item.description || "";
 
-      if (mediaTitleEl) mediaTitleEl.textContent = item.title || "";
-      if (mediaDescEl)  mediaDescEl.textContent  = item.description || "";
-
-      let nextItemDelay;
-
-      if (item.type === 'image') {
-        mediaVideoEl.style.display = 'none';
-        mediaVideoEl.pause();
-        mediaVideoEl.removeAttribute('src'); // Kaynağı temizle
-
-        mediaImageEl.src = item.url;
-        mediaImageEl.style.display = 'block';
-
-        // Resim için gösterim süresini kullan
-        nextItemDelay = (item.duration || 15) * 1000;
-        setTimeout(playNext, nextItemDelay);
-
-      } else if (item.type === 'video') {
-        mediaImageEl.style.display = 'none';
-        mediaImageEl.removeAttribute('src');
-
-        mediaVideoEl.src = item.url;
-        mediaVideoEl.style.display = 'block';
-        mediaVideoEl.play().catch(e => console.error("Video oynatılamadı:", e));
-        // Video bitince 'onended' olayı tetiklenecek, bu yüzden setTimeout kurmuyoruz.
-      }
+    if (item.type === 'image') {
+      mediaVideoEl.style.display = 'none';
+      mediaVideoEl.pause();
+      mediaVideoEl.removeAttribute('src');
+      mediaImageEl.src = item.url;
+      mediaImageEl.style.display = 'block';
+      _mediaTimer = setTimeout(_playNext, (item.duration || 15) * 1000);
+    } else if (item.type === 'video') {
+      mediaImageEl.style.display = 'none';
+      mediaImageEl.removeAttribute('src');
+      mediaVideoEl.src = item.url;
+      mediaVideoEl.style.display = 'block';
+      mediaVideoEl.play().catch(e => console.error("Video oynatılamadı:", e));
     }
-    mediaVideoEl.onended = playNext; // Video bitince sıradakine geç
-    playNext(); // Oynatıcıyı başlat
   }
+
+  function setupMediaPlayer() {
+    const mediaVideoEl = document.getElementById("mediaVideo");
+    if (!mediaVideoEl) return;
+    mediaVideoEl.onended = _playNext;
+    _mediaRunning = true;
+    _playNext();
+  }
+
+  function restartMediaPlayer() {
+    if (_mediaTimer) clearTimeout(_mediaTimer);
+    _mediaIndex = -1;
+    const mediaVideoEl = document.getElementById("mediaVideo");
+    if (mediaVideoEl) { mediaVideoEl.pause(); mediaVideoEl.removeAttribute('src'); }
+    _playNext();
+  }
+
+  /* ======================================================
+     CONFIG POLLING — her 60 saniyede duyuru & medya güncelle
+  ====================================================== */
+  function pollConfig() {
+    fetch('/pano/api/config/', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(data => {
+        const newAnn   = JSON.stringify(data.announcements   || []);
+        const newMedia = JSON.stringify(data.media_playlist  || []);
+
+        if (newAnn !== JSON.stringify(ANNOUNCEMENTS)) {
+          ANNOUNCEMENTS = data.announcements || [];
+          updateTicker();
+        }
+
+        if (newMedia !== JSON.stringify(MEDIA_PLAYLIST)) {
+          MEDIA_PLAYLIST = data.media_playlist || [];
+          if (_mediaRunning) restartMediaPlayer();
+        }
+      })
+      .catch(() => {});
+  }
+
+  setInterval(pollConfig, 60_000);
 
   tick();
   setInterval(tick, 250);
 
-  // Sayfa yüklendikten sonra medya oynatıcıyı kur
   setupMediaPlayer();
 })();
