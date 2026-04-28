@@ -268,4 +268,8 @@ nobet_proje/
 
 ## Lisans
 
-Bu proje okul yönetim amaçlı geliştirilmiş özel bir yazılımdır.
+Bu proje [GNU General Public License v3.0](LICENSE) kapsamında lisanslanmıştır.
+
+Kaynak kodu özgürce kullanabilir, değiştirebilir ve dağıtabilirsiniz; ancak türev çalışmaların da aynı lisans altında yayımlanması zorunludur.
+
+Daha fazla bilgi için [https://www.gnu.org/licenses/gpl-3.0.html](https://www.gnu.org/licenses/gpl-3.0.html) adresine bakın.
