@@ -270,7 +270,7 @@
                 </div>
                 {% endif %}
 
-                {% if is_ogretmen_menu and sinav_aktif_var %}
+                {% if is_ogretmen_menu and sinav_aktif_var or is_ogretmen_menu and sorumluluk_gorev_var %}
                 <hr class="menu-divider">
                 <div class="menu-section">
                     <div class="menu-group-title">Sınav İşlemleri</div>
@@ -278,8 +278,16 @@
                         {% if sinav_gozetim_var %}
                         <a href="{% url 'ogretmen_sinav_gozetim' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Sınav Gözetim Listem</a>
                         {% endif %}
+                        {% if sinav_aktif_var %}
                         <a href="{% url 'sinav_oturum_istatistik' %}" class="btn btn-lg" style="background-color: #6366f1; color: white;">Sınav Oturum İstatistikleri</a>
                         <a href="{% url 'sinav:ogrenci_sinav_yeri' %}" class="btn btn-lg" style="background-color: #7c3aed; color: white;">Öğrenci Sınav Yeri Sorgula</a>
+                        {% endif %}
+                        {% if sorumluluk_gorev_var %}
+                        <a href="{% url 'ogretmen_sorumluluk_gorevleri' %}" class="btn btn-lg" style="background-color: #0f766e; color: white;">Sınav Görevlerim</a>
+                        {% endif %}
+                        {% if sorumluluk_takvim_var %}
+                        <a href="{% url 'ogretmen_ogrenci_sinav_takvimi' %}" class="btn btn-lg" style="background-color: #7c3aed; color: white;">Öğrenci Sınav Takvimi</a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}

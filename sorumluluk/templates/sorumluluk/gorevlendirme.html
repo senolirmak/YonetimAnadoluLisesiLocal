@@ -87,9 +87,14 @@
 {% block sor_content %}
 <div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem; flex-wrap:wrap;">
   <a href="{% url 'sorumluluk:takvim_detay' sinav.pk %}" class="btn btn-secondary btn-sm">&#8592; Oturma Planına Dön</a>
-  <h1 style="font-size:1.25rem; font-weight:700; color:#1a1a2e; margin:0;">
+  <h1 style="font-size:1.25rem; font-weight:700; color:#1a1a2e; margin:0; flex:1;">
     {{ sinav.sinav_adi }} — Görevlendirme
   </h1>
+  <a href="{% url 'sorumluluk:gorevlendirme_pdf' sinav.pk %}" target="_blank"
+     class="btn btn-sm"
+     style="background:#dc2626; color:#fff; border:none; font-size:.82rem; padding:.35rem .8rem;">
+    &#128438; PDF İndir
+  </a>
 </div>
 
 <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:.7rem 1rem; margin-bottom:1.2rem; font-size:.85rem; color:#1e40af;">

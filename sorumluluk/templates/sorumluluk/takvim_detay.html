@@ -11,6 +11,37 @@
   .salon-tablo td { padding:.3rem .6rem; border-bottom:1px solid #f0f0f0; }
   .oturum-ust { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px 6px 0 0; padding:.55rem .9rem; font-size:.88rem; display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
   .oturum-blok { margin-bottom:1.5rem; }
+  .tarih-duzenle-btn {
+    background: none; border: none; cursor: pointer; padding: 0 .25rem;
+    color: #94a3b8; font-size: .82rem; line-height: 1;
+    vertical-align: middle; opacity: .7;
+  }
+  .tarih-duzenle-btn:hover { color: #1d4ed8; opacity: 1; }
+  .tarih-inline-form {
+    display: none; align-items: center; gap: .35rem; flex-wrap: wrap;
+    background: #fffbf0; border: 1px solid #fde68a;
+    border-radius: 5px; padding: .3rem .55rem; margin-top: .3rem;
+  }
+  .tarih-inline-form.acik { display: flex; }
+  .tarih-inline-form input[type=date],
+  .tarih-inline-form input[type=time] {
+    font-size: .82rem; padding: .2rem .4rem; border: 1px solid #cbd5e1;
+    border-radius: 4px; height: 28px;
+  }
+  .tarih-inline-form input[type=time] { width: 90px; }
+  .tarih-inline-form .btn-kaydet {
+    background: #16a34a; color: #fff; border: none; border-radius: 4px;
+    padding: .2rem .55rem; font-size: .78rem; cursor: pointer; height: 28px;
+  }
+  .tarih-inline-form .btn-iptal {
+    background: #e2e8f0; color: #334155; border: none; border-radius: 4px;
+    padding: .2rem .5rem; font-size: .78rem; cursor: pointer; height: 28px;
+  }
+
+  /* Öğrenci gizleme modu */
+  body.ogr-gizli .salon-grid-icerik { display: none; }
+  body.ogr-gizli .salon-grid-kap { display: none; }
+  body.ogr-gizli .oturum-blok .oturum-ust { border-radius: 6px; border-bottom-color: #e2e8f0; }
 </style>
 {% endblock %}
 
@@ -18,7 +49,11 @@
 <div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem; flex-wrap:wrap;">
   <a href="{% url 'sorumluluk:sinav_detay' sinav.pk %}" class="btn btn-secondary btn-sm">&#8592; Detaya Dön</a>
   <h1 style="font-size:1.25rem; font-weight:700; color:#1a1a2e; margin:0;">{{ sinav.sinav_adi }} — Oturma Planı</h1>
-  <div style="margin-left:auto; display:flex; gap:.5rem; flex-wrap:wrap;">
+  <div style="margin-left:auto; display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
+    <button id="btn-ogr-toggle" type="button" class="btn btn-sm btn-outline-secondary"
+            onclick="toggleOgrenciler()" title="Öğrenci listelerini gizle / göster">
+      👁 Öğrenciler
+    </button>
     <form method="post" action="{% url 'sorumluluk:takvim_olustur' sinav.pk %}"
           onsubmit="return confirm('Plan yeniden oluşturulsun mu?');">
       {% csrf_token %}
@@ -57,6 +92,9 @@
 <div class="oturum-blok">
   <div class="oturum-ust">
     <strong>{{ ot_veri.tarih|date:"d F Y" }}</strong>
+    <button type="button" class="tarih-duzenle-btn"
+            onclick="tarihFormAc('tarih-form-{{ ot_veri.tarih|date:"Ymd" }}-{{ ot_veri.oturum_no }}')"
+            title="Tarihi düzenle">✏️</button>
     &nbsp;|&nbsp; Oturum {{ ot_veri.oturum_no }}
     &nbsp;|&nbsp; {{ ot_veri.saat_baslangic|time:"H:i" }} – {{ ot_veri.saat_bitis|time:"H:i" }}
     <span style="color:#475569; font-weight:400; font-size:.8rem;">
@@ -66,7 +104,25 @@
       {{ ot_veri.salon1|length }} + {{ ot_veri.salon2|length }} + {{ ot_veri.salon3|length }} öğrenci
     </span>
   </div>
-  <div class="salon-grid" style="border:1px solid #e2e8f0; border-top:none; padding:.7rem; border-radius:0 0 6px 6px;">
+  <form id="tarih-form-{{ ot_veri.tarih|date:"Ymd" }}-{{ ot_veri.oturum_no }}"
+        class="tarih-inline-form"
+        method="post"
+        action="{% url 'sorumluluk:takvim_oturum_tarihi_guncelle' sinav.pk %}">
+    {% csrf_token %}
+    <input type="hidden" name="eski_tarih" value="{{ ot_veri.tarih|date:'Y-m-d' }}">
+    <input type="hidden" name="oturum_no"  value="{{ ot_veri.oturum_no }}">
+    <span style="font-size:.76rem; color:#92400e; font-weight:600; white-space:nowrap;">Tarih:</span>
+    <input type="date" name="yeni_tarih" value="{{ ot_veri.tarih|date:'Y-m-d' }}" required>
+    <span style="font-size:.76rem; color:#92400e; font-weight:600; white-space:nowrap; margin-left:.3rem;">Başlangıç:</span>
+    <input type="time" name="yeni_saat_baslangic" value="{{ ot_veri.saat_baslangic|time:'H:i' }}">
+    <span style="font-size:.76rem; color:#92400e; font-weight:600; white-space:nowrap;">Bitiş:</span>
+    <input type="time" name="yeni_saat_bitis" value="{{ ot_veri.saat_bitis|time:'H:i' }}">
+    <button type="submit" class="btn-kaydet">Kaydet</button>
+    <button type="button" class="btn-iptal"
+            onclick="tarihFormKapat('tarih-form-{{ ot_veri.tarih|date:"Ymd" }}-{{ ot_veri.oturum_no }}')">İptal</button>
+  </form>
+  <div class="salon-grid-kap" style="border:1px solid #e2e8f0; border-top:none; border-radius:0 0 6px 6px;">
+  <div class="salon-grid salon-grid-icerik" style="padding:.7rem;">
     <div>
       <div class="salon-baslik">Mazeret 1 ({{ ot_veri.salon1|length }})</div>
       {% if ot_veri.salon1 %}
@@ -124,8 +180,46 @@
       </table>
       {% else %}<p style="color:#aaa; font-size:.8rem;">Öğrenci yok.</p>{% endif %}
     </div>
-  </div>
-</div>
+  </div>{# /salon-grid-icerik #}
+  </div>{# /salon-grid-kap #}
+</div>{# /oturum-blok #}
 {% endfor %}
 {% endif %}
+
+<script>
+function tarihFormAc(id) {
+  var el = document.getElementById(id);
+  if (el) { el.classList.add('acik'); }
+}
+function tarihFormKapat(id) {
+  var el = document.getElementById(id);
+  if (el) { el.classList.remove('acik'); }
+}
+
+(function () {
+  var KEY = 'takvim_ogr_gizli';
+  var btn = document.getElementById('btn-ogr-toggle');
+
+  function uygula(gizli) {
+    if (gizli) {
+      document.body.classList.add('ogr-gizli');
+      btn.textContent = '👁 Öğrenciler (gizli)';
+      btn.classList.add('active');
+    } else {
+      document.body.classList.remove('ogr-gizli');
+      btn.textContent = '👁 Öğrenciler';
+      btn.classList.remove('active');
+    }
+  }
+
+  // Sayfa açılışında localStorage'dan oku
+  uygula(localStorage.getItem(KEY) === '1');
+
+  window.toggleOgrenciler = function () {
+    var simdi = document.body.classList.contains('ogr-gizli');
+    localStorage.setItem(KEY, simdi ? '0' : '1');
+    uygula(!simdi);
+  };
+})();
+</script>
 {% endblock %}

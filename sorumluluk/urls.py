@@ -24,8 +24,12 @@ urlpatterns = [
     path("ders/<int:pk>/duzenle/",            views.ogr_ders_duzenle,  name="ogr_ders_duzenle"),
     path("ders/<int:pk>/sil/",               views.ogr_ders_sil,      name="ogr_ders_sil"),
 
+    # Takvim tarih güncelleme
+    path("<int:sinav_pk>/takvim/tarih-guncelle/", views.takvim_oturum_tarihi_guncelle, name="takvim_oturum_tarihi_guncelle"),
+
     # Görevlendirme
     path("<int:sinav_pk>/gorevlendirme/",     views.gorevlendirme,     name="gorevlendirme"),
+    path("<int:sinav_pk>/gorevlendirme/pdf/", views.gorevlendirme_pdf, name="gorevlendirme_pdf"),
 
     # Takvim & Rapor
     path("<int:sinav_pk>/takvim/",            views.takvim_detay,      name="takvim_detay"),

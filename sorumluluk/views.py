@@ -561,6 +561,149 @@ def rapor_genel_takvim_pdf(request, sinav_pk):
     )
 
 @login_required
+@require_POST
+def takvim_oturum_tarihi_guncelle(request, sinav_pk):
+    from datetime import date as _date
+    from django.db import transaction
+
+    sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
+    from datetime import time as _time
+
+    try:
+        eski_tarih = _date.fromisoformat(request.POST.get("eski_tarih", ""))
+        yeni_tarih = _date.fromisoformat(request.POST.get("yeni_tarih", ""))
+        oturum_no  = int(request.POST.get("oturum_no", ""))
+    except (ValueError, TypeError):
+        messages.error(request, "Geçersiz tarih veya oturum bilgisi.")
+        return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
+
+    def _parse_time(val):
+        """HH:MM → time nesnesi, hata halinde None."""
+        try:
+            parts = val.strip().split(":")
+            return _time(int(parts[0]), int(parts[1]))
+        except Exception:
+            return None
+
+    yeni_bas = _parse_time(request.POST.get("yeni_saat_baslangic", ""))
+    yeni_bit = _parse_time(request.POST.get("yeni_saat_bitis", ""))
+
+    if yeni_tarih == eski_tarih and yeni_bas is None and yeni_bit is None:
+        return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
+
+    # Taşınan dersler
+    eski_dersler = set(
+        SorumluTakvim.objects
+        .filter(sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no)
+        .values_list("ders_adi", flat=True)
+    )
+    # Hedef slottaki mevcut dersler
+    hedef_dersler = set(
+        SorumluTakvim.objects
+        .filter(sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no)
+        .values_list("ders_adi", flat=True)
+    )
+    cakisan = eski_dersler & hedef_dersler
+    if cakisan:
+        messages.error(
+            request,
+            f"{yeni_tarih.strftime('%d.%m.%Y')} — Oturum {oturum_no}'de çakışan ders(ler) var: "
+            f"{', '.join(sorted(cakisan))}",
+        )
+        return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
+
+    hedef_var = bool(hedef_dersler)  # hedef slotta zaten kayıt var → merge modu
+
+    from django.db.models import Max
+
+    with transaction.atomic():
+        # Takvim ve komisyon: ders_adi dahil unique_together, çakışma garantili değil
+        SorumluTakvim.objects.filter(
+            sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+        ).update(tarih=yeni_tarih)
+        SorumluKomisyonUyesi.objects.filter(
+            sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+        ).update(tarih=yeni_tarih)
+
+        if hedef_var:
+            # Gozetmen: hedefte zaten atanmış salonları atla
+            hedef_salonlar = set(
+                SorumluGozetmen.objects
+                .filter(sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no)
+                .values_list("salon", flat=True)
+            )
+            SorumluGozetmen.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no,
+                salon__in=hedef_salonlar,
+            ).delete()
+            SorumluGozetmen.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+            ).update(tarih=yeni_tarih)
+
+            # OturmaPlani: hedef salon max sira_no'dan devam et
+            salon_max = dict(
+                SorumluOturmaPlani.objects
+                .filter(sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no)
+                .values("salon")
+                .annotate(m=Max("sira_no"))
+                .values_list("salon", "m")
+            )
+            to_move = list(
+                SorumluOturmaPlani.objects
+                .filter(sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no)
+                .order_by("salon", "sira_no")
+            )
+            SorumluOturmaPlani.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+            ).delete()
+            counters: dict = dict(salon_max)
+            for op in to_move:
+                counters[op.salon] = counters.get(op.salon, 0) + 1
+                op.pk      = None
+                op.tarih   = yeni_tarih
+                op.sira_no = counters[op.salon]
+            if to_move:
+                SorumluOturmaPlani.objects.bulk_create(to_move)
+        else:
+            SorumluGozetmen.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+            ).update(tarih=yeni_tarih)
+            SorumluOturmaPlani.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+            ).update(tarih=yeni_tarih)
+
+    # Saat güncelleme — tarih işlemlerinden bağımsız, yeni_tarih üzerinden uygula
+    saat_guncelleme = {}
+    if yeni_bas is not None:
+        saat_guncelleme["saat_baslangic"] = yeni_bas
+    if yeni_bit is not None:
+        saat_guncelleme["saat_bitis"] = yeni_bit
+
+    if saat_guncelleme:
+        with transaction.atomic():
+            SorumluTakvim.objects.filter(
+                sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no
+            ).update(**saat_guncelleme)
+            SorumluOturmaPlani.objects.filter(
+                sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no
+            ).update(**saat_guncelleme)
+
+    mesaj_parcalari = []
+    if yeni_tarih != eski_tarih:
+        eylem = "birleştirildi" if hedef_var else "güncellendi"
+        mesaj_parcalari.append(
+            f"Tarih {eski_tarih.strftime('%d.%m.%Y')} → {yeni_tarih.strftime('%d.%m.%Y')} olarak {eylem}"
+        )
+    if yeni_bas is not None:
+        mesaj_parcalari.append(f"Başlangıç {yeni_bas.strftime('%H:%M')}")
+    if yeni_bit is not None:
+        mesaj_parcalari.append(f"Bitiş {yeni_bit.strftime('%H:%M')}")
+
+    messages.success(request, f"Oturum {oturum_no} — {', '.join(mesaj_parcalari)}.")
+    return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
+
+
+@login_required
 def gorevlendirme(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
 
@@ -792,6 +935,26 @@ def gorevlendirme(request, sinav_pk):
         "personel_listesi": personel_listesi,
         "gorev_ozet_gruplu": gorev_ozet_gruplu,
     })
+
+
+@login_required
+def gorevlendirme_pdf(request, sinav_pk):
+    import io
+    from sorumluluk.services.pdf_service import gorevlendirme_pdf_uret
+
+    sinav = get_object_or_404(SorumluSinav.objects.select_related("egitim_yili"), pk=sinav_pk)
+    okul  = OkulBilgi.get()
+    buf   = io.BytesIO()
+    gorevlendirme_pdf_uret(buf, sinav, okul)
+    buf.seek(0)
+
+    donem  = sinav.get_donem_turu_display()  # type: ignore[attr-defined]
+    egitim = str(sinav.egitim_yili) if sinav.egitim_yili else ""
+    fname  = f"Gorevlendirme_{egitim}_{donem}.pdf".replace(" ", "_")
+    return HttpResponse(
+        buf.read(), content_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{fname}"'},
+    )
 
 
 @login_required

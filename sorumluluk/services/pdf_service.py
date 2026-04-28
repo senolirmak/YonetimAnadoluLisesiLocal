@@ -12,7 +12,7 @@ from reportlab.lib.fonts import addMapping
 
 from django.conf import settings
 
-from sorumluluk.models import SorumluOturmaPlani, SALON_CHOICES
+from sorumluluk.models import SorumluOturmaPlani, SorumluKomisyonUyesi, SorumluGozetmen, SorumluTakvim, SALON_CHOICES
 
 # --- Times New Roman — <b> etiketleri de normal ağırlıkta çizilir ---
 _FONTS_DIR = settings.BASE_DIR / "static" / "fonts"
@@ -428,4 +428,175 @@ def rapor_pdf_uret(buf, sinav, okul, oturumlar_veri, imza_sirkusu=False):
     mudur = _mudur_onay_blogu(okul)
     if mudur:
         elements.append(mudur)
+    doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
+
+
+# ---------------------------------------------------------------------------
+# Komisyon & Gözetmen Görevlendirme PDF
+# ---------------------------------------------------------------------------
+
+def gorevlendirme_pdf_uret(buf, sinav, okul):
+    """Her oturum için komisyon üyeleri ve gözetmen atamalarını listeleyen PDF üretir."""
+    from itertools import groupby
+
+    W, _ = A4
+    LR = 1.5 * cm
+    TB = 1.0 * cm
+    avail_w = W - 2 * LR
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=LR, rightMargin=LR,
+        topMargin=TB, bottomMargin=TB,
+    )
+
+    s_okul    = ParagraphStyle('GROkul',    fontName=_FONT, fontSize=12, alignment=1, spaceAfter=2, leading=16)
+    s_sinav   = ParagraphStyle('GRSinav',   fontName=_FONT, fontSize=9,  alignment=1, spaceAfter=2, textColor=_GRAY)
+    s_baslik  = ParagraphStyle('GRBaslik',  fontName=_FONT, fontSize=10, alignment=1, spaceAfter=5, leading=14)
+    s_oturum  = ParagraphStyle('GROturum',  fontName=_FONT, fontSize=9,  textColor=colors.white, leading=12)
+    s_bolum   = ParagraphStyle('GRBolum',   fontName=_FONT, fontSize=8,  leading=11)
+    s_hucre   = ParagraphStyle('GRHucre',   fontName=_FONT, fontSize=8.5, leading=12)
+    s_bos     = ParagraphStyle('GRBos',     fontName=_FONT, fontSize=8,  textColor=_GRAY, leading=11)
+
+    okul_adi    = _tr_upper(okul.okul_adi if okul and okul.okul_adi else "")
+    donem_str   = sinav.get_donem_turu_display()   # type: ignore[attr-defined]
+    egitim_yili = str(sinav.egitim_yili) if sinav.egitim_yili else ""
+    _GUNLER = {0: "Pazartesi", 1: "Salı", 2: "Çarşamba", 3: "Perşembe",
+               4: "Cuma", 5: "Cumartesi", 6: "Pazar"}
+
+    # --- Veri ---
+    takvim_saatler = {
+        (t.tarih, t.oturum_no): (t.saat_baslangic, t.saat_bitis)
+        for t in SorumluTakvim.objects.filter(sinav=sinav).order_by("tarih", "oturum_no")
+    }
+    kom_by_oturum: dict = defaultdict(list)
+    for k in SorumluKomisyonUyesi.objects.filter(sinav=sinav).select_related("uye1", "uye2").order_by("tarih", "oturum_no", "ders_adi"):
+        kom_by_oturum[(k.tarih, k.oturum_no)].append(k)
+
+    goz_by_oturum: dict = defaultdict(list)
+    for g in SorumluGozetmen.objects.filter(sinav=sinav).select_related("gozetmen").order_by("tarih", "oturum_no", "salon"):
+        goz_by_oturum[(g.tarih, g.oturum_no)].append(g)
+
+    oturum_keys = sorted(set(list(kom_by_oturum.keys()) + list(goz_by_oturum.keys())))
+
+    # --- Tablo stilleri ---
+    def _hdr_style(bg):
+        return TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0), bg),
+            ("FONTNAME",      (0, 0), (-1, -1), _FONT),
+            ("FONTSIZE",      (0, 0), (-1, 0),  8),
+            ("FONTSIZE",      (0, 1), (-1, -1), 8.5),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+            ("GRID",          (0, 0), (-1, -1), 0.3, _LIGHT),
+            ("LINEBELOW",     (0, 0), (-1, 0),  0.6, _GRAY),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ])
+
+    _KOM_BG  = colors.HexColor("#fef9ec")
+    _GOZ_BG  = colors.HexColor("#f0fdf4")
+    _HDR_KOM = colors.HexColor("#fde68a")
+    _HDR_GOZ = colors.HexColor("#a7f3d0")
+
+    # --- Elementler ---
+    elements = []
+
+    if okul_adi:
+        elements.append(Paragraph(okul_adi, s_okul))
+    donem_bilgi = "  ·  ".join(filter(None, [egitim_yili, donem_str]))
+    if donem_bilgi:
+        elements.append(Paragraph(donem_bilgi, s_sinav))
+    elements.append(Paragraph(f"{sinav.sinav_adi}  —  Komisyon & Gözetmen Görevlendirme Çizelgesi", s_baslik))
+    elements.append(HRFlowable(width="100%", thickness=1, color=_GRAY, spaceAfter=6))
+
+    for (tarih, oturum_no) in oturum_keys:
+        saatler = takvim_saatler.get((tarih, oturum_no))
+        if saatler:
+            saat_str = f"{saatler[0].strftime('%H:%M')} – {saatler[1].strftime('%H:%M')}"
+        else:
+            saat_str = ""
+        gun       = _GUNLER.get(tarih.weekday(), "")
+        tarih_str = f"{gun}, {_tr_tarih(tarih)}"
+        baslik    = f"{tarih_str}  |  Oturum {oturum_no}  |  {saat_str}"
+
+        hdr_tbl = Table([[Paragraph(baslik, s_oturum)]], colWidths=[avail_w])
+        hdr_tbl.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#1e3a5f")),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+            ("FONTNAME",      (0, 0), (-1, -1), _FONT),
+        ]))
+
+        block = [Spacer(1, 6), hdr_tbl]
+
+        # Komisyon tablosu
+        komisyonlar = kom_by_oturum.get((tarih, oturum_no), [])
+        if komisyonlar:
+            kom_data = [
+                [
+                    Paragraph("Ders", s_bolum),
+                    Paragraph("1. Komisyon Üyesi", s_bolum),
+                    Paragraph("2. Komisyon Üyesi", s_bolum),
+                ]
+            ]
+            for k in komisyonlar:
+                uye1_str = k.uye1.adi_soyadi if k.uye1 else "—"
+                uye2_str = k.uye2.adi_soyadi if k.uye2 else "—"
+                kom_data.append([
+                    Paragraph(k.ders_adi, s_hucre),
+                    Paragraph(uye1_str,   s_hucre),
+                    Paragraph(uye2_str,   s_hucre),
+                ])
+            kom_tbl = Table(kom_data, colWidths=[avail_w * 0.38, avail_w * 0.31, avail_w * 0.31])
+            style = _hdr_style(_HDR_KOM)
+            for i in range(1, len(kom_data)):
+                style.add("BACKGROUND", (0, i), (-1, i), _KOM_BG)
+            kom_tbl.setStyle(style)
+            block.append(kom_tbl)
+
+        # Gözetmen tablosu
+        gozetmenler = goz_by_oturum.get((tarih, oturum_no), [])
+        if gozetmenler:
+            goz_data = [
+                [
+                    Paragraph("Salon", s_bolum),
+                    Paragraph("Gözetmen", s_bolum),
+                ]
+            ]
+            for g in gozetmenler:
+                salon_label = _SALON_LABEL.get(g.salon, g.salon)
+                goz_str     = g.gozetmen.adi_soyadi if g.gozetmen else "—"
+                goz_data.append([
+                    Paragraph(salon_label, s_hucre),
+                    Paragraph(goz_str,     s_hucre),
+                ])
+            goz_tbl = Table(goz_data, colWidths=[avail_w * 0.3, avail_w * 0.7])
+            style = _hdr_style(_HDR_GOZ)
+            for i in range(1, len(goz_data)):
+                style.add("BACKGROUND", (0, i), (-1, i), _GOZ_BG)
+            goz_tbl.setStyle(style)
+            block.append(goz_tbl)
+
+        if not komisyonlar and not gozetmenler:
+            block.append(Paragraph("Bu oturumda görevlendirme bulunmamaktadır.", s_bos))
+
+        elements.append(KeepTogether(block))
+
+    mudur = _mudur_onay_blogu(okul)
+    if mudur:
+        elements.append(mudur)
+
+    _state = {"page": 0}
+
+    def on_page(canvas, doc):
+        _state["page"] += 1
+        canvas.saveState()
+        canvas.setFont(_FONT, 7.5)
+        canvas.setFillColor(_GRAY)
+        canvas.drawRightString(W - LR, TB * 0.6, f"Sayfa {_state['page']}")
+        canvas.restoreState()
+
     doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)

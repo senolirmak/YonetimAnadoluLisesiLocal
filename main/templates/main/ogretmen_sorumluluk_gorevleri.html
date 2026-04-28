@@ -1,0 +1,128 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .gorev-wrap { max-width: 820px; margin: 0 auto; padding: 1.2rem 1rem; }
+  .sinav-kart {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+    overflow: hidden; margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .sinav-baslik {
+    background: #1e3a5f; color: #fff;
+    padding: .7rem 1.1rem; font-size: .95rem; font-weight: 700;
+    display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  }
+  .sinav-meta { font-size: .78rem; opacity: .75; font-weight: 400; }
+  .oturum-blok { border-top: 1px solid #f0f4f8; padding: .8rem 1.1rem; }
+  .oturum-blok:first-child { border-top: none; }
+  .oturum-baslik {
+    display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+    font-size: .83rem; font-weight: 700; color: #334155; margin-bottom: .55rem;
+  }
+  .oturum-tarih { color: #1e3a5f; }
+  .oturum-sep { color: #cbd5e1; }
+  .oturum-saat { color: #64748b; font-weight: 400; }
+  .gorev-grup { display: flex; flex-direction: column; gap: .3rem; }
+  .gorev-etiket {
+    display: inline-flex; align-items: center; gap: .4rem;
+    font-size: .8rem; font-weight: 600; margin-bottom: .2rem;
+  }
+  .badge-komisyon {
+    background: #fef3c7; color: #92400e;
+    padding: .18rem .5rem; border-radius: 4px; font-size: .72rem;
+  }
+  .badge-gozetmen {
+    background: #d1fae5; color: #065f46;
+    padding: .18rem .5rem; border-radius: 4px; font-size: .72rem;
+  }
+  .gorev-icerik {
+    font-size: .85rem; color: #1e293b;
+    background: #f8fafc; border-radius: 5px;
+    padding: .35rem .7rem; border-left: 3px solid #94a3b8;
+  }
+  .gorev-icerik.komisyon { border-left-color: #f59e0b; background: #fffbf0; }
+  .gorev-icerik.gozetmen { border-left-color: #10b981; background: #f0fdf4; }
+  .bos-mesaj {
+    text-align: center; color: #94a3b8; padding: 2.5rem 1rem; font-size: .9rem;
+  }
+  .geri-btn { margin-bottom: 1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gorev-wrap">
+  <div class="geri-btn">
+    <a href="{% url 'index' %}" class="btn btn-secondary btn-sm">&#8592; Ana Sayfa</a>
+  </div>
+
+  <h1 style="font-size:1.2rem; font-weight:700; color:#1a1a2e; margin-bottom:1.2rem;">
+    Sorumluluk Sınavı Görevlerim
+    {% if ogretmen_adi %}
+    <span style="font-size:.85rem; font-weight:400; color:#64748b;">— {{ ogretmen_adi }}</span>
+    {% endif %}
+  </h1>
+
+  {% if hata %}
+  <div class="bos-mesaj">{{ hata }}</div>
+  {% elif not gorev_sinavlar %}
+  <div class="bos-mesaj">Henüz size atanmış sorumluluk sınavı görevi bulunmamaktadır.</div>
+  {% else %}
+
+  {% for sg in gorev_sinavlar %}
+  <div class="sinav-kart">
+    <div class="sinav-baslik">
+      <span>{{ sg.sinav.sinav_adi }}</span>
+      <span class="sinav-meta">
+        {% if sg.sinav.egitim_yili %}{{ sg.sinav.egitim_yili }}{% endif %}
+        {% if sg.sinav.egitim_yili and sg.sinav.donem_turu %} &middot; {% endif %}
+        {{ sg.sinav.get_donem_turu_display }}
+      </span>
+    </div>
+
+    {% for ot in sg.oturumlar %}
+    <div class="oturum-blok">
+      <div class="oturum-baslik">
+        <span class="oturum-tarih">{{ ot.tarih_str }}</span>
+        <span class="oturum-sep">|</span>
+        <span>Oturum {{ ot.oturum_no }}</span>
+        {% if ot.saat_baslangic %}
+        <span class="oturum-sep">|</span>
+        <span class="oturum-saat">{{ ot.saat_baslangic|time:"H:i" }} – {{ ot.saat_bitis|time:"H:i" }}</span>
+        {% endif %}
+      </div>
+
+      <div class="gorev-grup">
+        {% if ot.komisyonlar %}
+        <div>
+          <div class="gorev-etiket">
+            <span class="badge-komisyon">Komisyon Üyesi</span>
+          </div>
+          {% for ders in ot.komisyonlar %}
+          <div class="gorev-icerik komisyon">{{ ders }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if ot.gozetmenler %}
+        <div>
+          <div class="gorev-etiket">
+            <span class="badge-gozetmen">Gözetmen</span>
+          </div>
+          {% for salon in ot.gozetmenler %}
+          <div class="gorev-icerik gozetmen">{{ salon }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  {% endif %}
+</div>
+{% endblock %}

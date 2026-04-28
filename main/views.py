@@ -168,6 +168,7 @@ def index(request):
             rehberlik_sinif_sube = str(rehberlik_ders.sinif_sube)
 
         # Öğretmenin nöbet görevleri (son uygulama tarihine göre)
+
         try:
             nobet_ogretmen = request.user.personel.ogretmen
             son_uygulama = (
@@ -227,6 +228,28 @@ def index(request):
         except Exception:
             pass
 
+    # Sorumluluk sınavı: rehberlik sınıfındaki öğrencilerin takvimi var mı?
+    sorumluluk_takvim_var = False
+    if rehberlik_sinif_sube:
+        try:
+            from sorumluluk.models import SorumluOturmaPlani as _SOP
+            sorumluluk_takvim_var = _SOP.objects.filter(sinifsube=rehberlik_sinif_sube).exists()
+        except Exception:
+            pass
+
+    # Sorumluluk sınavı: öğretmenin komisyon/gözetmen görevi var mı?
+    sorumluluk_gorev_var = False
+    if hasattr(request.user, "personel") and request.user.personel:
+        try:
+            from sorumluluk.models import SorumluKomisyonUyesi as _SKU, SorumluGozetmen as _SGZ
+            _p = request.user.personel
+            sorumluluk_gorev_var = (
+                _SKU.objects.filter(Q(uye1=_p) | Q(uye2=_p)).exists()
+                or _SGZ.objects.filter(gozetmen=_p).exists()
+            )
+        except Exception:
+            pass
+
     return render(
         request,
         "main/index.html",
@@ -239,8 +262,10 @@ def index(request):
             "rehberlik_sinif_sube": rehberlik_sinif_sube,
             "ogretmen_nobetleri": ogretmen_nobetleri,
             "atanan_dersler": atanan_dersler,
-            "sinav_gozetim_var": sinav_gozetim_var,
-            "sinav_aktif_var":   sinav_aktif_var,
+            "sinav_gozetim_var":      sinav_gozetim_var,
+            "sinav_aktif_var":        sinav_aktif_var,
+            "sorumluluk_gorev_var":   sorumluluk_gorev_var,
+            "sorumluluk_takvim_var":  sorumluluk_takvim_var,
             "personel_istatistik": {
                 "toplam": toplam_ogretmen,
                 "ucretli": ucretli_ogretmen,
@@ -1511,6 +1536,195 @@ def sinif_oturma_plani(request):
         "ogrenciler":         ogrenciler,
         "yerlestirilmemis":   yerlestirilmemis,
         "sinif_sec":          False,
+    })
+
+
+# ─────────────────────────────────────────────────────────
+# Öğretmen — Rehberlik Sınıfı Öğrenci Sınav Takvimi
+# ─────────────────────────────────────────────────────────
+
+@login_required
+def ogretmen_ogrenci_sinav_takvimi(request):
+    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+        raise PermissionDenied
+
+    personel = getattr(request.user, "personel", None)
+    if not personel:
+        return render(request, "main/ogretmen_ogrenci_sinav_takvimi.html", {
+            "title": "Öğrenci Sınav Takvimi",
+            "hata": "Kullanıcınıza bağlı öğretmen kaydı bulunamadı.",
+        })
+
+    _aktif_tarih = get_aktif_dp_tarihi()
+    _dp_f = {"uygulama_tarihi": _aktif_tarih} if _aktif_tarih else {}
+    rehberlik_ders = (
+        DersProgrami.objects.filter(
+            ogretmen=personel,
+            ders__ders_adi__iexact="rehberlik ve yönlendirme",
+            **_dp_f,
+        )
+        .select_related("sinif_sube")
+        .first()
+    )
+
+    if not (rehberlik_ders and rehberlik_ders.sinif_sube):
+        return render(request, "main/ogretmen_ogrenci_sinav_takvimi.html", {
+            "title": "Öğrenci Sınav Takvimi",
+            "hata": "Ders programınızda rehberlik sınıfı bulunamadı.",
+        })
+
+    sinif_sube_str = str(rehberlik_ders.sinif_sube)
+
+    from sorumluluk.models import SorumluOturmaPlani, SorumluSinav, SALON_CHOICES
+
+    _SALON_LABEL = dict(SALON_CHOICES)
+    _AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+              "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
+    def _tr_tarih(d):
+        return f"{d.day} {_AYLAR[d.month - 1]} {d.year}"
+
+    planlar = list(
+        SorumluOturmaPlani.objects
+        .filter(sinifsube=sinif_sube_str)
+        .select_related("sinav", "sinav__egitim_yili")
+        .order_by("okulno", "sinav__id", "tarih", "saat_baslangic")
+    )
+
+    # Öğrenci bazında grupla: {(okulno, adi_soyadi): {sinav_id: [satır, ...]}}
+    from collections import defaultdict
+    ogrenci_map: dict = {}
+    for p in planlar:
+        key = (p.okulno, p.adi_soyadi)
+        if key not in ogrenci_map:
+            ogrenci_map[key] = {"okulno": p.okulno, "adi_soyadi": p.adi_soyadi, "sinavlar": {}}
+        sid = p.sinav_id
+        if sid not in ogrenci_map[key]["sinavlar"]:
+            ogrenci_map[key]["sinavlar"][sid] = {"sinav": p.sinav, "satirlar": []}
+        ogrenci_map[key]["sinavlar"][sid]["satirlar"].append({
+            "tarih":         p.tarih,
+            "tarih_str":     _tr_tarih(p.tarih),
+            "saat_baslangic": p.saat_baslangic,
+            "saat_bitis":    p.saat_bitis,
+            "ders_adi":      p.ders_adi,
+            "salon":         _SALON_LABEL.get(p.salon, p.salon),
+            "sira_no":       p.sira_no,
+        })
+
+    ogrenciler = [
+        {
+            "okulno":    v["okulno"],
+            "adi_soyadi": v["adi_soyadi"],
+            "sinavlar":  [
+                {"sinav": sd["sinav"], "satirlar": sd["satirlar"]}
+                for sd in sorted(v["sinavlar"].values(), key=lambda x: x["sinav"].id)
+            ],
+        }
+        for v in sorted(ogrenci_map.values(), key=lambda x: x["okulno"])
+    ]
+
+    return render(request, "main/ogretmen_ogrenci_sinav_takvimi.html", {
+        "title":          "Öğrenci Sınav Takvimi",
+        "sinif_sube":     sinif_sube_str,
+        "ogrenciler":     ogrenciler,
+        "ogretmen_adi":   personel.adi_soyadi,
+        "hata":           None if ogrenciler else f"{sinif_sube_str} sınıfına ait sorumluluk sınavı takvimi bulunamadı.",
+    })
+
+
+# ─────────────────────────────────────────────────────────
+# Öğretmen — Sorumluluk Sınavı Görevlerim
+# ─────────────────────────────────────────────────────────
+
+@login_required
+def ogretmen_sorumluluk_gorevleri(request):
+    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+        raise PermissionDenied
+
+    personel = getattr(request.user, "personel", None)
+    if not personel:
+        return render(request, "main/ogretmen_sorumluluk_gorevleri.html", {
+            "title": "Sınav Görevlerim",
+            "hata": "Kullanıcınıza bağlı öğretmen kaydı bulunamadı.",
+        })
+
+    from sorumluluk.models import (
+        SorumluKomisyonUyesi,
+        SorumluGozetmen,
+        SorumluTakvim,
+        SALON_CHOICES,
+    )
+
+    _SALON_LABEL = dict(SALON_CHOICES)
+    _AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+              "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
+    def _tr_tarih(d):
+        return f"{d.day} {_AYLAR[d.month - 1]} {d.year}"
+
+    komisyonlar = list(
+        SorumluKomisyonUyesi.objects
+        .filter(Q(uye1=personel) | Q(uye2=personel))
+        .select_related("sinav", "sinav__egitim_yili")
+        .order_by("sinav__id", "tarih", "oturum_no", "ders_adi")
+    )
+    gozetmenler = list(
+        SorumluGozetmen.objects
+        .filter(gozetmen=personel)
+        .select_related("sinav", "sinav__egitim_yili")
+        .order_by("sinav__id", "tarih", "oturum_no")
+    )
+
+    sinav_idler = {k.sinav_id for k in komisyonlar} | {g.sinav_id for g in gozetmenler}
+
+    takvim_saatler = {}
+    if sinav_idler:
+        for t in SorumluTakvim.objects.filter(sinav_id__in=sinav_idler).order_by("sinav", "tarih", "oturum_no"):
+            key = (t.sinav_id, t.tarih, t.oturum_no)
+            if key not in takvim_saatler:
+                takvim_saatler[key] = (t.saat_baslangic, t.saat_bitis)
+
+    sinav_map: dict = {}
+
+    def _oturum_al(sid, sinav_obj, tarih, oturum_no):
+        if sid not in sinav_map:
+            sinav_map[sid] = {"sinav": sinav_obj, "oturumlar": {}}
+        oturum_key = (tarih, oturum_no)
+        if oturum_key not in sinav_map[sid]["oturumlar"]:
+            saatler = takvim_saatler.get((sid, tarih, oturum_no))
+            sinav_map[sid]["oturumlar"][oturum_key] = {
+                "tarih":         tarih,
+                "tarih_str":     _tr_tarih(tarih),
+                "oturum_no":     oturum_no,
+                "saat_baslangic": saatler[0] if saatler else None,
+                "saat_bitis":    saatler[1] if saatler else None,
+                "komisyonlar":   [],
+                "gozetmenler":   [],
+            }
+        return sinav_map[sid]["oturumlar"][oturum_key]
+
+    for k in komisyonlar:
+        ot = _oturum_al(k.sinav_id, k.sinav, k.tarih, k.oturum_no)
+        ot["komisyonlar"].append(k.ders_adi)
+
+    for g in gozetmenler:
+        ot = _oturum_al(g.sinav_id, g.sinav, g.tarih, g.oturum_no)
+        ot["gozetmenler"].append(_SALON_LABEL.get(g.salon, g.salon))
+
+    gorev_sinavlar = [
+        {
+            "sinav": data["sinav"],
+            "oturumlar": sorted(data["oturumlar"].values(), key=lambda x: (x["tarih"], x["oturum_no"])),
+        }
+        for _, data in sorted(sinav_map.items())
+    ]
+
+    return render(request, "main/ogretmen_sorumluluk_gorevleri.html", {
+        "title":          "Sınav Görevlerim",
+        "gorev_sinavlar": gorev_sinavlar,
+        "ogretmen_adi":   personel.adi_soyadi,
+        "hata":           None if (komisyonlar or gozetmenler)
+                          else "Henüz size atanmış sorumluluk sınavı görevi bulunmamaktadır.",
     })
 
 

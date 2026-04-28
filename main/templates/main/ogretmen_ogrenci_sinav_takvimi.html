@@ -1,0 +1,147 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .takvim-wrap { max-width: 900px; margin: 0 auto; padding: 1.2rem 1rem; }
+  .sinif-baslik {
+    display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+    margin-bottom: 1.4rem;
+  }
+  .sinif-badge {
+    background: #1e3a5f; color: #fff;
+    padding: .3rem .8rem; border-radius: 6px; font-size: .95rem; font-weight: 700;
+  }
+  .ogr-kart {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+    overflow: hidden; margin-bottom: 1.4rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .ogr-baslik {
+    background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+    padding: .5rem .9rem; display: flex; align-items: center; gap: .6rem;
+    font-size: .85rem;
+  }
+  .ogr-adi { font-weight: 700; color: #1e293b; }
+  .ogr-no  { color: #64748b; font-size: .78rem; }
+  .sinav-blok { padding: .6rem .9rem .8rem; }
+  .sinav-blok + .sinav-blok { border-top: 1px dashed #e2e8f0; }
+  .sinav-adi {
+    font-size: .78rem; font-weight: 700; color: #1e3a5f;
+    text-transform: uppercase; letter-spacing: .04em;
+    margin-bottom: .45rem;
+  }
+  .sinav-tablo {
+    width: 100%; border-collapse: collapse; font-size: .82rem;
+  }
+  .sinav-tablo th {
+    background: #f1f5f9; color: #475569;
+    padding: .35rem .6rem; text-align: left;
+    font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .sinav-tablo td {
+    padding: .35rem .6rem; border-bottom: 1px solid #f0f4f8; color: #1e293b;
+    vertical-align: middle;
+  }
+  .sinav-tablo tr:last-child td { border-bottom: none; }
+  .salon-badge {
+    display: inline-block; background: #dbeafe; color: #1e40af;
+    padding: .1rem .45rem; border-radius: 4px; font-size: .75rem; font-weight: 600;
+  }
+  .sira-badge {
+    display: inline-block; background: #f0fdf4; color: #065f46;
+    padding: .1rem .45rem; border-radius: 4px; font-size: .75rem; font-weight: 600;
+  }
+  .bos-mesaj {
+    text-align: center; color: #94a3b8; padding: 2.5rem 1rem; font-size: .9rem;
+  }
+  @media (max-width: 600px) {
+    .sinav-tablo th:nth-child(4),
+    .sinav-tablo td:nth-child(4) { display: none; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="takvim-wrap">
+
+  <div style="margin-bottom:1rem;">
+    <a href="{% url 'index' %}" class="btn btn-secondary btn-sm">&#8592; Ana Sayfa</a>
+  </div>
+
+  <div class="sinif-baslik">
+    <h1 style="font-size:1.2rem; font-weight:700; color:#1a1a2e; margin:0;">
+      Öğrenci Sorumluluk Sınav Takvimi
+    </h1>
+    {% if sinif_sube %}
+    <span class="sinif-badge">{{ sinif_sube }}</span>
+    {% endif %}
+    {% if ogretmen_adi %}
+    <span style="font-size:.82rem; color:#64748b;">— {{ ogretmen_adi }}</span>
+    {% endif %}
+  </div>
+
+  {% if hata %}
+  <div class="bos-mesaj">{{ hata }}</div>
+
+  {% elif not ogrenciler %}
+  <div class="bos-mesaj">
+    {{ sinif_sube }} sınıfı için oluşturulmuş sorumluluk sınavı takvimi bulunamadı.
+  </div>
+
+  {% else %}
+
+  <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px;
+              padding:.6rem 1rem; margin-bottom:1.2rem; font-size:.83rem; color:#1e40af;">
+    <strong>{{ ogrenciler|length }}</strong> öğrenciye ait sınav takvimi listelenmektedir.
+  </div>
+
+  {% for ogr in ogrenciler %}
+  <div class="ogr-kart">
+    <div class="ogr-baslik">
+      <span class="ogr-adi">{{ ogr.adi_soyadi }}</span>
+      <span class="ogr-no">Okul No: {{ ogr.okulno }}</span>
+    </div>
+
+    {% for sg in ogr.sinavlar %}
+    <div class="sinav-blok">
+      <div class="sinav-adi">
+        {{ sg.sinav.sinav_adi }}
+        {% if sg.sinav.egitim_yili %}&nbsp;&middot;&nbsp;{{ sg.sinav.egitim_yili }}{% endif %}
+        &nbsp;&middot;&nbsp;{{ sg.sinav.get_donem_turu_display }}
+      </div>
+      <table class="sinav-tablo">
+        <thead>
+          <tr>
+            <th>Tarih</th>
+            <th>Saat</th>
+            <th>Ders</th>
+            <th>Salon</th>
+            <th>Sıra</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for satir in sg.satirlar %}
+          <tr>
+            <td>{{ satir.tarih_str }}</td>
+            <td style="white-space:nowrap;">
+              {{ satir.saat_baslangic|time:"H:i" }} – {{ satir.saat_bitis|time:"H:i" }}
+            </td>
+            <td>{{ satir.ders_adi }}</td>
+            <td><span class="salon-badge">{{ satir.salon }}</span></td>
+            <td><span class="sira-badge">{{ satir.sira_no }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  {% endif %}
+</div>
+{% endblock %}
