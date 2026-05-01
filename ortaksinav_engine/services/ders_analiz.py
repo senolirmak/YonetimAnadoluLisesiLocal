@@ -83,12 +83,29 @@ class DersAnalizService(BaseService):
         ders_map = {d.ders_adi: d for d in DersHavuzu.objects.all()}
         sube_map = {(ss.sinif, ss.sube): ss for ss in SinifSube.objects.all()}
 
+        # Ortak sınava katılacak seviyeler filtresi
+        ortak_seviyeleri = self.config.get("ORTAK_SINAV_SEVIYELERI", [])
+        if ortak_seviyeleri:
+            df_filtreli = df_filtreli[df_filtreli["Seviye"].isin(ortak_seviyeleri)]
+            self.log(f"Seviye filtresi uygulandı: {sorted(ortak_seviyeleri)} → {len(df_filtreli)} satır kaldı.")
+            if df_filtreli.empty:
+                raise RuntimeError(
+                    f"SubeDers: Seçili seviyeler ({sorted(ortak_seviyeleri)}) için planlanacak ders bulunamadı. "
+                    "Ders programı verilerini kontrol edin."
+                )
+
         # Sinav yapilmayacak derslerin mevcut SubeDers kayitlarini kaldir
         # NOT: df_filtreli hesabından SONRA silme yapılır ki döngüde geri eklenmesın
         if sinav_yapilmayacak:
             silinen, _ = SubeDers.objects.filter(ders__ders_adi__in=sinav_yapilmayacak).delete()
             if silinen:
                 self.log(f"{silinen} sinav-yapilmayacak ders/sube kaydi SubeDers'ten silindi.")
+
+        # Seçili seviye dışındaki mevcut SubeDers kayıtlarını kaldır
+        if ortak_seviyeleri:
+            silinen_sev, _ = SubeDers.objects.exclude(seviye__in=ortak_seviyeleri).delete()
+            if silinen_sev:
+                self.log(f"{silinen_sev} kayıt seçili seviye ({sorted(ortak_seviyeleri)}) dışı olduğu için SubeDers'ten silindi.")
 
         # Mevcut kayitlari topla; yalnizca eksik olanlari ekle
         mevcut = set(SubeDers.objects.values_list("ders_id", "seviye", "sube_id"))

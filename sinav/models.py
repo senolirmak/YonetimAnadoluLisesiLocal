@@ -285,6 +285,18 @@ class AlgoritmaParametreleri(models.Model):
     time_limit_phase1 = models.IntegerField(default=300)
     time_limit_phase2 = models.IntegerField(default=120)
     max_extra_days    = models.IntegerField(default=10)
+    kelebek_dagitim   = models.BooleanField(
+        default=True,
+        verbose_name="Kelebek Dağılımı",
+        help_text="Seçili: öğrenciler salonlara karışık dağıtılır. "
+                  "Seçili değil: her sınıf kendi salonunda sınava girer.",
+    )
+    max_sinav_per_gun = models.IntegerField(
+        default=2,
+        verbose_name="Günde Maks. Sınav Sayısı",
+        help_text="Bir öğrencinin (şubenin) aynı günde girebileceği en fazla sınav sayısı. "
+                  "ILP kısıtı bu değerle uygulanır.",
+    )
 
     class Meta:
         verbose_name = "Algoritma Parametreleri"
@@ -302,6 +314,8 @@ class AlgoritmaParametreleri(models.Model):
             "time_limit_phase1": self.time_limit_phase1,
             "time_limit_phase2": self.time_limit_phase2,
             "max_extra_days":    self.max_extra_days,
+            "kelebek_dagitim":   self.kelebek_dagitim,
+            "max_sinav_per_gun": self.max_sinav_per_gun,
         }
 
 

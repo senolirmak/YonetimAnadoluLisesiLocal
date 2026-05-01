@@ -26,9 +26,41 @@
 <form id="da-form" method="post" action="{% url 'sinav:ders_ayarlari_kaydet' %}">
   {% csrf_token %}
   <!-- JS tarafından doldurulacak gizli alanlar -->
-  <input type="hidden" id="sabit_json"   name="sabit_json">
-  <input type="hidden" id="catisma_json" name="catisma_json">
-  <input type="hidden" id="esleme_json"  name="esleme_json">
+  <input type="hidden" id="sabit_json"            name="sabit_json">
+  <input type="hidden" id="catisma_json"          name="catisma_json">
+  <input type="hidden" id="esleme_json"           name="esleme_json">
+  <input type="hidden" id="ortak_seviyeler_json"  name="ortak_seviyeler_json">
+
+  <!-- ===== ORTAK SINAVA KATILACAK SEVİYELER ===== -->
+  <div class="card" style="margin-bottom:1rem; border-left:4px solid #6366f1;">
+    <div class="da-card-header">
+      <div>
+        <h2>Ortak Sınava Katılacak Seviyeler</h2>
+        <p class="helptext">
+          Seçilen sınıf seviyeleri SubeDers ve takvim planlamasına dahil edilir.
+          Seçilmeyen seviyeler <strong>Adım 3 (SubeDers)</strong> çalıştırıldığında planlama dışına alınır.
+        </p>
+      </div>
+    </div>
+    <div class="sinif-secim" style="flex-wrap:wrap; gap:.75rem; margin-top:.5rem;">
+      <label class="sinif-item">
+        <input type="checkbox" class="ortak-seviye" value="9"
+          {% if 9 in ortak_sinav_seviyeleri %}checked{% endif %}> 9. Sınıf
+      </label>
+      <label class="sinif-item">
+        <input type="checkbox" class="ortak-seviye" value="10"
+          {% if 10 in ortak_sinav_seviyeleri %}checked{% endif %}> 10. Sınıf
+      </label>
+      <label class="sinif-item">
+        <input type="checkbox" class="ortak-seviye" value="11"
+          {% if 11 in ortak_sinav_seviyeleri %}checked{% endif %}> 11. Sınıf
+      </label>
+      <label class="sinif-item">
+        <input type="checkbox" class="ortak-seviye" value="12"
+          {% if 12 in ortak_sinav_seviyeleri %}checked{% endif %}> 12. Sınıf
+      </label>
+    </div>
+  </div>
 
   <div class="da-grids-wrap">
   <!-- ===== ÜST GRID: YAPILMAYACAK + ÇİFT OTURUMLU ===== -->
@@ -611,10 +643,18 @@ function eslemeSil(i) {
 // ──────────────────────────────────────────────
 // Form submit: JSON hidden inputs güncelle
 // ──────────────────────────────────────────────
-document.getElementById("da-form").addEventListener("submit", function() {
-  document.getElementById("sabit_json").value   = JSON.stringify(sabitState);
-  document.getElementById("catisma_json").value = JSON.stringify(catismaState);
-  document.getElementById("esleme_json").value  = JSON.stringify(eslemeState);
+document.getElementById("da-form").addEventListener("submit", function(e) {
+  const ortakSeviyeler = [...document.querySelectorAll(".ortak-seviye:checked")]
+                          .map(cb => parseInt(cb.value)).sort((a, b) => a - b);
+  if (ortakSeviyeler.length === 0) {
+    e.preventDefault();
+    alert("En az bir sınıf seviyesi seçilmelidir.");
+    return;
+  }
+  document.getElementById("sabit_json").value           = JSON.stringify(sabitState);
+  document.getElementById("catisma_json").value         = JSON.stringify(catismaState);
+  document.getElementById("esleme_json").value          = JSON.stringify(eslemeState);
+  document.getElementById("ortak_seviyeler_json").value = JSON.stringify(ortakSeviyeler);
 });
 
 // ──────────────────────────────────────────────

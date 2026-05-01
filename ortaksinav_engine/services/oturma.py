@@ -98,7 +98,13 @@ class OturmaPlanService(BaseService):
         self.log(f"\nOturum yerlesimi: {tarih} {saat} (Oturum {oturum})")
         baslik = f"{tarih} {saat} (Oturum {oturum})"
 
+        # Yeniden üretimde eski kayıtları temizle (aynı uretim + tarih + saat + oturum)
         if aktif_uretim is not None:
+            silinen, _ = OturmaPlani.objects.filter(
+                uretim=aktif_uretim, tarih=tarih, saat=saat, oturum=oturum
+            ).delete()
+            if silinen:
+                self.log(f"Önceki üretimden {silinen} kayıt silindi.")
             takvim_qs = Takvim.objects.filter(tarih=tarih, saat=saat, uretim=aktif_uretim).select_related("ders_saati")
         else:
             takvim_qs = Takvim.objects.filter(tarih=tarih, saat=saat, sinav=aktif_sinav).select_related("ders_saati")
@@ -136,21 +142,36 @@ class OturmaPlanService(BaseService):
             self.log("Bu oturumda sinava girecek ogrenci bulunamadi.")
             return
 
-        # Her oturum için farklı karıştırma — aynı öğrencinin her sınavda
-        # aynı salona düşmesini önler.
+        kelebek = self.config.get("KELEBEK_DAGITIM", True)
         _seed = int(hashlib.md5(f"{tarih}{saat}{oturum}".encode()).hexdigest(), 16) % (2 ** 31)
         ogr = df_o.sample(frac=1, random_state=_seed).reset_index(drop=True)
         salon_map = {name: [] for name in salon_adlari}
-        for i, (_, row) in enumerate(ogr.iterrows()):
-            salon_map[salon_adlari[i % len(salon_adlari)]].append(row.to_dict())
+
+        if kelebek:
+            # Her oturum için farklı karıştırma — öğrenciler salonlara dönüşümlü dağıtılır.
+            for i, (_, row) in enumerate(ogr.iterrows()):
+                salon_map[salon_adlari[i % len(salon_adlari)]].append(row.to_dict())
+        else:
+            # Kelebek yok: her öğrenci kendi şube salonuna gider.
+            self.log("Kelebek dağılımı kapalı: her sınıf kendi salonunda.")
+            for _, row in ogr.iterrows():
+                sinifsube = str(row.get("sinifsube", "")).upper().replace(" ", "")
+                salon_key = f"Salon-{sinifsube.replace('/', '_')}"
+                if salon_key in salon_map:
+                    salon_map[salon_key].append(row.to_dict())
 
         salon_grids = {}
         for salon, lst in salon_map.items():
-            df_salon = pd.DataFrame(lst)
-            for col in ("ders", "sinif"):
-                if col not in df_salon.columns:
-                    df_salon[col] = ""
-            salon_grids[salon] = self._place_matrix(df_salon)
+            if not lst:
+                continue
+            if kelebek:
+                df_salon = pd.DataFrame(lst)
+                for col in ("ders", "sinif"):
+                    if col not in df_salon.columns:
+                        df_salon[col] = ""
+                salon_grids[salon] = self._place_matrix(df_salon)
+            else:
+                salon_grids[salon] = self._simple_grid(lst)
 
         # DB kaydet
         tarih_date = datetime.strptime(tarih, "%Y-%m-%d").date()
@@ -233,6 +254,22 @@ class OturmaPlanService(BaseService):
     # ------------------------------------------------------------------
     # Ozel yardimci metodlar
     # ------------------------------------------------------------------
+
+    def _simple_grid(self, lst: list) -> list:
+        """Kelebek olmayan mod: öğrencileri sıra sıra, blok blok yerleştirir."""
+        ROWS, COLS_PER_BLOCK, BLOCKS = 6, 2, 3
+        grid = [
+            [[None] * COLS_PER_BLOCK for _ in range(ROWS)]
+            for _ in range(BLOCKS)
+        ]
+        idx = 0
+        for b in range(BLOCKS):
+            for r in range(ROWS):
+                for c in range(COLS_PER_BLOCK):
+                    if idx < len(lst):
+                        grid[b][r][c] = lst[idx] if isinstance(lst[idx], dict) else lst[idx].to_dict()
+                        idx += 1
+        return grid
 
     def _place_matrix(self, df_students):
         ROWS, COLS_PER_BLOCK, BLOCKS = 6, 2, 3

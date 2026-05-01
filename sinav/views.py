@@ -134,6 +134,24 @@ def _apply_config(session_cfg: dict):
         [e["ders1"], e["ders2"]]
         for e in _veri.get("ayni_slot_esleme", [])
     ]
+    ortak_seviyeleri = _veri.get("ortak_sinav_seviyeleri", [])
+    CONFIG["ORTAK_SINAV_SEVIYELERI"] = [int(s) for s in ortak_seviyeleri] if ortak_seviyeleri else []
+
+    # Kelebek dağılımı ayarı DB'den gelir; yoksa True (mevcut davranış)
+    kelebek = True
+    if prm is not None:
+        kelebek = bool(prm.kelebek_dagitim)
+    elif alg.get("kelebek_dagitim") is not None:
+        kelebek = bool(alg["kelebek_dagitim"])
+    CONFIG["KELEBEK_DAGITIM"] = kelebek
+
+    # Günde maks. sınav sayısı
+    if prm is not None:
+        CONFIG["MAX_SINAV_PER_GUN"] = int(prm.max_sinav_per_gun)
+    elif alg.get("max_sinav_per_gun") is not None:
+        CONFIG["MAX_SINAV_PER_GUN"] = int(alg["max_sinav_per_gun"])
+    else:
+        CONFIG["MAX_SINAV_PER_GUN"] = 2
 
 
 # ---------------------------------------------------------------
@@ -211,6 +229,8 @@ def _alg_form_initial(request):
             "time_limit_phase1": saved.get("time_limit_phase1", 300),
             "time_limit_phase2": saved.get("time_limit_phase2", 120),
             "max_extra_days":    saved.get("max_extra_days",    10),
+            "kelebek_dagitim":   saved.get("kelebek_dagitim",   True),
+            "max_sinav_per_gun": saved.get("max_sinav_per_gun", 2),
         }
     return AlgoritmaForm(initial=initial)
 
@@ -843,6 +863,8 @@ def parametre_kaydet(request):
     cfg["time_limit_phase1"] = form.cleaned_data["time_limit_phase1"]
     cfg["time_limit_phase2"] = form.cleaned_data["time_limit_phase2"]
     cfg["max_extra_days"]    = form.cleaned_data["max_extra_days"]
+    cfg["kelebek_dagitim"]   = form.cleaned_data.get("kelebek_dagitim", True)
+    cfg["max_sinav_per_gun"] = form.cleaned_data.get("max_sinav_per_gun", 2)
     request.session["ortaksinav_config"] = cfg
     request.session.modified = True
 
@@ -858,6 +880,8 @@ def parametre_kaydet(request):
                 "time_limit_phase1": form.cleaned_data["time_limit_phase1"],
                 "time_limit_phase2": form.cleaned_data["time_limit_phase2"],
                 "max_extra_days":    form.cleaned_data["max_extra_days"],
+                "kelebek_dagitim":   form.cleaned_data.get("kelebek_dagitim", True),
+                "max_sinav_per_gun": form.cleaned_data.get("max_sinav_per_gun", 2),
             },
         )
 
@@ -1226,7 +1250,7 @@ def _run_step(task_id: str, session_cfg: dict, func_name: str):
                     return _TASKS.get(task_id, {}).get("cancel", False)
 
             svc = TakvimService(CONFIG, log_fn=lambda m: _log(task_id, m), cancel_fn=_cancel_fn)
-            svc.adim4()
+            svc.takvimolustur()
         else:
             func, _ = ADIM_FUNCLARI[func_name]
             func()
@@ -1471,9 +1495,10 @@ def ders_ayarlari(request):
     dp_dersler = list(DersHavuzu.objects.order_by("ders_adi"))
     tum_dersler = sorted(DersHavuzu.objects.values_list("ders_adi", flat=True))
 
-    catisma_gruplari = veri.get("catisma_gruplari", [])
-    esleme_ciftleri  = veri.get("ayni_slot_esleme", [])
-    sabit_raw        = veri.get("sabit_sinavlar", [])
+    catisma_gruplari      = veri.get("catisma_gruplari", [])
+    esleme_ciftleri       = veri.get("ayni_slot_esleme", [])
+    sabit_raw             = veri.get("sabit_sinavlar", [])
+    ortak_sinav_seviyeleri = veri.get("ortak_sinav_seviyeleri", [9, 10, 11, 12])
 
     import json as _json
     varsayilan_catisma = {
@@ -1496,6 +1521,7 @@ def ders_ayarlari(request):
         "esleme_json":             _json.dumps(esleme_ciftleri, ensure_ascii=False),
         "varsayilan_catisma_json": _json.dumps(varsayilan_catisma, ensure_ascii=False),
         "tum_dersler_sabit":       tum_dersler,
+        "ortak_sinav_seviyeleri":  ortak_sinav_seviyeleri,
     })
 
 
@@ -1518,6 +1544,16 @@ def ders_ayarlari_kaydet(request):
                 veri[key] = _json.loads(raw)
             except Exception:
                 pass
+
+    raw_seviyeler = request.POST.get("ortak_seviyeler_json", "").strip()
+    if raw_seviyeler:
+        try:
+            parsed = _json.loads(raw_seviyeler)
+            seviyelar = sorted({int(s) for s in parsed if str(s).isdigit() or isinstance(s, int)})
+            if seviyelar:
+                veri["ortak_sinav_seviyeleri"] = seviyelar
+        except Exception:
+            pass
 
     _save_ayarlar(aktif, veri)
 

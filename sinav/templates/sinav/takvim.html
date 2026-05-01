@@ -95,6 +95,23 @@
         {% for err in alg_form.tatil_gunleri.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
       </div>
 
+      <div class="form-group">
+        {{ alg_form.max_sinav_per_gun.label_tag }}
+        <input type="number" name="{{ alg_form.max_sinav_per_gun.html_name }}"
+               value="{{ alg_form.max_sinav_per_gun.value }}"
+               style="width:80px;" min="1" max="5">
+        <span class="helptext">{{ alg_form.max_sinav_per_gun.help_text }}</span>
+        {% for err in alg_form.max_sinav_per_gun.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+      </div>
+
+      <div class="form-group" style="margin-top:.25rem;">
+        <label style="display:flex; align-items:center; gap:.5rem; font-weight:500; cursor:pointer;">
+          {{ alg_form.kelebek_dagitim }}
+          {{ alg_form.kelebek_dagitim.label }}
+        </label>
+        <span class="helptext">{{ alg_form.kelebek_dagitim.help_text }}</span>
+      </div>
+
       <details style="margin-top:.25rem;">
         <summary style="cursor:pointer; font-size:.85rem; color:#6b7280;">Gelişmiş (ILP Süre Limitleri)</summary>
         <div style="display:flex; flex-direction:column; gap:.75rem; margin-top:.6rem;">
@@ -144,16 +161,16 @@
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
     <h2>Sınav Takvimi Oluştur (ILP)</h2>
     <div style="display:flex; gap:.5rem;">
-      <button class="btn btn-success" id="btn-adim4"
+      <button class="btn btn-success" id="btn-takvimolustur"
         {% if sube_ders_sayisi == 0 %}disabled title="Önce Ders Ayarlarını kaydedin"{% endif %}
-        onclick="runAdim4()">
+        onclick="runTakvimOlustur()">
         Çalıştır
       </button>
-      <button class="btn btn-danger" id="durdur-adim4" style="display:none"
-        onclick="iptalAdim('durdur-adim4')">
+      <button class="btn btn-danger" id="durdur-takvimolustur" style="display:none"
+        onclick="iptalAdim('durdur-takvimolustur')">
         Durdur
       </button>
-      <span class="badge" id="badge-adim4" style="align-self:center;">Bekliyor</span>
+      <span class="badge" id="badge-takvimolustur" style="align-self:center;">Bekliyor</span>
     </div>
   </div>
   <div class="log-box" id="log-box">Henüz bir işlem başlatılmadı.</div>
@@ -169,14 +186,14 @@
 <script>
 const logBox   = document.getElementById("log-box");
 const onizCta  = document.getElementById("onizleme-cta");
-const badgeEl  = document.getElementById("badge-adim4");
-const btnEl    = document.getElementById("btn-adim4");
+const badgeEl  = document.getElementById("badge-takvimolustur");
+const btnEl    = document.getElementById("btn-takvimolustur");
 
-async function runAdim4() {
+async function runTakvimOlustur() {
   const data = await postJSON("{% url 'sinav:takvim' %}");
   if (!data.task_id) return;
   _activeTaskId = data.task_id;
-  const durdurBtn = document.getElementById("durdur-adim4");
+  const durdurBtn = document.getElementById("durdur-takvimolustur");
   durdurBtn.style.display = "inline-flex";
   badgeEl.className = "badge badge-running";
   badgeEl.textContent = "Calisiyor...";

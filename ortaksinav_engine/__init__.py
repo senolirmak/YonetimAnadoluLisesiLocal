@@ -32,7 +32,7 @@ def subeders_guncelle():
 
 def takvim_olustur():
     """Takvim: ILP ile catismasiz sinav takvimi olusturur."""
-    TakvimService(CONFIG).adim4()
+    TakvimService(CONFIG).takvimolustur()
 
 
 def oturma_planlarini_olustur():

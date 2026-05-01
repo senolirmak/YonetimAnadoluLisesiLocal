@@ -78,6 +78,20 @@ class AlgoritmaForm(forms.Form):
         min_value=1,
         help_text="Çözüm bulunamazsa takvim kaç gün uzatılabilir.",
     )
+    kelebek_dagitim = forms.BooleanField(
+        label="Kelebek Dağılımı",
+        required=False,
+        initial=True,
+        help_text="İşaretli: öğrenciler salonlara karışık dağıtılır (ortak sınav standardı). "
+                  "İşaretsiz: her sınıf kendi salonunda sınava girer.",
+    )
+    max_sinav_per_gun = forms.IntegerField(
+        label="Günde Maks. Sınav",
+        initial=2,
+        min_value=1,
+        max_value=5,
+        help_text="Bir öğrencinin aynı günde girebileceği en fazla sınav sayısı (ILP kısıtı).",
+    )
 
     def clean_oturum_saatleri(self):
         raw = self.cleaned_data.get("oturum_saatleri", "")

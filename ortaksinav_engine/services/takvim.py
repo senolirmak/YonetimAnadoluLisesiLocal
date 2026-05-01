@@ -32,8 +32,8 @@ from ortaksinav_engine.services.base import BaseService
 class TakvimService(BaseService):
     """ILP tabanli sinav takvimi olusturan servis."""
 
-    def adim4(self):
-        self.log("\nAdim 4: ILP ile sinav takvimi olusturuluyor...")
+    def takvimolustur(self):
+        self.log("\nILP ile sinav takvimi olusturuluyor...")
         from sinav.models import SubeDers, SinavBilgisi
 
         from django.db.models import F as _F
@@ -295,17 +295,18 @@ class TakvimService(BaseService):
         df_out = pd.DataFrame(rows_out)
 
         # Kural kontrolu
+        _max_per_gun = int(self.config.get("MAX_SINAV_PER_GUN", 2))
         tmp = df_out.copy()
         tmp["Subeler"] = tmp["Subeler"].str.split(", ")
         tmp = tmp.explode("Subeler").rename(columns={"Subeler": "Sube"})
         gcount = tmp.groupby(["GunIdx", "Sube"]).size().reset_index(name="Adet")
-        viol = gcount[gcount["Adet"] > 2]
+        viol = gcount[gcount["Adet"] > _max_per_gun]
         if not viol.empty:
             for _, row in viol.iterrows():
                 self.log(f"  IHLAL: {row['Sube']} - Gun {int(row['GunIdx'])+1} - {int(row['Adet'])} sinav")
-            self.log(f"IHLAL: {len(viol)} sube/gun kombinasyonunda > 2 sinav var!")
+            self.log(f"IHLAL: {len(viol)} sube/gun kombinasyonunda > {_max_per_gun} sinav var!")
         else:
-            self.log("Kural saglandi: Her sube icin her gunde <= 2 sinav.")
+            self.log(f"Kural saglandi: Her sube icin her gunde <= {_max_per_gun} sinav.")
 
         # Catisma grubu gun kisiti dogrulama
         if catisma_gun_kisitlari:
@@ -404,6 +405,7 @@ class TakvimService(BaseService):
 
     def _phase1(self, K_upper, G, DERSLER, SUBE_DERS_MAP, DAY_SLOTS,
                 fixed_slots=None, catisma_gun_kisitlari=None, pairs=None):
+        MAX_SINAV_PER_GUN = int(self.config.get("MAX_SINAV_PER_GUN", 2))
         DAYS = list(DAY_SLOTS.keys())
         model = LpProblem("MinSlot_Phase1", LpMinimize)
         x = {
@@ -434,7 +436,7 @@ class TakvimService(BaseService):
         for sube, dlist in SUBE_DERS_MAP.items():
             dset = set(dlist)
             for g, slots in DAY_SLOTS.items():
-                model += lpSum(x[(d, t)] for d in dset for t in slots if (d, t) in x) <= 2
+                model += lpSum(x[(d, t)] for d in dset for t in slots if (d, t) in x) <= MAX_SINAV_PER_GUN
 
         # Catisma grubundaki dersler: ayni sube icin ayni gunde en fazla 1 sinav
         for _sube, dset_cg in (catisma_gun_kisitlari or []):
@@ -475,6 +477,7 @@ class TakvimService(BaseService):
     def _phase2(self, min_slots, G, DERSLER, SUBE_DERS_MAP, pairs, DERS_WEIGHT,
                 oturum_sayisi_gun, ders_seviye_map=None, fixed_slots=None,
                 catisma_gun_kisitlari=None):
+        MAX_SINAV_PER_GUN = int(self.config.get("MAX_SINAV_PER_GUN", 2))
         """
         Faz-2: Exactly min_slots sloti kullanir (K = min_slots).
         Tum y[t]=1 olacagindan y degiskenleri kaldirilir.
@@ -509,11 +512,11 @@ class TakvimService(BaseService):
             for t in range(K):
                 model += x[(d1, t)] + x[(d2, t)] <= 1
 
-        # Sube/gun <= 2 sinavi
+        # Sube/gun <= MAX_SINAV_PER_GUN sinavi
         for sube, dlist in SUBE_DERS_MAP.items():
             dset = set(dlist)
             for g, slots in DAY_SLOTS.items():
-                model += lpSum(x[(d, t)] for d in dset for t in slots if (d, t) in x) <= 2
+                model += lpSum(x[(d, t)] for d in dset for t in slots if (d, t) in x) <= MAX_SINAV_PER_GUN
 
         # Catisma grubundaki dersler: ayni sube icin ayni gunde en fazla 1 sinav
         for _sube, dset_cg in (catisma_gun_kisitlari or []):
