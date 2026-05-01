@@ -2,6 +2,8 @@ from collections import defaultdict
 
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 from django.urls import path
@@ -381,3 +383,78 @@ class VeriYuklemeAdmin(admin.ModelAdmin):
             for chunk in f.chunks():
                 destination.write(chunk)
         return file_path
+
+
+# ──────────────────────────────────────────────
+# Öğretmen kullanıcı şifre sıfırlama — custom UserAdmin
+# ──────────────────────────────────────────────
+
+User = get_user_model()
+
+
+class OgretmenSifreDegistirForm(forms.Form):
+    yeni_sifre = forms.CharField(
+        label="Yeni Şifre",
+        widget=forms.PasswordInput(render_value=True),
+        min_length=6,
+    )
+    yeni_sifre2 = forms.CharField(
+        label="Yeni Şifre (Tekrar)",
+        widget=forms.PasswordInput(render_value=True),
+        min_length=6,
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        s1 = cleaned.get("yeni_sifre", "")
+        s2 = cleaned.get("yeni_sifre2", "")
+        if s1 and s2 and s1 != s2:
+            raise forms.ValidationError("Şifreler eşleşmiyor.")
+        return cleaned
+
+
+admin.site.unregister(User)
+
+
+@admin.register(User)
+class CustomUserAdmin(BaseUserAdmin):
+    change_list_template = "admin/auth/user/change_list.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        extra = [
+            path(
+                "ogretmen-sifre-degistir/",
+                self.admin_site.admin_view(self.ogretmen_sifre_degistir_view),
+                name="ogretmen_sifre_degistir",
+            ),
+        ]
+        return extra + urls
+
+    def ogretmen_sifre_degistir_view(self, request):
+        ogretmenler = User.objects.filter(groups__name="ogretmen", is_active=True)
+        form = OgretmenSifreDegistirForm(request.POST or None)
+
+        if request.method == "POST" and form.is_valid():
+            yeni_sifre = form.cleaned_data["yeni_sifre"]
+            sayi = 0
+            for user in ogretmenler:
+                user.set_password(yeni_sifre)
+                user.save(update_fields=["password"])
+                sayi += 1
+            self.message_user(
+                request,
+                f"{sayi} öğretmen kullanıcısının şifresi başarıyla değiştirildi.",
+                level=messages.SUCCESS,
+            )
+            return redirect("../")
+
+        context = {
+            "title": "Öğretmen Şifrelerini Değiştir",
+            "form": form,
+            "ogretmen_sayisi": ogretmenler.count(),
+            "ogretmenler": ogretmenler.order_by("username")[:20],
+            "opts": self.model._meta,
+            **self.admin_site.each_context(request),
+        }
+        return render(request, "admin/ogretmen_sifre_degistir.html", context)

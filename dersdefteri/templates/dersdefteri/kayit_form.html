@@ -167,7 +167,7 @@
           {{ devamsiz_listesi|length }} devamsız
         </span>
         {% endif %}
-        <a href="{% url 'devamsizlik:ogretmen_devamsizlik_ders' dp.ders_saati %}" class="dd-yoklama-link" style="margin-left:auto;" target="_blank">
+        <a href="{% url 'devamsizlik:ogretmen_devamsizlik_ders' dp.ders_saati.pk %}" class="dd-yoklama-link" style="margin-left:auto;" target="_blank">
           Yoklamaya Git ↗
         </a>
       </div>

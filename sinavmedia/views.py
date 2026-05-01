@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta
 
 from django.contrib import messages
@@ -7,30 +8,27 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from okul.models import DersHavuzu
-from sinav.models import SubeDers, Takvim
+from sinav.models import Takvim
 
 from .models import SinavMedia
 
 SEVIYE_LABELS = {9: "9. Sınıf", 10: "10. Sınıf", 11: "11. Sınıf", 12: "12. Sınıf"}
 
 
-def _ders_seviyeleri(ders_adi):
-    """SubeDers tablosundan dersin okutulduğu seviyeleri döndürür."""
-    base = ders_adi.replace(" (Uygulama)", "").replace(" (Yazili)", "").strip()
-    ders = DersHavuzu.objects.filter(ders_adi=base).first()
-    if not ders:
-        # Tam eşleşme yoksa içeren ara
-        ders = DersHavuzu.objects.filter(ders_adi__icontains=base).first()
-    if not ders:
-        return list(SEVIYE_LABELS.items())  # Bilinmiyorsa hepsini göster
-    seviyeler = (
-        SubeDers.objects.filter(ders=ders)
-        .values_list("seviye", flat=True)
-        .distinct()
-        .order_by("seviye")
-    )
-    return [(sev, SEVIYE_LABELS[sev]) for sev in seviyeler if sev in SEVIYE_LABELS]
+def _seviye_from_subeler(subeler_str):
+    """Takvim.subeler alanından o slota ait seviye listesini çıkarır.
+    Örn. '12/A, 12/B' → [(12, '12. Sınıf')]
+    """
+    seviyeler = set()
+    for sube in (s.strip() for s in subeler_str.upper().split(",") if s.strip()):
+        m = re.match(r'^(\d+)', sube)
+        if m:
+            sev = int(m.group(1))
+            if sev in SEVIYE_LABELS:
+                seviyeler.add(sev)
+    if not seviyeler:
+        return list(SEVIYE_LABELS.items())
+    return [(sev, SEVIYE_LABELS[sev]) for sev in sorted(seviyeler)]
 
 TOLERANS_DAKIKA = 5
 
@@ -46,10 +44,27 @@ def yonetim(request):
     if not _mudur_yardimcisi_mi(request.user):
         raise Http404
 
-    # Aktif sınav + aktif üretim filtresi — duplicate üretimlerden korunmak için
     from sinav.models import SinavBilgisi, TakvimUretim as TU
     aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
-    aktif_uretim = TU.objects.filter(sinav=aktif_sinav, aktif=True).first() if aktif_sinav else None
+
+    if not aktif_sinav:
+        return render(request, "sinavmedia/yonetim.html", {
+            "aktif_sinav": None, "aktif_uretim": None,
+            "slot_listesi": [], "hata": "Henüz aktif bir sınav tanımlanmamış.",
+        })
+
+    # aktif=True olan üretimi önce ara; yoksa en son üretimi kullan
+    aktif_uretim = (
+        TU.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        or TU.objects.filter(sinav=aktif_sinav).order_by("-uretim_tarihi").first()
+    )
+
+    ctx_base = {"aktif_sinav": aktif_sinav, "aktif_uretim": aktif_uretim}
+
+    if not aktif_uretim:
+        return render(request, "sinavmedia/yonetim.html",
+                      {**ctx_base, "slot_listesi": [],
+                       "hata": "Bu sınav için henüz takvim üretimi yapılmamış."})
 
     # Sadece (Uygulama) içeren takvim slotlarını getir
     takvimler = (
@@ -67,14 +82,15 @@ def yonetim(request):
     slot_listesi = []
     for t in takvimler:
         medya_map = {m.seviye: m for m in t.medyalar.all()}
-        seviyeler = _ders_seviyeleri(t.ders.ders_adi if t.ders else "")
+        seviyeler = _seviye_from_subeler(t.subeler)
         satirlar = [
             {"seviye": sev, "label": lbl, "medya": medya_map.get(sev)}
             for sev, lbl in seviyeler
         ]
         slot_listesi.append({"takvim": t, "satirlar": satirlar})
 
-    return render(request, "sinavmedia/yonetim.html", {"slot_listesi": slot_listesi})
+    return render(request, "sinavmedia/yonetim.html",
+                  {**ctx_base, "slot_listesi": slot_listesi})
 
 
 # ---------------------------------------------------------------

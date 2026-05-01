@@ -1378,6 +1378,7 @@ def sinav_bilgisi_listesi(request):
         "aktif_sinav":   _aktif_sinav(),
         "okul":          okul,
         "okul_tamam":    okul_tamam,
+        "db_ozeti":      _db_ozeti(),
         **kurulum,
         **dosya,
     })

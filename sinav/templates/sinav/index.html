@@ -120,46 +120,6 @@
   {% endif %}
 </div>
 
-<!-- Veritabanı durumu -->
-<div class="card">
-  <h2>Veritabanı Durumu</h2>
-  <div class="db-grid">
-    <div class="db-item"><span class="db-num">{{ db_ozeti.ogrenci }}</span><span class="db-lbl">Öğrenci</span></div>
-    <div class="db-item"><span class="db-num">{{ db_ozeti.ders_program }}</span><span class="db-lbl">Ders Program</span></div>
-    <div class="db-item"><span class="db-num">{{ db_ozeti.sube_ders }}</span><span class="db-lbl">Şube Ders</span></div>
-    <div class="db-item"><span class="db-num">{{ db_ozeti.takvim }}</span><span class="db-lbl">Takvim</span></div>
-    <div class="db-item"><span class="db-num">{{ db_ozeti.oturma_plani }}</span><span class="db-lbl">Oturma Planı</span></div>
-  </div>
-</div>
-
-<!-- ===== İŞ AKIŞI ADIMLARI ===== -->
-<div class="card">
-  <h2>İşlem Adımları</h2>
-  <div class="akis-grid">
-
-    <a href="{% url 'sinav:ders_ayarlari' %}" class="akis-kart">
-      <span class="akis-num">Adım 3</span>
-      <span class="akis-baslik">Ders Ayarları</span>
-      <span class="akis-aciklama">Sınav yapılmayacak ve iki oturumlu dersleri belirle, filtrele</span>
-      <span class="akis-durum {% if db_ozeti.sube_ders > 0 %}durum-ok{% else %}durum-bos{% endif %}">
-        {% if db_ozeti.sube_ders > 0 %}✓ {{ db_ozeti.sube_ders }} ders{% else %}Yapılmadı{% endif %}
-      </span>
-    </a>
-
-    <a href="{% url 'sinav:takvim_sayfasi' %}" class="akis-kart">
-      <span class="akis-num">Adım 4</span>
-      <span class="akis-baslik">Sınav Takvimi (ILP)</span>
-      <span class="akis-aciklama">Çakışmasız sınav takvimini ILP ile oluştur</span>
-      <span class="akis-durum {% if db_ozeti.takvim > 0 %}durum-ok{% else %}durum-bos{% endif %}">
-        {% if db_ozeti.takvim > 0 %}✓ {{ db_ozeti.takvim }} ders planlandı{% else %}Yapılmadı{% endif %}
-      </span>
-    </a>
-
-
-
-  </div>
-</div>
-
 {% endif %}{# aktif_sinav #}
 
 <style>
@@ -184,47 +144,6 @@
 .kurulum-adim-baslik { font-weight: 600; font-size: .9rem; color: #1a1a2e; }
 .kurulum-adim-aciklama { font-size: .78rem; color: #6b7280; margin-top: .1rem; }
 
-.db-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: .75rem;
-}
-.db-item {
-  background: #f0f4ff;
-  border: 1px solid #c7d2fe;
-  border-radius: 7px;
-  padding: .75rem;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: .2rem;
-}
-.db-num { font-size: 1.6rem; font-weight: 700; color: #3730a3; }
-.db-lbl { font-size: .72rem; color: #6b7280; }
-
-.akis-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-.akis-kart {
-  display: flex; flex-direction: column; gap: .4rem;
-  border: 1px solid #e5e7eb; border-radius: 8px;
-  padding: 1rem 1.1rem;
-  background: #fafafa;
-  text-decoration: none; color: inherit;
-  transition: box-shadow .15s, border-color .15s;
-}
-.akis-kart:hover {
-  border-color: #6366f1;
-  box-shadow: 0 3px 12px rgba(99,102,241,.12);
-}
-.akis-num { font-size: .72rem; color: #9ca3af; font-weight: 500; }
-.akis-baslik { font-size: .95rem; font-weight: 700; color: #1a1a2e; }
-.akis-aciklama { font-size: .78rem; color: #6b7280; line-height: 1.4; flex: 1; }
-.akis-durum { font-size: .75rem; font-weight: 600; margin-top: .3rem; }
-.durum-ok  { color: #16a34a; }
-.durum-bos { color: #9ca3af; }
 
 .sinav-info-card { border-left: 4px solid #16a34a; }
 .sinav-info-grid { display: flex; flex-wrap: wrap; gap: .75rem 2rem; align-items: center; }

@@ -1,0 +1,60 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Öğretmen Şifrelerini Değiştir{% endblock %}
+
+{% block content %}
+<h1>Öğretmen Kullanıcılarının Şifresini Değiştir</h1>
+
+<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
+  <strong>Dikkat:</strong> Bu işlem <strong>{{ ogretmen_sayisi }} aktif öğretmen</strong>
+  kullanıcısının şifresini aynı anda değiştirecektir.
+  İşlem geri alınamaz.
+</div>
+
+<form method="post">
+  {% csrf_token %}
+
+  <div style="max-width:420px;">
+    {% for field in form %}
+    <div style="margin-bottom:1rem;">
+      <label for="{{ field.id_for_label }}" style="display:block; font-weight:600; margin-bottom:.3rem;">
+        {{ field.label }}
+      </label>
+      {{ field }}
+      {% for err in field.errors %}
+        <p style="color:#dc3545; margin:.25rem 0 0; font-size:.9rem;">{{ err }}</p>
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+    {% if form.non_field_errors %}
+      {% for err in form.non_field_errors %}
+        <p style="color:#dc3545; margin:.25rem 0; font-size:.9rem;">{{ err }}</p>
+      {% endfor %}
+    {% endif %}
+
+    <div style="margin-top:1.5rem; display:flex; gap:.75rem; align-items:center;">
+      <input type="submit" value="Şifreleri Değiştir"
+             style="background:#dc3545; color:#fff; border:none; padding:.5rem 1.25rem;
+                    border-radius:4px; font-size:.95rem; cursor:pointer;">
+      <a href="../" style="color:#6c757d; font-size:.9rem;">İptal</a>
+    </div>
+  </div>
+</form>
+
+{% if ogretmenler %}
+<details style="margin-top:2rem;">
+  <summary style="cursor:pointer; color:#6c757d; font-size:.88rem;">
+    Etkilenecek kullanıcılar (ilk 20)
+  </summary>
+  <ul style="margin-top:.5rem; font-size:.88rem; color:#495057;">
+    {% for u in ogretmenler %}
+      <li>{{ u.username }}{% if u.get_full_name %} — {{ u.get_full_name }}{% endif %}</li>
+    {% endfor %}
+    {% if ogretmen_sayisi > 20 %}
+      <li style="color:#6c757d;">… ve {{ ogretmen_sayisi|add:"-20" }} kullanıcı daha</li>
+    {% endif %}
+  </ul>
+</details>
+{% endif %}
+
+{% endblock %}

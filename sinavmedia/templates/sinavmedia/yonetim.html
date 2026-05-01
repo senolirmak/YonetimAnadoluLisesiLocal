@@ -8,7 +8,11 @@
   <div>
     <h2 style="margin:0; color:#3730a3;">Sınav Medya Yönetimi</h2>
     <span style="font-size:.82rem; color:#6b7280;">
-      (Uygulama) sınavları için seviyeye göre video/ses yükleyin.
+      {% if aktif_sinav %}
+        {{ aktif_sinav }} &mdash; (Uygulama) sınavları için seviyeye göre video/ses yükleyin.
+      {% else %}
+        (Uygulama) sınavları için seviyeye göre video/ses yükleyin.
+      {% endif %}
     </span>
   </div>
 </div>
@@ -22,7 +26,11 @@
   {% endfor %}
 {% endif %}
 
-{% if not slot_listesi %}
+{% if hata %}
+<div class="card" style="border-left:4px solid #f59e0b; background:#fffbeb; color:#92400e; padding:.75rem 1.5rem;">
+  ⚠️ {{ hata }}
+</div>
+{% elif not slot_listesi %}
 <div class="card" style="text-align:center; color:#9ca3af; padding:2rem;">
   Takvimde henüz (Uygulama) slotu yok. Önce sınav takvimi oluşturun.
 </div>
