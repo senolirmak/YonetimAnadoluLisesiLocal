@@ -699,6 +699,13 @@ def haftalik_ders_programi(request):
             .order_by("sinif_sube__sinif", "sinif_sube__sube")
         )
 
+        # Rehberlik hariç haftalık ders saati toplamı
+        # .lower() yerine .upper() — Türkçe İ/i karakter sorunu (rehberli̇k != rehberlik)
+        ders_saati_toplam = sum(
+            1 for d in dersler
+            if not (d.ders and "REHBERLİK" in d.ders.ders_adi.upper())
+        )
+
     context = {
         "title": "Haftalık Ders Programı",
         "is_yonetici": is_yonetici,
@@ -709,6 +716,7 @@ def haftalik_ders_programi(request):
         "program_tablo": program_tablo,
         "nobet_gorevleri": nobet_gorevleri,
         "rehberlik_siniflari": rehberlik_siniflari,
+        "ders_saati_toplam": ders_saati_toplam if secilen_personel else 0,
     }
     return render(request, "dersprogrami/haftalik_program.html", context)
 

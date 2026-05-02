@@ -90,6 +90,11 @@
     color: #065f46;
     border: 1px solid #6ee7b7;
   }
+  .hp-chip-ders {
+    background: #e0f2fe;
+    color: #075985;
+    border: 1px solid #7dd3fc;
+  }
 
   /* Program tablosu */
   .hp-tablo-wrap {
@@ -201,6 +206,11 @@
         {% for sinif, sube in rehberlik_siniflari %}
           {{ sinif }}/{{ sube }}{% if not forloop.last %}, {% endif %}
         {% endfor %}
+      </span>
+      {% endif %}
+      {% if ders_saati_toplam %}
+      <span class="hp-meta-chip hp-chip-ders" title="Rehberlik ve Yönlendirme dersi hariç">
+        Ders Saati: {{ ders_saati_toplam }}
       </span>
       {% endif %}
     </div>
