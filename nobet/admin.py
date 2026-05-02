@@ -205,7 +205,7 @@ class DersProgramiAdmin(admin.ModelAdmin):
 @admin.register(NobetGorevi)
 class NobetGoreviAdmin(admin.ModelAdmin):
     list_display = ("ogretmen", "nobet_gun", "nobet_yeri", "uygulama_tarihi")
-    search_fields = ("ogretmen__personel__adi_soyadi", "nobet_yeri")
+    search_fields = ("ogretmen__personel__adi_soyadi", "nobet_yeri__ad")
     list_filter = ("nobet_gun", "nobet_yeri", "uygulama_tarihi")
 
 
