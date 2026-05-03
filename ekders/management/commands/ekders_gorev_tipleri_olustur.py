@@ -7,7 +7,7 @@ from ekders.models import GorevTipi
 GOREV_TIPLERI = [
     {"kod": "mudur",           "ad": "Okul Müdürü",       "maas_karsiligi_haftalik": 2,  "hazirlik_katsayi": "0.00"},
     {"kod": "mudur_yardimcisi","ad": "Müdür Yardımcısı",  "maas_karsiligi_haftalik": 6,  "hazirlik_katsayi": "0.00"},
-    {"kod": "brans_ogretmeni", "ad": "Öğretmen",           "maas_karsiligi_haftalik": 15, "hazirlik_katsayi": "0.00"},
+    {"kod": "brans_ogretmeni", "ad": "Öğretmen",           "maas_karsiligi_haftalik": 15, "hazirlik_katsayi": "0.10"},
     {"kod": "rehber_ogretmen", "ad": "Rehberlik",           "maas_karsiligi_haftalik": 18, "hazirlik_katsayi": "0.00"},
     {"kod": "ucretli_ogretmen","ad": "Ücretli Öğretmen",   "maas_karsiligi_haftalik": 0,  "hazirlik_katsayi": "0.10"},
 ]
