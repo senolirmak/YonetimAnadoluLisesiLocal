@@ -897,22 +897,24 @@ def parametre_kaydet(request):
 # ---------------------------------------------------------------
 @login_required
 def takvim_gecmisi(request):
-    """Üretilen takvimlerin listesi: hangi sınav, ne zaman, algoritma çıktısı."""
+    """Üretilen takvimlerin listesi: aktif sınava ait üretimler."""
     from sinav.models import TakvimUretim
     from django.db.models import Count
     aktif = _aktif_sinav()
     kayitlar = (
         TakvimUretim.objects
+        .filter(sinav=aktif)
         .select_related("sinav")
         .annotate(sinav_takvim_sayisi=Count("takvimler_uretim"))
         .order_by("-uretim_tarihi")
-    )
+    ) if aktif else TakvimUretim.objects.none()
     aktif_uretim = (
         TakvimUretim.objects.filter(sinav=aktif, aktif=True).first()
         if aktif else None
     )
     return render(request, "sinav/takvim_gecmisi.html", {
         "kayitlar": kayitlar,
+        "aktif_sinav": aktif,
         "aktif_uretim": aktif_uretim,
     })
 

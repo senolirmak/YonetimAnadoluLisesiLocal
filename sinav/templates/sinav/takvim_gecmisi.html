@@ -7,7 +7,13 @@
      display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem;">
   <div>
     <h2 style="margin:0; color:#3730a3;">Üretilen Takvimler</h2>
-    <span style="font-size:.82rem; color:#6b7280;">{{ kayitlar|length }} kayıt</span>
+    {% if aktif_sinav %}
+    <span style="font-size:.82rem; color:#6b7280;">
+      {{ aktif_sinav }} &mdash; {{ kayitlar|length }} kayıt
+    </span>
+    {% else %}
+    <span style="font-size:.82rem; color:#ef4444;">Aktif sınav seçili değil</span>
+    {% endif %}
   </div>
   <div style="display:flex; gap:.5rem; align-items:center;">
     <a href="{% url 'sinav:takvim_sayfasi' %}" class="btn btn-secondary btn-sm">← Takvim (ILP)</a>
@@ -19,9 +25,14 @@
   </div>
 </div>
 
-{% if not kayitlar %}
+{% if not aktif_sinav %}
 <div class="card" style="text-align:center; color:#9ca3af; padding:2rem;">
-  Henüz kaydedilmiş takvim üretimi yok. Takvim oluşturduktan sonra buraya yansır.
+  Aktif sınav bulunamadı.
+  <a href="{% url 'sinav:sinav_bilgisi_listesi' %}" style="color:#6366f1;">Sınav Bilgisi</a> sayfasından bir sınavı aktif işaretleyin.
+</div>
+{% elif not kayitlar %}
+<div class="card" style="text-align:center; color:#9ca3af; padding:2rem;">
+  Bu sınav için henüz kaydedilmiş takvim üretimi yok. Takvim oluşturduktan sonra buraya yansır.
 </div>
 {% endif %}
 
