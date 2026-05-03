@@ -4,13 +4,13 @@ from math import floor
 from ekders.models import GOREV_TIPI_ESLEME, GorevTipi, OgretmenEkDers, Tatil
 
 GUN_ALANLARI = {
-    "Pazartesi": "pazartesi",
-    "Salı":      "sali",
-    "Çarşamba":  "carsamba",
-    "Perşembe":  "persembe",
-    "Cuma":      "cuma",
-    "Cumartesi": "cumartesi",
-    "Pazar":     "pazar",
+    "Monday":    "pazartesi",
+    "Tuesday":   "sali",
+    "Wednesday": "carsamba",
+    "Thursday":  "persembe",
+    "Friday":    "cuma",
+    "Saturday":  "cumartesi",
+    "Sunday":    "pazar",
 }
 
 REHBERLIK_DERS_ADI = "REHBERLİK VE YÖNLENDİRME"
@@ -113,10 +113,19 @@ def donem_hesapla(donem):
             if sum(gunluk.values()) == 0:
                 continue
 
-            nobet = NobetGorevi.objects.filter(
-                ogretmen__personel=personel,
-                tarih__range=[pazartesi, pazar],
-            ).count()
+            son_nobet_ut = (
+                NobetGorevi.objects
+                .filter(ogretmen__personel=personel, uygulama_tarihi__lte=pazartesi)
+                .order_by("-uygulama_tarihi")
+                .values_list("uygulama_tarihi", flat=True)
+                .first()
+            )
+            nobet = (
+                NobetGorevi.objects
+                .filter(ogretmen__personel=personel, uygulama_tarihi=son_nobet_ut)
+                .count()
+                if son_nobet_ut else 0
+            )
 
             OgretmenEkDers.objects.update_or_create(
                 donem=donem,
