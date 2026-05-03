@@ -54,12 +54,42 @@ def donem_duzenle(request, pk):
 
 @login_required
 def donem_detay(request, pk):
+    from datetime import date as date_type
     donem = get_object_or_404(EkDersDonemi, pk=pk)
-    ozet_listesi = donem_ozet_listesi(donem)
+
+    haftalar = list(
+        OgretmenEkDers.objects
+        .filter(donem=donem)
+        .values_list("hafta_baslangic", flat=True)
+        .distinct()
+        .order_by("hafta_baslangic")
+    )
+
+    secili_hafta = None
+    hafta_str = request.GET.get("hafta")
+    if hafta_str:
+        try:
+            secili_hafta = date_type.fromisoformat(hafta_str)
+        except ValueError:
+            pass
+    if secili_hafta not in haftalar:
+        secili_hafta = haftalar[0] if haftalar else None
+
+    hafta_kayitlari = []
+    if secili_hafta:
+        hafta_kayitlari = (
+            OgretmenEkDers.objects
+            .filter(donem=donem, hafta_baslangic=secili_hafta)
+            .select_related("personel", "gorev_tipi")
+            .order_by("personel__adi_soyadi")
+        )
+
     onay = getattr(donem, "onay", None)
     return render(request, "ekders/donem_detay.html", {
         "donem": donem,
-        "ozet_listesi": ozet_listesi,
+        "haftalar": haftalar,
+        "secili_hafta": secili_hafta,
+        "hafta_kayitlari": hafta_kayitlari,
         "onay": onay,
         "onay_form": EkDersOnayForm() if not onay and not donem.kapandi else None,
     })
@@ -93,7 +123,9 @@ def hafta_duzenle(request, pk, kayit_pk):
         if form.is_valid():
             form.save()
             messages.success(request, f"{kayit.personel} – {kayit.hafta_baslangic:%d.%m.%Y} kaydı güncellendi.")
-            return redirect("ekders:donem_detay", pk=pk)
+            hafta_str = request.GET.get("hafta", "")
+            url = f"/ekders/{pk}/" + (f"?hafta={hafta_str}" if hafta_str else "")
+            return redirect(url)
     else:
         form = OgretmenEkDersForm(instance=kayit)
     return render(request, "ekders/hafta_duzenle.html", {
