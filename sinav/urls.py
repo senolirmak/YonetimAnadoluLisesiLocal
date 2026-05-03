@@ -62,6 +62,7 @@ urlpatterns = [
     path("pdf-rapor/", views.pdf_rapor, name="pdf_rapor"),
     path("takvim/gecmis/<int:pk>/sil/", views.takvim_uretim_sil, name="takvim_uretim_sil"),
     path("takvim/gecmis/<int:pk>/kullan/", views.takvim_uretim_kullan, name="takvim_uretim_kullan"),
+    path("takvim/gecmis/<int:pk>/aciklama/", views.takvim_uretim_aciklama_guncelle, name="takvim_uretim_aciklama_guncelle"),
     path("takvim/onizleme/", views.takvim_onizleme, name="takvim_onizleme"),
     path("takvim/onayla/", views.takvim_onayla, name="takvim_onayla"),
     path("takvim/iptal/", views.takvim_onizleme_iptal, name="takvim_onizleme_iptal"),

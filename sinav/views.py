@@ -1202,6 +1202,24 @@ def sinif_listesi_pdf_view(request):
 
 
 @require_POST
+@login_required
+def takvim_uretim_aciklama_guncelle(request, pk):
+    import json
+    from sinav.models import TakvimUretim
+    from django.http import JsonResponse
+    uretim = TakvimUretim.objects.filter(pk=pk).first()
+    if not uretim:
+        return JsonResponse({"ok": False}, status=404)
+    try:
+        data = json.loads(request.body)
+    except (ValueError, KeyError):
+        return JsonResponse({"ok": False}, status=400)
+    uretim.aciklama = data.get("aciklama", "").strip()[:200]
+    uretim.save(update_fields=["aciklama"])
+    return JsonResponse({"ok": True, "aciklama": uretim.aciklama})
+
+
+@require_POST
 def takvim_uretim_sil(request, pk):
     from sinav.models import TakvimUretim
     TakvimUretim.objects.filter(pk=pk).delete()

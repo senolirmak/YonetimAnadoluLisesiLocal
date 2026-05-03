@@ -38,6 +38,26 @@
       <div style="font-size:.8rem; color:#6b7280; margin-top:.2rem;">
         Üretim tarihi: {{ k.uretim_tarihi|date:"d.m.Y H:i" }}
       </div>
+      <!-- Açıklama satırı -->
+      <div class="tg-aciklama-wrap" id="aciklama-wrap-{{ k.pk }}" style="margin-top:.35rem; display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;">
+        <span class="tg-aciklama-text" id="aciklama-text-{{ k.pk }}"
+              style="font-size:.85rem; color:{% if k.aciklama %}#374151{% else %}#9ca3af{% endif %}; font-style:{% if k.aciklama %}normal{% else %}italic{% endif %};">
+          {% if k.aciklama %}{{ k.aciklama }}{% else %}Açıklama yok{% endif %}
+        </span>
+        <button type="button" class="tg-aciklama-edit-btn" title="Açıklama düzenle"
+                onclick="aciklamaEditAc({{ k.pk }}, '{{ k.aciklama|escapejs }}')">✎</button>
+        <!-- inline edit formu (gizli) -->
+        <span id="aciklama-form-{{ k.pk }}" style="display:none; align-items:center; gap:.3rem;">
+          <input type="text" id="aciklama-input-{{ k.pk }}"
+                 maxlength="200" placeholder="Açıklama girin…"
+                 class="tg-aciklama-input"
+                 onkeydown="if(event.key==='Enter')aciklamaKaydet({{ k.pk }});if(event.key==='Escape')aciklamaIptal({{ k.pk }});" />
+          <button type="button" class="btn btn-primary btn-sm" style="padding:.2rem .6rem; font-size:.78rem;"
+                  onclick="aciklamaKaydet({{ k.pk }})">Kaydet</button>
+          <button type="button" class="btn btn-secondary btn-sm" style="padding:.2rem .5rem; font-size:.78rem;"
+                  onclick="aciklamaIptal({{ k.pk }})">İptal</button>
+        </span>
+      </div>
     </div>
     <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
       {% if k.aktif %}
@@ -112,6 +132,53 @@ function toggleLog(pk) {
     btn.textContent = "Log Göster";
   }
 }
+
+function aciklamaEditAc(pk, mevcutDeger) {
+  document.getElementById("aciklama-text-" + pk).style.display = "none";
+  document.querySelector(`#aciklama-wrap-${pk} .tg-aciklama-edit-btn`).style.display = "none";
+  const form = document.getElementById("aciklama-form-" + pk);
+  form.style.display = "inline-flex";
+  const input = document.getElementById("aciklama-input-" + pk);
+  input.value = mevcutDeger;
+  input.focus();
+  input.select();
+}
+
+function aciklamaIptal(pk) {
+  document.getElementById("aciklama-form-" + pk).style.display = "none";
+  document.getElementById("aciklama-text-" + pk).style.display = "";
+  document.querySelector(`#aciklama-wrap-${pk} .tg-aciklama-edit-btn`).style.display = "";
+}
+
+function aciklamaKaydet(pk) {
+  const input = document.getElementById("aciklama-input-" + pk);
+  const aciklama = input.value.trim();
+  const url = `/sinav/takvim/gecmis/${pk}/aciklama/`;
+  fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ""
+    },
+    body: JSON.stringify({ aciklama })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      const textEl = document.getElementById("aciklama-text-" + pk);
+      if (data.aciklama) {
+        textEl.textContent = data.aciklama;
+        textEl.style.color = "#374151";
+        textEl.style.fontStyle = "normal";
+      } else {
+        textEl.textContent = "Açıklama yok";
+        textEl.style.color = "#9ca3af";
+        textEl.style.fontStyle = "italic";
+      }
+      aciklamaIptal(pk);
+    }
+  });
+}
 </script>
 
 <style>
@@ -144,6 +211,18 @@ function toggleLog(pk) {
   white-space: pre-wrap; max-height: 360px; overflow-y: auto;
   margin: 0;
 }
+.tg-aciklama-edit-btn {
+  background: none; border: none; cursor: pointer;
+  color: #6366f1; font-size: .9rem; padding: 0 .2rem;
+  line-height: 1; opacity: .7;
+}
+.tg-aciklama-edit-btn:hover { opacity: 1; }
+.tg-aciklama-input {
+  font-size: .83rem; padding: .25rem .5rem;
+  border: 1px solid #a5b4fc; border-radius: 5px;
+  outline: none; width: 260px; max-width: 100%;
+}
+.tg-aciklama-input:focus { border-color: #6366f1; box-shadow: 0 0 0 2px #ede9fe; }
 </style>
 
 {% endblock %}

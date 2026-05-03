@@ -332,6 +332,7 @@ class TakvimUretim(models.Model):
         null=True, blank=True, related_name="takvim_uretimler",
     )
     uretim_tarihi = models.DateTimeField(auto_now_add=True)
+    aciklama = models.CharField(max_length=200, blank=True, default="", verbose_name="Açıklama")
     log_metni = models.TextField(blank=True, default="")
     aktif = models.BooleanField(default=False, verbose_name="PDF Raporunda Kullan")
     oturma_sifirla = models.BooleanField(default=False)
