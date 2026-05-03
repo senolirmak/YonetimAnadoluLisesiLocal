@@ -13,6 +13,12 @@ GUN_ALANLARI = {
     "Sunday":    "pazar",
 }
 
+# Pazartesi = 0 … Pazar = 6
+GUN_OFFSET = {
+    "Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3,
+    "Friday": 4, "Saturday": 5, "Sunday": 6,
+}
+
 REHBERLIK_DERS_ADI = "REHBERLİK VE YÖNLENDİRME"
 
 
@@ -58,20 +64,39 @@ def _son_uygulama_tarihi(personel, baslangic):
     )
 
 
-def _gunluk_ders(personel, uygulama_tarihi):
+def _devamsizlik_saati(personel, tarih):
+    """Belirtilen gün için personelin devamsız olduğu ders saati sayısını döndürür."""
+    from personeldevamsizlik.models import Devamsizlik
+    kayitlar = Devamsizlik.objects.filter(
+        ogretmen__personel=personel,
+        baslangic_tarihi__lte=tarih,
+        bitis_tarihi__gte=tarih,
+    )
+    toplam = 0
+    for k in kayitlar:
+        saatler = [s.strip() for s in k.ders_saatleri.split(",") if s.strip()]
+        toplam += len(saatler)
+    return toplam
+
+
+def _gunluk_ders(personel, uygulama_tarihi, hafta_baslangic):
     """
-    Her gün için ders saatini döndürür (REHBERLİK VE YÖNLENDİRME hariç).
+    Her gün için net ders saatini döndürür:
+      programlanan (REHBERLİK hariç) − devamsızlık saati  (min 0).
     {field_name: saat} sözlüğü.
     """
     from dersprogrami.models import DersProgrami
     sonuc = {}
-    for gun_tr, field in GUN_ALANLARI.items():
-        sonuc[field] = (
+    for gun_en, field in GUN_ALANLARI.items():
+        programlanan = (
             DersProgrami.objects
-            .filter(ogretmen=personel, uygulama_tarihi=uygulama_tarihi, gun=gun_tr)
+            .filter(ogretmen=personel, uygulama_tarihi=uygulama_tarihi, gun=gun_en)
             .exclude(ders__ders_adi__iexact=REHBERLIK_DERS_ADI)
             .count()
         )
+        gun_tarihi = hafta_baslangic + timedelta(days=GUN_OFFSET[gun_en])
+        devamsiz = _devamsizlik_saati(personel, gun_tarihi)
+        sonuc[field] = max(0, programlanan - devamsiz)
     return sonuc
 
 
@@ -107,7 +132,7 @@ def donem_hesapla(donem):
             if not gorev_tipi:
                 continue
 
-            gunluk = _gunluk_ders(personel, uygulama)
+            gunluk = _gunluk_ders(personel, uygulama, pazartesi)
 
             # Hiç ders saati yoksa kayıt oluşturma
             if sum(gunluk.values()) == 0:
