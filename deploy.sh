@@ -97,12 +97,17 @@ bilgi "Static dosyalar toplanıyor..."
 python manage.py collectstatic --noinput --clear -v 0
 basari "Static dosyalar güncellendi."
 
-# ── 8. İzinleri düzelt ───────────────────────────────────────
+# ── 8. Nginx reload ──────────────────────────────────────────
+bilgi "Nginx yeniden yükleniyor..."
+sudo systemctl reload nginx || uyari "Nginx reload atlandı."
+basari "Nginx yeniden yüklendi."
+
+# ── 9. İzinleri düzelt ───────────────────────────────────────
 sudo chmod 600 "$PROJE_DIZIN/.env"
 sudo chown -R www-data:www-data "$PROJE_DIZIN/staticfiles" 2>/dev/null || true
 sudo chown -R www-data:www-data "$PROJE_DIZIN/media"       2>/dev/null || true
 
-# ── 9. Servisi başlat ─────────────────────────────────────────
+# ── 10. Servisi başlat ────────────────────────────────────────
 bilgi "Servis başlatılıyor..."
 sudo systemctl start "$SERVIS"
 sleep 3
@@ -113,7 +118,7 @@ else
     hata "Servis başlatılamadı! Loglar: sudo journalctl -u $SERVIS -n 30"
 fi
 
-# ── 10. Kritik tablo özeti ────────────────────────────────────
+# ── 11. Kritik tablo özeti ────────────────────────────────────
 echo ""
 bilgi "Kritik tablo kayıt sayıları:"
 python - <<'PYEOF'
@@ -146,7 +151,7 @@ with connection.cursor() as cur:
             print(f"  {ad:<26} : tablo bulunamadı")
 PYEOF
 
-# ── 11. Eski yedekleri temizle (30 günden eski) ───────────────
+# ── 12. Eski yedekleri temizle (30 günden eski) ───────────────
 bilgi "30 günden eski yedekler temizleniyor..."
 find "$YEDEK_DIZIN" -name "*.dump" -mtime +30 -delete 2>/dev/null && \
     basari "Eski yedekler temizlendi." || \
