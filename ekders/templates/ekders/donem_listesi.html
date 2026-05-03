@@ -1,0 +1,59 @@
+{% extends "ekders/base.html" %}
+{% block ekders_title %}Ek Ders Dönemleri{% endblock %}
+
+{% block ekders_content %}
+<div class="card" style="border-left:4px solid #16a34a; padding:1rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem;">
+  <div>
+    <h2 style="margin:0; color:#166534;">Ek Ders Dönemleri</h2>
+    <span style="font-size:.82rem; color:#6b7280;">{{ donemler|length }} dönem</span>
+  </div>
+  <div style="display:flex; gap:.5rem;">
+    <a href="{% url 'ekders:tatil_listesi' %}" class="btn btn-secondary btn-sm">Tatilleri Yönet</a>
+    <a href="{% url 'ekders:donem_olustur' %}" class="btn btn-primary btn-sm">+ Yeni Dönem</a>
+  </div>
+</div>
+
+{% if not donemler %}
+<div class="card" style="text-align:center; color:#9ca3af; padding:2rem;">
+  Henüz dönem oluşturulmamış.
+</div>
+{% else %}
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>Dönem Adı</th>
+        <th>Başlangıç</th>
+        <th>Bitiş</th>
+        <th style="text-align:center;">Hafta</th>
+        <th style="text-align:center;">Kayıt</th>
+        <th style="text-align:center;">Durum</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in donemler %}
+      <tr>
+        <td><a href="{% url 'ekders:donem_detay' d.pk %}" style="color:#166534; font-weight:600;">{{ d.ad }}</a></td>
+        <td>{{ d.baslangic_tarihi|date:"d.m.Y" }}</td>
+        <td>{{ d.bitis_tarihi|date:"d.m.Y" }}</td>
+        <td style="text-align:center;">{{ d.hafta_sayisi }}</td>
+        <td style="text-align:center;">{{ d.kayitlar.count }}</td>
+        <td style="text-align:center;">
+          {% if d.kapandi %}
+            <span class="badge badge-kapali">Onaylı</span>
+          {% else %}
+            <span class="badge badge-acik">Açık</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{% url 'ekders:donem_detay' d.pk %}" class="btn btn-secondary btn-sm">Detay</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

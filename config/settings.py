@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "sinavmedia",
     "bildirim_gonderici",
     "sorumluluk",
+    "ekders",
 ]
 
 # ── Sınıf Tahtası Bildirim Ayarları ──────────────────────────

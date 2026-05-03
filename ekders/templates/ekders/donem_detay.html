@@ -1,0 +1,157 @@
+{% extends "ekders/base.html" %}
+{% block ekders_title %}{{ donem.ad }} — Ek Ders{% endblock %}
+
+{% block ekders_content %}
+
+<!-- ── Başlık ── -->
+<div class="card" style="border-left:4px solid #16a34a; padding:1rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem;">
+  <div>
+    <h2 style="margin:0; color:#166534;">{{ donem.ad }}</h2>
+    <span style="font-size:.82rem; color:#6b7280;">
+      {{ donem.baslangic_tarihi|date:"d.m.Y" }} – {{ donem.bitis_tarihi|date:"d.m.Y" }}
+      &nbsp;|&nbsp; {{ donem.hafta_sayisi }} hafta
+      {% if donem.kapandi %}&nbsp;|&nbsp;<span class="badge badge-kapali">Onaylı &amp; Kapalı</span>{% endif %}
+    </span>
+  </div>
+  <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+    {% if not donem.kapandi %}
+    <a href="{% url 'ekders:donem_duzenle' donem.pk %}" class="btn btn-secondary btn-sm">Düzenle</a>
+    <form method="post" action="{% url 'ekders:donem_hesapla' donem.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-warning btn-sm"
+              onclick="return confirm('Mevcut kayıtlar güncellenecek. Devam?')">
+        Otomatik Hesapla
+      </button>
+    </form>
+    {% endif %}
+    <a href="{% url 'ekders:donem_listesi' %}" class="btn btn-secondary btn-sm">← Dönemler</a>
+  </div>
+</div>
+
+<!-- ── Özet Tablosu ── -->
+{% if ozet_listesi %}
+<div class="card" style="padding:0; overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Adı Soyadı</th>
+        <th>Branş</th>
+        <th>Görevi</th>
+        <th style="text-align:center;">Hafta</th>
+        <th style="text-align:center;">Toplam Ders</th>
+        <th style="text-align:center;">Maaş Karş.</th>
+        <th style="text-align:center;">Hazırlık</th>
+        <th style="text-align:center;">Nöbet Saat</th>
+        <th style="text-align:center;">Diğer</th>
+        <th style="text-align:center; font-weight:700; color:#166534;">Ücretli Ek Ders</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for oz in ozet_listesi %}
+      <tr>
+        <td style="font-weight:600;">{{ oz.personel.adi_soyadi }}</td>
+        <td>{{ oz.personel.brans }}</td>
+        <td>{{ oz.gorev_tipi.ad }}</td>
+        <td style="text-align:center;">{{ oz.hafta_sayisi }}</td>
+        <td style="text-align:center;">{{ oz.toplam_ders }}</td>
+        <td style="text-align:center;">{{ oz.maas_karsiligi }}</td>
+        <td style="text-align:center;">{{ oz.hazirlik }}</td>
+        <td style="text-align:center;">{{ oz.toplam_nobet_saat }}</td>
+        <td style="text-align:center;">{{ oz.toplam_diger }}</td>
+        <td style="text-align:center; font-weight:700; color:#166534;">{{ oz.ucretli_ekders }}</td>
+        <td>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="toggleHafta('{{ oz.personel.pk }}')">Haftalar</button>
+        </td>
+      </tr>
+      <!-- Haftalık detay satırları (gizli) -->
+      <tr id="hafta-{{ oz.personel.pk }}" style="display:none;">
+        <td colspan="11" style="padding:.5rem 1.5rem; background:#f9fafb;">
+          <table style="font-size:.82rem; margin:0;">
+            <thead>
+              <tr>
+                <th style="background:#f0fdf4;">Hafta</th>
+                <th style="background:#f0fdf4; text-align:center;">Pzt</th>
+                <th style="background:#f0fdf4; text-align:center;">Sal</th>
+                <th style="background:#f0fdf4; text-align:center;">Çar</th>
+                <th style="background:#f0fdf4; text-align:center;">Per</th>
+                <th style="background:#f0fdf4; text-align:center;">Cum</th>
+                <th style="background:#f0fdf4; text-align:center;">Cmt</th>
+                <th style="background:#f0fdf4; text-align:center;">Paz</th>
+                <th style="background:#f0fdf4; text-align:center;">Toplam</th>
+                <th style="background:#f0fdf4; text-align:center;">Nöbet</th>
+                <th style="background:#f0fdf4; text-align:center;">Diğer</th>
+                {% if not donem.kapandi %}<th style="background:#f0fdf4;"></th>{% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for k in oz.haftalik_kayitlar %}
+              <tr>
+                <td>{{ k.hafta_baslangic|date:"d.m.Y" }}</td>
+                <td style="text-align:center;">{{ k.pazartesi }}</td>
+                <td style="text-align:center;">{{ k.sali }}</td>
+                <td style="text-align:center;">{{ k.carsamba }}</td>
+                <td style="text-align:center;">{{ k.persembe }}</td>
+                <td style="text-align:center;">{{ k.cuma }}</td>
+                <td style="text-align:center;">{{ k.cumartesi }}</td>
+                <td style="text-align:center;">{{ k.pazar }}</td>
+                <td style="text-align:center; font-weight:600;">{{ k.haftalik_ders_saati }}</td>
+                <td style="text-align:center;">{{ k.nobet_sayisi }} ({{ k.nobet_saati }}s)</td>
+                <td style="text-align:center;">{{ k.diger_zorunlu_saat }}</td>
+                {% if not donem.kapandi %}
+                <td>
+                  <a href="{% url 'ekders:hafta_duzenle' donem.pk k.pk %}"
+                     class="btn btn-secondary btn-sm">Düzenle</a>
+                </td>
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; color:#9ca3af; padding:2rem;">
+  Henüz kayıt yok. "Otomatik Hesapla" ile ders programından verileri çekin.
+</div>
+{% endif %}
+
+<!-- ── Onay ── -->
+{% if not donem.kapandi and onay_form and ozet_listesi %}
+<div class="card" style="border-left:4px solid #2563eb; max-width:480px;">
+  <h2 style="color:#1e40af;">Dönemi Onayla</h2>
+  <form method="post" action="{% url 'ekders:donem_onayla' donem.pk %}">
+    {% csrf_token %}
+    <div class="form-group">
+      <label>Onay Notu (isteğe bağlı)</label>
+      {{ onay_form.notlar }}
+    </div>
+    <button type="submit" class="btn btn-primary"
+            onclick="return confirm('Dönem onaylanıp kapatılacak. Devam?')">
+      Onayla ve Kapat
+    </button>
+  </form>
+</div>
+{% endif %}
+
+{% if onay %}
+<div class="card" style="border-left:4px solid #16a34a; background:#f0fdf4;">
+  <strong style="color:#166534;">Onay Bilgisi:</strong>
+  {{ onay.onaylayan }} tarafından {{ onay.onay_tarihi|date:"d.m.Y H:i" }} tarihinde onaylandı.
+  {% if onay.notlar %}<br><span style="color:#374151;">{{ onay.notlar }}</span>{% endif %}
+</div>
+{% endif %}
+
+<script>
+function toggleHafta(pk) {
+  const row = document.getElementById("hafta-" + pk);
+  row.style.display = row.style.display === "none" ? "" : "none";
+}
+</script>
+{% endblock %}

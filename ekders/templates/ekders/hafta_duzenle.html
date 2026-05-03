@@ -1,0 +1,64 @@
+{% extends "ekders/base.html" %}
+{% block ekders_title %}Haftalık Kayıt Düzenle{% endblock %}
+
+{% block ekders_content %}
+<div class="card" style="max-width:580px;">
+  <h2>{{ kayit.personel }} — {{ kayit.hafta_baslangic|date:"d.m.Y" }} Haftası</h2>
+  <p style="font-size:.85rem; color:#6b7280; margin-bottom:1.2rem;">Dönem: {{ donem.ad }}</p>
+  <form method="post">
+    {% csrf_token %}
+    <fieldset style="border:1px solid #d1fae5; border-radius:6px; padding:.8rem 1rem; margin-bottom:1rem;">
+      <legend style="font-size:.82rem; font-weight:600; color:#166534; padding:0 .4rem;">
+        Günlük Ders Yükü (REHBERLİK VE YÖNLENDİRME hariç)
+      </legend>
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:.5rem;">
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:.75rem;">Pzt</label>{{ form.pazartesi }}
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:.75rem;">Sal</label>{{ form.sali }}
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:.75rem;">Çar</label>{{ form.carsamba }}
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:.75rem;">Per</label>{{ form.persembe }}
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:.75rem;">Cum</label>{{ form.cuma }}
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:.75rem;">Cmt</label>{{ form.cumartesi }}
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:.75rem;">Paz</label>{{ form.pazar }}
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="form-group">
+      <label>{{ form.gorev_tipi.label }}</label>{{ form.gorev_tipi }}
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:.75rem;">
+      <div class="form-group">
+        <label>{{ form.nobet_sayisi.label }}</label>{{ form.nobet_sayisi }}
+      </div>
+      <div class="form-group">
+        <label>{{ form.diger_zorunlu_saat.label }}</label>{{ form.diger_zorunlu_saat }}
+      </div>
+    </div>
+    <div class="form-group">
+      <label>{{ form.notlar.label }}</label>{{ form.notlar }}
+    </div>
+
+    {% for e in form.non_field_errors %}
+      <div class="field-error">{{ e }}</div>
+    {% endfor %}
+
+    <div style="display:flex; gap:.5rem; margin-top:1rem;">
+      <button type="submit" class="btn btn-primary">Kaydet</button>
+      <a href="{% url 'ekders:donem_detay' donem.pk %}" class="btn btn-secondary">İptal</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

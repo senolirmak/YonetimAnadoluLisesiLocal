@@ -1,0 +1,26 @@
+{% extends "ekders/base.html" %}
+{% block ekders_title %}{{ baslik }}{% endblock %}
+
+{% block ekders_content %}
+<div class="card" style="max-width:540px;">
+  <h2>{{ baslik }}</h2>
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form %}
+    <div class="form-group">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+      {% for e in field.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+    </div>
+    {% endfor %}
+    {% if form.non_field_errors %}
+      {% for e in form.non_field_errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+    {% endif %}
+    <div style="display:flex; gap:.5rem; margin-top:1rem;">
+      <button type="submit" class="btn btn-primary">Kaydet</button>
+      <a href="{% url 'ekders:donem_listesi' %}" class="btn btn-secondary">İptal</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

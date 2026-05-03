@@ -1,0 +1,68 @@
+{% extends "ekders/base.html" %}
+{% block ekders_title %}Tatil Günleri{% endblock %}
+
+{% block ekders_content %}
+<div class="card" style="border-left:4px solid #16a34a; padding:1rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem;">
+  <div>
+    <h2 style="margin:0; color:#166534;">Tatil Günleri</h2>
+    <span style="font-size:.82rem; color:#6b7280;">Hafta sayısı hesabında bu tarihler çıkarılır.</span>
+  </div>
+  <a href="{% url 'ekders:donem_listesi' %}" class="btn btn-secondary btn-sm">← Dönemler</a>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; align-items:start;">
+
+  <!-- Tatil Ekleme Formu -->
+  <div class="card">
+    <h2>Tatil Ekle</h2>
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+      <div class="form-group">
+        <label>{{ field.label }}</label>
+        {{ field }}
+        {% for e in field.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+      </div>
+      {% endfor %}
+      {% for e in form.non_field_errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+      <button type="submit" class="btn btn-primary">Ekle</button>
+    </form>
+  </div>
+
+  <!-- Tatil Listesi -->
+  <div class="card" style="padding:0; overflow:hidden;">
+    {% if tatiller %}
+    <table>
+      <thead>
+        <tr>
+          <th>Tatil Adı</th>
+          <th>Başlangıç</th>
+          <th>Bitiş</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tatiller %}
+        <tr>
+          <td>{{ t.ad }}</td>
+          <td>{{ t.baslangic|date:"d.m.Y" }}</td>
+          <td>{{ t.bitis|date:"d.m.Y" }}</td>
+          <td>
+            <form method="post" action="{% url 'ekders:tatil_sil' t.pk %}"
+                  onsubmit="return confirm('Silinsin mi?')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-danger btn-sm">Sil</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="padding:1.5rem; color:#9ca3af; text-align:center;">Kayıtlı tatil yok.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
