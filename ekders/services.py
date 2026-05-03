@@ -69,7 +69,7 @@ def _gunluk_ders(personel, uygulama_tarihi):
         sonuc[field] = (
             DersProgrami.objects
             .filter(ogretmen=personel, uygulama_tarihi=uygulama_tarihi, gun=gun_tr)
-            .exclude(ders__ad__iexact=REHBERLIK_DERS_ADI)
+            .exclude(ders__ders_adi__iexact=REHBERLIK_DERS_ADI)
             .count()
         )
     return sonuc
