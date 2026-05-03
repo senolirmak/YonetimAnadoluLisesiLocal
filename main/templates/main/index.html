@@ -308,6 +308,9 @@
                         <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" class="btn btn-lg" style="background-color: #dc3545; color: white;">Öğrenci Özel Durumları</a>
                         <a href="{% url 'ogrenci:excel_yukle' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Excel Yükle</a>
                         {% endif %}
+                        {% if user.is_superuser or is_mudur_yardimcisi %}
+                        <a href="{% url 'veriaktar_ana' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">e-Okul Veri Aktar</a>
+                        {% endif %}
                     </div>
                     {% if rehberlik_sinif_sube %}
                     <div style="margin-top:10px;padding:10px 12px;background:#f0fff4;border:1px solid #c3e6cb;border-radius:6px;font-size:0.9em;color:#155724;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
@@ -411,9 +414,9 @@
                     <span class="badge" style="background-color:#343a40;color:#fff;">{{ ogrenci_istatistik.muduriyetcagri_cagri }}</span>
                 </div>
 
-                {% if is_mudur_yardimcisi %}
+                {% if user.is_superuser or is_mudur_yardimcisi %}
                 <div style="margin-top:14px;">
-                    <a href="{% url 'devamsizlik:ogrenci_devamsizlik_listesi' %}" class="btn btn-sm btn-outline-secondary" style="width:100%;">Detaylı Görünüm</a>
+                    <a href="{% url 'devamsizlik:ogrenci_devamsizlik_listesi' %}" class="btn btn-sm" style="background-color:#17a2b8;color:#fff;">Yoklama Listesi</a>
                 </div>
                 {% endif %}
             </div>
@@ -439,6 +442,74 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- Öğrenci Bilgileri Kartı -->
+        <div class="index-col-side">
+            <div class="menu-group">
+                <div class="menu-group-title">Öğrenci Bilgileri</div>
+                <div style="font-size:0.88em;">
+                    <!-- Başlık satırı -->
+                    <div style="display:grid;grid-template-columns:1fr 44px 44px 44px;gap:4px 6px;padding:0 4px 6px;border-bottom:1px solid #e9ecef;font-weight:600;color:#495057;">
+                        <span>Sınıf</span>
+                        <span style="text-align:center;color:#e83e8c;">Kız</span>
+                        <span style="text-align:center;color:#007bff;">Erkek</span>
+                        <span style="text-align:center;">Top.</span>
+                    </div>
+                    {% for s in ogrenci_seviye_listesi %}
+                    <!-- Sınıf satırı — tıklanabilir -->
+                    <div onclick="toggleSube('sube-{{ s.sinif }}')"
+                         style="display:grid;grid-template-columns:1fr 44px 44px 44px;gap:4px 6px;
+                                padding:5px 4px;border-bottom:1px solid #f1f1f1;cursor:pointer;
+                                transition:background .15s;"
+                         onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background=''">
+                        <span style="color:#495057;font-weight:500;">
+                            <span id="arrow-{{ s.sinif }}" style="display:inline-block;width:14px;font-size:0.8em;color:#adb5bd;">▶</span>
+                            {{ s.sinif }}. Sınıf
+                        </span>
+                        <span style="text-align:center;"><span class="badge" style="background-color:#e83e8c;color:#fff;">{{ s.kiz }}</span></span>
+                        <span style="text-align:center;"><span class="badge" style="background-color:#007bff;color:#fff;">{{ s.erkek }}</span></span>
+                        <span style="text-align:center;"><span class="badge" style="background-color:#343a40;color:#fff;">{{ s.toplam }}</span></span>
+                    </div>
+                    <!-- Şube detay satırları (gizli) -->
+                    <div id="sube-{{ s.sinif }}" style="display:none;background:#f8f9fa;border-bottom:1px solid #e9ecef;">
+                        {% for sb in s.subeler %}
+                        <div style="display:grid;grid-template-columns:1fr 44px 44px 44px;gap:4px 6px;padding:4px 4px 4px 22px;">
+                            <span style="color:#6c757d;">{{ s.sinif }}/{{ sb.sube }}</span>
+                            <span style="text-align:center;"><span class="badge" style="background-color:#f48fb1;color:#fff;">{{ sb.kiz }}</span></span>
+                            <span style="text-align:center;"><span class="badge" style="background-color:#64b5f6;color:#fff;">{{ sb.erkek }}</span></span>
+                            <span style="text-align:center;"><span class="badge" style="background-color:#78909c;color:#fff;">{{ sb.toplam }}</span></span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% empty %}
+                    <div style="padding:8px 4px;color:#6c757d;">Öğrenci kaydı bulunamadı.</div>
+                    {% endfor %}
+                    {% if ogrenci_seviye_listesi %}
+                    <!-- Genel toplam -->
+                    <div style="display:grid;grid-template-columns:1fr 44px 44px 44px;gap:4px 6px;padding:6px 4px 2px;border-top:2px solid #dee2e6;font-weight:600;">
+                        <span style="color:#495057;">Toplam</span>
+                        <span style="text-align:center;"><span class="badge" style="background-color:#e83e8c;color:#fff;">{{ ogrenci_genel_toplam.kiz }}</span></span>
+                        <span style="text-align:center;"><span class="badge" style="background-color:#007bff;color:#fff;">{{ ogrenci_genel_toplam.erkek }}</span></span>
+                        <span style="text-align:center;"><span class="badge" style="background-color:#343a40;color:#fff;">{{ ogrenci_genel_toplam.toplam }}</span></span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <script>
+        function toggleSube(id) {
+            var el = document.getElementById(id);
+            var sinif = id.replace('sube-', '');
+            var arrow = document.getElementById('arrow-' + sinif);
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+                arrow.textContent = '▼';
+            } else {
+                el.style.display = 'none';
+                arrow.textContent = '▶';
+            }
+        }
+        </script>
 
         <!-- 2. Kolon: Okul Bilgileri -->
         <div class="index-col-side">

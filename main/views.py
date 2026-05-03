@@ -197,6 +197,40 @@ def index(request):
         except Exception:
             pass
 
+    # Seviye + şube bazlı öğrenci kız/erkek sayıları (tek sorgu)
+    from ogrenci.models import Ogrenci as _Ogrenci
+    _sube_qs = (
+        _Ogrenci.objects
+        .values("sinif", "sube", "cinsiyet")
+        .annotate(sayi=Count("id"))
+        .order_by("sinif", "sube", "cinsiyet")
+    )
+    _sinif_map = {}   # {sinif: {kiz, erkek}}
+    _sube_map = {}    # {sinif: {sube: {kiz, erkek}}}
+    for r in _sube_qs:
+        s, sb, cins = r["sinif"], r["sube"], r["cinsiyet"]
+        _sinif_map.setdefault(s, {"sinif": s, "kiz": 0, "erkek": 0})
+        _sube_map.setdefault(s, {}).setdefault(sb, {"sube": sb, "kiz": 0, "erkek": 0})
+        if cins == "K":
+            _sinif_map[s]["kiz"] += r["sayi"]
+            _sube_map[s][sb]["kiz"] = r["sayi"]
+        elif cins == "E":
+            _sinif_map[s]["erkek"] += r["sayi"]
+            _sube_map[s][sb]["erkek"] = r["sayi"]
+    ogrenci_seviye_listesi = []
+    for v in sorted(_sinif_map.values(), key=lambda x: x["sinif"]):
+        s = v["sinif"]
+        subeler = [
+            {**sb, "toplam": sb["kiz"] + sb["erkek"]}
+            for sb in sorted(_sube_map.get(s, {}).values(), key=lambda x: x["sube"])
+        ]
+        ogrenci_seviye_listesi.append({**v, "toplam": v["kiz"] + v["erkek"], "subeler": subeler})
+    ogrenci_genel_toplam = {
+        "kiz":    sum(v["kiz"]  for v in _sinif_map.values()),
+        "erkek":  sum(v["erkek"] for v in _sinif_map.values()),
+        "toplam": sum(v["kiz"] + v["erkek"] for v in _sinif_map.values()),
+    }
+
     gunun_nobetci_ogrencileri = list(
         OgrenciNobetGorevi.objects.filter(tarih=today)
         .select_related("ogrenci")
@@ -281,6 +315,8 @@ def index(request):
                 "disiplin_cagri": disiplin_cagri,
                 "muduriyetcagri_cagri": muduriyetcagri_cagri,
             },
+            "ogrenci_seviye_listesi": ogrenci_seviye_listesi,
+            "ogrenci_genel_toplam":   ogrenci_genel_toplam,
         },
     )
 

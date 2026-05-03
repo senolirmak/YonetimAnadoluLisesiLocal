@@ -56,7 +56,7 @@ class OkulBilgiForm(forms.Form):
 
 
 class OgrenciImportForm(forms.Form):
-    dosya = forms.FileField(label="Öğrenci Listesi Excel Dosyası (OOG01001R020_...XLS)")
+    dosya = forms.FileField(label="Öğrenci Listesi Excel Dosyası (OOG01001R020_... .XLS veya .XLSX)")
     dosya_tarihi = forms.DateField(
         label="Dosya Tarihi",
         required=False,
