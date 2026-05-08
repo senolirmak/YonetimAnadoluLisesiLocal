@@ -59,9 +59,10 @@ class OgrenciIsleyici:
 
             if isinstance(val0, float) and val0 > 0 and aktif_sinif is not None:
                 try:
-                    okulno = str(ws.cell_value(row_idx, 1)).strip()
-                    if okulno.endswith(".0"):
-                        okulno = okulno[:-2]
+                    okulno_str = str(ws.cell_value(row_idx, 1)).strip()
+                    if okulno_str.endswith(".0"):
+                        okulno_str = okulno_str[:-2]
+                    okulno = int(okulno_str) if okulno_str.isdigit() else 0
                     adi = str(ws.cell_value(row_idx, 4)).strip().upper()
                     soyadi = str(ws.cell_value(row_idx, 8)).strip().upper()
                     cinsiyet_raw = str(ws.cell_value(row_idx, 12)).strip().lower()
@@ -106,9 +107,10 @@ class OgrenciIsleyici:
             # Öğrenci satırı: col0 sayısal S.No > 0
             if isinstance(val0, (int, float)) and val0 > 0 and aktif_sinif is not None:
                 try:
-                    okulno = str(row[1]).strip() if row[1] is not None else ""
-                    if okulno.endswith(".0"):
-                        okulno = okulno[:-2]
+                    okulno_str = str(row[1]).strip() if row[1] is not None else ""
+                    if okulno_str.endswith(".0"):
+                        okulno_str = okulno_str[:-2]
+                    okulno = int(okulno_str) if okulno_str.isdigit() else 0
                     adi = str(row[4]).strip().upper() if row[4] is not None else ""
                     soyadi = str(row[8]).strip().upper() if row[8] is not None else ""
                     cinsiyet_raw = str(row[12]).strip().lower() if row[12] is not None else ""
@@ -144,7 +146,7 @@ class OgrenciIsleyici:
 
         for kayit in self._kayitlar:
             okulno = kayit["okulno"]
-            tckimlikno_placeholder = okulno.zfill(11)
+            tckimlikno_placeholder = str(okulno).zfill(11)
             try:
                 obj, created = Ogrenci.objects.update_or_create(
                     okulno=okulno,

@@ -176,7 +176,7 @@ def cagri_liste(request, servis):
         qs = qs.filter(
             Q(ogrenci__adi__icontains=ogrenci_q)
             | Q(ogrenci__soyadi__icontains=ogrenci_q)
-            | Q(ogrenci__okulno__icontains=ogrenci_q)
+            | (Q(ogrenci__okulno=int(ogrenci_q)) if ogrenci_q.strip().isdigit() else Q())
         )
 
     # Listenin her satırında "Sil" butonu gösterilecek mi?

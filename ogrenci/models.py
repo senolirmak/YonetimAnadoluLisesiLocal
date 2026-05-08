@@ -8,7 +8,7 @@ CINSIYET_CHOICES = (
 
 
 class Ogrenci(models.Model):
-    okulno = models.CharField(max_length=20, unique=True, verbose_name="Okul No")
+    okulno = models.PositiveIntegerField(unique=True, verbose_name="Okul No")
     sinif = models.IntegerField(verbose_name="Sınıf")
     sube = models.CharField(max_length=2, verbose_name="Şube")
     tckimlikno = models.CharField(max_length=11, unique=True, verbose_name="TC Kimlik No")

@@ -89,7 +89,7 @@ def gorusme_liste(request):
         qs = qs.filter(
             Q(ogrenci__adi__icontains=ogrenci_q)
             | Q(ogrenci__soyadi__icontains=ogrenci_q)
-            | Q(ogrenci__okulno__icontains=ogrenci_q)
+            | (Q(ogrenci__okulno=int(ogrenci_q)) if ogrenci_q.strip().isdigit() else Q())
         )
     if kullanici_rehber and gizli_filtr in ("0", "1"):
         qs = qs.filter(gizli=(gizli_filtr == "1"))

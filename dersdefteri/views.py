@@ -147,8 +147,6 @@ def kayit_form(request, dp_pk):
     from devamsizlik.models import OgrenciDevamsizlik
     devamsiz_qs = OgrenciDevamsizlik.objects.none()
     if dp.sinif_sube:
-        from django.db.models import IntegerField
-        from django.db.models.functions import Cast
         devamsiz_qs = (
             OgrenciDevamsizlik.objects.filter(
                 tarih=today,
@@ -157,8 +155,7 @@ def kayit_form(request, dp_pk):
                 ogrenci__sube=dp.sinif_sube.sube,
             )
             .select_related("ogrenci")
-            .annotate(okulno_int=Cast("ogrenci__okulno", IntegerField()))
-            .order_by("okulno_int")
+            .order_by("ogrenci__okulno")
         )
 
     form = DersDefterForm(request.POST or None, instance=instance)

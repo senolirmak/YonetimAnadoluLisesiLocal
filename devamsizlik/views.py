@@ -301,7 +301,7 @@ def ogrenci_devamsizlik_listesi(request):
         qs = qs.filter(
             models.Q(ogrenci__adi__icontains=ogrenci_q)
             | models.Q(ogrenci__soyadi__icontains=ogrenci_q)
-            | models.Q(ogrenci__okulno__icontains=ogrenci_q)
+            | (models.Q(ogrenci__okulno=int(ogrenci_q)) if ogrenci_q.strip().isdigit() else models.Q())
         )
     if kaynak == "normal":
         qs = qs.exclude(aciklama__startswith="Faaliyet:")

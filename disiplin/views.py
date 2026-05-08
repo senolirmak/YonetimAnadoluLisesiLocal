@@ -105,7 +105,7 @@ def gorusme_liste(request):
         qs = qs.filter(
             Q(ogrenci__adi__icontains=ogrenci_q)
             | Q(ogrenci__soyadi__icontains=ogrenci_q)
-            | Q(ogrenci__okulno__icontains=ogrenci_q)
+            | (Q(ogrenci__okulno=int(ogrenci_q)) if ogrenci_q.strip().isdigit() else Q())
         )
     if kullanici_disiplin and gizli_filtr in ("0", "1"):
         qs = qs.filter(gizli=(gizli_filtr == "1"))
@@ -525,7 +525,7 @@ def cagri_liste(request):
         qs = qs.filter(
             Q(ogrenci__adi__icontains=ogrenci_q)
             | Q(ogrenci__soyadi__icontains=ogrenci_q)
-            | Q(ogrenci__okulno__icontains=ogrenci_q)
+            | (Q(ogrenci__okulno=int(ogrenci_q)) if ogrenci_q.strip().isdigit() else Q())
         )
 
     qs = qs.order_by("-tarih", "ders_saati")
