@@ -24,12 +24,48 @@
     /* slide (çok hafif) */
     .slideOut{ opacity:0 !important; transform: translateX(-2.5%); }
     .slideIn { opacity:1 !important; transform: translateX(0); }
+
+    /* Kesintisiz ticker overlay */
+    #kioskTicker {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      height: clamp(44px, 5.2vw, 110px);
+      background: rgba(0,0,0,0.92);
+      border-top: 1px solid rgba(0,255,0,0.55);
+      overflow: hidden;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+    }
+    #kioskTickerInner {
+      white-space: nowrap;
+      display: inline-block;
+      padding-left: 100%;
+      animation: kioskTicker 40s linear infinite;
+    }
+    #kioskTickerInner span {
+      font-family: "Noto Color Emoji","Noto Emoji","DejaVu Sans",Arial,sans-serif;
+      font-size: clamp(18px, 2.4vw, 70px);
+      letter-spacing: 0.08em;
+      color: #0fffff;
+      text-shadow: 0 0 12px rgba(0,255,0,0.35);
+    }
+    @keyframes kioskTicker {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-100%); }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <iframe id="f1" class="show"></iframe>
     <iframe id="f2"></iframe>
+  </div>
+
+  <!-- Kesintisiz duyuru bandı — iframe değişiminden etkilenmez -->
+  <div id="kioskTicker">
+    <div id="kioskTickerInner"><span id="kioskTickerText">📢 Yükleniyor…</span></div>
   </div>
 
   <script>
@@ -81,6 +117,41 @@
         scheduleNext();
       };
     }
+
+    // ---- KESİNTİSİZ TICKER ----
+    const tickerTextEl = document.getElementById('kioskTickerText');
+    const tickerInnerEl = document.getElementById('kioskTickerInner');
+    let _announcements = [];
+
+    function setTickerText(items) {
+      if (!items || items.length === 0) return;
+      tickerTextEl.textContent = items.join('   |   ');
+    }
+
+    function fetchAnnouncements() {
+      fetch('/pano/api/config/', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+          const incoming = data.announcements || [];
+          if (JSON.stringify(incoming) !== JSON.stringify(_announcements)) {
+            _announcements = incoming;
+            setTickerText(_announcements);
+          }
+        })
+        .catch(() => {});
+    }
+
+    fetchAnnouncements();
+    setInterval(fetchAnnouncements, 60_000);
+    // ---------------------------
+
+    // İndex sayfası medya listesini bitirdiğinde erken geçiş
+    window.addEventListener('message', e => {
+      if (e.data && e.data.type === 'pano:mediaPlaylistDone') {
+        clearTimeout(timer);
+        swap();
+      }
+    });
 
     // İlk yükleme
     setSrc(f1, PAGES[0].url);

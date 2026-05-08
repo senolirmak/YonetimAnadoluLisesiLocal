@@ -99,6 +99,9 @@ def etkinlikler(request):
             grouped[gun].append(e)
         return grouped
 
+    duyurular_qs = Duyuru.objects.filter(aktif=True).order_by("sira")
+    duyuru_metinleri = [d.metin for d in duyurular_qs if d.yayinda_mi(now)]
+
     context = {
         "ongoing_events": ongoing_qs.exists(),
         "ongoing_grouped": group_by_day(ongoing_qs),
@@ -106,8 +109,8 @@ def etkinlikler(request):
         "upcoming_grouped": group_by_day(upcoming_qs),
         "now": now,
         "SCHOOL_NAME": _okul_adi(),
-        "DUYURULAR": [],
-        "DUYURULAR_JSON": json.dumps([]),
+        "DUYURULAR": duyuru_metinleri,
+        "DUYURULAR_JSON": json.dumps(duyuru_metinleri),
         "DERSLER": json.dumps(ders_saatleri),
         "LESSON_MIN": lesson_min,
     }

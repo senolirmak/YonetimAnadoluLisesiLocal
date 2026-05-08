@@ -98,6 +98,12 @@
   }
   updateTicker();
 
+  // Kiosk iframe içindeyse sayfanın kendi ticker'ını gizle (kiosk üstte tutar)
+  if (window.self !== window.top) {
+    const ft = document.querySelector('.ticker');
+    if (ft) ft.style.display = 'none';
+  }
+
   updateScale();
 
   /* ======================================================
@@ -310,60 +316,132 @@
   buildLessonList();
 
   /* ======================================================
-     MEDIA PLAYER (SAĞ PANEL)
+     MEDIA PLAYER (SAĞ PANEL) — A/B Çift Katman Crossfade
   ====================================================== */
-  let _mediaIndex   = -1;
-  let _mediaTimer   = null;
-  let _mediaRunning = false;
+  let _mediaIndex    = -1;
+  let _mediaTimer    = null;
+  let _mediaRunning  = false;
+  let _activeLayer   = 'A';
+  let _progressStart = null;
+  let _progressDur   = 0;
+  let _progressRaf   = null;
+
+  function _layerEls(name) {
+    return {
+      layer: document.getElementById('mediaLayer' + name),
+      img:   document.getElementById('mediaImage' + name),
+      video: document.getElementById('mediaVideo' + name),
+    };
+  }
+
+  function _switchLayer(nextName) {
+    const cur = _layerEls(_activeLayer);
+    const nxt = _layerEls(nextName);
+    if (cur.layer) cur.layer.classList.remove('active');
+    if (nxt.layer) nxt.layer.classList.add('active');
+    _activeLayer = nextName;
+  }
+
+  function _startProgress(durationMs) {
+    const bar = document.getElementById('mediaProgress');
+    if (!bar) return;
+    if (_progressRaf) cancelAnimationFrame(_progressRaf);
+    _progressStart = performance.now();
+    _progressDur   = durationMs;
+    bar.style.width = '0%';
+    function step(now) {
+      const pct = Math.min(100, ((now - _progressStart) / _progressDur) * 100);
+      bar.style.width = pct + '%';
+      if (pct < 100) _progressRaf = requestAnimationFrame(step);
+    }
+    _progressRaf = requestAnimationFrame(step);
+  }
+
+  function _updateSlideCounter() {
+    const el = document.getElementById('slideCounter');
+    if (!el) return;
+    el.textContent = MEDIA_PLAYLIST.length > 0
+      ? `${_mediaIndex + 1} / ${MEDIA_PLAYLIST.length}`
+      : '';
+  }
+
+  function _onPlaylistCycleDone() {
+    if (window.parent !== window) {
+      // Kiosk iframe içindeyiz — parent'a erken geçiş sinyali gönder
+      window.parent.postMessage({ type: 'pano:mediaPlaylistDone' }, '*');
+    } else {
+      // Doğrudan açılmış — etkinlikler sayfasına git
+      window.location.href = '/pano/etkinlikler/';
+    }
+  }
 
   function _playNext() {
-    const mediaImageEl = document.getElementById("mediaImage");
-    const mediaVideoEl = document.getElementById("mediaVideo");
-    const mediaTitleEl = document.getElementById("mediaTitle");
-    const mediaDescEl  = document.getElementById("mediaDesc");
-    if (!mediaImageEl || !mediaVideoEl) return;
+    const emptyEl = document.getElementById('mediaEmpty');
+    const titleEl = document.getElementById('mediaTitle');
+    const descEl  = document.getElementById('mediaDesc');
 
     if (MEDIA_PLAYLIST.length === 0) {
-      mediaImageEl.style.display = 'none';
-      mediaVideoEl.style.display = 'none';
+      if (emptyEl) emptyEl.style.display = 'flex';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const nextIndex = (_mediaIndex + 1) % MEDIA_PLAYLIST.length;
+    const cycleComplete = nextIndex < _mediaIndex; // sadece wrap-around'da true
+    _mediaIndex = nextIndex;
+
+    if (cycleComplete) {
+      _onPlaylistCycleDone();
       return;
     }
 
-    _mediaIndex = (_mediaIndex + 1) % MEDIA_PLAYLIST.length;
-    const item = MEDIA_PLAYLIST[_mediaIndex];
+    const item  = MEDIA_PLAYLIST[_mediaIndex];
 
-    if (mediaTitleEl) mediaTitleEl.textContent = item.title || "";
-    if (mediaDescEl)  mediaDescEl.textContent  = item.description || "";
+    if (titleEl) titleEl.textContent = item.title       || '';
+    if (descEl)  descEl.textContent  = item.description || '';
+    _updateSlideCounter();
+
+    const nextName = _activeLayer === 'A' ? 'B' : 'A';
+    const nxt = _layerEls(nextName);
 
     if (item.type === 'image') {
-      mediaVideoEl.style.display = 'none';
-      mediaVideoEl.pause();
-      mediaVideoEl.removeAttribute('src');
-      mediaImageEl.src = item.url;
-      mediaImageEl.style.display = 'block';
-      _mediaTimer = setTimeout(_playNext, (item.duration || 15) * 1000);
+      if (nxt.video) { nxt.video.pause(); nxt.video.removeAttribute('src'); nxt.video.style.display = 'none'; }
+      nxt.img.src = item.url;
+      nxt.img.style.display = 'block';
+      _switchLayer(nextName);
+      const dur = (item.duration || 15) * 1000;
+      _startProgress(dur);
+      _mediaTimer = setTimeout(_playNext, dur);
     } else if (item.type === 'video') {
-      mediaImageEl.style.display = 'none';
-      mediaImageEl.removeAttribute('src');
-      mediaVideoEl.src = item.url;
-      mediaVideoEl.style.display = 'block';
-      mediaVideoEl.play().catch(e => console.error("Video oynatılamadı:", e));
+      if (nxt.img) { nxt.img.removeAttribute('src'); nxt.img.style.display = 'none'; }
+      nxt.video.src = item.url;
+      nxt.video.currentTime = 0;
+      nxt.video.style.display = 'block';
+      _switchLayer(nextName);
+      nxt.video.play().catch(e => console.error('Video oynatılamadı:', e));
     }
   }
 
   function setupMediaPlayer() {
-    const mediaVideoEl = document.getElementById("mediaVideo");
-    if (!mediaVideoEl) return;
-    mediaVideoEl.onended = _playNext;
+    ['A', 'B'].forEach(name => {
+      const v = document.getElementById('mediaVideo' + name);
+      if (v) v.onended = () => { if (_mediaTimer) clearTimeout(_mediaTimer); _playNext(); };
+    });
     _mediaRunning = true;
     _playNext();
   }
 
   function restartMediaPlayer() {
-    if (_mediaTimer) clearTimeout(_mediaTimer);
-    _mediaIndex = -1;
-    const mediaVideoEl = document.getElementById("mediaVideo");
-    if (mediaVideoEl) { mediaVideoEl.pause(); mediaVideoEl.removeAttribute('src'); }
+    if (_mediaTimer)    clearTimeout(_mediaTimer);
+    if (_progressRaf)   cancelAnimationFrame(_progressRaf);
+    _mediaIndex  = -1;
+    _activeLayer = 'A';
+    ['A', 'B'].forEach(name => {
+      const els = _layerEls(name);
+      if (els.video) { els.video.pause(); els.video.removeAttribute('src'); }
+      if (els.img)   { els.img.removeAttribute('src'); }
+      if (els.layer) { els.layer.classList.toggle('active', name === 'A'); }
+    });
     _playNext();
   }
 
