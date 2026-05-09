@@ -149,6 +149,20 @@
 </div>
 {% endif %}
 
+{% if aktif_uretim %}
+<div class="card" style="border-left:4px solid #16a34a; background:#f0fdf4; padding:.9rem 1.5rem;
+     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+  <div>
+    <strong style="color:#166534;">✓ Onaylı Takvim</strong>
+    <span style="font-size:.82rem; color:#6b7280; margin-left:.6rem;">{{ aktif_uretim }}</span>
+  </div>
+  <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+    <a href="{% url 'sinav:takvim_onizleme' %}" class="btn btn-secondary btn-sm">Takvimi Görüntüle</a>
+    <a href="{% url 'sinav:sinav_takvimi_pdf_view' %}" class="btn btn-success btn-sm" target="_blank">PDF İndir</a>
+  </div>
+</div>
+{% endif %}
+
 {% if onizleme_mevcut %}
 <div class="card" style="border-left:4px solid #6366f1; background:#eef2ff; padding:.9rem 1.5rem;
      display:flex; justify-content:space-between; align-items:center;">

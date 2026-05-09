@@ -133,6 +133,12 @@
 
   <div style="margin-top:1.2rem; display:flex; gap:.7rem; align-items:center; flex-wrap:wrap;">
     <button type="submit" class="btn btn-primary">Kaydet</button>
+    <button type="button" class="btn btn-secondary" onclick="belgeTumunuAyarla(true)">
+      Belge: Tümünü İşaretle
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="belgeTumunuAyarla(false)">
+      Belge: Tümünü Kaldır
+    </button>
     <form method="post" action="{% url 'sinav:mazeret_dagit' mazeret.pk %}" style="margin:0;"
           onsubmit="return confirm('Belge teslim / sürekli devamsız durumuna göre takvim yeniden oluşturulsun mu?');">
       {% csrf_token %}
@@ -149,6 +155,11 @@
 function toggleDers(baslik) {
   const icerik = baslik.nextElementSibling;
   icerik.style.display = icerik.style.display === "none" ? "" : "none";
+}
+
+function belgeTumunuAyarla(isaretle) {
+  document.querySelectorAll('input[type="checkbox"][name="belge_teslim"]')
+    .forEach(cb => cb.checked = isaretle);
 }
 </script>
 {% endblock %}

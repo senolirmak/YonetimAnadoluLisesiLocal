@@ -107,16 +107,26 @@ class MazeretILPService(BaseService):
             return False, "Aktif takvim üretimi bulunamadı."
 
         # Sürekli devamsız ve muaf filtresi
-        sureksiz = set(
-            Ogrenci.objects.filter(sureksiz_devamsiz=True)
-            .values_list("okulno", flat=True)
+        # Ogrenci.okulno int; MazeretOgrenci.okulno CharField → str dönüşümü
+        sureksiz_strs = {
+            str(x) for x in
+            Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+        }
+
+        # Subquery yerine Python listesi: int↔varchar tip çakışmasını önle
+        _mo_okulno_strs = list(
+            MazeretOgrenci.objects.filter(mazeret_sinav=mazeret_sinav)
+            .values_list("okulno", flat=True).distinct()
         )
-        muaf_pairs: set[tuple[str, str]] = set(
-            OgrenciMuaf.objects.filter(
-                ogrenci__okulno__in=MazeretOgrenci.objects.filter(
-                    mazeret_sinav=mazeret_sinav
-                ).values("okulno")
-            ).values_list("ogrenci__okulno", "ders__ders_adi")
+        _mo_okulno_ints = [int(x) for x in _mo_okulno_strs if x]
+        muaf_pairs: set[tuple[str, str]] = (
+            {
+                (str(ok), ders)
+                for ok, ders in OgrenciMuaf.objects.filter(
+                    ogrenci__okulno__in=_mo_okulno_ints
+                ).values_list("ogrenci__okulno", "ders__ders_adi")
+            }
+            if _mo_okulno_ints else set()
         )
 
         uygun = [
@@ -124,7 +134,7 @@ class MazeretILPService(BaseService):
             for r in MazeretOgrenci.objects.filter(
                 mazeret_sinav=mazeret_sinav, belge_teslim=True
             )
-            .exclude(okulno__in=sureksiz)
+            .exclude(okulno__in=sureksiz_strs)
             .values("okulno", "ders_adi", "sinav_turu")
             if (r["okulno"], r["ders_adi"]) not in muaf_pairs
         ]
@@ -180,31 +190,45 @@ class MazeretILPService(BaseService):
         G = nx.Graph()
         G.add_nodes_from(range(N))
 
-        # Ortak öğrencisi olan ders çiftleri
+        # Ortak öğrencisi olan ders çiftleri — aynı slot VE aynı gün kısıtı için ayrı kayıt
+        student_pairs: set[tuple[int, int]] = set()
         for dersler_seti in ogr_dersler.values():
             dlist = list(dersler_seti)
             for a in range(len(dlist)):
                 for b in range(a + 1, len(dlist)):
-                    G.add_edge(ders_idx[dlist[a]], ders_idx[dlist[b]])
+                    ia = ders_idx[dlist[a]]
+                    ib = ders_idx[dlist[b]]
+                    G.add_edge(ia, ib)
+                    student_pairs.add((min(ia, ib), max(ia, ib)))
 
-        # Uygulama exclusive: diğer tüm derslerle çakışır
+        # Uygulama exclusive: diğer tüm derslerle çakışır (yalnızca slot kısıtı)
         for d in DERSLER:
             if d[1] == "Uygulama":
-                u = ders_idx[d]
+                ui = ders_idx[d]
                 for v in range(N):
-                    if v != u:
-                        G.add_edge(u, v)
+                    if v != ui:
+                        G.add_edge(ui, v)
+
+        # Öğrenci-paylaşan alt graf: günlük çakışma için minimum gün sayısını belirler
+        G_student = nx.Graph()
+        G_student.add_nodes_from(range(N))
+        for ia, ib in student_pairs:
+            G_student.add_edge(ia, ib)
+        student_greedy = nx.coloring.greedy_color(G_student, strategy="largest_first")
+        min_days_ogrenci = (max(student_greedy.values()) + 1) if student_greedy else 1
 
         self.log(
             f"Mazeret ILP: {N} ders, "
             f"{G.number_of_edges()} çakışma kenarı, "
             f"{K_gun} oturum/gün, "
-            f"toplam kapasite {toplam_kapasite} öğrenci/slot"
+            f"toplam kapasite {toplam_kapasite} öğrenci/slot, "
+            f"min gün (öğrenci çakışma) = {min_days_ogrenci}"
         )
 
-        # Greedy renklendirme → slot üst sınırı
+        # Greedy renklendirme → slot üst sınırı; öğrenci günlük kısıtı için yeterli gün sağla
         greedy = nx.coloring.greedy_color(G, strategy="largest_first")
-        K = (max(greedy.values()) + 1) if greedy else 1
+        K_greedy = (max(greedy.values()) + 1) if greedy else 1
+        K = max(K_greedy, min_days_ogrenci * K_gun)
 
         # ──────────────────────────────────────────────
         # ILP
@@ -237,9 +261,39 @@ class MazeretILPService(BaseService):
                 <= toplam_kapasite
             )
 
+        # Öğrenci bazlı günlük çakışma kısıtı:
+        # Ortak öğrencisi olan iki dersin aynı güne atanması engellenir.
+        # u_gün[i][d] = 1 ⟺ ders i, gün d'de planlandı
+        num_days = (K + K_gun - 1) // K_gun
+        u_gun = {
+            (i, d): LpVariable(f"ug_{i}_{d}", cat=LpBinary)
+            for i in range(N)
+            for d in range(num_days)
+        }
+        for i in range(N):
+            for d in range(num_days):
+                slots_in_day = [t for t in range(K) if t // K_gun == d]
+                prob += u_gun[(i, d)] == lpSum(x[i][t] for t in slots_in_day)
+
+        for ia, ib in student_pairs:
+            for d in range(num_days):
+                prob += u_gun[(ia, d)] + u_gun[(ib, d)] <= 1
+
+        if student_pairs:
+            self.log(
+                f"  Günlük çakışma kısıtı: {len(student_pairs)} öğrenci-paylaşan ders çifti, "
+                f"{num_days} gün × çift = {len(student_pairs) * num_days} kısıt eklendi."
+            )
+
         for t in range(K):
             for i in range(N):
                 prob += y[t] >= x[i][t]
+
+        # Slotları ardışık kullan: y[t] >= y[t+1]
+        # Bu olmadan CBC boşluklu slotlar seçebilir; sıkıştırma sonrası ILP günleri
+        # gerçek günlerle örtüşmez ve öğrenci günlük çakışma kısıtı anlamsız kalır.
+        for t in range(K - 1):
+            prob += y[t] >= y[t + 1]
 
         status = prob.solve(PULP_CBC_CMD(
             msg=0,

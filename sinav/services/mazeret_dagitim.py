@@ -167,14 +167,18 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> tuple[int, int]:
     ).values("ders_adi")[:1]
 
     # Özel durum 1: Sürekli devamsız → tüm derslerden hariç (DB seviyesinde filtre)
-    sureksiz_okulnolari = set(
+    # Ogrenci.okulno PositiveIntegerField; SinavSalonYoklama.okulno CharField → str dönüşümü
+    sureksiz_okulnolari = {
+        str(x) for x in
         Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
-    )
+    }
 
     # Özel durum 2: Muaf → (okulno, ders_adi) bazında hariç
-    muaf_okulno_ders: set[tuple[str, str]] = set(
-        OgrenciMuaf.objects.values_list("ogrenci__okulno", "ders__ders_adi")
-    )
+    # ogrenci__okulno int döner → str'ye normalize et
+    muaf_okulno_ders: set[tuple[str, str]] = {
+        (str(ok), ders)
+        for ok, ders in OgrenciMuaf.objects.values_list("ogrenci__okulno", "ders__ders_adi")
+    }
 
     absent_rows = list(
         SinavSalonYoklama.objects.filter(uretim=aktif_uretim, durum="yok")
@@ -305,18 +309,27 @@ def dagit(mazeret_sinav: MazeretSinav) -> Tuple[bool, str]:
         return False, "Aktif takvim üretimi bulunamadı. Önce bir takvim üretimi aktif yapın."
 
     # Sürekli devamsız öğrenciler → tüm derslerden hariç
-    sureksiz_okulnolari = set(
+    # Ogrenci.okulno int; MazeretOgrenci.okulno CharField → str dönüşümü
+    sureksiz_okulnolari = {
+        str(x) for x in
         Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
-    )
+    }
 
     # Muaf (ders bazında): (okulno, ders_adi) çiftleri → o ders için hariç
-    # OgrenciMuaf.ders → DersHavuzu.ders_adi ile eşleştir
-    muaf_okulno_ders: set[tuple[str, str]] = set(
-        OgrenciMuaf.objects.filter(
-            ogrenci__okulno__in=MazeretOgrenci.objects.filter(
-                mazeret_sinav=mazeret_sinav
-            ).values("okulno")
-        ).values_list("ogrenci__okulno", "ders__ders_adi")
+    # Subquery yerine Python listesi kullanarak int↔varchar tip çakışmasını önle
+    _mo_okulno_strs = list(
+        MazeretOgrenci.objects.filter(mazeret_sinav=mazeret_sinav)
+        .values_list("okulno", flat=True).distinct()
+    )
+    _mo_okulno_ints = [int(x) for x in _mo_okulno_strs if x]
+    muaf_okulno_ders: set[tuple[str, str]] = (
+        {
+            (str(ok), ders)
+            for ok, ders in OgrenciMuaf.objects.filter(
+                ogrenci__okulno__in=_mo_okulno_ints
+            ).values_list("ogrenci__okulno", "ders__ders_adi")
+        }
+        if _mo_okulno_ints else set()
     )
 
     # Belge teslim etmiş öğrencilerden uygun (ders_adi, sinav_turu) çiftlerini bul

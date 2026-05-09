@@ -43,19 +43,26 @@ def oturma_plani_olustur(mazeret: "MazeretSinav") -> dict:
     # Mevcut planı temizle
     MazeretOturmaPlani.objects.filter(mazeret_sinav=mazeret).delete()
 
-    # Sürekli devamsız okulno'lar
-    sureksiz = set(
-        Ogrenci.objects.filter(sureksiz_devamsiz=True)
-        .values_list("okulno", flat=True)
-    )
+    # Sürekli devamsız okulno'lar — Ogrenci.okulno int; MazeretOgrenci.okulno CharField → str
+    sureksiz_strs = {
+        str(x) for x in
+        Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+    }
 
-    # Muaf (okulno, ders_adi) çiftleri
-    muaf_pairs: set[tuple[str, str]] = set(
-        OgrenciMuaf.objects.filter(
-            ogrenci__okulno__in=MazeretOgrenci.objects.filter(
-                mazeret_sinav=mazeret
-            ).values("okulno")
-        ).values_list("ogrenci__okulno", "ders__ders_adi")
+    # Muaf (okulno, ders_adi) çiftleri — subquery yerine Python listesi (int↔varchar tip uyumu)
+    _mo_okulno_ints = [
+        int(x) for x in
+        MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
+        .values_list("okulno", flat=True).distinct() if x
+    ]
+    muaf_pairs: set[tuple[str, str]] = (
+        {
+            (str(ok), ders)
+            for ok, ders in OgrenciMuaf.objects.filter(
+                ogrenci__okulno__in=_mo_okulno_ints
+            ).values_list("ogrenci__okulno", "ders__ders_adi")
+        }
+        if _mo_okulno_ints else set()
     )
 
     # Oturumları sıralı işle
@@ -76,7 +83,7 @@ def oturma_plani_olustur(mazeret: "MazeretSinav") -> dict:
                 sinav_turu=od.sinav_turu,
                 belge_teslim=True,
             )
-            .exclude(okulno__in=sureksiz)
+            .exclude(okulno__in=sureksiz_strs)
             .order_by("sinifsube", "adi_soyadi")
             .values_list("okulno", "adi_soyadi", "sinifsube")
         )

@@ -52,6 +52,7 @@
 <div class="no-print" style="margin-bottom:1rem; display:flex; gap:.6rem;">
   <a href="{% url 'sinav:mazeret_takvim' mazeret.pk %}" class="btn btn-secondary btn-sm">&#8592; Takvime Dön</a>
   <button onclick="window.print()" class="btn btn-primary btn-sm">Yazdır</button>
+  <a href="{% url 'sinav:mazeret_rapor_pdf' mazeret.pk %}" class="btn btn-success btn-sm">PDF İndir</a>
 </div>
 
 <div class="rapor-baslik">

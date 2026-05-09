@@ -23,6 +23,7 @@
     {% endif %}
     {% if onaylandi %}
       <span class="badge badge-done">✓ Onaylandı</span>
+      <a href="{% url 'sinav:sinav_takvimi_pdf_view' %}" class="btn btn-success btn-sm" target="_blank">PDF İndir</a>
       <button type="submit" form="takvim-guncelle-form" class="btn btn-primary btn-sm">Değişiklikleri Kaydet</button>
     {% else %}
       <form method="post" action="{% url 'sinav:takvim_onizleme_iptal' %}">

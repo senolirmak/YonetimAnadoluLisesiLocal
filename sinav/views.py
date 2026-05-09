@@ -524,7 +524,8 @@ def _takvim_ctx(request, alg_form=None):
     if alg_form is None:
         alg_form = _alg_form_initial(request)
     aktif = _aktif_sinav()
-    son_uretim = TakvimUretim.objects.filter(sinav=aktif).first() if aktif else None
+    son_uretim    = TakvimUretim.objects.filter(sinav=aktif).first() if aktif else None
+    aktif_uretim  = TakvimUretim.objects.filter(sinav=aktif, aktif=True).first() if aktif else None
     takvim_sayisi = Takvim.objects.filter(sinav=aktif).count()
     return {
         "aktif_sinav":       aktif,
@@ -532,6 +533,7 @@ def _takvim_ctx(request, alg_form=None):
         "alg_acik":          bool(alg_form.errors),
         "sube_ders_sayisi":  SubeDers.objects.count(),
         "takvim_sayisi":     takvim_sayisi,
+        "aktif_uretim":      aktif_uretim,
         "onizleme_mevcut":   bool(son_uretim and son_uretim.onizleme_verisi is not None),
     }
 
@@ -2194,13 +2196,18 @@ def mazeret_yoklama_simule(request):
             if yk["durum"] == "yok":
                 yoklama_ozet[key]["yok"] += 1
 
+        import datetime as _dt
         for key, oz in sorted(oturum_ozet.items()):
             tarih_str, saat_str, salon_str = key
             yk = yoklama_ozet.get(key, {"toplam": 0, "yok": 0})
             ogrenci = oz["ogrenci"]
             haric   = oz["haric"]
+            try:
+                tarih_obj = _dt.date.fromisoformat(tarih_str)
+            except ValueError:
+                tarih_obj = tarih_str
             oturum_listesi.append({
-                "tarih":       tarih_str,
+                "tarih":       tarih_obj,
                 "saat":        saat_str,
                 "salon":       salon_str,
                 "ogrenci":     ogrenci,
@@ -2581,11 +2588,15 @@ def mazeret_ogrenci_listesi(request, pk):
                 sinav=sinav, okulno=okulno, ders_adi=ders_adi, sinav_turu=sinav_turu
             ).delete()
 
+        # Subquery yerine Python listesi: Ogrenci.okulno (int) ↔ MazeretOgrenci.okulno (varchar)
+        _mo_okulno_ints = [
+            int(x) for x in
+            MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
+            .values_list("okulno", flat=True).distinct() if x
+        ]
         guncellenen_ogr = 0
-        for ogr in OgrenciModel.objects.filter(
-            okulno__in=MazeretOgrenci.objects.filter(mazeret_sinav=mazeret).values("okulno")
-        ):
-            yeni_sureksiz = ogr.okulno in sureksiz_isaretli
+        for ogr in (OgrenciModel.objects.filter(okulno__in=_mo_okulno_ints) if _mo_okulno_ints else OgrenciModel.objects.none()):
+            yeni_sureksiz = str(ogr.okulno) in sureksiz_isaretli
             if ogr.sureksiz_devamsiz != yeni_sureksiz:
                 ogr.sureksiz_devamsiz = yeni_sureksiz
                 ogr.save(update_fields=["sureksiz_devamsiz"])
@@ -2597,19 +2608,27 @@ def mazeret_ogrenci_listesi(request, pk):
         )
         return redirect("sinav:mazeret_ogrenci_listesi", pk=pk)
 
-    # Sürekli devamsız okulnoları
-    sureksiz_okulnolari = set(
+    # Sürekli devamsız okulnoları — int → str (MazeretOgrenci.okulno CharField)
+    sureksiz_okulnolari = {
+        str(x) for x in
         OgrenciModel.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
-    )
+    }
 
-    # Muaf (ders bazında): (okulno, ders_adi) çiftleri
+    # Muaf (ders bazında): subquery yerine Python listesi (int↔varchar tip uyumu)
     from ogrenci.models import OgrenciMuaf
-    muaf_okulno_ders: set[tuple[str, str]] = set(
-        OgrenciMuaf.objects.filter(
-            ogrenci__okulno__in=MazeretOgrenci.objects.filter(
-                mazeret_sinav=mazeret
-            ).values("okulno")
-        ).values_list("ogrenci__okulno", "ders__ders_adi")
+    _mo_ok_ints = [
+        int(x) for x in
+        MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
+        .values_list("okulno", flat=True).distinct() if x
+    ]
+    muaf_okulno_ders: set[tuple[str, str]] = (
+        {
+            (str(ok), ders)
+            for ok, ders in OgrenciMuaf.objects.filter(
+                ogrenci__okulno__in=_mo_ok_ints
+            ).values_list("ogrenci__okulno", "ders__ders_adi")
+        }
+        if _mo_ok_ints else set()
     )
 
     tum_ogrenciler = list(
@@ -2731,8 +2750,8 @@ def mazeret_takvim_olustur(request, pk):
                          "Öğrencilerin belge teslim durumunu kontrol edin.")
     else:
         msg = (f"Takvim oluşturuldu: {sonuc['toplam']} öğrenci — "
-               f"Mazeret1: {sonuc['salonlar'].get('Mazeret1', 0)}, "
-               f"Mazeret2: {sonuc['salonlar'].get('Mazeret2', 0)}.")
+               f"Mazeret 1: {sonuc['salonlar'].get('Mazeret 1', 0)}, "
+               f"Mazeret 2: {sonuc['salonlar'].get('Mazeret 2', 0)}.")
         if sonuc["uyari"]:
             messages.warning(request, msg + " " + sonuc["uyari"])
         else:
@@ -2774,8 +2793,8 @@ def mazeret_takvim_detay(request, pk):
     oturumlar_veri = []
     for oturum in oturumlar_qs:
         kayitlar = list(oturum.oturma_plani.order_by("salon", "sira_no"))
-        salon1 = [k for k in kayitlar if k.salon == "Mazeret1"]
-        salon2 = [k for k in kayitlar if k.salon == "Mazeret2"]
+        salon1 = [k for k in kayitlar if k.salon == "Mazeret 1"]
+        salon2 = [k for k in kayitlar if k.salon == "Mazeret 2"]
         dersler = list(
             MazeretOturumDers.objects
             .filter(oturum=oturum)
@@ -2841,8 +2860,8 @@ def mazeret_rapor(request, pk):
     oturumlar_veri = []
     for oturum in oturumlar_qs:
         kayitlar = list(oturum.oturma_plani.order_by("salon", "sira_no"))
-        salon1 = [k for k in kayitlar if k.salon == "Mazeret1"]
-        salon2 = [k for k in kayitlar if k.salon == "Mazeret2"]
+        salon1 = [k for k in kayitlar if k.salon == "Mazeret 1"]
+        salon2 = [k for k in kayitlar if k.salon == "Mazeret 2"]
         dersler = list(
             MazeretOturumDers.objects
             .filter(oturum=oturum)
@@ -2862,3 +2881,44 @@ def mazeret_rapor(request, pk):
         "oturumlar_veri": oturumlar_veri,
         "okul": okul,
     })
+
+
+@login_required
+def mazeret_rapor_pdf_view(request, pk):
+    """Mazeret oturma planını PDF olarak indirir (ReportLab)."""
+    import io
+    from django.http import HttpResponse
+    from ortaksinav_engine.services.pdf_rapor import mazeret_rapor_pdf
+
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+
+    oturumlar_qs = (
+        MazeretOturum.objects
+        .filter(gun__mazeret_sinav=mazeret)
+        .select_related("gun")
+        .order_by("gun__tarih", "oturum_no")
+    )
+    oturumlar_veri = []
+    for oturum in oturumlar_qs:
+        kayitlar = list(oturum.oturma_plani.order_by("salon", "sira_no"))
+        oturumlar_veri.append({
+            "oturum": oturum,
+            "dersler": list(
+                MazeretOturumDers.objects
+                .filter(oturum=oturum)
+                .select_related("ders")
+                .order_by("ders__ders_adi")
+            ),
+            "salon1": [k for k in kayitlar if k.salon == "Mazeret 1"],
+            "salon2": [k for k in kayitlar if k.salon == "Mazeret 2"],
+        })
+
+    okul = OkulBilgi.get()
+    buf = io.BytesIO()
+    mazeret_rapor_pdf(oturumlar_veri, buf, okul, mazeret)
+    buf.seek(0)
+
+    dosya_adi = f"mazeret_rapor_{pk}.pdf"
+    response = HttpResponse(buf, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{dosya_adi}"'
+    return response
