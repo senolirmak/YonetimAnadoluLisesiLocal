@@ -125,57 +125,46 @@ class AlgoritmaForm(forms.Form):
 
 
 class MazeretSinavForm(forms.ModelForm):
-    """Mazeret sınav planı oluşturma formu."""
+    """Mazeret sınav planı oluşturma formu (ILP tabanlı)."""
 
-    # Virgülle veya yeni satırla ayrılmış tarih listesi
-    tarihler = forms.CharField(
-        label="Sınav Günleri",
-        widget=forms.Textarea(attrs={
-            "rows": 4,
-            "placeholder": "2026-05-12\n2026-05-13",
-        }),
-        help_text="Her satıra bir tarih, YYYY-AA-GG formatında. En az 1 gün girilmeli.",
+    baslangic_tarihi = forms.DateField(
+        label="Başlangıç Tarihi",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        help_text=(
+            "ILP bu tarihten itibaren iş günlerini kullanarak çakışmasız takvim üretir."
+        ),
     )
 
     oturum_saatleri = forms.CharField(
-        label="Oturum Saatleri",
+        label="Günlük Oturum Saatleri",
         initial="08:50,10:30,12:10,13:35,14:25",
         help_text=(
-            "Virgülle ayrılmış, HH:MM formatında. "
-            "Yazılı oturumlar başa, Uygulama oturumları sona yerleştirilir. "
-            "En az 4 saat girilmeli."
+            "Virgülle ayrılmış HH:MM formatında. "
+            "ILP bu saatleri her gün için oturum slotu olarak kullanır. "
+            "En az 1 saat girilmeli."
+        ),
+    )
+
+    salon_config_text = forms.CharField(
+        label="Salon ve Kapasiteler",
+        widget=forms.Textarea(attrs={"rows": 3}),
+        initial="Mazeret 1:36\nMazeret 2:36",
+        help_text=(
+            "Her satıra  Salon Adı:Kapasite  formatında. "
+            "ILP her slottaki öğrenci sayısını toplam kapasiteyle sınırlar."
         ),
     )
 
     class Meta:
         model = MazeretSinav
-        fields = ["aciklama"]
+        fields = ["aciklama", "baslangic_tarihi", "oturum_saatleri"]
         labels = {"aciklama": "Açıklama (opsiyonel)"}
-
-    def clean_tarihler(self):
-        raw = self.cleaned_data.get("tarihler", "")
-        hatali, gecerli = [], []
-        for line in raw.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                gecerli.append(date.fromisoformat(line))
-            except ValueError:
-                hatali.append(line)
-        if hatali:
-            raise forms.ValidationError(
-                f"Geçersiz tarih formatı (YYYY-AA-GG olmalı): {', '.join(hatali)}"
-            )
-        if not gecerli:
-            raise forms.ValidationError("En az bir sınav günü girilmeli.")
-        return gecerli
 
     def clean_oturum_saatleri(self):
         raw = self.cleaned_data.get("oturum_saatleri", "")
         saatler = [s.strip() for s in raw.split(",") if s.strip()]
-        if len(saatler) < 4:
-            raise forms.ValidationError("En az 4 oturum saati girilmeli.")
+        if not saatler:
+            raise forms.ValidationError("En az 1 oturum saati girilmeli.")
         pattern = re.compile(r"^\d{2}:\d{2}$")
         hatali = [s for s in saatler if not pattern.match(s)]
         if hatali:
@@ -183,3 +172,38 @@ class MazeretSinavForm(forms.ModelForm):
                 f"Geçersiz saat formatı (HH:MM olmalı): {', '.join(hatali)}"
             )
         return ",".join(saatler)
+
+    def clean_salon_config_text(self):
+        raw = self.cleaned_data.get("salon_config_text", "")
+        config: dict[str, int] = {}
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if ":" not in line:
+                raise forms.ValidationError(
+                    f"Geçersiz format: '{line}'. 'Salon Adı:Kapasite' formatı bekleniyor."
+                )
+            ad, _, kap_str = line.partition(":")
+            ad = ad.strip()
+            if not ad:
+                raise forms.ValidationError("Salon adı boş olamaz.")
+            try:
+                kap = int(kap_str.strip())
+                if kap < 1:
+                    raise ValueError
+            except ValueError:
+                raise forms.ValidationError(
+                    f"'{ad}' için kapasite pozitif tam sayı olmalı."
+                )
+            config[ad] = kap
+        if not config:
+            raise forms.ValidationError("En az bir salon tanımlanmalı.")
+        return config
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        obj.salon_config = self.cleaned_data.get("salon_config_text") or {}
+        if commit:
+            obj.save()
+        return obj

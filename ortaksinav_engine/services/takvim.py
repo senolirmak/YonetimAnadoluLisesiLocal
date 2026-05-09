@@ -216,6 +216,24 @@ class TakvimService(BaseService):
         if pairs:
             self.log(f"  Cift oturumlu ayni-gun kisiti: {len(pairs)} cift (Faz-1 ve Faz-2).")
 
+        # Eş zamanlı eşleme çiftlerini önceden filtrele: hem DERSLER'de hem çakışmasız olanlar
+        esleme_gercek: list[tuple[str, str]] = []
+        for d1, d2 in (self.config.get("AYNI_SLOT_ESLEME") or []):
+            if d1 not in DERSLER or d2 not in DERSLER:
+                continue
+            if G.has_edge(d1, d2):
+                self.log(
+                    f"  [Eş Zamanlı] '{d1}' ↔ '{d2}': ortak öğrenci var (aynı şube), "
+                    f"eşleme uygulanamaz — bu iki ders AYRI slotlara atanacak."
+                )
+                continue
+            esleme_gercek.append((d1, d2))
+        if esleme_gercek:
+            self.log(
+                f"  Eş zamanlı eşleme: {len(esleme_gercek)} çift, "
+                f"Faz-1 ve Faz-2'de aynı slota hard kısıt olarak uygulanacak."
+            )
+
         # Faz-1
         while True:
             if self.is_cancelled():
@@ -223,7 +241,7 @@ class TakvimService(BaseService):
             DAY_SLOTS = self._day_slots_dict(K_upper, OTURUM_SAYISI_GUN)
             min_slots, ders_to_slot_p1, _ = self._phase1(
                 K_upper, G, DERSLER, SUBE_DERS_MAP, DAY_SLOTS, fixed_slots,
-                catisma_gun_kisitlari, pairs,
+                catisma_gun_kisitlari, pairs, esleme_gercek,
             )
             if min_slots is not None:
                 break
@@ -254,7 +272,7 @@ class TakvimService(BaseService):
         K_phase2 = max(min_slots, max(fixed_slots.values()) + 1) if fixed_slots else min_slots
         ders_to_slot = self._phase2(
             K_phase2, G, DERSLER, SUBE_DERS_MAP, pairs, DERS_WEIGHT, OTURUM_SAYISI_GUN,
-            ders_seviye_map, fixed_slots, catisma_gun_kisitlari,
+            ders_seviye_map, fixed_slots, catisma_gun_kisitlari, esleme_gercek,
         )
         if ders_to_slot is None:
             self.log("Faz-2 cozum bulamadi; Faz-1 sonucu kullaniliyor.")
@@ -404,7 +422,7 @@ class TakvimService(BaseService):
         }
 
     def _phase1(self, K_upper, G, DERSLER, SUBE_DERS_MAP, DAY_SLOTS,
-                fixed_slots=None, catisma_gun_kisitlari=None, pairs=None):
+                fixed_slots=None, catisma_gun_kisitlari=None, pairs=None, esleme_gercek=None):
         MAX_SINAV_PER_GUN = int(self.config.get("MAX_SINAV_PER_GUN", 2))
         DAYS = list(DAY_SLOTS.keys())
         model = LpProblem("MinSlot_Phase1", LpMinimize)
@@ -458,6 +476,11 @@ class TakvimService(BaseService):
                 for g in DAYS:
                     model += u1[(dL, g)] == u1[(dK, g)]
 
+        # Eş zamanlı eşleme hard kısıtı (Faz-1)
+        for d1, d2 in (esleme_gercek or []):
+            for t in range(K_upper):
+                model += x[(d1, t)] == x[(d2, t)]
+
         model += lpSum(y[t] for t in range(K_upper))
         model.solve(PULP_CBC_CMD(msg=False, timeLimit=self.config["TIME_LIMIT_PHASE1"],
                                  gapRel=0.0, threads=0))
@@ -476,7 +499,7 @@ class TakvimService(BaseService):
 
     def _phase2(self, min_slots, G, DERSLER, SUBE_DERS_MAP, pairs, DERS_WEIGHT,
                 oturum_sayisi_gun, ders_seviye_map=None, fixed_slots=None,
-                catisma_gun_kisitlari=None):
+                catisma_gun_kisitlari=None, esleme_gercek=None):
         MAX_SINAV_PER_GUN = int(self.config.get("MAX_SINAV_PER_GUN", 2))
         """
         Faz-2: Exactly min_slots sloti kullanir (K = min_slots).
@@ -555,24 +578,10 @@ class TakvimService(BaseService):
                 w_d = DERS_WEIGHT.get(d, 1)
                 model += M[t] >= w_d * x[(d, t)]
 
-        # Ayni slot eslemesi: cakisma yoksa ayni slotta olmasi tercih edilir (soft)
-        esleme_ciftleri = self.config.get("AYNI_SLOT_ESLEME") or []
-        esleme_term = 0
-        esleme_aktif = 0
-        for idx, (d1, d2) in enumerate(esleme_ciftleri):
-            if d1 not in DERSLER or d2 not in DERSLER:
-                continue
-            if G.has_edge(d1, d2):
-                self.log(f"  [Esleme] '{d1}' ↔ '{d2}' çakışıyor; ayni slot atanamaz, atlanıyor.")
-                continue
+        # Eş zamanlı eşleme hard kısıtı (Faz-2): x[d1,t] == x[d2,t] for all t
+        for d1, d2 in (esleme_gercek or []):
             for t in range(K):
-                z = LpVariable(f"zes_{idx}_{t}", cat=LpBinary)
-                model += z <= x[(d1, t)]
-                model += z <= x[(d2, t)]
-                esleme_term += z
-            esleme_aktif += 1
-        if esleme_aktif:
-            self.log(f"  Ayni slot esleme: {esleme_aktif} cift, soft kisit olarak eklendi.")
+                model += x[(d1, t)] == x[(d2, t)]
 
         # Kelebek karisimi: her slotta farkli sinif seviyelerinden ders olsun
         # lev[s,t] = 1 ise slot t'de seviye s'den en az bir ders var
@@ -601,7 +610,6 @@ class TakvimService(BaseService):
             0.01 * slot_usage
             + 0.01 * lpSum(M[t] for t in range(K))
             + diversity_term
-            - 0.4 * esleme_term
         )
 
         model.solve(PULP_CBC_CMD(msg=False, timeLimit=self.config["TIME_LIMIT_PHASE2"],

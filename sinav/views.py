@@ -2111,6 +2111,237 @@ def sinav_yoklama_yok_detay(request):
 
 
 # ===========================================================================
+# Yoklama Simülasyonu
+# ===========================================================================
+
+@login_required
+def mazeret_yoklama_simule(request):
+    """
+    Aktif takvim üretiminin OturmaPlani kayıtlarından SinavSalonYoklama
+    simülasyonu oluşturur. Mazeret sınav planlamasını test etmek için kullanılır.
+
+    Özel durum kuralları (mazeret ile aynı mantık):
+    - Sürekli Devamsız (Ogrenci.sureksiz_devamsiz=True) → simülasyonda devamsız seçilmez
+    - Muaf (OgrenciMuaf) → o ders için devamsız seçilmez
+    """
+    from okul.auth import is_mudur_yardimcisi as _mudur_mi
+    from django.core.exceptions import PermissionDenied
+    import random
+    import re
+    from collections import defaultdict
+    from ogrenci.models import Ogrenci as _Ogrenci, OgrenciMuaf as _OgrenciMuaf
+
+    if not (request.user.is_superuser or _mudur_mi(request.user)):
+        raise PermissionDenied
+
+    aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
+    aktif_uretim = (
+        TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        if aktif_sinav else None
+    )
+
+    # ---------- Özel durum setleri (mazeret ile aynı) ----------
+    _SINAV_TURU_RE = re.compile(r'^(.*?)\s+\((Yazili|Uygulama)\)$')
+
+    def _base_ders(ders_adi_full: str) -> str:
+        m = _SINAV_TURU_RE.match(ders_adi_full or "")
+        return m.group(1).strip() if m else (ders_adi_full or "")
+
+    sureksiz_okulnolari: set[str] = set(
+        _Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+    )
+    muaf_okulno_ders: set[tuple[str, str]] = set(
+        _OgrenciMuaf.objects.values_list("ogrenci__okulno", "ders__ders_adi")
+    )
+
+    def _ozel_durum(okulno: str, ders_adi_full: str) -> str:
+        """Özel durum varsa etiket döner; yoksa boş string."""
+        if okulno in sureksiz_okulnolari:
+            return "sureksiz"
+        if (okulno, _base_ders(ders_adi_full)) in muaf_okulno_ders:
+            return "muaf"
+        return ""
+
+    # ---------- Mevcut durum istatistikleri ----------
+    toplam_oturum = 0
+    toplam_ogrenci = 0
+    toplam_haric = 0          # özel durumlu toplam
+    yoklama_kayit_sayisi = 0
+    yok_sayisi = 0
+    oturum_listesi = []
+
+    if aktif_uretim:
+        # (tarih, saat, salon) → {ogrenci, haric} sayıları
+        oturum_ozet: dict[tuple, dict] = defaultdict(lambda: {"ogrenci": 0, "haric": 0})
+        for op in (
+            OturmaPlani.objects
+            .filter(uretim=aktif_uretim)
+            .values("tarih", "saat", "salon", "okulno", "ders_adi")
+            .order_by("tarih", "saat", "salon")
+        ):
+            key = (str(op["tarih"]), op["saat"], op["salon"])
+            oturum_ozet[key]["ogrenci"] += 1
+            if _ozel_durum(op["okulno"], op["ders_adi"]):
+                oturum_ozet[key]["haric"] += 1
+
+        # Yoklama durumu: oturum başına kayıt ve yok sayısı
+        yoklama_ozet: dict[tuple, dict] = defaultdict(lambda: {"toplam": 0, "yok": 0})
+        for yk in SinavSalonYoklama.objects.filter(uretim=aktif_uretim).values(
+            "tarih", "saat", "salon", "durum"
+        ):
+            key = (str(yk["tarih"]), yk["saat"], yk["salon"])
+            yoklama_ozet[key]["toplam"] += 1
+            if yk["durum"] == "yok":
+                yoklama_ozet[key]["yok"] += 1
+
+        for key, oz in sorted(oturum_ozet.items()):
+            tarih_str, saat_str, salon_str = key
+            yk = yoklama_ozet.get(key, {"toplam": 0, "yok": 0})
+            ogrenci = oz["ogrenci"]
+            haric   = oz["haric"]
+            oturum_listesi.append({
+                "tarih":       tarih_str,
+                "saat":        saat_str,
+                "salon":       salon_str,
+                "ogrenci":     ogrenci,
+                "haric":       haric,
+                "uygun":       ogrenci - haric,
+                "yoklama_var": yk["toplam"] > 0,
+                "yok_sayisi":  yk["yok"],
+            })
+            toplam_oturum += 1
+            toplam_ogrenci += ogrenci
+            toplam_haric   += haric
+            yoklama_kayit_sayisi += yk["toplam"]
+            yok_sayisi += yk["yok"]
+
+    # ---------- POST işlemleri ----------
+    if request.method == "POST":
+        action = request.POST.get("action", "simule")
+
+        if action == "temizle":
+            if aktif_uretim:
+                silinen = SinavSalonYoklama.objects.filter(uretim=aktif_uretim).delete()
+                messages.success(
+                    request,
+                    f"Aktif üretim için tüm yoklama kayıtları silindi ({silinen[0]} kayıt)."
+                )
+            else:
+                messages.warning(request, "Aktif takvim üretimi bulunamadı.")
+            return redirect("sinav:mazeret_yoklama_simule")
+
+        if not aktif_uretim:
+            messages.error(request, "Aktif takvim üretimi bulunamadı.")
+            return redirect("sinav:mazeret_yoklama_simule")
+
+        try:
+            devamsizlik_yuzdesi = max(1, min(100, int(request.POST.get("devamsizlik_yuzdesi", 15))))
+        except (ValueError, TypeError):
+            devamsizlik_yuzdesi = 15
+
+        mevcut_de_kaydet = request.POST.get("mevcut_de_kaydet") == "1"
+        sifirla_once     = request.POST.get("sifirla_once") == "1"
+
+        # Seçili oturumlar: "oturum_<tarih>_<saat>_<salon>" POST key'leri
+        secili_keys = {
+            k.removeprefix("oturum_")
+            for k in request.POST
+            if k.startswith("oturum_")
+        }
+        tumu_sec = not secili_keys
+
+        from django.db.models import Q as _Q
+
+        op_qs = OturmaPlani.objects.filter(uretim=aktif_uretim)
+        if not tumu_sec:
+            filtre = _Q()
+            for key in secili_keys:
+                parcalar = key.split("_", 2)
+                if len(parcalar) == 3:
+                    t_str, saat_str, salon_str = parcalar
+                    filtre |= _Q(tarih=t_str, saat=saat_str, salon=salon_str)
+            op_qs = op_qs.filter(filtre)
+
+        kayitlar = list(
+            op_qs.values(
+                "tarih", "saat", "salon", "okulno",
+                "adi_soyadi", "sinifsube", "sira_no", "ders_adi",
+            ).order_by("tarih", "saat", "salon", "sira_no")
+        )
+
+        if sifirla_once:
+            sil_qs = SinavSalonYoklama.objects.filter(uretim=aktif_uretim)
+            if not tumu_sec:
+                sil_filtre = _Q()
+                for key in secili_keys:
+                    parcalar = key.split("_", 2)
+                    if len(parcalar) == 3:
+                        t_str, saat_str, salon_str = parcalar
+                        sil_filtre |= _Q(tarih=t_str, saat=saat_str, salon=salon_str)
+                sil_qs = sil_qs.filter(sil_filtre)
+            sil_qs.delete()
+
+        # Simülasyon
+        rng = random.Random()
+        yeni_kayitlar = []
+        yok_count = mevcut_count = haric_count = 0
+
+        for r in kayitlar:
+            ozel = _ozel_durum(r["okulno"], r["ders_adi"])
+
+            if ozel:
+                # Sürekli devamsız / muaf → sınava girmez; mevcut kaydı da oluşturma
+                haric_count += 1
+                continue
+
+            is_absent = rng.random() * 100 < devamsizlik_yuzdesi
+            if is_absent:
+                durum = "yok"
+                yok_count += 1
+            elif mevcut_de_kaydet:
+                durum = "mevcut"
+                mevcut_count += 1
+            else:
+                continue
+
+            yeni_kayitlar.append(SinavSalonYoklama(
+                uretim=aktif_uretim,
+                tarih=r["tarih"],
+                saat=r["saat"],
+                salon=r["salon"],
+                okulno=r["okulno"],
+                adi_soyadi=r["adi_soyadi"],
+                sinifsube=r["sinifsube"],
+                sira_no=r["sira_no"],
+                durum=durum,
+                kaydeden=request.user,
+            ))
+
+        SinavSalonYoklama.objects.bulk_create(yeni_kayitlar, ignore_conflicts=True)
+
+        messages.success(
+            request,
+            f"Simülasyon tamamlandı: {len(kayitlar) - haric_count} uygun öğrenciden "
+            f"{yok_count} devamsız ({devamsizlik_yuzdesi}%), "
+            f"{mevcut_count} mevcut kaydedildi. "
+            f"{haric_count} özel durumlu öğrenci (sürekli devamsız/muaf) atlandı."
+        )
+        return redirect("sinav:mazeret_yoklama_simule")
+
+    return render(request, "sinav/mazeret_yoklama_simule.html", {
+        "aktif_sinav":          aktif_sinav,
+        "aktif_uretim":         aktif_uretim,
+        "oturum_listesi":       oturum_listesi,
+        "toplam_oturum":        toplam_oturum,
+        "toplam_ogrenci":       toplam_ogrenci,
+        "toplam_haric":         toplam_haric,
+        "toplam_uygun":         toplam_ogrenci - toplam_haric,
+        "yoklama_kayit_sayisi": yoklama_kayit_sayisi,
+        "yok_sayisi":           yok_sayisi,
+    })
+
+
+# ===========================================================================
 # Mazeret Sınavı
 # ===========================================================================
 
@@ -2158,8 +2389,12 @@ def mazeret_sinav_listesi(request):
 
 @login_required
 def mazeret_sinav_olustur(request):
-    """Yeni mazeret sınav planı oluşturur: günleri ve oturumları kaydeder, sonra dağıtır."""
-    from .services.mazeret_dagitim import oturumlari_olustur, populate_ogrenciler, dagit
+    """
+    Yeni mazeret sınav planı oluşturur.
+    ILP motoru başlangıç tarihinden itibaren çakışmasız takvim üretir.
+    """
+    from .services.mazeret_dagitim import populate_ogrenciler
+    from .services.mazeret_ilp import MazeretILPService
 
     aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
     if not aktif_sinav:
@@ -2173,71 +2408,66 @@ def mazeret_sinav_olustur(request):
             mazeret.sinav = aktif_sinav
             mazeret.save()
 
-            tarihler = form.cleaned_data["tarihler"]
+            baslangic = form.cleaned_data["baslangic_tarihi"]
             oturum_saatleri = form.cleaned_data["oturum_saatleri"]
 
-            for tarih in sorted(set(tarihler)):
-                MazeretGun.objects.create(mazeret_sinav=mazeret, tarih=tarih)
+            # Öğrenci listesini yoklama verilerinden doldur
+            # (sureksiz_devamsiz ve muaf öğrenciler otomatik hariç tutulur)
+            eklenen, haric = populate_ogrenciler(mazeret)
 
-            oturumlari_olustur(mazeret, oturum_saatleri)
-            populate_ogrenciler(mazeret)
-            basarili, mesaj = dagit(mazeret)
+            # ILP ile çakışmasız takvim üret
+            svc = MazeretILPService(
+                config={"TIME_LIMIT": 120},
+                log_fn=lambda m: None,
+            )
+            basarili, mesaj = svc.calistir(
+                mazeret_sinav=mazeret,
+                baslangic_tarih=baslangic,
+                oturum_saatleri_str=oturum_saatleri,
+            )
 
             if basarili:
-                messages.success(request, f"Mazeret sınav planı oluşturuldu. {mesaj}")
+                haric_notu = f" ({haric} özel durumlu öğrenci hariç tutuldu.)" if haric else ""
+                messages.success(request, f"Mazeret sınav planı oluşturuldu. {mesaj}{haric_notu}")
             else:
-                messages.warning(request, f"Plan oluşturuldu fakat dağıtım hatası: {mesaj}")
+                messages.warning(request, f"Plan kaydedildi fakat ILP hatası: {mesaj}")
 
             return redirect("sinav:mazeret_detay", pk=mazeret.pk)
     else:
         # Varsayılan oturum saatlerini AlgoritmaParametreleri'nden al
         varsayilan_saatler = "08:50,10:30,12:10,13:35,14:25"
         try:
-            params = aktif_sinav.parametreler
-            varsayilan_saatler = params.oturum_saatleri
+            varsayilan_saatler = aktif_sinav.parametreler.oturum_saatleri
         except Exception:
             pass
 
-        # Aktif takvim üretiminden mazeret tarihlerini hesapla:
-        # Ana takvimin son günü + 5 takvim günü sonrasından başlayarak
-        # ana takvimle aynı gün sayısı kadar hafta içi gün öner.
+        # Başlangıç tarihi önerisi: ana takvimin son gününden 5 iş günü sonrası
+        from datetime import timedelta as _td
         aktif_uretim = TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
-        ana_takvim_tarihleri = []
-        mazeret_onerileri = []
+        oneri_tarih = None
         if aktif_uretim:
-            ana_takvim_tarihleri = sorted(
+            son_gun = (
                 Takvim.objects.filter(uretim=aktif_uretim)
                 .values_list("tarih", flat=True)
-                .distinct()
+                .order_by("tarih")
+                .last()
             )
-        if ana_takvim_tarihleri:
-            from datetime import timedelta
-            son_gun = ana_takvim_tarihleri[-1]
-            gun_sayisi = len(ana_takvim_tarihleri)
-            aday = son_gun + timedelta(days=5)
-            while len(mazeret_onerileri) < gun_sayisi:
-                if aday.weekday() < 5:  # Pazartesi–Cuma
-                    mazeret_onerileri.append(aday)
-                aday += timedelta(days=1)
+            if son_gun:
+                aday = son_gun + _td(days=5)
+                while aday.weekday() >= 5:
+                    aday += _td(days=1)
+                oneri_tarih = aday
 
-        varsayilan_tarihler = "\n".join(str(t) for t in mazeret_onerileri)
         form = MazeretSinavForm(initial={
             "oturum_saatleri": varsayilan_saatler,
-            "tarihler": varsayilan_tarihler,
+            "baslangic_tarihi": oneri_tarih,
+            "salon_config_text": "Mazeret 1:36\nMazeret 2:36",
         })
 
-    # Ana takvim tarihlerini ve mazeret önerilerini template'e gönder
     aktif_uretim = TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
-    ana_takvim_tarihleri_ctx = sorted(
-        Takvim.objects.filter(uretim=aktif_uretim)
-        .values_list("tarih", flat=True)
-        .distinct()
-    ) if aktif_uretim else []
-
     return render(request, "sinav/mazeret_olustur.html", {
         "aktif_sinav": aktif_sinav,
         "form": form,
-        "ana_takvim_tarihleri": ana_takvim_tarihleri_ctx,
         "aktif_uretim": aktif_uretim,
     })
 
@@ -2426,18 +2656,48 @@ def mazeret_ogrenci_listesi(request, pk):
 @login_required
 @require_POST
 def mazeret_sinav_dagit(request, pk):
-    """Öğrenci listesini günceller ve dağıtımı yeniden çalıştırır (AJAX veya form POST)."""
-    from .services.mazeret_dagitim import populate_ogrenciler, dagit
+    """
+    Öğrenci listesini günceller ve ILP ile yeniden dağıtır.
+    baslangic_tarihi MazeretSinav üzerinde saklanır; eksikse form'dan alınır.
+    """
+    from .services.mazeret_dagitim import populate_ogrenciler
+    from .services.mazeret_ilp import MazeretILPService
 
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
-    populate_ogrenciler(mazeret)
-    basarili, mesaj = dagit(mazeret)
+
+    baslangic = mazeret.baslangic_tarihi
+    if not baslangic:
+        # POST parametresinden al (detay sayfasındaki formdan)
+        from datetime import date as _date
+        try:
+            baslangic = _date.fromisoformat(request.POST.get("baslangic_tarihi", ""))
+        except (ValueError, TypeError):
+            hata = "Yeniden dağıtım için başlangıç tarihi gerekli. Lütfen bir tarih seçin."
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "mesaj": hata})
+            messages.error(request, hata)
+            return redirect("sinav:mazeret_detay", pk=pk)
+        mazeret.baslangic_tarihi = baslangic
+        mazeret.save(update_fields=["baslangic_tarihi"])
+
+    oturum_saatleri = mazeret.oturum_saatleri or request.POST.get("oturum_saatleri", "")
+
+    eklenen, haric = populate_ogrenciler(mazeret)
+
+    svc = MazeretILPService(config={"TIME_LIMIT": 120}, log_fn=lambda m: None)
+    basarili, mesaj = svc.calistir(
+        mazeret_sinav=mazeret,
+        baslangic_tarih=baslangic,
+        oturum_saatleri_str=oturum_saatleri,
+    )
+
+    haric_notu = f" ({haric} özel durumlu öğrenci hariç tutuldu.)" if haric else ""
 
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
-        return JsonResponse({"ok": basarili, "mesaj": mesaj})
+        return JsonResponse({"ok": basarili, "mesaj": mesaj + haric_notu})
 
     if basarili:
-        messages.success(request, mesaj)
+        messages.success(request, mesaj + haric_notu)
     else:
         messages.error(request, mesaj)
     return redirect("sinav:mazeret_detay", pk=pk)

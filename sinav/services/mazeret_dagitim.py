@@ -142,18 +142,21 @@ def oturumlari_olustur(mazeret_sinav: MazeretSinav, oturum_saatleri_str: str | N
             oturum_no += 1
 
 
-def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> int:
+def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> tuple[int, int]:
     """
     SinavSalonYoklama(durum="yok") kayıtlarından MazeretOgrenci tablosunu doldurur.
+    Özel durumlar:
+      - sureksiz_devamsiz=True öğrenciler tamamen hariç tutulur.
+      - OgrenciMuaf kaydı olan öğrenciler ilgili ders için hariç tutulur.
     Mevcut belge_teslim değerlerini korur; yeni kayıtlar için belge_teslim=False.
 
-    Returns: eklenen kayıt sayısı
+    Returns: (eklenen_kayit_sayisi, hariç_tutulan_sayisi)
     """
     aktif_uretim = TakvimUretim.objects.filter(
         sinav=mazeret_sinav.sinav, aktif=True
     ).first()
     if not aktif_uretim:
-        return 0
+        return 0, 0
 
     ders_adi_subq = OturmaPlani.objects.filter(
         uretim=aktif_uretim,
@@ -163,8 +166,14 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> int:
         salon=OuterRef("salon"),
     ).values("ders_adi")[:1]
 
+    # Özel durum 1: Sürekli devamsız → tüm derslerden hariç (DB seviyesinde filtre)
     sureksiz_okulnolari = set(
         Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+    )
+
+    # Özel durum 2: Muaf → (okulno, ders_adi) bazında hariç
+    muaf_okulno_ders: set[tuple[str, str]] = set(
+        OgrenciMuaf.objects.values_list("ogrenci__okulno", "ders__ders_adi")
     )
 
     absent_rows = list(
@@ -189,6 +198,7 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> int:
     }
 
     yeni = []
+    haric = 0
     for row in absent_rows:
         ders_adi_full = (row.get("ders_adi_full") or "").strip()
         if not ders_adi_full:
@@ -196,6 +206,12 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> int:
         m = _SINAV_TURU_RE.match(ders_adi_full)
         ders_adi   = m.group(1).strip() if m else ders_adi_full
         sinav_turu = m.group(2) if m else ""
+
+        # Özel durum 2: bu ders için muaf mı?
+        if (row["okulno"], ders_adi) in muaf_okulno_ders:
+            haric += 1
+            continue
+
         key = (row["okulno"], ders_adi, sinav_turu)
         if key not in mevcut:
             yeni.append(MazeretOgrenci(
@@ -210,7 +226,7 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> int:
 
     if yeni:
         MazeretOgrenci.objects.bulk_create(yeni, ignore_conflicts=True)
-    return len(yeni)
+    return len(yeni), haric
 
 
 def _absent_ders_listesi(aktif_uretim) -> list[dict]:

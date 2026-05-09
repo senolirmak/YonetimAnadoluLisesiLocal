@@ -2,10 +2,16 @@
 {% block sinav_title %}Mazeret Sınavları{% endblock %}
 
 {% block sinav_content %}
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem;">
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.6rem; margin-bottom:1.2rem;">
   <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e;">Mazeret Sınavı Planları</h1>
   {% if aktif_sinav %}
-  <a href="{% url 'sinav:mazeret_olustur' %}" class="btn btn-primary">+ Yeni Plan</a>
+  <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+    <a href="{% url 'sinav:mazeret_yoklama_simule' %}" class="btn btn-secondary btn-sm"
+       title="Test amaçlı devamsızlık simülasyonu oluştur">
+      🧪 Yoklama Simülasyonu
+    </a>
+    <a href="{% url 'sinav:mazeret_olustur' %}" class="btn btn-primary">+ Yeni Plan</a>
+  </div>
   {% endif %}
 </div>
 

@@ -105,11 +105,10 @@
       Rapor Al
     </a>
     {% endif %}
-    <form method="post" action="{% url 'sinav:mazeret_dagit' mazeret.pk %}"
-          onsubmit="return confirm('Dağıtım yeniden çalıştırılsın mı? Mevcut atamalar silinecek.');">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-primary btn-sm">Yeniden Dağıt</button>
-    </form>
+    <button type="button" class="btn btn-primary btn-sm"
+            onclick="document.getElementById('ilp-yeniden-form').style.display='block'">
+      Yeniden Planla (ILP)
+    </button>
     <form method="post" action="{% url 'sinav:mazeret_sil' mazeret.pk %}"
           onsubmit="return confirm('Bu mazeret planı silinsin mi?');">
       {% csrf_token %}
@@ -123,6 +122,51 @@
     <span>📅 <strong>Sınav:</strong> {{ mazeret.sinav }}</span>
     <span>🗓 <strong>Oluşturulma:</strong> {{ mazeret.olusturma_tarihi|date:"d.m.Y H:i" }}</span>
     <span>📆 <strong>Gün sayısı:</strong> {{ gunler_veri|length }}</span>
+    {% if mazeret.baslangic_tarihi %}
+    <span>🚀 <strong>ILP Başlangıç:</strong> {{ mazeret.baslangic_tarihi|date:"d.m.Y" }}</span>
+    {% endif %}
+    {% if mazeret.efektif_salon_config %}
+    <span>🏛
+      {% for salon, kap in mazeret.efektif_salon_config.items %}
+        <strong>{{ salon }}</strong>:{{ kap }}{% if not forloop.last %}, {% endif %}
+      {% endfor %}
+    </span>
+    {% endif %}
+  </div>
+</div>
+
+{# ILP Yeniden Planla formu — gizli, buton ile açılır #}
+<div id="ilp-yeniden-form" style="display:none; margin-bottom:1rem;">
+  <div class="card" style="border-left:4px solid #6366f1; padding:1rem 1.5rem;">
+    <div style="font-weight:600; margin-bottom:.7rem; color:#1a1a2e;">ILP ile Yeniden Planla</div>
+    <div style="font-size:.83rem; color:#64748b; margin-bottom:.8rem;">
+      Mevcut gün ve oturum atamaları silinip yeniden hesaplanır.
+      Öğrenci listesi de güncel yoklama verisinden yenilenir.
+    </div>
+    <form method="post" action="{% url 'sinav:mazeret_dagit' mazeret.pk %}"
+          onsubmit="return confirm('ILP yeniden çalıştırılsın mı? Mevcut takvim tamamen silinecek.');">
+      {% csrf_token %}
+      <div style="display:flex; align-items:flex-end; gap:.8rem; flex-wrap:wrap;">
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:.83rem;">Başlangıç Tarihi</label>
+          <input type="date" name="baslangic_tarihi"
+                 value="{{ mazeret.baslangic_tarihi|date:'Y-m-d' }}"
+                 required style="margin-top:.2rem;">
+        </div>
+        <div class="form-group" style="margin:0; flex:1; min-width:220px;">
+          <label style="font-size:.83rem;">Oturum Saatleri</label>
+          <input type="text" name="oturum_saatleri"
+                 value="{{ mazeret.oturum_saatleri|default:'08:50,10:30,12:10,13:35,14:25' }}"
+                 placeholder="08:50,10:30,12:10,13:35,14:25"
+                 style="margin-top:.2rem;">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">ILP Çalıştır</button>
+        <button type="button" class="btn btn-secondary btn-sm"
+                onclick="document.getElementById('ilp-yeniden-form').style.display='none'">
+          İptal
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 

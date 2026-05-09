@@ -401,9 +401,27 @@ class MazeretSinav(models.Model):
         verbose_name="Sınav",
     )
     aciklama = models.CharField(max_length=200, blank=True, verbose_name="Açıklama")
+    baslangic_tarihi = models.DateField(null=True, blank=True, verbose_name="ILP Başlangıç Tarihi")
+    oturum_saatleri = models.CharField(
+        max_length=200, blank=True, default="",
+        verbose_name="Oturum Saatleri",
+        help_text="Virgülle ayrılmış HH:MM listesi. Boşsa AlgoritmaParametreleri'nden okunur.",
+    )
+    salon_config = models.JSONField(
+        default=dict, blank=True,
+        verbose_name="Salon Yapılandırması",
+        help_text='{"Mazeret 1": 36, "Mazeret 2": 36} formatında salon adı → kapasite.',
+    )
     olusturma_tarihi = models.DateTimeField(auto_now_add=True)
     onaylandi = models.BooleanField(default=False, verbose_name="Onaylandı")
     onay_tarihi = models.DateTimeField(null=True, blank=True, verbose_name="Onay Tarihi")
+
+    VARSAYILAN_SALON_CONFIG: dict[str, int] = {"Mazeret 1": 36, "Mazeret 2": 36}
+
+    @property
+    def efektif_salon_config(self) -> dict[str, int]:
+        """Salon adı → kapasite; boşsa varsayılanı döner."""
+        return self.salon_config if self.salon_config else self.VARSAYILAN_SALON_CONFIG
 
     class Meta:
         ordering = ["-olusturma_tarihi"]
@@ -552,10 +570,8 @@ class MazeretBelgeTeslim(models.Model):
 class MazeretOturmaPlani(models.Model):
     """
     Mazeret sınavı oturma planı — OturmaPlani'nin mazeret karşılığı.
-    Öğrenciler Mazeret1 ve Mazeret2 salonlarına (kapasitesi 40) yerleştirilir.
+    Salon adları ve kapasiteleri MazeretSinav.salon_config'den okunur.
     """
-    SALON_CHOICES = [("Mazeret1", "Mazeret1"), ("Mazeret2", "Mazeret2")]
-
     mazeret_sinav = models.ForeignKey(
         MazeretSinav, on_delete=models.CASCADE,
         related_name="oturma_plani", verbose_name="Mazeret Sınav",
@@ -565,7 +581,7 @@ class MazeretOturmaPlani(models.Model):
         related_name="oturma_plani", verbose_name="Oturum",
     )
     salon = models.CharField(
-        max_length=20, choices=SALON_CHOICES, verbose_name="Salon",
+        max_length=50, verbose_name="Salon",
     )
     sira_no = models.PositiveSmallIntegerField(verbose_name="Sıra No")
     okulno = models.CharField(max_length=20, verbose_name="Okul No")

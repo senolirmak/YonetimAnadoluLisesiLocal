@@ -1,0 +1,230 @@
+{% extends "sinav/base.html" %}
+{% block sinav_title %}Yoklama Simülasyonu{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .stat-kutu {
+    display: flex; flex-direction: column; align-items: center;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: .9rem 1.2rem; min-width: 130px;
+  }
+  .stat-sayi { font-size: 1.8rem; font-weight: 700; color: #1a1a2e; line-height: 1; }
+  .stat-etiket { font-size: .76rem; color: #64748b; margin-top: .25rem; text-align: center; }
+  .stat-yok .stat-sayi { color: #dc2626; }
+  .oturum-tablo { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .oturum-tablo th {
+    padding: .5rem .75rem; background: #f1f5f9;
+    border-bottom: 2px solid #e2e8f0; text-align: left;
+    white-space: nowrap;
+  }
+  .oturum-tablo td { padding: .4rem .75rem; border-bottom: 1px solid #f0f0f0; }
+  .oturum-tablo tr:hover td { background: #f8fafc; }
+  .cb-all { cursor: pointer; }
+  .badge-var { background: #d1fae5; color: #065f46; border-radius: 4px; padding: 1px 7px; font-size: .75rem; font-weight: 600; }
+  .badge-yok-var { background: #fee2e2; color: #991b1b; border-radius: 4px; padding: 1px 7px; font-size: .75rem; font-weight: 600; }
+  .badge-eksik { background: #f1f5f9; color: #94a3b8; border-radius: 4px; padding: 1px 7px; font-size: .75rem; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block sinav_content %}
+<div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem;">
+  <a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary btn-sm">&#8592; Mazeret Listesi</a>
+  <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Yoklama Simülasyonu</h1>
+</div>
+
+{% if not aktif_sinav %}
+<div class="card" style="border-left:4px solid #f59e0b; background:#fffbeb; color:#92400e;">
+  Aktif sınav tanımlanmamış.
+</div>
+{% elif not aktif_uretim %}
+<div class="card" style="border-left:4px solid #f59e0b; background:#fffbeb; color:#92400e;">
+  Aktif takvim üretimi bulunamadı. Önce takvim üretimi yapın.
+</div>
+{% else %}
+
+{# ── Açıklama ── #}
+<div class="card" style="border-left:4px solid #6366f1; padding:.85rem 1.5rem; margin-bottom:1rem;">
+  <strong style="color:#3730a3;">Test Aracı:</strong>
+  <span style="font-size:.87rem; color:#475569;">
+    Aktif takvim üretimindeki oturma planından rastgele devamsız öğrenciler seçerek
+    <code>SinavSalonYoklama</code> kayıtları oluşturur.
+    Oluşturulan kayıtlar mazeret sınav planlamasında kullanılır.
+    Gerçek yoklama verisi varsa <em>Sıfırla önce</em> seçeneğini kullanın.
+  </span>
+</div>
+
+{# ── İstatistik Kutuları ── #}
+<div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;">
+  <div class="stat-kutu">
+    <span class="stat-sayi">{{ toplam_oturum }}</span>
+    <span class="stat-etiket">Toplam Oturum<br>(tarih×saat×salon)</span>
+  </div>
+  <div class="stat-kutu">
+    <span class="stat-sayi">{{ toplam_ogrenci }}</span>
+    <span class="stat-etiket">Oturuma Atanan<br>Toplam Öğrenci</span>
+  </div>
+  <div class="stat-kutu">
+    <span class="stat-sayi">{{ yoklama_kayit_sayisi }}</span>
+    <span class="stat-etiket">Mevcut Yoklama<br>Kayıt Sayısı</span>
+  </div>
+  <div class="stat-kutu stat-yok">
+    <span class="stat-sayi">{{ yok_sayisi }}</span>
+    <span class="stat-etiket">Devamsız (Yok)<br>Kayıt Sayısı</span>
+  </div>
+  <div class="stat-kutu" style="border-color:#f59e0b;">
+    <span class="stat-sayi" style="color:#b45309;">{{ toplam_haric }}</span>
+    <span class="stat-etiket">Özel Durum<br>(Hariç Tutulan)</span>
+  </div>
+  <div class="stat-kutu" style="border-color:#10b981;">
+    <span class="stat-sayi" style="color:#065f46;">{{ toplam_uygun }}</span>
+    <span class="stat-etiket">Simülasyona<br>Uygun Öğrenci</span>
+  </div>
+</div>
+<div style="font-size:.78rem; color:#78350f; background:#fffbeb; border:1px solid #fcd34d;
+            border-radius:5px; padding:.5rem .9rem; margin-bottom:1rem;">
+  <strong>Hariç tutulanlar:</strong> "Sürekli Devamsız" öğrenciler ile ilgili ders için "Muaf" olan öğrenciler simülasyonda devamsız seçilmez, mazeret planlamasına dahil edilmez.
+</div>
+
+{# ── Simülasyon Formu ── #}
+<form method="post" id="simule-form">
+  {% csrf_token %}
+  <input type="hidden" name="action" id="action-input" value="simule">
+
+  <div class="card" style="padding:1rem 1.5rem; margin-bottom:1rem;">
+    <h2 style="margin-bottom:1rem;">Simülasyon Parametreleri</h2>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; margin-bottom:1rem;">
+
+      <div class="form-group">
+        <label>Devamsızlık Yüzdesi (%)</label>
+        <input type="number" name="devamsizlik_yuzdesi" value="15" min="1" max="100"
+               style="margin-top:.25rem;">
+        <span class="helptext">Her öğrencinin devamsız seçilme olasılığı.</span>
+      </div>
+
+      <div class="form-group" style="justify-content:center;">
+        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer; margin-top:.25rem;">
+          <input type="checkbox" name="mevcut_de_kaydet" value="1" checked>
+          <span>Mevcut öğrencileri de kaydet</span>
+        </label>
+        <span class="helptext">İşaretliyse tüm oturum yoklaması tamamlanmış görünür.</span>
+      </div>
+
+      <div class="form-group" style="justify-content:center;">
+        <label style="display:flex; align-items:center; gap:.5rem; cursor:pointer; margin-top:.25rem;">
+          <input type="checkbox" name="sifirla_once" value="1">
+          <span>Mevcut yoklama verilerini sıfırla</span>
+        </label>
+        <span class="helptext" style="color:#dc2626;">Eski kayıtlar silinir, yenileri yazılır.</span>
+      </div>
+
+    </div>
+
+    <div style="display:flex; gap:.8rem; flex-wrap:wrap;">
+      <button type="submit" class="btn btn-primary">Simülasyon Çalıştır</button>
+      <button type="button" class="btn btn-secondary"
+              onclick="secimTumunuDegistir(true)">Tümünü Seç</button>
+      <button type="button" class="btn btn-secondary"
+              onclick="secimTumunuDegistir(false)">Seçimi Kaldır</button>
+      <button type="button" class="btn btn-danger"
+              onclick="temizleOnay()"
+              style="margin-left:auto;">
+        Tüm Yoklama Verilerini Sil
+      </button>
+    </div>
+  </div>
+
+  {# ── Oturum Listesi ── #}
+  {% if oturum_listesi %}
+  <div class="card" style="padding:0; overflow-x:auto;">
+    <table class="oturum-tablo">
+      <thead>
+        <tr>
+          <th>
+            <input type="checkbox" class="cb-all" id="cb-hepsi" checked
+                   onchange="secimTumunuDegistir(this.checked)" title="Tümünü Seç/Kaldır">
+          </th>
+          <th>Tarih</th>
+          <th>Saat</th>
+          <th>Salon</th>
+          <th style="text-align:right;">Öğrenci</th>
+          <th style="text-align:right;">Uygun</th>
+          <th style="text-align:right;">Hariç</th>
+          <th>Yoklama</th>
+          <th style="text-align:right;">Devamsız</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ot in oturum_listesi %}
+        <tr>
+          <td>
+            <input type="checkbox"
+                   name="oturum_{{ ot.tarih|date:'Y-m-d' }}_{{ ot.saat }}_{{ ot.salon }}"
+                   class="cb-oturum" checked>
+          </td>
+          <td style="white-space:nowrap;">{{ ot.tarih|date:"d.m.Y" }}</td>
+          <td>{{ ot.saat }}</td>
+          <td>{{ ot.salon }}</td>
+          <td style="text-align:right; font-weight:600;">{{ ot.ogrenci }}</td>
+          <td style="text-align:right;">
+            {% if ot.uygun %}
+              <span style="color:#065f46; font-weight:600;">{{ ot.uygun }}</span>
+            {% else %}
+              <span style="color:#cbd5e1;">—</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            {% if ot.haric %}
+              <span style="color:#b45309; font-weight:600;" title="Sürekli Devamsız veya Muaf">{{ ot.haric }}</span>
+            {% else %}
+              <span style="color:#cbd5e1;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if ot.yoklama_var %}
+              <span class="badge-var">Girildi</span>
+            {% else %}
+              <span class="badge-eksik">Girilmedi</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            {% if ot.yok_sayisi %}
+              <span class="badge-yok-var">{{ ot.yok_sayisi }} yok</span>
+            {% else %}
+              <span style="color:#cbd5e1;">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center; color:#9ca3af; padding:2rem;">
+    Aktif takvim üretiminde oturma planı bulunamadı.
+    Önce oturma planı oluşturun.
+  </div>
+  {% endif %}
+
+</form>
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function secimTumunuDegistir(durum) {
+  document.querySelectorAll(".cb-oturum").forEach(cb => cb.checked = durum);
+  const hepsi = document.getElementById("cb-hepsi");
+  if (hepsi) hepsi.checked = durum;
+}
+
+function temizleOnay() {
+  if (!confirm("Aktif üretim için TÜM yoklama kayıtları silinsin mi? Bu işlem geri alınamaz.")) return;
+  document.getElementById("action-input").value = "temizle";
+  document.getElementById("simule-form").submit();
+}
+</script>
+{% endblock %}

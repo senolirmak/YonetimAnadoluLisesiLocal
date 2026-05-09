@@ -232,11 +232,15 @@
   <div class="card da-grid-alt-tam">
     <div class="da-card-header">
       <div>
-        <h2>Aynı Slot Eşlemeleri</h2>
+        <h2>Eş Zamanlı Sınav Eşlemeleri</h2>
         <p class="helptext">
-          Eşlenen ders çiftleri ILP tarafından aynı oturuma yerleştirilmeye çalışılır.
-          Çakışma (aynı şubede olan) dersler için bu kural uygulanamaz.
-          Örn: <strong>MATEMATİK ↔ SEÇMELİ MATEMATİK</strong>
+          Farklı öğrenci gruplarına ait iki sınavın <strong>aynı oturumda eş zamanlı yapılabileceğini</strong>
+          belirtir. Bu iki sınav ortak öğrenci paylaşmadığından çakışma olmadan aynı slota atanabilir;
+          ILP bu çiftleri mümkün olduğunca aynı slota yerleştirmeye çalışır.
+        </p>
+        <p class="helptext" style="margin-top:.3rem; color:#b45309;">
+          <strong>Not:</strong> Aynı şubede okutulan (ortak öğrencisi olan) dersler hiçbir zaman
+          aynı slota atanamaz — böyle bir çift eklenirse ILP tarafından görmezden gelinir.
         </p>
       </div>
     </div>
@@ -603,15 +607,19 @@ function catismaVarsayilanEkle() {
 function renderEsleme() {
   const div = document.getElementById("esleme-liste-div");
   if (!eslemeState.length) {
-    div.innerHTML = '<p class="bos-mesaj" style="margin-bottom:.75rem;">Henüz eşleme tanımlanmadı.</p>';
+    div.innerHTML = '<p class="bos-mesaj" style="margin-bottom:.75rem;">Henüz eş zamanlı sınav eşlemesi tanımlanmadı.</p>';
     return;
   }
   let html = '<div class="esleme-liste">';
   eslemeState.forEach((e, i) => {
     html += `
       <div class="esleme-kart">
+        <span style="font-size:.7rem; font-weight:700; background:#d1fae5; color:#065f46;
+                     border-radius:4px; padding:.1rem .45rem; letter-spacing:.03em;">
+          EŞ ZAMANLI
+        </span>
         <span class="esleme-chip">${e.ders1}</span>
-        <span class="esleme-ok">↔</span>
+        <span class="esleme-ok" title="Aynı oturumda eş zamanlı yapılabilir">⇔</span>
         <span class="esleme-chip">${e.ders2}</span>
         <button type="button" class="btn btn-danger btn-sm"
                 style="margin-left:auto;"
@@ -625,9 +633,13 @@ function renderEsleme() {
 function eslemeEkle() {
   const d1 = (document.getElementById("esleme-ders1").value || "").trim().toUpperCase();
   const d2 = (document.getElementById("esleme-ders2").value || "").trim().toUpperCase();
-  if (!d1 || !d2) { alert("Her iki ders adı da zorunludur."); return; }
+  if (!d1 || !d2) { alert("Her iki ders seçilmelidir."); return; }
   if (d1 === d2)  { alert("İki ders farklı olmalıdır."); return; }
-  if (eslemeState.some(e => e.ders1 === d1 && e.ders2 === d2)) { alert("Bu eşleme zaten kayıtlı."); return; }
+  // Ters yönde de kontrol et (A↔B == B↔A)
+  if (eslemeState.some(e =>
+        (e.ders1 === d1 && e.ders2 === d2) ||
+        (e.ders1 === d2 && e.ders2 === d1)
+      )) { alert("Bu eşleme zaten kayıtlı."); return; }
   eslemeState.push({ ders1: d1, ders2: d2 });
   renderEsleme();
   document.getElementById("esleme-ders1").value = "";

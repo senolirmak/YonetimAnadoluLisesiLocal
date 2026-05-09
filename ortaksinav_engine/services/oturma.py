@@ -92,7 +92,7 @@ class OturmaPlanService(BaseService):
         self.log("\nSecili oturumlar tamamlandi.\n")
 
     def generate_oturum(self, tarih: str, saat: str, oturum: int, aktif_sinav=None, aktif_uretim=None):
-        from ogrenci.models import Ogrenci as OgrenciModel
+        from ogrenci.models import Ogrenci as OgrenciModel, OgrenciMuaf
         from sinav.models import Takvim, OturmaPlani
 
         self.log(f"\nOturum yerlesimi: {tarih} {saat} (Oturum {oturum})")
@@ -126,6 +126,12 @@ class OturmaPlanService(BaseService):
             for s in normalize_sube_cell(t.subeler)
         }
 
+        # Özel durum 1: Sürekli devamsız öğrencileri hiçbir sınavda oturma planına alma
+        sureksiz_set = set(
+            OgrenciModel.objects.filter(sureksiz_devamsiz=True)
+            .values_list("okulno", flat=True)
+        )
+
         df_o = pd.DataFrame(OgrenciModel.objects.values(
             "okulno", "adi", "soyadi", "cinsiyet", "sinif", "sube",
         ))
@@ -135,6 +141,14 @@ class OturmaPlanService(BaseService):
             self.log("DB'de ogrenci yok. Adim 1'i calistirin.")
             return
 
+        # Sürekli devamsız filtresi
+        if sureksiz_set:
+            onceki = len(df_o)
+            df_o = df_o[~df_o["okulno"].isin(sureksiz_set)].copy()
+            hariç_sureksiz = onceki - len(df_o)
+            if hariç_sureksiz:
+                self.log(f"  Özel durum: {hariç_sureksiz} sürekli devamsız öğrenci hariç tutuldu.")
+
         df_o["sinifsube"] = df_o["sinifsube"].astype(str).str.upper().str.replace(" ", "")
         df_o["ders"] = df_o["sinifsube"].map(sube_to_ders).fillna("Diger")
         df_o = df_o[df_o["ders"] != "Diger"].copy()
@@ -142,15 +156,62 @@ class OturmaPlanService(BaseService):
             self.log("Bu oturumda sinava girecek ogrenci bulunamadi.")
             return
 
+        # Özel durum 2: Muaf öğrencileri bu oturumun dersi için hariç tut
+        # ders_tam_adi → base_adi (suffix'i çıkar): "Matematik (Yazili)" → "Matematik"
+        _sfx_re = re.compile(r'^(.*?)\s+\((Yazili|Uygulama)\)$')
+
+        def _base_ders(adi: str) -> str:
+            m = _sfx_re.match(adi or "")
+            return m.group(1).strip() if m else (adi or "")
+
+        oturum_base_ders = {_base_ders(v) for v in sube_to_ders.values()}
+        muaf_pairs: set[tuple] = set(
+            OgrenciMuaf.objects.filter(ders__ders_adi__in=oturum_base_ders)
+            .values_list("ogrenci__okulno", "ders__ders_adi")
+        )
+        if muaf_pairs:
+            df_o["_ders_base"] = df_o["ders"].apply(_base_ders)
+            onceki = len(df_o)
+            df_o = df_o[
+                ~df_o.apply(
+                    lambda r: (r["okulno"], r["_ders_base"]) in muaf_pairs,
+                    axis=1,
+                )
+            ].copy()
+            df_o = df_o.drop(columns=["_ders_base"])
+            hariç_muaf = onceki - len(df_o)
+            if hariç_muaf:
+                self.log(f"  Özel durum: {hariç_muaf} muaf öğrenci bu oturum için hariç tutuldu.")
+
+        if df_o.empty:
+            self.log("Bu oturumda sinava girecek ogrenci bulunamadi (ozel durumlar sonrasi).")
+            return
+
         kelebek = self.config.get("KELEBEK_DAGITIM", True)
         _seed = int(hashlib.md5(f"{tarih}{saat}{oturum}".encode()).hexdigest(), 16) % (2 ** 31)
         ogr = df_o.sample(frac=1, random_state=_seed).reset_index(drop=True)
         salon_map = {name: [] for name in salon_adlari}
+        n_salons = len(salon_adlari)
+        SALON_KAPASITE = 36  # 3 blok × 6 sıra × 2 koltuk
 
         if kelebek:
-            # Her oturum için farklı karıştırma — öğrenciler salonlara dönüşümlü dağıtılır.
-            for i, (_, row) in enumerate(ogr.iterrows()):
-                salon_map[salon_adlari[i % len(salon_adlari)]].append(row.to_dict())
+            # Kademe 2: Her sınav grubu kendi içinde salonlara orantılı dağıtılır.
+            # Round-robin (tüm öğrenci karışık) yerine per-grup round-robin:
+            # her salona her gruptan floor ya da ceil kadar düşer → garantili denge.
+            groups_by_ders: dict[str, list] = {}
+            for _, row in ogr.iterrows():
+                groups_by_ders.setdefault(row["ders"], []).append(row.to_dict())
+
+            for students in groups_by_ders.values():
+                for i, student in enumerate(students):
+                    salon_map[salon_adlari[i % n_salons]].append(student)
+
+            for salon, lst in salon_map.items():
+                bos = SALON_KAPASITE - len(lst)
+                self.log(
+                    f"  {salon}: {len(lst)} öğrenci, {bos} boş koltuk "
+                    f"(doluluk %{100 * len(lst) // SALON_KAPASITE})"
+                )
         else:
             # Kelebek yok: her öğrenci kendi şube salonuna gider.
             self.log("Kelebek dağılımı kapalı: her sınıf kendi salonunda.")
@@ -329,100 +390,130 @@ class OturmaPlanService(BaseService):
         return grid
 
     @staticmethod
-    def _build_layout(exam_counts, rows=6, cols=6, max_bt_tries=0):
+    def _build_layout(exam_counts, rows=6, cols=6):
+        """
+        Üç fazlı yerleşim algoritması.
+
+        Faz 1 (Stride deseni):
+            Boş koltuklar grid'e düzenli aralıklarla yayılır; tampon görevi görür.
+
+        Faz 2 (MRV greedy):
+            En kısıtlı konuma önce ata (Minimum Remaining Values).
+            exam_key = (ders, seviye) → aynı ders+seviye komşu olamaz.
+            Çakışmasız seçenek yoksa en az çakışan grup atanır.
+
+        Faz 3 (Takas onarımı):
+            Kalan komşu çakışmalarını yerel ikili takasla gider.
+        """
         EMPTY_KEY = ("__EMPTY__", None)
         total_students = sum(exam_counts.values())
         TOTAL_SLOTS = rows * cols
 
-        if total_students < TOTAL_SLOTS:
-            exam_counts = exam_counts.copy()
-            exam_counts[EMPTY_KEY] = TOTAL_SLOTS - total_students
+        if total_students == 0:
+            return [[EMPTY_KEY] * cols for _ in range(rows)]
 
-        exam_list = sorted(exam_counts.items(), key=lambda kv: -kv[1])
-        exam_keys = [k for k, _ in exam_list]
-        positions = [(r, c) for r in range(rows) for c in range(cols)]
+        # ── Faz 1: Stride tabanlı dolu konum belirleme ──────────────────────
+        if total_students >= TOTAL_SLOTS:
+            occupied_indices = list(range(TOTAL_SLOTS))
+        else:
+            occupied_indices = [
+                i * TOTAL_SLOTS // total_students for i in range(total_students)
+            ]
 
-        def is_adjacent_forbidden(layout, r, c, exam_key):
-            if exam_key == EMPTY_KEY:
-                return False
+        all_positions = [(r, c) for r in range(rows) for c in range(cols)]
+        occupied_list = [all_positions[idx] for idx in occupied_indices]
+        occupied_set  = set(occupied_list)
+
+        # Komşuluk haritası — sadece dolu konumlar arası
+        def occ_neighbors(r, c):
+            result = []
             for dc in (-1, 1):
                 nc = c + dc
-                if 0 <= nc < cols and (c // 2) == (nc // 2):
-                    if layout[r][nc] == exam_key:
-                        return True
+                if 0 <= nc < cols and (c // 2) == (nc // 2) and (r, nc) in occupied_set:
+                    result.append((r, nc))
             for dr in (-1, 1):
                 nr = r + dr
-                if 0 <= nr < rows:
-                    if layout[nr][c] == exam_key:
-                        return True
-            return False
+                if 0 <= nr < rows and (nr, c) in occupied_set:
+                    result.append((nr, c))
+            return result
 
-        # Backtracking
-        for _ in range(max_bt_tries):
-            layout = [[None] * cols for _ in range(rows)]
-            remaining = dict(exam_counts)
-            local_keys = exam_keys[:]
-            random.shuffle(local_keys)
-            local_positions = positions[:]
-            random.shuffle(local_positions)
+        adj = {pos: occ_neighbors(*pos) for pos in occupied_set}
 
-            def backtrack(pos_idx):
-                if pos_idx >= len(local_positions):
-                    return all(v == 0 for v in remaining.values())
-                r, c = local_positions[pos_idx]
-                for ek in local_keys:
-                    if remaining[ek] <= 0:
-                        continue
-                    if is_adjacent_forbidden(layout, r, c, ek):
-                        continue
-                    layout[r][c] = ek
-                    remaining[ek] -= 1
-                    if backtrack(pos_idx + 1):
-                        return True
-                    layout[r][c] = None
-                    remaining[ek] += 1
-                return False
+        # ── Faz 2: MRV greedy ───────────────────────────────────────────────
+        layout     = [[EMPTY_KEY] * cols for _ in range(rows)]
+        assignment: dict = {}
+        remaining  = dict(exam_counts)
+        keys_desc  = sorted(exam_counts, key=lambda k: -exam_counts[k])
 
-            if backtrack(0):
-                return layout
+        def valid_keys(pos):
+            forbidden = {assignment.get(n) for n in adj[pos]} - {None}
+            return [k for k in keys_desc if remaining.get(k, 0) > 0 and k not in forbidden]
 
-        # Greedy fallback
-        layout = [[None] * cols for _ in range(rows)]
-        remaining = dict(exam_counts)
+        unassigned = set(occupied_set)
 
-        def conflict_score(layout, r, c, exam_key):
-            if exam_key == EMPTY_KEY:
-                return 0
-            score = 0
-            for dc in (-1, 1):
-                nc = c + dc
-                if 0 <= nc < cols and (c // 2) == (nc // 2):
-                    if layout[r][nc] == exam_key:
-                        score += 1
-            for dr in (-1, 1):
-                nr = r + dr
-                if 0 <= nr < rows:
-                    if layout[nr][c] == exam_key:
-                        score += 1
-            return score
-
-        shuffled = positions[:]
-        random.shuffle(shuffled)
-        for r, c in shuffled:
-            best_key, best_score = None, None
-            for ek in exam_keys:
-                if remaining.get(ek, 0) <= 0:
+        while unassigned:
+            # En kısıtlı konum: geçerli seçenek sayısı az, komşu sayısı fazla
+            best = min(unassigned, key=lambda p: (len(valid_keys(p)), -len(adj[p]), p))
+            vk = valid_keys(best)
+            if vk:
+                chosen = vk[0]              # geçerliler içinde en büyük grup
+            else:
+                available = [k for k in keys_desc if remaining.get(k, 0) > 0]
+                if not available:
+                    unassigned.discard(best)
                     continue
-                score = conflict_score(layout, r, c, ek)
-                if best_score is None or score < best_score:
-                    best_score = score
-                    best_key = ek
-                    if best_score == 0:
+                # Çakışmasız seçenek yok → en az çakışan grubu ata
+                chosen = min(
+                    available,
+                    key=lambda k: sum(1 for n in adj[best] if assignment.get(n) == k),
+                )
+            r, c = best
+            layout[r][c]   = chosen
+            assignment[best] = chosen
+            remaining[chosen] -= 1
+            unassigned.discard(best)
+
+        # ── Faz 3: Takas onarımı ────────────────────────────────────────────
+        # Kalan komşu çakışmalarını yerel ikili takasla azalt (max 5 geçiş)
+        for _ in range(5):
+            improved = False
+            for pos in occupied_set:
+                key_here = assignment.get(pos)
+                if key_here is None:
+                    continue
+                conflict_n = [n for n in adj[pos] if assignment.get(n) == key_here]
+                if not conflict_n:
+                    continue
+                old_here = len(conflict_n)
+
+                for pos2 in occupied_set:
+                    if pos2 == pos:
+                        continue
+                    key2 = assignment.get(pos2)
+                    if key2 is None or key2 == key_here:
+                        continue
+                    # Takas sonrası çakışma sayılarını hesapla
+                    new_here = sum(
+                        1 for n in adj[pos]  if assignment.get(n) == key2 and n != pos2
+                    )
+                    old_p2 = sum(
+                        1 for n in adj[pos2] if assignment.get(n) == key2 and n != pos
+                    )
+                    new_p2 = sum(
+                        1 for n in adj[pos2] if assignment.get(n) == key_here and n != pos
+                    )
+                    if new_here + new_p2 < old_here + old_p2:
+                        # Takas faydalı
+                        r,  c  = pos
+                        r2, c2 = pos2
+                        layout[r][c]   = key2
+                        layout[r2][c2] = key_here
+                        assignment[pos]  = key2
+                        assignment[pos2] = key_here
+                        improved = True
                         break
-            if best_key is None:
-                best_key = EMPTY_KEY
-            layout[r][c] = best_key
-            remaining[best_key] = remaining.get(best_key, 0) - 1
+            if not improved:
+                break
 
         return layout
 

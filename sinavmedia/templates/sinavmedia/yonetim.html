@@ -1,6 +1,26 @@
 {% extends "sinav/base.html" %}
 {% block title %}Sınav Medya Yönetimi{% endblock %}
 
+{% block nav %}
+<nav class="sinav-nav">
+  <span style="color:#e8f0f5; font-size:1rem; font-weight:700; letter-spacing:.03em;">
+    🎬 Sınav Medya Yönetimi
+  </span>
+  <div class="sinav-nav-sag">
+    <a href="{% url 'index' %}" class="sinav-nav-geri">&#8592; Okul Yönetimine Dön</a>
+    {% if aktif_sinav %}
+      <span class="sinav-badge">
+        {{ aktif_sinav.egitim_ogretim_yili }} &nbsp;|&nbsp;
+        {{ aktif_sinav.get_donem_display }} &nbsp;|&nbsp;
+        {{ aktif_sinav.get_sinav_adi_display }}
+      </span>
+    {% else %}
+      <span class="sinav-badge yok">Aktif sınav seçilmedi</span>
+    {% endif %}
+  </div>
+</nav>
+{% endblock %}
+
 {% block sinav_content %}
 
 <div class="card" style="border-left:4px solid #6366f1; padding:1rem 1.5rem;
