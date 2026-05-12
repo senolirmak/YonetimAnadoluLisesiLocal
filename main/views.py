@@ -19,6 +19,7 @@ from nobet.models import (
     NobetAtanamayan,
     NobetGecmisi,
     NobetGorevi,
+    NobetIstatistik,
     NobetPersonel,
     OkulBilgi,
     OkulDonem,
@@ -1767,6 +1768,145 @@ def ogretmen_sorumluluk_gorevleri(request):
 # ─────────────────────────────────────────────────────────
 # Okul Yapılandırması
 # ─────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────
+# Nöbetçi Öğretmen — Ders Doldurma İstatistikleri
+# ─────────────────────────────────────────────
+
+
+@login_required
+def nobetci_ders_doldurma_istatistik(request):
+    if not (
+        request.user.is_superuser
+        or request.user.groups.filter(name="mudur_yardimcisi").exists()
+        or _ogretmen_menu_gorumu(request.user)
+    ):
+        raise PermissionDenied
+
+    # ── Aktif nöbet tarifesi ──────────────────────────────────────
+    aktif_gorev_tarihi = (
+        NobetGorevi.objects.order_by("-uygulama_tarihi")
+        .values_list("uygulama_tarihi", flat=True)
+        .first()
+    )
+
+    GUN_TR = {
+        "Monday": "Pazartesi", "Tuesday": "Salı", "Wednesday": "Çarşamba",
+        "Thursday": "Perşembe", "Friday": "Cuma",
+        "Saturday": "Cumartesi", "Sunday": "Pazar",
+    }
+
+    # ── Tarih aralığı filtresi (GET: donem = 30 | 90 | tum) ───────
+    donem = request.GET.get("donem", "30")
+    today = timezone.localdate()
+    if donem == "tum":
+        tarih_siniri = None
+    elif donem == "90":
+        tarih_siniri = today - timedelta(days=90)
+    else:
+        donem = "30"
+        tarih_siniri = today - timedelta(days=30)
+
+    gecmis_qs = NobetGecmisi.objects.all()
+    atanamayan_qs = NobetAtanamayan.objects.all()
+    if tarih_siniri:
+        gecmis_qs = gecmis_qs.filter(tarih__date__gte=tarih_siniri)
+        atanamayan_qs = atanamayan_qs.filter(tarih__date__gte=tarih_siniri)
+
+    # ── Özet sayılar ─────────────────────────────────────────────
+    toplam_doldurma = gecmis_qs.count()
+    toplam_atanamayan = atanamayan_qs.count()
+
+    # ── Aktif nöbet programındaki öğretmenleri grupla ─────────────
+    gorevler = (
+        NobetGorevi.objects.filter(uygulama_tarihi=aktif_gorev_tarihi)
+        .select_related("ogretmen__personel")
+        .order_by("ogretmen__personel__adi_soyadi", "nobet_gun")
+    )
+
+    # {NobetOgretmen.pk: [gun_tr, ...]}
+    ogretmen_gunler = {}
+    ogretmen_obj = {}
+    for g in gorevler:
+        pk = g.ogretmen_id
+        ogretmen_gunler.setdefault(pk, []).append(GUN_TR.get(g.nobet_gun, g.nobet_gun))
+        ogretmen_obj[pk] = g.ogretmen
+
+    if not ogretmen_gunler:
+        return render(request, "main/nobetci_ders_doldurma_istatistik.html", {
+            "title": "Ders Doldurma İstatistikleri",
+            "satirlar": [],
+            "toplam_doldurma": 0,
+            "toplam_atanamayan": 0,
+            "aktif_gorev_tarihi": None,
+            "donem": donem,
+        })
+
+    # ── Dönem içi doldurma sayıları (tek sorgu) ───────────────────
+    doldurma_counts = dict(
+        gecmis_qs.filter(ogretmen_id__in=ogretmen_gunler)
+        .values("ogretmen_id")
+        .annotate(sayi=Count("id"))
+        .values_list("ogretmen_id", "sayi")
+    )
+
+    # ── Önceden hesaplanmış istatistikler ─────────────────────────
+    istatistikler = {
+        ist.ogretmen_id: ist
+        for ist in NobetIstatistik.objects.filter(ogretmen_id__in=ogretmen_gunler)
+    }
+
+    # ── Satır listesi (ağırlıklı puana göre azalan) ───────────────
+    satirlar = []
+    for pk, gunler in ogretmen_gunler.items():
+        ogr = ogretmen_obj[pk]
+        ist = istatistikler.get(pk)
+        donem_count = doldurma_counts.get(pk, 0)
+        satirlar.append({
+            "adi_soyadi":       ogr.personel.adi_soyadi,
+            "gunler":           gunler,
+            "donem_doldurma":   donem_count,
+            "toplam_nobet":     ist.toplam_nobet      if ist else 0,
+            "haftalik_ort":     round(ist.haftalik_ortalama, 2) if ist else 0,
+            "agirlikli_puan":   round(ist.agirlikli_puan, 1)    if ist else 0,
+            "son_nobet":        ist.son_nobet_tarihi  if ist else None,
+            "son_nobet_yeri":   ist.son_nobet_yeri    if ist else "-",
+        })
+
+    satirlar.sort(key=lambda r: r["agirlikli_puan"], reverse=True)
+
+    # ── Son 20 ders doldurma kaydı ────────────────────────────────
+    son_kayitlar_qs = (
+        NobetGecmisi.objects
+        .filter(ogretmen_id__in=ogretmen_gunler)
+        .select_related("ogretmen__personel")
+        .order_by("-tarih")[:20]
+    )
+    devamsiz_ids = [k.devamsiz for k in son_kayitlar_qs if k.devamsiz]
+    devamsiz_map = dict(
+        NobetPersonel.objects.filter(pk__in=devamsiz_ids).values_list("pk", "adi_soyadi")
+    )
+    son_kayitlar = [
+        {
+            "tarih":    k.tarih,
+            "saat":     k.saat,
+            "sinif":    k.sinif,
+            "nobetci":  k.ogretmen.personel.adi_soyadi,
+            "devamsiz": devamsiz_map.get(k.devamsiz, "-"),
+        }
+        for k in son_kayitlar_qs
+    ]
+
+    return render(request, "main/nobetci_ders_doldurma_istatistik.html", {
+        "title":               "Ders Doldurma İstatistikleri",
+        "satirlar":            satirlar,
+        "son_kayitlar":        son_kayitlar,
+        "toplam_doldurma":     toplam_doldurma,
+        "toplam_atanamayan":   toplam_atanamayan,
+        "aktif_gorev_tarihi":  aktif_gorev_tarihi,
+        "donem":               donem,
+    })
+
 
 @login_required
 def okul_ayarlari(request):

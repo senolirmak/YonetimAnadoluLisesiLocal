@@ -760,7 +760,7 @@ def faaliyet_rapor_pdf(request, pk):
     for sira, ogr in enumerate(ogrenciler, start=1):
         satir = [
             Paragraph(str(sira), s_center),
-            Paragraph(ogr.okulno or "", s_center),
+            Paragraph(str(ogr.okulno) if ogr.okulno else "", s_center),
             Paragraph(f"{ogr.sinif}/{ogr.sube}", s_center),
             Paragraph(f"{ogr.adi} {ogr.soyadi}", s_normal),
         ]

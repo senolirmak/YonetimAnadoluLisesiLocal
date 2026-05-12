@@ -11,6 +11,7 @@ urlpatterns = [
         name="ogretmen_gunun_nobetcileri",
     ),
     path("nobet/ders-doldurma/", views.ogretmen_ders_doldurma, name="ogretmen_ders_doldurma"),
+    path("nobet/ders-doldurma/istatistik/", views.nobetci_ders_doldurma_istatistik, name="nobetci_ders_doldurma_istatistik"),
     path("sinav/gozetim/", views.ogretmen_sinav_gozetim, name="ogretmen_sinav_gozetim"),
     path("sinav/medya/", views.ogretmen_sinav_medya, name="ogretmen_sinav_medya"),
     path("sinav/gozetim/sinif-listesi/", views.ogretmen_gozetim_sinif_listesi, name="ogretmen_gozetim_sinif_listesi"),

@@ -607,7 +607,7 @@ def devamsizlik_sinif_pdf(request):
                 rows.append(
                     [
                         Paragraph(str(i), report.cell_style_small),
-                        Paragraph(k.ogrenci.okulno, report.cell_style_small),
+                        Paragraph(str(k.ogrenci.okulno), report.cell_style_small),
                         Paragraph(f"{k.ogrenci.adi} {k.ogrenci.soyadi}", report.cell_style_small),
                         Paragraph(k.ogrenci.sube, report.cell_style_small),
                         Paragraph(

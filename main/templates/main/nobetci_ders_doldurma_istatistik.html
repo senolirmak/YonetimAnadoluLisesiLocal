@@ -1,0 +1,179 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="container">
+  <h2 class="page-title mb-20">{{ title }}</h2>
+
+  <!-- Navigasyon -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+    <a href="{% url 'nobet_dagitim' %}"            class="btn btn-primary">Haftalık Nöbet</a>
+    <a href="{% url 'gunun_nobetcileri' %}"         class="btn btn-warning">Günün Nöbetçileri</a>
+    <a href="{% url 'nobet_ders_doldurma' %}"       class="btn btn-success">Ders Doldurma</a>
+  </div>
+
+  {% if messages %}
+  <div class="mb-20">
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'success' %}msg-success{% elif message.tags == 'error' %}msg-error{% else %}msg-info{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Dönem filtresi -->
+  <div class="filter-box" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
+    <span style="font-weight:600;font-size:0.93em;">Dönem:</span>
+    <a href="?donem=30"
+       class="btn {% if donem == '30' %}btn-primary{% else %}btn-secondary{% endif %}"
+       style="padding:4px 14px;font-size:0.88em;">Son 30 Gün</a>
+    <a href="?donem=90"
+       class="btn {% if donem == '90' %}btn-primary{% else %}btn-secondary{% endif %}"
+       style="padding:4px 14px;font-size:0.88em;">Son 90 Gün</a>
+    <a href="?donem=tum"
+       class="btn {% if donem == 'tum' %}btn-primary{% else %}btn-secondary{% endif %}"
+       style="padding:4px 14px;font-size:0.88em;">Tüm Zamanlar</a>
+    {% if aktif_gorev_tarihi %}
+    <span style="margin-left:auto;font-size:0.83em;color:#6c757d;">
+      Aktif nöbet tarifesi: <strong>{{ aktif_gorev_tarihi|date:"d.m.Y" }}</strong>
+    </span>
+    {% endif %}
+  </div>
+
+  <!-- Özet kartlar -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px;">
+    <div class="card" style="padding:16px 20px;text-align:center;">
+      <div style="font-size:2em;font-weight:700;color:#2e7d32;">{{ toplam_doldurma }}</div>
+      <div style="font-size:0.85em;color:#555;margin-top:4px;">
+        {% if donem == 'tum' %}Toplam{% elif donem == '90' %}Son 90 Gün{% else %}Son 30 Gün{% endif %}
+        Ders Doldurma
+      </div>
+    </div>
+    <div class="card" style="padding:16px 20px;text-align:center;">
+      <div style="font-size:2em;font-weight:700;color:#c62828;">{{ toplam_atanamayan }}</div>
+      <div style="font-size:0.85em;color:#555;margin-top:4px;">Atanamayan Ders</div>
+    </div>
+    <div class="card" style="padding:16px 20px;text-align:center;">
+      <div style="font-size:2em;font-weight:700;color:#1565c0;">{{ satirlar|length }}</div>
+      <div style="font-size:0.85em;color:#555;margin-top:4px;">Aktif Nöbetçi Öğretmen</div>
+    </div>
+  </div>
+
+  <!-- Öğretmen istatistik tablosu -->
+  {% if satirlar %}
+  <div class="card" style="margin-bottom:28px;">
+    <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Nöbetçi Öğretmen Ders Doldurma Tablosu</span>
+      <span style="font-size:0.82em;opacity:.85;">Ağırlıklı puana göre azalan sıra</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table" style="box-shadow:none;min-width:700px;">
+        <thead>
+          <tr class="table-sub-header">
+            <th style="width:34px;" class="center">#</th>
+            <th>Adı Soyadı</th>
+            <th class="center">Nöbet Günleri</th>
+            <th class="center">
+              {% if donem == 'tum' %}Toplam{% elif donem == '90' %}Son 90 Gün{% else %}Son 30 Gün{% endif %}
+            </th>
+            <th class="center">Genel Toplam</th>
+            <th class="center">Haftalık Ort.</th>
+            <th class="center">Puan</th>
+            <th>Son Ders Doldurma</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in satirlar %}
+          <tr>
+            <td class="center" style="color:#888;font-size:0.85em;">{{ forloop.counter }}</td>
+            <td style="font-weight:500;">{{ r.adi_soyadi }}</td>
+            <td class="center">
+              {% for gun in r.gunler %}
+              <span style="display:inline-block;background:#e3f2fd;color:#1565c0;
+                           border-radius:4px;padding:1px 7px;font-size:0.78em;
+                           margin:1px;">{{ gun }}</span>
+              {% endfor %}
+            </td>
+            <td class="center">
+              {% if r.donem_doldurma > 0 %}
+              <span style="font-weight:700;color:#2e7d32;">{{ r.donem_doldurma }}</span>
+              {% else %}
+              <span style="color:#bbb;">—</span>
+              {% endif %}
+            </td>
+            <td class="center" style="font-weight:600;">{{ r.toplam_nobet }}</td>
+            <td class="center" style="color:#555;">{{ r.haftalik_ort }}</td>
+            <td class="center">
+              <span style="display:inline-block;min-width:38px;text-align:center;
+                           background:{% if r.agirlikli_puan >= 10 %}#e8f5e9;color:#1b5e20;
+                           {% elif r.agirlikli_puan >= 5 %}#fff8e1;color:#e65100;
+                           {% else %}#fce4ec;color:#880e4f;{% endif %}
+                           border-radius:5px;padding:2px 8px;font-weight:700;font-size:0.88em;">
+                {{ r.agirlikli_puan }}
+              </span>
+            </td>
+            <td style="font-size:0.85em;color:#555;">
+              {% if r.son_nobet %}
+              {{ r.son_nobet|date:"d.m.Y" }}
+              {% if r.son_nobet_yeri and r.son_nobet_yeri != '-' %}
+              <span style="color:#888;margin-left:4px;">· {{ r.son_nobet_yeri }}</span>
+              {% endif %}
+              {% else %}
+              <span style="color:#ccc;">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="padding:32px;text-align:center;color:#888;margin-bottom:28px;">
+    Aktif nöbet tarifesinde kayıtlı öğretmen bulunamadı.
+  </div>
+  {% endif %}
+
+  <!-- Son 20 kayıt -->
+  {% if son_kayitlar %}
+  <div class="card">
+    <div class="card-header" style="background:#417690;color:#fff;">
+      Son Ders Doldurma Kayıtları
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table" style="box-shadow:none;">
+        <thead>
+          <tr class="table-sub-header">
+            <th>Tarih</th>
+            <th class="center">Ders</th>
+            <th class="center">Sınıf</th>
+            <th>Görevlendirilen Nöbetçi</th>
+            <th>Devamsız Öğretmen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for k in son_kayitlar %}
+          <tr>
+            <td style="font-size:0.87em;white-space:nowrap;">
+              {{ k.tarih|date:"d.m.Y" }}
+              <span style="color:#999;font-size:0.9em;">{{ k.tarih|date:"H:i" }}</span>
+            </td>
+            <td class="center">{{ k.saat }}. Ders</td>
+            <td class="center">{{ k.sinif|default:"—" }}</td>
+            <td style="font-weight:500;color:#2e7d32;">{{ k.nobetci }}</td>
+            <td style="color:#555;">{{ k.devamsiz }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
