@@ -1132,7 +1132,40 @@ def oturma_plani_pdf_view(request):
 
 @login_required
 def sinav_takvimi_pdf_view(request):
-    """Aktif TakvimUretim'e bağlı tek sayfalık öğrenci Sınav Takvimi PDF'i döner."""
+    """Aktif TakvimUretim'e bağlı tek sayfalık öğrenci Sınav Takvimi PDF'i döner.
+    ?subeler=0  →  Şubeler sütunu olmadan üretir (varsayılan: şubeli).
+    """
+    import io
+    from sinav.models import TakvimUretim
+    from ortaksinav_engine.services.pdf_rapor import sinav_takvimi_pdf
+
+    aktif = _aktif_sinav()
+    if not aktif:
+        raise Http404
+
+    aktif_uretim = TakvimUretim.objects.filter(sinav=aktif, aktif=True).first()
+    if not aktif_uretim:
+        raise Http404
+
+    from sinav.models import Takvim as TakvimModel
+    TakvimModel.objects.filter(sinav=aktif, uretim__isnull=True).update(uretim=aktif_uretim)
+
+    goster_subeler = request.GET.get("subeler", "1") != "0"
+    okul = OkulBilgi.get()
+    buf  = io.BytesIO()
+    sinav_takvimi_pdf(buf, okul, aktif_uretim,
+                      hazirlayan_user=request.user,
+                      goster_subeler=goster_subeler)
+    buf.seek(0)
+    etiket = "" if goster_subeler else "_subesiz"
+    fname = f"Sinav_Takvimi{etiket}_{aktif.egitim_ogretim_yili}.pdf"
+    return HttpResponse(buf.read(), content_type="application/pdf",
+                        headers={"Content-Disposition": f'inline; filename="{fname}"'})
+
+
+@login_required
+def sinav_takvimi_subesiz_pdf_view(request):
+    """Şubeler sütunu olmadan sınav takvimi PDF'i döner."""
     import io
     from sinav.models import TakvimUretim
     from ortaksinav_engine.services.pdf_rapor import sinav_takvimi_pdf
@@ -1150,9 +1183,11 @@ def sinav_takvimi_pdf_view(request):
 
     okul = OkulBilgi.get()
     buf  = io.BytesIO()
-    sinav_takvimi_pdf(buf, okul, aktif_uretim)
+    sinav_takvimi_pdf(buf, okul, aktif_uretim,
+                      hazirlayan_user=request.user,
+                      goster_subeler=False)
     buf.seek(0)
-    fname = f"Sinav_Takvimi_{aktif.egitim_ogretim_yili}.pdf"
+    fname = f"Sinav_Takvimi_subesiz_{aktif.egitim_ogretim_yili}.pdf"
     return HttpResponse(buf.read(), content_type="application/pdf",
                         headers={"Content-Disposition": f'inline; filename="{fname}"'})
 

@@ -19,7 +19,8 @@ urlpatterns = [
     path("calistir/oturma-secili/",  views.calistir_oturma_secili,  name="oturma_secili"),
     path("pdf/oturma-plani/",   views.oturma_plani_pdf_view,   name="oturma_plani_pdf_view"),
     path("pdf/sinif-listesi/",  views.sinif_listesi_pdf_view,  name="sinif_listesi_pdf_view"),
-    path("pdf/sinav-takvimi/",  views.sinav_takvimi_pdf_view,  name="sinav_takvimi_pdf_view"),
+    path("pdf/sinav-takvimi/",         views.sinav_takvimi_pdf_view,         name="sinav_takvimi_pdf_view"),
+    path("pdf-rapor/sinav-takvimi-subesiz/", views.sinav_takvimi_subesiz_pdf_view, name="sinav_takvimi_subesiz_pdf_view"),
 
     # Gorev durumu (polling) + iptal
     path("gorev/<str:task_id>/", views.gorev_durumu, name="gorev_durumu"),

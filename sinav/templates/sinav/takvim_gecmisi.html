@@ -102,7 +102,7 @@
       {% for satir in log.splitlines %}
         {% if "seviye/oturum" in satir %}
         <div class="tg-ozet-satir tg-kelebek">
-          <span class="tg-icon">🦋</span> {{ satir|slice:"2:" }}
+          <span class="tg-icon">🦋</span> {{ satir }}
         </div>
         {% endif %}
       {% endfor %}

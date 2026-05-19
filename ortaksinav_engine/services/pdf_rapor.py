@@ -261,10 +261,11 @@ _GUNLER = {0: "Pazartesi", 1: "Salı", 2: "Çarşamba",
            3: "Perşembe", 4: "Cuma", 5: "Cumartesi", 6: "Pazar"}
 
 
-def sinav_takvimi_pdf(out, okul, aktif_uretim):
+def sinav_takvimi_pdf(out, okul, aktif_uretim, hazirlayan_user=None, goster_subeler=True):
     """
     Aktif TakvimUretim'e bağlı Takvim kayıtlarından yayın kaliteli sınav takvimi PDF üretir.
     Gün başlık satırı + oturum başına ders satırları, imza bölümü ile A4 PDF.
+    goster_subeler=False: Şubeler sütunu olmadan üretir.
     out: dosya yolu veya BytesIO
     """
     from sinav.models import Takvim
@@ -302,8 +303,12 @@ def sinav_takvimi_pdf(out, okul, aktif_uretim):
     sig_st  = ParagraphStyle("sg",  fontName="DejaVuSans",      fontSize=8.5,leading=12, alignment=1)
     sig_b   = ParagraphStyle("sgb", fontName="DejaVuSans-Bold", fontSize=8.5,leading=12, alignment=1)
 
-    # Ot.(1.4) | Saat(2.0) | Ders(7.1) | Şubeler(7.1) = 17.6 cm
-    col_ws = [1.4 * cm, 2.0 * cm, 7.1 * cm, 7.1 * cm]
+    # Şubeli : Ot.(1.4) | Saat(2.0) | Ders(7.1) | Şubeler(7.1) = 17.6 cm
+    # Şubesiz: Tarih(3.5) | Ot.(1.2) | Saat(1.8) | Ders(11.1)  = 17.6 cm
+    if goster_subeler:
+        col_ws = [1.4 * cm, 2.0 * cm, 7.1 * cm, 7.1 * cm]
+    else:
+        col_ws = [3.5 * cm, 1.2 * cm, 1.8 * cm, 11.1 * cm]
 
     sinav = aktif_uretim.sinav
     yil = sinav.egitim_ogretim_yili if sinav else ""
@@ -331,13 +336,21 @@ def sinav_takvimi_pdf(out, okul, aktif_uretim):
     ))
     story.append(Spacer(1, 0.3 * cm))
 
-    # ── Tablo: başlık satırı + gün başlıkları + ders satırları ──
-    tbl_data = [[
-        Paragraph("<b>Ot.</b>", ctr_st),
-        Paragraph("<b>Saat</b>", ctr_st),
-        Paragraph("<b>Sınav / Ders</b>", cell_b),
-        Paragraph("<b>Şubeler</b>", cell_b),
-    ]]
+    # ── Tablo ──
+    if goster_subeler:
+        tbl_data = [[
+            Paragraph("<b>OT.</b>", ctr_st),
+            Paragraph("<b>SAAT</b>", ctr_st),
+            Paragraph("<b>SINAV / DERS</b>", ctr_st),
+            Paragraph("<b>ŞUBELER</b>", ctr_st),
+        ]]
+    else:
+        tbl_data = [[
+            Paragraph("<b>TARİH</b>", ctr_st),
+            Paragraph("<b>OT.</b>", ctr_st),
+            Paragraph("<b>SAAT</b>", ctr_st),
+            Paragraph("<b>SINAV / DERS</b>", ctr_st),
+        ]]
 
     style_cmds = [
         ("FONTNAME",      (0, 0), (-1, -1), "DejaVuSans"),
@@ -348,72 +361,114 @@ def sinav_takvimi_pdf(out, okul, aktif_uretim):
         ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
         ("TOPPADDING",    (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#1e3a5f")),
+        ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#4a7ab5")),
         ("TEXTCOLOR",     (0, 0), (-1, 0),  colors.white),
+        ("FONTSIZE",      (0, 0), (-1, 0),  12),
         ("ALIGN",         (0, 0), (-1, 0),  "CENTER"),
     ]
 
     row_idx = 1
-    _BEYAZ   = colors.white
-    _ACIK    = colors.HexColor("#f0f4ff")
+    _BEYAZ = colors.white
+    _ACIK  = colors.HexColor("#f0f4ff")
 
     for tarih, satirlar in gunler:
         gun_str = _GUNLER.get(tarih.weekday(), "")
 
-        # Gün başlık satırı
-        tbl_data.append([
-            Paragraph(f"<b>{gun_str}, {_tarih_tr(tarih)}</b>", cell_b),
-            "", "", "",
-        ])
-        style_cmds += [
-            ("SPAN",       (0, row_idx), (-1, row_idx)),
-            ("BACKGROUND", (0, row_idx), (-1, row_idx), colors.HexColor("#dbeafe")),
-            ("TEXTCOLOR",  (0, row_idx), (-1, row_idx), colors.HexColor("#1d4ed8")),
-            ("ALIGN",      (0, row_idx), (-1, row_idx), "LEFT"),
-            ("TOPPADDING", (0, row_idx), (-1, row_idx), 4),
-            ("BOTTOMPADDING", (0, row_idx), (-1, row_idx), 4),
-        ]
-        row_idx += 1
+        if goster_subeler:
+            # Gün başlık satırı (yalnızca şubeli versiyonda)
+            tbl_data.append([
+                Paragraph(f"<b>{gun_str}, {_tarih_tr(tarih)}</b>", cell_b),
+                "", "", "",
+            ])
+            style_cmds += [
+                ("SPAN",          (0, row_idx), (-1, row_idx)),
+                ("BACKGROUND",    (0, row_idx), (-1, row_idx), colors.HexColor("#dbeafe")),
+                ("TEXTCOLOR",     (0, row_idx), (-1, row_idx), colors.HexColor("#1d4ed8")),
+                ("ALIGN",         (0, row_idx), (-1, row_idx), "LEFT"),
+                ("TOPPADDING",    (0, row_idx), (-1, row_idx), 4),
+                ("BOTTOMPADDING", (0, row_idx), (-1, row_idx), 4),
+            ]
+            row_idx += 1
 
-        # Ders satırları
+        gun_row_start = row_idx
+        tarih_p = Paragraph(
+            f"<b>{tarih.day} {_TR_AYLAR[tarih.month - 1]}</b><br/>{gun_str}", ctr_st
+        )
+
         for i, t in enumerate(satirlar):
             ders_k = str(t.ders) if t.ders else ""
             if t.sinav_turu:
                 ders_k += f" ({t.sinav_turu})"
-            tbl_data.append([
-                Paragraph(str(t.oturum), ctr_st),
-                Paragraph((t.saat or "")[:5], ctr_st),
-                Paragraph(ders_k, cell_st),
-                Paragraph(t.subeler or "", cell_st),
-            ])
+            if goster_subeler:
+                tbl_data.append([
+                    Paragraph(str(t.oturum), ctr_st),
+                    Paragraph((t.saat or "")[:5], ctr_st),
+                    Paragraph(ders_k, cell_st),
+                    Paragraph(t.subeler or "", cell_st),
+                ])
+            else:
+                tbl_data.append([
+                    tarih_p if i == 0 else "",
+                    Paragraph(str(t.oturum), ctr_st),
+                    Paragraph((t.saat or "")[:5], ctr_st),
+                    Paragraph(ders_k, cell_st),
+                ])
             bg = _BEYAZ if i % 2 == 0 else _ACIK
             style_cmds.append(("BACKGROUND", (0, row_idx), (-1, row_idx), bg))
             row_idx += 1
 
+        # Aynı güne ait oturum sayısı > 1 ise tarih hücresini dikey birleştir
+        if not goster_subeler and len(satirlar) > 1:
+            style_cmds += [
+                ("SPAN",   (0, gun_row_start), (0, row_idx - 1)),
+                ("VALIGN", (0, gun_row_start), (0, row_idx - 1), "MIDDLE"),
+                ("BACKGROUND", (0, gun_row_start), (0, row_idx - 1), colors.HexColor("#dbeafe")),
+            ]
+
     tbl = Table(tbl_data, colWidths=col_ws, repeatRows=1)
     tbl.setStyle(TableStyle(style_cmds))
     story.append(tbl)
-    story.append(Spacer(1, 0.8 * cm))
+    story.append(Spacer(1, 0.5 * cm))
 
     # ── İmza / Onay bölümü ──
     mudur = (okul.okul_muduru or "") if okul else ""
     yil_str = yil.split("-")[0] if "-" in (yil or "") else (yil or "")
 
+    from okul.models import OkulYonetici
+    mudur_yrd_obj = None
+    if hazirlayan_user and getattr(hazirlayan_user, "is_authenticated", False):
+        mudur_yrd_obj = (
+            OkulYonetici.objects
+            .filter(user=hazirlayan_user, unvan="mudur_yardimcisi", aktif=True)
+            .select_related("personel", "user")
+            .first()
+        )
+        if mudur_yrd_obj is None:
+            full_name = hazirlayan_user.get_full_name().upper().strip()
+            if full_name:
+                for obj in OkulYonetici.objects.filter(unvan="mudur_yardimcisi", aktif=True).select_related("personel", "user"):
+                    if obj.adi_soyadi.upper().strip() == full_name:
+                        mudur_yrd_obj = obj
+                        break
+    if mudur_yrd_obj is None:
+        mudur_yrd_obj = (
+            OkulYonetici.objects
+            .filter(unvan="mudur_yardimcisi", aktif=True)
+            .select_related("personel", "user")
+            .first()
+        )
+    mudur_yrd_adi = mudur_yrd_obj.adi_soyadi if mudur_yrd_obj else ""
+
     sig_data = [
         [
             Paragraph("Hazırlayan", sig_b),
             Paragraph("", sig_st),
-            Paragraph("Onaylayan", sig_b),
+            Paragraph(f"UYGUNDUR<br/>.../.../{ son_tarih.year}", sig_b),
         ],
         [
-            Paragraph("<br/><br/><br/>Müdür Yardımcısı", sig_st),
+            Paragraph(f"<br/><br/><br/>{mudur_yrd_adi}<br/>Müdür Yardımcısı", sig_st),
             Paragraph("", sig_st),
-            Paragraph(f"<br/><br/><br/>{mudur}", sig_st),
-        ],
-        [
-            Paragraph(f".../.../{ yil_str or '....'}  İmza", sig_st),
-            Paragraph("UYGUNDUR", sig_b),
-            Paragraph(f".../.../{ yil_str or '....'}  İmza / Mühür", sig_st),
+            Paragraph(f"<br/><br/><br/>{mudur}<br/>Okul Müdürü", sig_st),
         ],
     ]
     sig_ws = [avail_w * 0.38, avail_w * 0.24, avail_w * 0.38]
@@ -423,11 +478,9 @@ def sinav_takvimi_pdf(out, okul, aktif_uretim):
         ("FONTSIZE",      (0, 0), (-1, -1), 8.5),
         ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
         ("VALIGN",        (0, 0), (-1, -1), "BOTTOM"),
-        ("LINEBELOW",     (0, 1), (0, 1),   0.5, colors.black),
-        ("LINEBELOW",     (2, 1), (2, 1),   0.5, colors.black),
         ("TOPPADDING",    (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("TEXTCOLOR",     (1, 2), (1, 2),   colors.HexColor("#374151")),
+        ("TEXTCOLOR",     (2, 0), (2, 0),   colors.HexColor("#374151")),
     ]))
     story.append(sig_tbl)
 

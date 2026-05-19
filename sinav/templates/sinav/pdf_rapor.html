@@ -10,6 +10,8 @@
     <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
       <a href="{% url 'sinav:sinav_takvimi_pdf_view' %}" target="_blank"
          class="btn btn-primary btn-sm">Sınav Takvimi PDF</a>
+      <a href="{% url 'sinav:sinav_takvimi_subesiz_pdf_view' %}" target="_blank"
+         class="btn btn-sm" style="border:1px solid #1e3a5f; color:#1e3a5f; background:#fff;">Sınav Takvimi Ayrıntı Yok</a>
       <!-- Öğretmen sayfası butonu -->
       {% if secili_uretim.aktif %}
         <a href="{% url 'sinav:gozetmen_ozet' %}"
