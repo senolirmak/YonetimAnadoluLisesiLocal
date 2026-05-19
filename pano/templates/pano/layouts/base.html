@@ -1,4 +1,4 @@
-{% load static %}
+{% load static %}{% now "YmdH" as sv %}
 <!doctype html>
 <html lang="tr">
 <head>
@@ -30,10 +30,11 @@
     "LESSON_MIN": {{ LESSON_MIN|default:40 }},
     "FLASH_MS": {{ FLASH_MS|default:900 }},
     "BLINK_ACTIVE_LESSON": {{ BLINK_ACTIVE_LESSON|default:"true" }},
-    "MEDIA_PLAYLIST": {{ MEDIA_PLAYLIST|default:"[]"|safe }}
+    "MEDIA_PLAYLIST": {{ MEDIA_PLAYLIST|default:"[]"|safe }},
+    "ETKINLIK_SAYFASI": {{ ETKINLIK_SAYFASI|default:"true"|lower }}
   };
 </script>
 
-<script src="{% static 'pano/js/pano.js' %}"></script>
+<script src="{% static 'pano/js/pano.js' %}?v={{ sv }}"></script>
 </body>
 </html>

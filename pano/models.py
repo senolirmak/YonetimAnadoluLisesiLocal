@@ -145,6 +145,11 @@ class KioskAyar(models.Model):
     ana_sayfa_sure = models.PositiveIntegerField(
         default=15, help_text="Ana sayfa ekranda kaç saniye kalsın?"
     )
+    etkinlik_sayfasi = models.BooleanField(
+        default=True,
+        verbose_name="Etkinlikler sayfası",
+        help_text="Kapalıysa /pano/etkinlikler/ sayfasına geçiş yapılmaz.",
+    )
     etkinlik_sure = models.PositiveIntegerField(
         default=15, help_text="Etkinlikler ekranda kaç saniye kalsın?"
     )

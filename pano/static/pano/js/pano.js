@@ -366,6 +366,8 @@
   }
 
   function _onPlaylistCycleDone() {
+    const etkinlikAktif = window.PANO_CONFIG && window.PANO_CONFIG.ETKINLIK_SAYFASI;
+    if (!etkinlikAktif) return;
     if (window.parent !== window) {
       // Kiosk iframe içindeyiz — parent'a erken geçiş sinyali gönder
       window.parent.postMessage({ type: 'pano:mediaPlaylistDone' }, '*');

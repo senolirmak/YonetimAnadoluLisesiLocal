@@ -54,6 +54,9 @@ def index(request):
         )
     # ----------------------------------------------------
 
+    ayar = KioskAyar.objects.filter(aktif=True).first()
+    etkinlik_sayfasi = ayar.etkinlik_sayfasi if ayar else True
+
     context = {
         "SCHOOL_NAME": _okul_adi(),
         "DERSLER": json.dumps(ders_saatleri),
@@ -63,6 +66,7 @@ def index(request):
         "FLASH_MS": 900,
         "BLINK_ACTIVE_LESSON": "true",
         "MEDIA_PLAYLIST": json.dumps(media_playlist),
+        "ETKINLIK_SAYFASI": "true" if etkinlik_sayfasi else "false",
     }
 
     return render(request, "pano/index.html", context)
@@ -150,10 +154,9 @@ def kiosk(request):
         ayar = KioskAyar()
 
     # Kiosk'ta dönecek sayfaların URL'lerini ve sürelerini al
-    pages = [
-        {"url": reverse("pano:index"), "duration": ayar.ana_sayfa_sure},
-        {"url": reverse("pano:etkinlikler"), "duration": ayar.etkinlik_sure},
-    ]
+    pages = [{"url": reverse("pano:index"), "duration": ayar.ana_sayfa_sure}]
+    if ayar.etkinlik_sayfasi:
+        pages.append({"url": reverse("pano:etkinlikler"), "duration": ayar.etkinlik_sure})
 
     context = {
         "pages": json.dumps(pages),

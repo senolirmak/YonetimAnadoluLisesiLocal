@@ -96,6 +96,6 @@ class MedyaIcerikAdmin(admin.ModelAdmin):
 
 @admin.register(KioskAyar)
 class KioskAyarAdmin(admin.ModelAdmin):
-    list_display = ("id", "aktif", "ana_sayfa_sure", "etkinlik_sure", "efekt", "updated_at")
-    list_editable = ("aktif", "ana_sayfa_sure", "etkinlik_sure", "efekt")
+    list_display = ("id", "aktif", "ana_sayfa_sure", "etkinlik_sayfasi", "etkinlik_sure", "efekt", "updated_at")
+    list_editable = ("aktif", "ana_sayfa_sure", "etkinlik_sayfasi", "etkinlik_sure", "efekt")
     list_display_links = ("id",)  # ✅ ilk link alanı id oldu
