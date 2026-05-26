@@ -32,8 +32,8 @@
 /* DSEG fontu zaten ekledin demiştin; yolunu buna göre ayarla */
 @font-face {
   font-family: "SevenSeg";
-  src: url("../fonts/DSEG7Classic-Regular.woff") format("woff"),
-       url("../fonts/DSEG7Classic-Regular.ttf") format("truetype");
+  src: url("../../fonts/DSEG7Classic-Regular.woff") format("woff"),
+       url("../../fonts/DSEG7Classic-Regular.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
 }

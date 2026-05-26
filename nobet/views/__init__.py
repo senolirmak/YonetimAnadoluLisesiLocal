@@ -33,6 +33,13 @@ from .permissions import (
     yonetici_required,
 )
 
+from .ogretmen import (
+    nobetci_ders_doldurma_istatistik,
+    ogretmen_ders_doldurma,
+    ogretmen_gunun_nobetcileri,
+    ogretmen_haftalik_nobet,
+)
+
 __all__ = [
     # permissions
     "YONETICI_GRUPLAR",
@@ -61,4 +68,9 @@ __all__ = [
     "download_gunun_nobetcileri_png",
     "download_unassigned_ders_png",
     "devamsizlik_sinif_pdf",
+    # ogretmen (salt okunur sayfalar)
+    "ogretmen_haftalik_nobet",
+    "ogretmen_gunun_nobetcileri",
+    "ogretmen_ders_doldurma",
+    "nobetci_ders_doldurma_istatistik",
 ]

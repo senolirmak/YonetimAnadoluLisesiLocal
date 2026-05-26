@@ -779,6 +779,77 @@ def rehber_ogretmenler(request):
     return render(request, "dersprogrami/rehber_ogretmenler.html", context)
 
 
+# ─────────────────────────────────────────────
+# Öğretmen → Ders → Haftalık Saat → Şube Listesi
+# ─────────────────────────────────────────────
+
+
+@yonetici_required
+def ogretmen_ders_listesi(request):
+    ara = request.GET.get("ara", "").strip()
+    ders_filtre = request.GET.get("ders", "").strip()
+    brans_filtre = request.GET.get("brans", "").strip()
+
+    qs = (
+        DersProgrami.objects.aktif()
+        .select_related("ogretmen", "ders", "sinif_sube")
+        .order_by("ogretmen__brans", "ogretmen__adi_soyadi", "ders__ders_adi", "sinif_sube__sinif", "sinif_sube__sube")
+    )
+
+    if ara:
+        qs = qs.filter(ogretmen__adi_soyadi__icontains=ara)
+    if ders_filtre:
+        qs = qs.filter(ders__ders_adi__icontains=ders_filtre)
+    if brans_filtre:
+        qs = qs.filter(ogretmen__brans__iexact=brans_filtre)
+
+    pivot = {}
+    for k in qs:
+        p = k.ogretmen
+        ders_adi = k.ders.ders_adi if k.ders else "—"
+        sube_str = str(k.sinif_sube) if k.sinif_sube else "—"
+        key = (p.pk, ders_adi)
+        if key not in pivot:
+            pivot[key] = {"personel": p, "ders_adi": ders_adi, "siniflar": [], "_seen": set(), "haftalik_saat": 0}
+        pivot[key]["haftalik_saat"] += 1
+        if sube_str not in pivot[key]["_seen"]:
+            pivot[key]["_seen"].add(sube_str)
+            pivot[key]["siniflar"].append(sube_str)
+
+    ogretmen_gruplari = {}
+    for key, row in pivot.items():
+        p_pk = key[0]
+        if p_pk not in ogretmen_gruplari:
+            ogretmen_gruplari[p_pk] = {"personel": row["personel"], "dersler": [], "toplam_saat": 0}
+        ogretmen_gruplari[p_pk]["dersler"].append({
+            "ders_adi": row["ders_adi"],
+            "haftalik_saat": row["haftalik_saat"],
+            "siniflar": ", ".join(row["siniflar"]),
+        })
+        ogretmen_gruplari[p_pk]["toplam_saat"] += row["haftalik_saat"]
+
+    ogretmen_listesi = sorted(
+        ogretmen_gruplari.values(),
+        key=lambda r: (r["personel"].brans, r["personel"].adi_soyadi),
+    )
+
+    tum_dersler = sorted({k[1] for k in pivot.keys() if k[1] != "—"})
+    tum_branslar = sorted(
+        {row["personel"].brans for row in ogretmen_gruplari.values() if row["personel"].brans}
+    )
+
+    context = {
+        "title": "Öğretmen Ders Listesi",
+        "ogretmen_listesi": ogretmen_listesi,
+        "ara": ara,
+        "ders_filtre": ders_filtre,
+        "brans_filtre": brans_filtre,
+        "tum_dersler": tum_dersler,
+        "tum_branslar": tum_branslar,
+    }
+    return render(request, "dersprogrami/ogretmen_ders_listesi.html", context)
+
+
 @mudur_yardimcisi_required
 def dersprogrami_yukle(request):
     form = DersProgramiImportForm(request.POST or None, request.FILES or None)

@@ -50,9 +50,9 @@ class NobetPDFReport:
 
     def _register_fonts(self):
         try:
-            font_path = os.path.join(settings.BASE_DIR, "main", "static", "fonts", "DejaVuSans.ttf")
+            font_path = os.path.join(settings.BASE_DIR, "static", "fonts", "DejaVuSans.ttf")
             font_path_bold = os.path.join(
-                settings.BASE_DIR, "main", "static", "fonts", "DejaVuSans-Bold.ttf"
+                settings.BASE_DIR, "static", "fonts", "DejaVuSans-Bold.ttf"
             )
             pdfmetrics.registerFont(TTFont("DejaVuSans", font_path))
             pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", font_path_bold))

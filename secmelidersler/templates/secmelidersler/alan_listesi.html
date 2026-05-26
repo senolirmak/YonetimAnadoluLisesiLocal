@@ -1,0 +1,186 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #417690;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.88em;
+        color: #2d5469;
+        margin-bottom: 16px;
+    }
+    .alan-blok { margin-bottom: 28px; }
+    .alan-blok-baslik {
+        font-size: 1em;
+        font-weight: 700;
+        color: #2d5469;
+        border-bottom: 2px solid #417690;
+        padding-bottom: 6px;
+        margin-bottom: 12px;
+    }
+    .alan-kart-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 14px;
+    }
+    .alan-kart {
+        border: 1px solid #c5d8e8;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .alan-kart-baslik {
+        background: #417690;
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.92em;
+        padding: 8px 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .alan-kart-baslik .aksiyon a {
+        color: rgba(255,255,255,.75);
+        font-size: 0.82em;
+        text-decoration: none;
+        margin-left: 10px;
+    }
+    .alan-kart-baslik .aksiyon a:hover { color: #fff; }
+    .alan-kart-baslik .aksiyon a.sil-link { color: #ffb3b3; }
+    .alan-kart-baslik .aksiyon a.sil-link:hover { color: #ff6b6b; }
+    .alan-kart-govde { padding: 10px 14px; }
+    .ders-chip-liste {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-bottom: 0;
+    }
+    .ders-chip {
+        background: #e8f0f5;
+        color: #2d5469;
+        border-radius: 10px;
+        padding: 2px 10px;
+        font-size: 0.78em;
+        font-weight: 500;
+    }
+    .bos-mesaj { color: #adb5bd; font-style: italic; font-size: 0.85em; }
+    .yeni-btn {
+        display: inline-block;
+        background: #28a745;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 7px 20px;
+        font-size: 0.9em;
+        font-weight: 600;
+        text-decoration: none;
+        margin-bottom: 18px;
+    }
+    .yeni-btn:hover { background: #218838; color: #fff; }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        margin-left: 10px;
+        background: #fff;
+    }
+    .sil-form { display: inline; }
+</style>
+
+<div class="container-fluid py-3">
+    <h5 class="mb-2">{{ title }}</h5>
+    <p class="bilgi-notu">
+        11. ve 12. sınıf için <strong>MF, TM, DİL</strong> gibi alanları burada tanımlayabilirsiniz.
+        Her alana ait seçmeli dersler öğrenci seçim formlarında kullanılabilir.
+    </p>
+
+    <a href="{% url 'secmeli_alan_yeni' %}" class="yeni-btn">+ Yeni Alan</a>
+    <a href="{% url 'secmeli_ogrenci_listesi' %}" class="geri-btn">← Seçmeli Dersler</a>
+
+    {% if not alanlar_11 and not alanlar_12 %}
+    <p class="bos-mesaj" style="margin-top:24px">Henüz alan tanımlanmamış.</p>
+    {% endif %}
+
+    {% if alanlar_11 %}
+    <div class="alan-blok">
+        <div class="alan-blok-baslik">11. Sınıf Alanları</div>
+        <div class="alan-kart-grid">
+            {% for alan in alanlar_11 %}
+            <div class="alan-kart">
+                <div class="alan-kart-baslik">
+                    <span>{{ alan.adi }}</span>
+                    <span class="aksiyon">
+                        <a href="{% url 'secmeli_alan_duzenle' alan.pk %}">Düzenle</a>
+                        <form method="post" action="{% url 'secmeli_alan_sil' alan.pk %}" class="sil-form"
+                              onsubmit="return confirm('{{ alan.adi }} alanını silmek istediğinizden emin misiniz?')">
+                            {% csrf_token %}
+                            <button type="submit" class="sil-link" style="background:none;border:none;cursor:pointer;color:#ffb3b3;font-size:0.82em;padding:0;margin-left:10px;">Sil</button>
+                        </form>
+                    </span>
+                </div>
+                <div class="alan-kart-govde">
+                    {% with dersler=alan.dersler.all %}
+                    {% if dersler %}
+                    <div class="ders-chip-liste">
+                        {% for ders in dersler %}
+                        <span class="ders-chip">{{ ders.ders_adi }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <span class="bos-mesaj">Ders atanmamış</span>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if alanlar_12 %}
+    <div class="alan-blok">
+        <div class="alan-blok-baslik">12. Sınıf Alanları</div>
+        <div class="alan-kart-grid">
+            {% for alan in alanlar_12 %}
+            <div class="alan-kart">
+                <div class="alan-kart-baslik">
+                    <span>{{ alan.adi }}</span>
+                    <span class="aksiyon">
+                        <a href="{% url 'secmeli_alan_duzenle' alan.pk %}">Düzenle</a>
+                        <form method="post" action="{% url 'secmeli_alan_sil' alan.pk %}" class="sil-form"
+                              onsubmit="return confirm('{{ alan.adi }} alanını silmek istediğinizden emin misiniz?')">
+                            {% csrf_token %}
+                            <button type="submit" class="sil-link" style="background:none;border:none;cursor:pointer;color:#ffb3b3;font-size:0.82em;padding:0;margin-left:10px;">Sil</button>
+                        </form>
+                    </span>
+                </div>
+                <div class="alan-kart-govde">
+                    {% with dersler=alan.dersler.all %}
+                    {% if dersler %}
+                    <div class="ders-chip-liste">
+                        {% for ders in dersler %}
+                        <span class="ders-chip">{{ ders.ders_adi }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <span class="bos-mesaj">Ders atanmamış</span>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

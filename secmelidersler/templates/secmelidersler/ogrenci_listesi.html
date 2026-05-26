@@ -1,0 +1,174 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #417690;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.88em;
+        color: #2d5469;
+        margin-bottom: 16px;
+    }
+    .filtre-bar {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+    }
+    .filtre-bar label { font-weight: 600; font-size: 0.88em; color: #495057; white-space: nowrap; }
+    .filtre-bar select {
+        padding: 5px 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.92em;
+        min-width: 120px;
+    }
+    .filtre-bar .btn-f {
+        padding: 5px 16px;
+        background: #417690;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.9em;
+        cursor: pointer;
+    }
+    .filtre-bar a.btn-temizle {
+        padding: 5px 12px;
+        color: #6c757d;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.9em;
+        text-decoration: none;
+        background: #fff;
+    }
+    .ogr-tablo { width: 100%; border-collapse: collapse; font-size: 0.91em; }
+    .ogr-tablo thead th {
+        background: #417690;
+        color: #fff;
+        padding: 8px 14px;
+        text-align: left;
+        font-weight: 600;
+    }
+    .ogr-tablo td { padding: 7px 14px; border-bottom: 1px solid #e9ecef; vertical-align: middle; }
+    .ogr-tablo tbody tr:hover td { background: #f1f5f9; }
+    .ogr-tablo tr.son-sinif td { color: #adb5bd; }
+
+    .sinif-ok { font-size: 0.8em; color: #6c757d; }
+    .sinif-ok .mevcut { color: #495057; font-weight: 600; }
+    .sinif-ok .gelecek { color: #417690; font-weight: 700; }
+
+    .badge-saat {
+        display: inline-block;
+        border-radius: 10px;
+        padding: 1px 10px;
+        font-size: 0.82em;
+        font-weight: 600;
+    }
+    .badge-saat.tam   { background: #28a745; color: #fff; }
+    .badge-saat.kismi { background: #ffc107; color: #212529; }
+    .badge-saat.bos   { background: #e9ecef; color: #6c757d; }
+    .badge-saat.son   { background: #f8f9fa; color: #adb5bd; border: 1px solid #dee2e6; }
+
+    .btn-sec { padding: 4px 14px; background: #417690; color: #fff; border: none; border-radius: 4px; font-size: 0.85em; text-decoration: none; }
+    .btn-sec:hover { background: #2d5469; color: #fff; }
+    .btn-sec.duzenle { background: #28a745; }
+    .btn-sec.duzenle:hover { background: #218838; }
+</style>
+
+<div class="container-fluid py-3">
+    <h5 class="mb-2">{{ title }}</h5>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+        <p class="bilgi-notu" style="margin-bottom:0;flex:1">
+            Bu sayfada öğrencilerin <strong>gelecek eğitim yılında okuyacakları sınıf</strong> için seçmeli ders tercihleri belirlenmektedir.
+            Mevcut sınıf seviyesine göre bir üst sınıf planlaması yapılır. 12. sınıf öğrencileri için planlama yapılamaz.
+        </p>
+        <a href="{% url 'secmeli_alan_listesi' %}"
+           style="white-space:nowrap;background:#6c757d;color:#fff;border-radius:4px;padding:7px 16px;text-decoration:none;font-size:0.88em;flex-shrink:0;">
+            Alan Tanımları (MF/TM/DİL)
+        </a>
+    </div>
+
+    <form method="get" class="filtre-bar">
+        <label for="id_sinif">Mevcut Sınıf:</label>
+        <select id="id_sinif" name="sinif">
+            <option value="">— Tümü —</option>
+            {% for s in tum_siniflar %}
+            <option value="{{ s }}" {% if secilen_sinif == s|stringformat:"s" %}selected{% endif %}>{{ s }}. Sınıf</option>
+            {% endfor %}
+        </select>
+
+        <label for="id_sube">Şube:</label>
+        <select id="id_sube" name="sube">
+            <option value="">— Tümü —</option>
+            {% for sb in tum_subeler %}
+            <option value="{{ sb }}" {% if secilen_sube == sb %}selected{% endif %}>{{ sb }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit" class="btn-f">Filtrele</button>
+        {% if secilen_sinif or secilen_sube %}
+        <a href="{% url 'secmeli_ogrenci_listesi' %}" class="btn-temizle">Temizle</a>
+        {% endif %}
+    </form>
+
+    <table class="ogr-tablo">
+        <thead>
+            <tr>
+                <th>Mevcut → Gelecek Sınıf</th>
+                <th>Okul No</th>
+                <th>Ad Soyad</th>
+                <th style="text-align:center">Seçilen Saat</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in ogr_listesi %}
+            <tr {% if row.son_sinif %}class="son-sinif"{% endif %}>
+                <td>
+                    <span class="sinif-ok">
+                        <span class="mevcut">{{ row.ogrenci.sinif }}/{{ row.ogrenci.sube }}</span>
+                        {% if not row.son_sinif %}
+                        → <span class="gelecek">{{ row.gelecek_sinif }}. Sınıf</span>
+                        {% endif %}
+                    </span>
+                </td>
+                <td>{{ row.ogrenci.okulno }}</td>
+                <td>{{ row.ogrenci.adi }} {{ row.ogrenci.soyadi }}</td>
+                <td style="text-align:center">
+                    {% if row.son_sinif %}
+                        <span class="badge-saat son">Son sınıf</span>
+                    {% elif row.toplam_saat == 20 %}
+                        <span class="badge-saat tam">{{ row.toplam_saat }} saat ✓</span>
+                    {% elif row.toplam_saat > 0 %}
+                        <span class="badge-saat kismi">{{ row.toplam_saat }} saat</span>
+                    {% else %}
+                        <span class="badge-saat bos">Seçim yok</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not row.son_sinif %}
+                    <a href="{% url 'secmeli_ogrenci_formu' row.ogrenci.pk %}"
+                       class="btn-sec {% if row.toplam_saat > 0 %}duzenle{% endif %}">
+                        {% if row.toplam_saat > 0 %}Düzenle{% else %}Seç{% endif %}
+                    </a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" style="color:#6c757d;font-style:italic;padding:20px">Öğrenci bulunamadı.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

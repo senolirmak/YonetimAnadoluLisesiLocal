@@ -606,15 +606,16 @@ def faaliyet_rapor_pdf(request, pk):
         toplam_devamsizlik += len(ids)
 
     # DejaVu font (Türkçe karakter desteği)
-    font_dir = os.path.join(os.path.dirname(__file__), "fonts")
-    font_regular = os.path.join(font_dir, "DejaVuSans.ttf")
-    font_bold = os.path.join(font_dir, "DejaVuSans-Bold.ttf")
-    if os.path.exists(font_regular) and os.path.exists(font_bold):
+    from django.conf import settings as _settings
+    _fonts_dir = _settings.BASE_DIR / "static" / "fonts"
+    font_regular = str(_fonts_dir / "DejaVuSans.ttf")
+    font_bold_path = str(_fonts_dir / "DejaVuSans-Bold.ttf")
+    try:
         pdfmetrics.registerFont(TTFont("DejaVu", font_regular))
-        pdfmetrics.registerFont(TTFont("DejaVu-Bold", font_bold))
+        pdfmetrics.registerFont(TTFont("DejaVu-Bold", font_bold_path))
         base_font = "DejaVu"
         bold_font = "DejaVu-Bold"
-    else:
+    except Exception:
         base_font = "Helvetica"
         bold_font = "Helvetica-Bold"
 

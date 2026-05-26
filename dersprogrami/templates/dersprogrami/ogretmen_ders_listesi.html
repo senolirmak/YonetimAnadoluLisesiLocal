@@ -1,0 +1,183 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .filtre-bar {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+    .filtre-bar label { font-weight: 600; font-size: 0.88em; color: #495057; white-space: nowrap; }
+    .filtre-bar input[type="text"],
+    .filtre-bar select {
+        padding: 5px 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.92em;
+        min-width: 160px;
+    }
+    .filtre-bar .btn-filtre {
+        padding: 5px 16px;
+        background: #417690;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.9em;
+        cursor: pointer;
+    }
+    .filtre-bar .btn-filtre:hover { background: #2d5469; }
+    .filtre-bar .btn-temizle {
+        padding: 5px 12px;
+        background: #fff;
+        color: #6c757d;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.9em;
+        text-decoration: none;
+    }
+    .filtre-bar .btn-temizle:hover { background: #f1f3f5; }
+
+    .ozet-bilgi { font-size: 0.87em; color: #6c757d; margin-bottom: 14px; }
+    .ozet-bilgi strong { color: #343a40; }
+
+    .ders-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.91em;
+    }
+    .ders-tablo thead th {
+        background: #417690;
+        color: #fff;
+        padding: 9px 14px;
+        text-align: left;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+    .ders-tablo tbody tr:hover td { background: #f1f5f9; }
+    .ders-tablo td {
+        padding: 7px 14px;
+        border-bottom: 1px solid #e9ecef;
+        vertical-align: middle;
+        color: #212529;
+    }
+    .ders-tablo tr.ogr-sinir td { border-top: 2px solid #dee2e6; }
+
+    .col-ogr   { width: 20%; font-weight: 600; background: #f8f9fa; }
+    .col-brans { width: 15%; color: #6c757d; font-size: 0.88em; background: #f8f9fa; }
+    .col-ders  { width: 25%; }
+    .col-saat  { width: 10%; text-align: center; }
+    .col-sube  { width: 30%; color: #495057; font-size: 0.9em; }
+
+    .saat-badge {
+        display: inline-block;
+        background: #17a2b8;
+        color: #fff;
+        border-radius: 10px;
+        padding: 1px 10px;
+        font-size: 0.82em;
+        font-weight: 600;
+    }
+    .toplam-saat {
+        display: inline-block;
+        background: #6c757d;
+        color: #fff;
+        border-radius: 10px;
+        padding: 1px 9px;
+        font-size: 0.78em;
+        font-weight: 600;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+    .empty-msg { color: #6c757d; font-style: italic; padding: 20px 0; }
+</style>
+
+<div class="container-fluid py-3">
+    <h5 class="mb-3">{{ title }}</h5>
+
+    <form method="get" class="filtre-bar">
+        <label for="id_ara">Öğretmen adı:</label>
+        <input type="text" id="id_ara" name="ara" value="{{ ara }}" placeholder="Ada göre ara…">
+
+        <label for="id_brans">Branş:</label>
+        <select id="id_brans" name="brans">
+            <option value="">— Tüm branşlar —</option>
+            {% for b in tum_branslar %}
+            <option value="{{ b }}" {% if brans_filtre == b %}selected{% endif %}>{{ b }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="id_ders">Ders:</label>
+        <select id="id_ders" name="ders">
+            <option value="">— Tüm dersler —</option>
+            {% for d in tum_dersler %}
+            <option value="{{ d }}" {% if ders_filtre == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit" class="btn-filtre">Filtrele</button>
+        {% if ara or ders_filtre or brans_filtre %}
+        <a href="{% url 'ogretmen_ders_listesi' %}" class="btn-temizle">Temizle</a>
+        {% endif %}
+    </form>
+
+    {% if ogretmen_listesi %}
+    <p class="ozet-bilgi">
+        <strong>{{ ogretmen_listesi|length }}</strong> öğretmen
+        {% if brans_filtre %} — branş: "<strong>{{ brans_filtre }}</strong>"{% endif %}
+        {% if ders_filtre %} — ders: "<strong>{{ ders_filtre }}</strong>"{% endif %}
+        {% if ara %} — ad: "<strong>{{ ara }}</strong>"{% endif %}
+    </p>
+
+    <table class="ders-tablo">
+        <thead>
+            <tr>
+                <th class="col-ogr">Öğretmen</th>
+                <th class="col-brans">Branş</th>
+                <th class="col-ders">Ders</th>
+                <th class="col-saat">Haftalık Saat</th>
+                <th class="col-sube">Okuttuğu Şube(ler)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ogr in ogretmen_listesi %}
+                {% for ders in ogr.dersler %}
+                <tr class="{% if forloop.first %}ogr-sinir{% endif %}">
+                    {% if forloop.first %}
+                    <td class="col-ogr" rowspan="{{ ogr.dersler|length }}">
+                        {{ ogr.personel.adi_soyadi }}
+                        <span class="toplam-saat" title="Toplam haftalık ders saati">{{ ogr.toplam_saat }}s</span>
+                    </td>
+                    <td class="col-brans" rowspan="{{ ogr.dersler|length }}">{{ ogr.personel.brans }}</td>
+                    {% endif %}
+                    <td class="col-ders">{{ ders.ders_adi }}</td>
+                    <td class="col-saat"><span class="saat-badge">{{ ders.haftalik_saat }}</span></td>
+                    <td class="col-sube">{{ ders.siniflar }}</td>
+                </tr>
+                {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% else %}
+    <p class="empty-msg">
+        {% if ara or ders_filtre or brans_filtre %}
+            Arama kriterlerine uygun kayıt bulunamadı.
+        {% else %}
+            Aktif dönem için ders programı kaydı bulunmuyor.
+        {% endif %}
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

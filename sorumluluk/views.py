@@ -975,3 +975,102 @@ def ogrenci_takvim_pdf(request, sinav_pk):
     fname = f"Ogrenci_Sinav_Takvimi_{sinav.egitim_yili}_{sinav.get_donem_turu_display()}.pdf"
     return HttpResponse(buf.read(), content_type="application/pdf",
                         headers={"Content-Disposition": f'inline; filename="{fname}"'})
+
+
+# ─────────────────────────────────────────────────────────
+# Öğretmen — Sorumluluk Sınavı Görevlerim
+# ─────────────────────────────────────────────────────────
+
+@login_required
+def ogretmen_sorumluluk_gorevleri(request):
+    from django.core.exceptions import PermissionDenied
+    from django.db.models import Q
+    from main.utils import _ogretmen_menu_gorumu
+    from sorumluluk.models import (
+        SorumluKomisyonUyesi,
+        SorumluGozetmen,
+        SorumluTakvim,
+        SALON_CHOICES,
+    )
+
+    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+        raise PermissionDenied
+
+    personel = getattr(request.user, "personel", None)
+    if not personel:
+        return render(request, "sorumluluk/ogretmen_sorumluluk_gorevleri.html", {
+            "title": "Sınav Görevlerim",
+            "hata": "Kullanıcınıza bağlı öğretmen kaydı bulunamadı.",
+        })
+
+    _SALON_LABEL = dict(SALON_CHOICES)
+    _AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+              "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
+    def _tr_tarih(d):
+        return f"{d.day} {_AYLAR[d.month - 1]} {d.year}"
+
+    komisyonlar = list(
+        SorumluKomisyonUyesi.objects
+        .filter(Q(uye1=personel) | Q(uye2=personel))
+        .select_related("sinav", "sinav__egitim_yili")
+        .order_by("sinav__id", "tarih", "oturum_no", "ders_adi")
+    )
+    gozetmenler = list(
+        SorumluGozetmen.objects
+        .filter(gozetmen=personel)
+        .select_related("sinav", "sinav__egitim_yili")
+        .order_by("sinav__id", "tarih", "oturum_no")
+    )
+
+    sinav_idler = {k.sinav_id for k in komisyonlar} | {g.sinav_id for g in gozetmenler}
+
+    takvim_saatler = {}
+    if sinav_idler:
+        for t in SorumluTakvim.objects.filter(sinav_id__in=sinav_idler).order_by("sinav", "tarih", "oturum_no"):
+            key = (t.sinav_id, t.tarih, t.oturum_no)
+            if key not in takvim_saatler:
+                takvim_saatler[key] = (t.saat_baslangic, t.saat_bitis)
+
+    sinav_map: dict = {}
+
+    def _oturum_al(sid, sinav_obj, tarih, oturum_no):
+        if sid not in sinav_map:
+            sinav_map[sid] = {"sinav": sinav_obj, "oturumlar": {}}
+        oturum_key = (tarih, oturum_no)
+        if oturum_key not in sinav_map[sid]["oturumlar"]:
+            saatler = takvim_saatler.get((sid, tarih, oturum_no))
+            sinav_map[sid]["oturumlar"][oturum_key] = {
+                "tarih":         tarih,
+                "tarih_str":     _tr_tarih(tarih),
+                "oturum_no":     oturum_no,
+                "saat_baslangic": saatler[0] if saatler else None,
+                "saat_bitis":    saatler[1] if saatler else None,
+                "komisyonlar":   [],
+                "gozetmenler":   [],
+            }
+        return sinav_map[sid]["oturumlar"][oturum_key]
+
+    for k in komisyonlar:
+        ot = _oturum_al(k.sinav_id, k.sinav, k.tarih, k.oturum_no)
+        ot["komisyonlar"].append(k.ders_adi)
+
+    for g in gozetmenler:
+        ot = _oturum_al(g.sinav_id, g.sinav, g.tarih, g.oturum_no)
+        ot["gozetmenler"].append(_SALON_LABEL.get(g.salon, g.salon))
+
+    gorev_sinavlar = [
+        {
+            "sinav": data["sinav"],
+            "oturumlar": sorted(data["oturumlar"].values(), key=lambda x: (x["tarih"], x["oturum_no"])),
+        }
+        for _, data in sorted(sinav_map.items())
+    ]
+
+    return render(request, "sorumluluk/ogretmen_sorumluluk_gorevleri.html", {
+        "title":          "Sınav Görevlerim",
+        "gorev_sinavlar": gorev_sinavlar,
+        "ogretmen_adi":   personel.adi_soyadi,
+        "hata":           None if (komisyonlar or gozetmenler)
+                          else "Henüz size atanmış sorumluluk sınavı görevi bulunmamaktadır.",
+    })

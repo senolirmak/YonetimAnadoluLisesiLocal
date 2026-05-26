@@ -1,0 +1,467 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<style>
+/* ── Layout — öğrenci formuyla aynı ── */
+.secim-sayfa { max-width: 1100px; margin: 0 auto; padding: 16px; }
+
+.alan-bilgi-kart {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px 18px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-end;
+    font-size: 0.92em;
+}
+.alan-bilgi-kart .input-grup { display: flex; flex-direction: column; }
+.alan-bilgi-kart .input-grup label {
+    font-size: 0.78em; color: #6c757d; font-weight: 600; text-transform: uppercase; margin-bottom: 3px;
+}
+.alan-bilgi-kart .input-grup select,
+.alan-bilgi-kart .input-grup input[type=text] {
+    padding: 5px 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.95em; min-width: 160px;
+}
+.alan-bilgi-kart .input-grup .field-hata { color: #dc3545; font-size: 0.78em; margin-top: 2px; }
+
+/* ── İki sütun ── */
+.iki-sutun { display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start; }
+
+/* ── Sol: Özet tablo ── */
+.ozet-tablo {
+    width: 200px;
+    border-collapse: collapse;
+    font-size: 0.88em;
+    border: 2px solid #417690;
+}
+.ozet-tablo caption {
+    background: #417690;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.9em;
+    padding: 6px 10px;
+    text-align: center;
+    caption-side: top;
+}
+.ozet-tablo th { background: #e9ecef; padding: 5px 10px; text-align: left; font-size: 0.83em; color: #495057; }
+.ozet-tablo td { padding: 5px 10px; border-bottom: 1px solid #dee2e6; }
+.ozet-tablo td:last-child { text-align: center; font-weight: 600; color: #417690; }
+
+/* ── Toplam kontrol kartı ── */
+.toplam-kart {
+    margin-top: 10px;
+    border: 2px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 0.86em;
+    overflow: hidden;
+    transition: border-color .2s;
+}
+.toplam-kart .tk-satir {
+    display: flex; justify-content: space-between; padding: 5px 10px;
+    border-bottom: 1px solid #f1f3f5; color: #495057;
+}
+.toplam-kart .tk-satir span:last-child { font-weight: 600; }
+.toplam-kart .tk-ayrac { height: 2px; background: #dee2e6; }
+.toplam-kart .tk-sonuc {
+    display: flex; justify-content: space-between; padding: 7px 10px;
+    font-weight: 700; font-size: 1.05em; background: #f8f9fa; transition: background .2s, color .2s;
+}
+.toplam-kart .tk-mesaj {
+    text-align: center; padding: 4px 10px 5px; font-size: 0.88em; color: #6c757d; transition: color .2s;
+}
+.toplam-kart.secili { border-color: #28a745; }
+.toplam-kart.secili .tk-ayrac { background: #28a745; }
+.toplam-kart.secili .tk-sonuc { background: #d4edda; color: #155724; }
+.toplam-kart.secili .tk-mesaj { color: #155724; font-weight: 600; }
+.toplam-kart.asim { border-color: #dc3545; }
+.toplam-kart.asim .tk-ayrac { background: #dc3545; }
+.toplam-kart.asim .tk-sonuc { background: #f8d7da; color: #721c24; }
+.toplam-kart.asim .tk-mesaj { color: #dc3545; font-weight: 600; }
+
+/* ── Açıklamalar kartı ── */
+.aciklama-kart {
+    margin-top: 10px; border: 1px solid #c5d8e8; border-radius: 4px;
+    font-size: 0.82em; overflow: hidden; word-break: break-word;
+}
+.aciklama-kart .ac-baslik {
+    background: #e8f0f5; color: #2d5469; font-weight: 700; font-size: 0.85em;
+    text-transform: uppercase; letter-spacing: .04em; padding: 5px 10px; border-bottom: 1px solid #c5d8e8;
+}
+.aciklama-kart .ac-govde { padding: 8px 10px; color: #495057; line-height: 1.55; }
+.aciklama-kart .ac-govde p { margin: 0 0 6px; }
+.aciklama-kart .ac-govde p:last-child { margin-bottom: 0; }
+.aciklama-kart .ac-govde strong { color: #2d5469; }
+
+/* ── Seçmeli panel ── */
+.secmeli-panel { border: 2px solid #417690; border-radius: 4px; overflow: hidden; }
+.secmeli-panel-baslik {
+    background: #417690; color: #fff; font-weight: 700; font-size: 0.9em;
+    padding: 7px 14px; display: flex; justify-content: space-between; align-items: center;
+}
+.secmeli-panel-baslik .saat-sayac {
+    background: rgba(0,0,0,.25); border-radius: 12px; padding: 2px 14px;
+    font-size: 1em; font-weight: 700; white-space: nowrap;
+}
+.sayac-deger { color: #ffd; }
+
+/* ── Grup başlığı ── */
+.grup-baslik {
+    background: #e8f0f5; border-top: 1px solid #c5d8e8; border-bottom: 1px solid #c5d8e8;
+    padding: 5px 14px; font-size: 0.8em; font-weight: 700; color: #2d5469;
+    text-transform: uppercase; letter-spacing: .04em;
+}
+.grup-baslik.zorunlu::after { content: " ★"; color: #e67e22; }
+
+/* ── Ders satırları ── */
+.ders-satir {
+    display: flex; align-items: flex-start; padding: 6px 14px;
+    border-bottom: 1px solid #f1f3f5; gap: 10px; font-size: 0.88em;
+}
+.ders-satir:last-child { border-bottom: none; }
+.ders-satir:hover { background: #f8fbff; }
+.ders-satir.secili { background: #e8f5e9; }
+.ders-satir .chk-ders { margin-top: 2px; cursor: pointer; width: 15px; height: 15px; flex-shrink: 0; }
+.ders-satir .ders-adi-label { flex: 1; cursor: pointer; color: #212529; line-height: 1.4; }
+.ders-satir .saat-sabit {
+    white-space: nowrap; background: #17a2b8; color: #fff; border-radius: 10px;
+    padding: 0 9px; font-size: 0.82em; font-weight: 600; line-height: 1.8; flex-shrink: 0;
+}
+
+/* ── Çoklu saat radio paneli ── */
+.saat-secim-panel { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
+.saat-secim-panel.devre-disi { opacity: 0.35; pointer-events: none; }
+.saat-radio-label {
+    display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 0.82em;
+    color: #495057; background: #f1f3f5; border: 1px solid #dee2e6; border-radius: 4px;
+    padding: 2px 9px; user-select: none;
+}
+.saat-radio-label:has(input:checked) {
+    background: #d4edda; border-color: #28a745; color: #155724; font-weight: 600;
+}
+.saat-radio-label input[type=radio] { width: 13px; height: 13px; }
+
+/* Gizli sınıf blokları */
+.sinif-blok { display: none; }
+.sinif-blok.aktif { display: block; }
+
+/* ── Hata ── */
+.hata-listesi {
+    background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;
+    padding: 10px 16px; margin-bottom: 14px; font-size: 0.9em; color: #721c24;
+}
+.hata-listesi ul { margin: 0; padding-left: 18px; }
+
+/* ── Eylem çubuğu ── */
+.eylem-cubugu { display: flex; align-items: center; gap: 12px; padding: 12px 0 4px; flex-wrap: wrap; }
+.btn-kaydet {
+    background: #28a745; color: #fff; border: none; border-radius: 4px;
+    padding: 8px 28px; font-size: 0.95em; font-weight: 600; cursor: pointer;
+}
+.btn-kaydet:hover { background: #218838; }
+.btn-geri {
+    background: #fff; color: #6c757d; border: 1px solid #dee2e6; border-radius: 4px;
+    padding: 7px 16px; font-size: 0.9em; text-decoration: none;
+}
+</style>
+
+<div class="secim-sayfa">
+    <h5 class="mb-3">{{ title }}</h5>
+
+    {% if form.non_field_errors %}
+    <div class="hata-listesi">
+        <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <div style="background:#e8f4fd;border-left:4px solid #417690;border-radius:4px;padding:7px 14px;font-size:0.87em;color:#2d5469;margin-bottom:12px;">
+        11. ve 12. sınıf öğrencilerinin hangi <strong>alana</strong> (MF, TM, DİL…) dahil olduğunu bu sayfada tanımlayabilirsiniz.
+        Her alan için ilgili seçmeli dersleri ve saat seçeneklerini belirleyiniz.
+    </div>
+
+    <form method="post" id="alan-form">
+        {% csrf_token %}
+
+        {# ── Alan bilgi kartı ── #}
+        <div class="alan-bilgi-kart">
+            <div class="input-grup">
+                <label for="{{ form.sinif_seviyesi.id_for_label }}">Sınıf Seviyesi</label>
+                {{ form.sinif_seviyesi }}
+                {% if form.sinif_seviyesi.errors %}
+                <span class="field-hata">{{ form.sinif_seviyesi.errors.0 }}</span>
+                {% endif %}
+            </div>
+            <div class="input-grup">
+                <label for="{{ form.adi.id_for_label }}">Alan Adı</label>
+                {{ form.adi }}
+                {% if form.adi.errors %}
+                <span class="field-hata">{{ form.adi.errors.0 }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="iki-sutun">
+            {# ── Sol: Özet + Açıklama ── #}
+            <div>
+                <table class="ozet-tablo">
+                    <caption>ALAN BİLGİSİ</caption>
+                    <thead><tr><th>Bilgi</th><th>Değer</th></tr></thead>
+                    <tbody>
+                        <tr><td>Sınıf</td><td id="ozet-sinif">—</td></tr>
+                        <tr><td>Alan Adı</td><td id="ozet-adi">—</td></tr>
+                    </tbody>
+                </table>
+
+                {# Sınıf bazlı saat özeti — JS ile gösterilir #}
+                {% for sv, ozet in sinif_ozet.items %}
+                <table class="ozet-tablo sinif-ozet-tablo" data-sinif="{{ sv }}"
+                       style="margin-top:6px;display:none;">
+                    <caption>{{ sv }}. SINIF DERS SAATLERİ</caption>
+                    <thead><tr><th>Ders Grubu</th><th>Saat</th></tr></thead>
+                    <tbody>
+                        <tr><td>Zorunlu (Ortak) Dersler</td><td>{{ ozet.ortak }}</td></tr>
+                        <tr><td>Rehberlik ve Yönlendirme</td><td>{{ ozet.rehberlik }}</td></tr>
+                        <tr style="font-weight:700;color:#417690;">
+                            <td>Seçmeli Dersler (maks.)</td><td>{{ ozet.secmeli_maks }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr><td>TOPLAM</td><td>40</td></tr>
+                    </tfoot>
+                </table>
+                {% endfor %}
+
+                <div class="toplam-kart" id="toplam-kart" style="margin-top:6px;">
+                    <div class="tk-satir">
+                        <span>Seçilen dersler</span>
+                        <span><span id="secili-sayi">0</span> ders</span>
+                    </div>
+                    <div class="tk-satir">
+                        <span>Seçilen saat</span>
+                        <span><span id="secili-saat">0</span> / <span id="maks-saat">—</span> saat</span>
+                    </div>
+                    <div class="tk-ayrac"></div>
+                    <div class="tk-sonuc">
+                        <span>TOPLAM</span>
+                        <span><span id="secili-sayi2">0</span> ders / <span id="secili-saat2">0</span> saat</span>
+                    </div>
+                    <div class="tk-mesaj" id="toplam-mesaj">Henüz ders seçilmedi</div>
+                </div>
+
+                <div class="aciklama-kart">
+                    <div class="ac-baslik">Açıklamalar</div>
+                    <div class="ac-govde">
+                        <p>
+                            <strong>Alan nedir?</strong> 11. ve 12. sınıflarda öğrenciler <em>MF</em>, <em>TM</em>, <em>DİL</em>
+                            gibi alanlara göre farklı seçmeli dersler okurlar.
+                        </p>
+                        <p>
+                            Her alan için ilgili seçmeli dersler işaretlenmelidir. Birden fazla saat seçeneği olan derslerde
+                            saat seçimi zorunludur. Aynı ders birden fazla alana atanabilir.
+                        </p>
+                        <p>
+                            <strong>Sınıf seviyesini</strong> seçtikten sonra o sınıfa ait dersler sağ panelde görünür.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {# ── Sağ: Seçmeli Dersler ── #}
+            <div class="secmeli-panel">
+                <div class="secmeli-panel-baslik">
+                    <span>SEÇMELİ DERSLER</span>
+                    <span class="saat-sayac">
+                        Seçilen: <span class="sayac-deger" id="sayac">0</span> ders &nbsp;|&nbsp; <span class="sayac-deger" id="sayac-saat">0</span> saat
+                    </span>
+                </div>
+
+                {# sinif_bloklar: [(sv, [(grup, [(fname, fname_saat, ders, chk_bf, saat_bf)])]), ...] #}
+                {% for sinif_seviyesi, gruplar in form.sinif_bloklar %}
+                <div class="sinif-blok" data-sinif="{{ sinif_seviyesi }}">
+                    {% for grup, entries in gruplar %}
+                    <div class="grup-baslik {% if grup.zorunlu_grup %}zorunlu{% endif %}">
+                        {{ grup.adi }}
+                        {% if grup.zorunlu_grup %}<span style="font-weight:400;font-size:.85em;text-transform:none"> (zorunlu grup)</span>{% endif %}
+                    </div>
+
+                    {% for fname, fname_saat, ders, chk_bf, saat_bf in entries %}
+                    <div class="ders-satir {% if chk_bf.value %}secili{% endif %}"
+                         id="satir_{{ ders.pk }}" data-ders="{{ ders.pk }}">
+
+                        {% if saat_bf is None %}
+                        {# ── Sabit saatli ders ── #}
+                        <input type="checkbox"
+                               class="chk-ders"
+                               id="{{ chk_bf.id_for_label }}"
+                               name="{{ chk_bf.html_name }}"
+                               value="true"
+                               data-saat="{{ ders.sabit_saat }}"
+                               {% if chk_bf.value %}checked{% endif %}>
+                        <label class="ders-adi-label" for="{{ chk_bf.id_for_label }}">{{ ders.ders_adi }}</label>
+                        <span class="saat-sabit">{{ ders.sabit_saat }}s</span>
+
+                        {% else %}
+                        {# ── Çoklu saatli ders ── #}
+                        <input type="checkbox"
+                               class="chk-ders"
+                               id="{{ chk_bf.id_for_label }}"
+                               name="{{ chk_bf.html_name }}"
+                               value="true"
+                               {% if chk_bf.value %}checked{% endif %}>
+                        <label class="ders-adi-label" for="{{ chk_bf.id_for_label }}">{{ ders.ders_adi }}</label>
+                        <div class="saat-secim-panel {% if not chk_bf.value %}devre-disi{% endif %}"
+                             id="saat_panel_{{ ders.pk }}">
+                            {% for radio in saat_bf %}
+                            <label class="saat-radio-label">
+                                {{ radio.tag }}
+                                {{ radio.choice_label }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                    </div>
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+                {% endfor %}
+
+                <div id="sinif-secilmedi" style="padding:20px 14px;color:#6c757d;font-style:italic;font-size:0.88em;display:none;">
+                    Sınıf seviyesi seçildiğinde dersler burada görünecektir.
+                </div>
+            </div>
+        </div>
+
+        {# ── Eylem çubuğu ── #}
+        <div class="eylem-cubugu">
+            <button type="submit" class="btn-kaydet">Kaydet</button>
+            <a href="{% url 'secmeli_alan_listesi' %}" class="btn-geri">← İptal</a>
+        </div>
+    </form>
+</div>
+
+<script>
+(function () {
+    const sinifSelect = document.getElementById("{{ form.sinif_seviyesi.id_for_label }}");
+    const adiInput    = document.getElementById("{{ form.adi.id_for_label }}");
+    const bloklar     = document.querySelectorAll(".sinif-blok");
+    const sayacEl       = document.getElementById("sayac");
+    const sayacSaatEl   = document.getElementById("sayac-saat");
+    const seciliSayiEl  = document.getElementById("secili-sayi");
+    const seciliSaatEl  = document.getElementById("secili-saat");
+    const maksSaatEl    = document.getElementById("maks-saat");
+    const seciliSayi2El = document.getElementById("secili-sayi2");
+    const seciliSaat2El = document.getElementById("secili-saat2");
+    const mesajEl       = document.getElementById("toplam-mesaj");
+    const kartEl        = document.getElementById("toplam-kart");
+    const ozetSinifEl   = document.getElementById("ozet-sinif");
+    const ozetAdiEl     = document.getElementById("ozet-adi");
+    const sinifSecilmediEl  = document.getElementById("sinif-secilmedi");
+    const ozetTabloEls      = document.querySelectorAll(".sinif-ozet-tablo");
+
+    // Sınıf bazlı maks. seçmeli saat (view'dan)
+    const sinifMaksSaat = {
+        {% for sv, ozet in sinif_ozet.items %}"{{ sv }}": {{ ozet.secmeli_maks }}{% if not forloop.last %}, {% endif %}{% endfor %}
+    };
+
+    function toplamHesapla() {
+        let sayi = 0, saat = 0;
+        document.querySelectorAll(".sinif-blok.aktif .ders-satir").forEach(function (satir) {
+            const chk = satir.querySelector(".chk-ders");
+            if (!chk || !chk.checked) return;
+            sayi++;
+            if (chk.dataset.saat) {
+                saat += parseInt(chk.dataset.saat, 10);
+            } else {
+                const radio = satir.querySelector(".saat-secim-panel input[type=radio]:checked");
+                if (radio) saat += parseInt(radio.value, 10);
+            }
+        });
+        return { sayi, saat };
+    }
+
+    function sayacGuncelle() {
+        const { sayi, saat } = toplamHesapla();
+        const maks = sinifMaksSaat[sinifSelect.value] || null;
+
+        if (sayacEl)       sayacEl.textContent       = sayi;
+        if (sayacSaatEl)   sayacSaatEl.textContent   = saat;
+        if (seciliSayiEl)  seciliSayiEl.textContent  = sayi;
+        if (seciliSaatEl)  seciliSaatEl.textContent  = saat;
+        if (maksSaatEl)    maksSaatEl.textContent    = maks !== null ? maks : "—";
+        if (seciliSayi2El) seciliSayi2El.textContent = sayi;
+        if (seciliSaat2El) seciliSaat2El.textContent = saat;
+
+        if (kartEl && mesajEl) {
+            const asim = maks !== null && saat > maks;
+            kartEl.classList.toggle("secili", sayi > 0 && !asim);
+            kartEl.classList.toggle("asim",   asim);
+            mesajEl.textContent = asim
+                ? "⚠ Maksimum saati (" + maks + ") aşıyor!"
+                : sayi > 0
+                    ? "✓ " + sayi + " ders, " + saat + " saat"
+                    : "Henüz ders seçilmedi";
+        }
+    }
+
+    function sinifGuncelle() {
+        const secili = sinifSelect.value;
+        const seciliText = sinifSelect.options[sinifSelect.selectedIndex]
+            ? sinifSelect.options[sinifSelect.selectedIndex].text : "—";
+        if (ozetSinifEl) ozetSinifEl.textContent = seciliText || "—";
+
+        // Seçmeli ders blokları
+        let blokVar = false;
+        bloklar.forEach(function (blok) {
+            const aktif = blok.dataset.sinif === secili;
+            blok.classList.toggle("aktif", aktif);
+            blok.querySelectorAll("input[type=checkbox], input[type=radio]").forEach(function (inp) {
+                inp.disabled = !aktif;
+            });
+            if (aktif) blokVar = true;
+        });
+
+        // Sınıf özet tabloları
+        ozetTabloEls.forEach(function (tablo) {
+            tablo.style.display = tablo.dataset.sinif === secili ? "" : "none";
+        });
+
+        if (sinifSecilmediEl) sinifSecilmediEl.style.display = (!secili || !blokVar) ? "block" : "none";
+        sayacGuncelle();
+    }
+
+    function adiGuncelle() {
+        if (ozetAdiEl) ozetAdiEl.textContent = adiInput.value.trim() || "—";
+    }
+
+    // Checkbox ve radio değişimi
+    document.querySelectorAll(".ders-satir").forEach(function (satir) {
+        const chk = satir.querySelector(".chk-ders");
+        const panel = satir.querySelector(".saat-secim-panel");
+        if (!chk) return;
+
+        chk.addEventListener("change", function () {
+            satir.classList.toggle("secili", chk.checked);
+            if (panel) panel.classList.toggle("devre-disi", !chk.checked);
+            sayacGuncelle();
+        });
+
+        if (panel) {
+            panel.querySelectorAll("input[type=radio]").forEach(function (r) {
+                r.addEventListener("change", sayacGuncelle);
+            });
+        }
+    });
+
+    sinifSelect.addEventListener("change", sinifGuncelle);
+    if (adiInput) { adiInput.addEventListener("input", adiGuncelle); adiGuncelle(); }
+
+    sinifGuncelle();
+})();
+</script>
+{% endblock %}

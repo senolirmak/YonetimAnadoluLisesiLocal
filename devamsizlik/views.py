@@ -64,7 +64,7 @@ def ogretmen_devamsizlik(request, ders_saati=None):
     simdi = timezone.localtime().time()
 
     # Ogretmen grubu yalnızca bugünü görebilir
-    from main.views import _only_ogretmen
+    from main.utils import _only_ogretmen
 
     if _only_ogretmen(request.user):
         secili_tarih = bugun
@@ -348,15 +348,13 @@ def _build_pdf(qs, tarih_bas, tarih_bit, secili_sinifler, okul_adi=""):
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     # Türkçe karakter desteği için DejaVu fontları
+    from django.conf import settings as _settings
+    _fonts_dir = _settings.BASE_DIR / "static" / "fonts"
     font_normal = "Helvetica"
     font_bold = "Helvetica-Bold"
     try:
-        pdfmetrics.registerFont(
-            TTFont("DejaVuSans", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
-        )
-        pdfmetrics.registerFont(
-            TTFont("DejaVuSans-Bold", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
-        )
+        pdfmetrics.registerFont(TTFont("DejaVuSans",      str(_fonts_dir / "DejaVuSans.ttf")))
+        pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", str(_fonts_dir / "DejaVuSans-Bold.ttf")))
         font_normal = "DejaVuSans"
         font_bold = "DejaVuSans-Bold"
     except Exception:
