@@ -1,0 +1,456 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .sayfa { max-width: 1100px; margin: 0 auto; padding: 20px 16px; }
+
+    /* ── Üst bar ── */
+    .ust-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+    }
+    .toplam-chip {
+        display: inline-block;
+        background: #e9ecef;
+        color: #495057;
+        border-radius: 10px;
+        padding: 3px 14px;
+        font-size: 0.83em;
+        font-weight: 600;
+        margin-left: auto;
+    }
+
+    /* ── Seviye blok ── */
+    .seviye-blok { margin-bottom: 28px; }
+    .seviye-baslik {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        border-radius: 8px 8px 0 0;
+        color: #fff;
+        font-weight: 700;
+        font-size: 1.0em;
+    }
+    .seviye-baslik-sayi {
+        font-size: 0.82em;
+        font-weight: 400;
+        opacity: .85;
+    }
+    .seviye-9  { background: #0891b2; }
+    .seviye-10 { background: #0e7490; }
+    .seviye-11 { background: #2d5469; }
+    .seviye-12 { background: #1e3a4a; }
+
+    /* ── Şube grid ── */
+    .sube-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+        gap: 10px;
+        padding: 14px;
+        background: #f8fbff;
+        border: 1px solid #c5d8e8;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+    }
+    .sube-kart {
+        background: #fff;
+        border: 1.5px solid #c5d8e8;
+        border-radius: 6px;
+        padding: 12px 14px;
+        text-decoration: none;
+        color: inherit;
+        transition: box-shadow .15s, border-color .15s, transform .12s;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .sube-kart:hover {
+        box-shadow: 0 3px 10px rgba(65,118,144,.18);
+        border-color: #417690;
+        transform: translateY(-2px);
+        text-decoration: none;
+        color: inherit;
+    }
+    .sube-kart.aktif-sube {
+        border-color: #0891b2;
+        background: #e8f4fd;
+        box-shadow: 0 0 0 2px #0891b2;
+    }
+    .sube-adi {
+        font-size: 1.25em;
+        font-weight: 800;
+        color: #2d5469;
+        letter-spacing: .02em;
+    }
+    .sube-sayi { font-size: 0.8em; color: #6c757d; }
+    .sube-ilerleme {
+        height: 4px;
+        background: #e9ecef;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 2px;
+    }
+    .sube-ilerleme-bar {
+        height: 100%;
+        background: #28a745;
+        border-radius: 2px;
+    }
+    .sube-tamamladi { font-size: 0.75em; color: #28a745; font-weight: 600; }
+    .sube-tamamladi.sifir { color: #adb5bd; }
+
+    /* ── Öğrenci tablosu ── */
+    .ogr-tablo-blok {
+        margin-top: 12px;
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .ogr-tablo-baslik {
+        background: #417690;
+        color: #fff;
+        padding: 9px 16px;
+        font-size: 0.88em;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .ogr-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88em;
+    }
+    .ogr-tablo thead th {
+        background: #e8f4fd;
+        color: #2d5469;
+        padding: 7px 12px;
+        font-size: 0.8em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        border-bottom: 1px solid #c5d8e8;
+    }
+    .ogr-tablo thead th.col-c { text-align: center; }
+    .ogr-tablo tbody tr { border-bottom: 1px solid #f1f3f5; }
+    .ogr-tablo tbody tr:hover { background: #f8fbff; }
+    .ogr-tablo td { padding: 7px 12px; vertical-align: middle; }
+    .ogr-tablo td.col-c { text-align: center; }
+
+    .tam-chip   { display:inline-block; background:#28a745; color:#fff; border-radius:10px; padding:1px 9px; font-size:.78em; font-weight:600; }
+    .eksik-chip { display:inline-block; background:#ffc107; color:#212529; border-radius:10px; padding:1px 9px; font-size:.78em; font-weight:600; }
+    .bos-chip   { display:inline-block; background:#e9ecef; color:#6c757d; border-radius:10px; padding:1px 9px; font-size:.78em; font-weight:600; }
+    .mezun-chip { display:inline-block; background:#6c757d; color:#fff; border-radius:10px; padding:1px 9px; font-size:.78em; font-weight:600; }
+
+    .btn-detay {
+        display: inline-block;
+        color: #417690;
+        font-size: 0.8em;
+        text-decoration: none;
+        border: 1px solid #c5d8e8;
+        border-radius: 4px;
+        padding: 2px 9px;
+        background: #fff;
+    }
+    .btn-detay:hover { background: #e8f4fd; border-color: #417690; text-decoration: none; }
+    .kapat-btn {
+        margin-left: auto;
+        font-size: 0.78em;
+        color: rgba(255,255,255,.8);
+        border: 1px solid rgba(255,255,255,.3);
+        border-radius: 4px;
+        padding: 2px 10px;
+        background: transparent;
+        text-decoration: none;
+    }
+    .kapat-btn:hover { color:#fff; border-color:#fff; text-decoration:none; }
+
+    /* ── Aktif şube kartı ── */
+    .sube-kart-aktif-genisletilmis { cursor: default; }
+    .sube-kart-aktif-genisletilmis:hover {
+        transform: none;
+        box-shadow: 0 0 0 2px #0891b2;
+    }
+    .sube-kart-ust {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 6px;
+    }
+    .sube-kapat-btn {
+        font-size: 0.75em;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 1px 7px;
+        text-decoration: none;
+        background: #fff;
+        flex-shrink: 0;
+        line-height: 1.6;
+    }
+    .sube-kapat-btn:hover { background: #f8d7da; color: #c0392b; border-color: #f5c6cb; text-decoration: none; }
+
+    /* ── İşlem kartları (yanyana) ── */
+    .islem-kart-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    @media (max-width: 640px) { .islem-kart-grid { grid-template-columns: 1fr; } }
+    .islem-kart {
+        background: #fff;
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .islem-kart-ust {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .islem-kart-ikon { font-size: 1.3em; flex-shrink: 0; }
+    .islem-kart-baslik-metin {
+        font-size: 0.9em;
+        font-weight: 700;
+        color: #2d5469;
+    }
+    .islem-kart-aciklama {
+        font-size: 0.82em;
+        color: #495057;
+        line-height: 1.5;
+        flex: 1;
+    }
+
+    .btn-toplu-ata {
+        font-size: 0.8em;
+        font-weight: 600;
+        color: #fff;
+        background: #28a745;
+        border: none;
+        border-radius: 4px;
+        padding: 4px 14px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .btn-toplu-ata:hover { background: #218838; }
+</style>
+
+<div class="sayfa">
+    <h5 class="mb-2">{{ title }}</h5>
+
+    <div class="ust-bar">
+        <a href="{% url 'index' %}" class="geri-btn">← Ana Sayfa</a>
+        <span class="toplam-chip">{{ ogr_listesi|length }} öğrenci</span>
+    </div>
+
+    {% for seviye in seviyeler %}
+    <div class="seviye-blok">
+
+        <div class="seviye-baslik seviye-{{ seviye.sinif_no }}">
+            <span>{{ seviye.sinif_no }}. SINIF</span>
+            <span class="seviye-baslik-sayi">{{ seviye.subeler|length }} şube · {{ seviye.toplam_ogr }} öğrenci</span>
+        </div>
+
+        <div class="sube-grid" id="{% if secilen_sinif == seviye.sinif_no|stringformat:'s' %}ogr-tablo{% endif %}">
+            {% for sube in seviye.subeler %}
+            {% if secilen_sinif == seviye.sinif_no|stringformat:'s' and secilen_sube == sube.sube %}
+            {# ── Seçili şube kartı (sadece bilgi + kapat) ── #}
+            <div class="sube-kart aktif-sube sube-kart-aktif-genisletilmis">
+                <div class="sube-kart-ust">
+                    <div>
+                        <div class="sube-adi">{{ sube.sinif_sube }}</div>
+                        <div class="sube-sayi">{{ sube.toplam }} öğrenci</div>
+                    </div>
+                    <a href="{% url 'ogrdrs_listesi' %}" class="sube-kapat-btn" title="Kapat">✕</a>
+                </div>
+                <div class="sube-ilerleme">
+                    {% if sube.toplam > 0 %}
+                    <div class="sube-ilerleme-bar"
+                         style="width:{% widthratio sube.tamamladi sube.toplam 100 %}%"></div>
+                    {% endif %}
+                </div>
+                <div class="sube-tamamladi {% if sube.tamamladi == 0 %}sifir{% endif %}">
+                    {% if sube.tamamladi > 0 %}✓ {{ sube.tamamladi }} tamamladı{% else %}—{% endif %}
+                </div>
+            </div>
+            {% else %}
+            {# ── Normal şube kartı ── #}
+            <a href="?sinif={{ seviye.sinif_no }}&sube={{ sube.sube }}#ogr-tablo"
+               class="sube-kart">
+                <div class="sube-adi">{{ sube.sinif_sube }}</div>
+                <div class="sube-sayi">{{ sube.toplam }} öğrenci</div>
+                <div class="sube-ilerleme">
+                    {% if sube.toplam > 0 %}
+                    <div class="sube-ilerleme-bar"
+                         style="width:{% widthratio sube.tamamladi sube.toplam 100 %}%"></div>
+                    {% endif %}
+                </div>
+                <div class="sube-tamamladi {% if sube.tamamladi == 0 %}sifir{% endif %}">
+                    {% if sube.tamamladi > 0 %}✓ {{ sube.tamamladi }} tamamladı{% else %}—{% endif %}
+                </div>
+            </a>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        {# Seçili şubenin işlem kartları + öğrenci tablosu #}
+        {% for sube in seviye.subeler %}
+        {% if secilen_sinif == seviye.sinif_no|stringformat:'s' and secilen_sube == sube.sube %}
+
+        <div class="islem-kart-grid">
+
+            <div class="islem-kart">
+                <div class="islem-kart-ust">
+                    <span class="islem-kart-ikon">📋</span>
+                    <div class="islem-kart-baslik-metin">Mevcut Yıl Derslerini Ata</div>
+                </div>
+                <div class="islem-kart-aciklama">
+                    Aktif ders programından <strong>{{ sube.sinif_sube }}</strong> şubesinin
+                    haftalık çizelgesi alınarak tüm <strong>{{ sube.toplam }} öğrenciye</strong>
+                    mevcut yıl dersleri atanır. Varsa önceki atamalar silinip yeniden oluşturulur.
+                </div>
+                <form method="post" action="{% url 'ogrdrs_toplu_ders_ata' %}"
+                      onsubmit="return confirm('{{ sube.sinif_sube }} — {{ sube.toplam }} öğrenciye ders programından mevcut yıl dersleri atanacak.\nMevcut atamalar silinip yeniden oluşturulacak.\nDevam edilsin mi?')">
+                    {% csrf_token %}
+                    <input type="hidden" name="sinif" value="{{ seviye.sinif_no }}">
+                    <input type="hidden" name="sube" value="{{ sube.sube }}">
+                    <button type="submit" class="btn-toplu-ata">Toplu Ata</button>
+                </form>
+            </div>
+
+            <div class="islem-kart">
+                <div class="islem-kart-ust">
+                    <span class="islem-kart-ikon">📚</span>
+                    <div class="islem-kart-baslik-metin">Gelecek Yıl Zorunlu Derslerini Ata</div>
+                </div>
+                <div class="islem-kart-aciklama">
+                    Aktif EÖY'deki <strong>{{ seviye.sinif_no|add:1 }}. sınıf</strong>
+                    zorunlu ders çizelgesi alınarak tüm <strong>{{ sube.toplam }} öğrenciye</strong>
+                    zorunlu dersler atanır. Zaten atanmış olanlar tekrar eklenmez.
+                </div>
+                <form method="post" action="{% url 'ogrdrs_toplu_zorunlu_ata' %}"
+                      onsubmit="return confirm('{{ sube.sinif_sube }} — {{ sube.toplam }} öğrenciye {{ seviye.sinif_no|add:1 }}. sınıf zorunlu dersleri atanacak.\nZaten atanmış olanlar atlanır.\nDevam edilsin mi?')">
+                    {% csrf_token %}
+                    <input type="hidden" name="sinif" value="{{ seviye.sinif_no }}">
+                    <input type="hidden" name="sube" value="{{ sube.sube }}">
+                    <button type="submit" class="btn-toplu-ata" style="background:#0891b2;">Toplu Ata</button>
+                </form>
+            </div>
+
+            <div class="islem-kart islem-kart-toggle" onclick="toggleOgrTablo()" style="cursor:pointer;">
+                <div class="islem-kart-ust">
+                    <span class="islem-kart-ikon">👥</span>
+                    <div class="islem-kart-baslik-metin">Öğrenci Ders Ayrıntıları</div>
+                </div>
+                <div class="islem-kart-aciklama">
+                    <strong>{{ sube.sinif_sube }}</strong> şubesindeki
+                    <strong>{{ sube.toplam }} öğrencinin</strong>
+                    ders atama durumunu listele. Her öğrenci için detay sayfasına erişin.
+                </div>
+                <span class="btn-toplu-ata" id="tablo-toggle-btn" style="background:#6f42c1;display:inline-block;padding:4px 14px;">Göster</span>
+            </div>
+
+        </div>
+
+        <div class="ogr-tablo-blok" id="ogr-detay-tablo" style="display:none;margin-top:10px;">
+            <div class="ogr-tablo-baslik">
+                <span>{{ sube.sinif_sube }} — Öğrenci Ders Ayrıntıları</span>
+                <button onclick="toggleOgrTablo()" class="kapat-btn" style="border:none;cursor:pointer;">✕ Gizle</button>
+            </div>
+            <table class="ogr-tablo">
+                <thead>
+                    <tr>
+                        <th>Okul No</th>
+                        <th>Ad Soyad</th>
+                        <th class="col-c">Gel. Sınıf</th>
+                        <th class="col-c">Zorunlu</th>
+                        <th class="col-c">Seçmeli</th>
+                        <th class="col-c">Durum</th>
+                        <th class="col-c">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ogr in sube.ogrenciler %}
+                    <tr>
+                        <td>{{ ogr.ogrenci.okulno }}</td>
+                        <td>{{ ogr.ogrenci.adi }} {{ ogr.ogrenci.soyadi }}</td>
+                        <td class="col-c">
+                            {% if ogr.son_sinif %}
+                            <span class="mezun-chip">Mezun</span>
+                            {% else %}
+                            {{ ogr.gelecek_sinif }}.
+                            {% endif %}
+                        </td>
+                        <td class="col-c">{{ ogr.zorunlu_sayi }}</td>
+                        <td class="col-c">
+                            {% if not ogr.son_sinif %}
+                            {{ ogr.secmeli_saat }} / {{ ogr.secmeli_maks }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="col-c">
+                            {% if ogr.son_sinif %}
+                            <span class="mezun-chip">Mezun</span>
+                            {% elif ogr.secmeli_maks > 0 and ogr.secmeli_saat >= ogr.secmeli_maks %}
+                            <span class="tam-chip">Tam</span>
+                            {% elif ogr.secmeli_saat > 0 %}
+                            <span class="eksik-chip">Eksik</span>
+                            {% else %}
+                            <span class="bos-chip">Boş</span>
+                            {% endif %}
+                        </td>
+                        <td class="col-c">
+                            <a href="{% url 'ogrdrs_detay' ogr.ogrenci.pk %}" class="btn-detay">Detay →</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% endif %}
+        {% endfor %}
+
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+function toggleOgrTablo() {
+    const tablo = document.getElementById("ogr-detay-tablo");
+    const btn   = document.getElementById("tablo-toggle-btn");
+    const kart  = document.querySelector(".islem-kart-toggle");
+    if (!tablo) return;
+    const goster = tablo.style.display === "none";
+    tablo.style.display = goster ? "block" : "none";
+    if (btn)  btn.textContent  = goster ? "Gizle" : "Göster";
+    if (kart) kart.style.borderColor = goster ? "#6f42c1" : "";
+    if (goster) tablo.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    const anchor = document.getElementById("ogr-tablo");
+    if (anchor) anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+</script>
+{% endblock %}

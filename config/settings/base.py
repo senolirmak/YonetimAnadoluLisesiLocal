@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "sorumluluk",
     "ekders",
     "secmelidersler",
+    "ogrencidersleri",
 ]
 
 BILDIRIM_ANAHTAR = os.getenv("BILDIRIM_ANAHTAR", "")

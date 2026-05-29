@@ -48,8 +48,6 @@
 .ortak-tablo td:last-child { text-align: center; font-weight: 600; color: #417690; }
 .ortak-tablo tfoot td { font-weight: 700; background: #e9ecef; border-top: 2px solid #417690; }
 
-
-
 /* ── Toplam kontrol kartı ── */
 .toplam-kart {
     margin-top: 10px;
@@ -418,7 +416,7 @@
                     <div class="tk-ayrac"></div>
                     <div class="tk-sonuc">
                         <span>TOPLAM</span>
-                        <span><span id="genel-toplam">{{ ortak_toplam_saat }}</span> / 40 saat</span>
+                        <span><span id="genel-toplam">{{ ortak_toplam_saat }}</span> / {{ toplam_saat }} saat</span>
                     </div>
                     <div class="tk-mesaj" id="toplam-mesaj">—</div>
                 </div>
@@ -530,8 +528,8 @@
         {# ── Eylem çubuğu ── #}
         <div class="eylem-cubugu no-print">
             <button type="submit" class="btn-kaydet">Kaydet</button>
-            <a href="{% url 'secmeli_ogrenci_pdf' ogrenci.pk %}" target="_blank" class="btn-yazdir">PDF Rapor</a>
-            <a href="{% url 'secmeli_ogrenci_listesi' %}" class="btn-geri">← Listeye Dön</a>
+            <a href="{% url 'ogrdrs_secmeli_pdf' ogrenci.pk %}" target="_blank" class="btn-yazdir">PDF Rapor</a>
+            <a href="{% url 'ogrdrs_detay' ogrenci.pk %}" class="btn-geri">← Geri</a>
         </div>
     </form>
 </div>
@@ -540,7 +538,7 @@
 (function () {
     const MAKS    = {{ maks_saat }};
     const ORTAK   = {{ ortak_toplam_saat }};
-    const TOPLAM_HEDEF = 40;
+    const TOPLAM_HEDEF = {{ toplam_saat }};
     const sayacEl = document.getElementById("sayac");
 
     function toplamHesapla() {

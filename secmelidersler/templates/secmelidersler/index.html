@@ -1,0 +1,180 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .hub-sayfa { max-width: 860px; margin: 0 auto; padding: 20px 16px; }
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #417690;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.88em;
+        color: #2d5469;
+        margin-bottom: 24px;
+    }
+    .hub-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+    }
+    .hub-kart {
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+        text-decoration: none;
+        color: inherit;
+        transition: box-shadow .15s, transform .15s;
+        display: flex;
+        flex-direction: column;
+    }
+    .hub-kart:hover {
+        box-shadow: 0 4px 14px rgba(65,118,144,.18);
+        transform: translateY(-2px);
+        text-decoration: none;
+        color: inherit;
+    }
+    .hub-kart-renk {
+        height: 6px;
+    }
+    .hub-kart-govde {
+        padding: 16px 18px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .hub-kart-baslik {
+        font-size: 0.98em;
+        font-weight: 700;
+        color: #2d5469;
+    }
+    .hub-kart-aciklama {
+        font-size: 0.83em;
+        color: #6c757d;
+        line-height: 1.5;
+        flex: 1;
+    }
+    .hub-kart-link {
+        font-size: 0.82em;
+        font-weight: 600;
+        color: #417690;
+        margin-top: 6px;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+        margin-bottom: 20px;
+    }
+</style>
+
+<div class="hub-sayfa">
+    <h5 class="mb-2">{{ title }}</h5>
+
+    {% if aktif_yil %}
+    <div style="display:flex;align-items:center;gap:10px;background:#e8f5e9;border-left:4px solid #2e7d32;border-radius:4px;padding:8px 14px;font-size:0.88em;color:#1b5e20;margin-bottom:16px;">
+        <span style="font-size:1.1em;">📅</span>
+        <span>Aktif Eğitim-Öğretim Yılı: <strong>{{ aktif_yil }}</strong></span>
+    </div>
+    {% else %}
+    <div style="display:flex;align-items:center;gap:10px;background:#fff3e0;border-left:4px solid #e65100;border-radius:4px;padding:8px 14px;font-size:0.88em;color:#bf360c;margin-bottom:16px;">
+        <span style="font-size:1.1em;">⚠️</span>
+        <span>Aktif eğitim-öğretim yılı tanımlanmamış. Veriler yıldan bağımsız görüntüleniyor.
+            <a href="/admin/okul/okulbilgi/" style="color:#bf360c;font-weight:600;">Okul Bilgisi</a>'nden aktif yılı belirleyin.</span>
+    </div>
+    {% endif %}
+
+    <p class="bilgi-notu">
+        Öğrencilerin gelecek yıl için seçmeli ders tercihlerini, sınıf bazlı alan tanımlarını ve
+        zorunlu ders çizelgesini bu bölümden yönetebilirsiniz.
+    </p>
+
+    <a href="{% url 'index' %}" class="geri-btn">← Ana Sayfa</a>
+
+    <div class="hub-grid">
+
+        <a href="{% url 'secmeli_sinif_toplam_saat' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#e67e22;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Toplam Ders Saati</div>
+                <div class="hub-kart-aciklama">
+                    Sınıf seviyelerine göre haftalık toplam ders saatini belirle.
+                    Seçmeli ders limiti bu değerden hesaplanır.
+                </div>
+                <div class="hub-kart-link">Ayarlara git →</div>
+            </div>
+        </a>
+
+        <a href="{% url 'secmeli_ortak_ders_listesi' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#417690;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Zorunlu (Ortak) Dersler</div>
+                <div class="hub-kart-aciklama">
+                    Her sınıf seviyesi için zorunlu ders listesini düzenle.
+                    Toplam ortak saat, seçmeli ders limitini belirler.
+                </div>
+                <div class="hub-kart-link">Ders listesine git →</div>
+            </div>
+        </a>
+
+        <a href="{% url 'secmeli_grup_listesi' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#6f42c1;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Seçmeli Ders Grupları</div>
+                <div class="hub-kart-aciklama">
+                    Akademik Çalışmalar, İnsan-Toplum-Bilim, Din-Ahlak-Değer, Kültür-Sanat-Spor
+                    gruplarını ve içindeki dersleri yönet.
+                </div>
+                <div class="hub-kart-link">Grup listesine git →</div>
+            </div>
+        </a>
+
+        <a href="{% url 'secmeli_alan_listesi' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#0e7490;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Alan Tanımları (11–12. Sınıf)</div>
+                <div class="hub-kart-aciklama">
+                    MF, TM, DİL gibi alanları tanımla. Her alana ait seçmeli dersleri ve
+                    haftalık saatlerini belirle.
+                </div>
+                <div class="hub-kart-link">Alan listesine git →</div>
+            </div>
+        </a>
+
+        <a href="{% url 'ortak_havuz_listesi' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#2d5469;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Ortak Ders Havuzu</div>
+                <div class="hub-kart-aciklama">
+                    Sınıf seviyelerine atanabilecek zorunlu derslerin merkezi listesi.
+                    Buradan ders tanımlayın, seviye sayfasından atama yapın.
+                </div>
+                <div class="hub-kart-link">Havuza git →</div>
+            </div>
+        </a>
+
+        <a href="{% url 'secmeli_havuz_listesi' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#6f42c1;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Seçmeli Ders Havuzu</div>
+                <div class="hub-kart-aciklama">
+                    Gruplara eklenebilecek derslerin merkezi listesi. Buraya eklenen dersler
+                    grup detay sayfasındaki havuzda görünür.
+                </div>
+                <div class="hub-kart-link">Havuza git →</div>
+            </div>
+        </a>
+
+    </div>
+</div>
+{% endblock %}

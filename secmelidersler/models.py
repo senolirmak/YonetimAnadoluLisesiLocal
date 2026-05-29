@@ -2,8 +2,93 @@ from django.db import models
 
 SINIF_SEVIYELERI = [(9, "9. Sınıf"), (10, "10. Sınıf"), (11, "11. Sınıf"), (12, "12. Sınıf")]
 
+_VARSAYILAN_TOPLAM_SAAT = 40
+
+
+# ---------------------------------------------------------------------------
+# Eğitim-Öğretim Yılı yardımcı fonksiyonları
+# ---------------------------------------------------------------------------
+
+def get_aktif_egitim_yili():
+    """OkulBilgi singleton'dan aktif eğitim-öğretim yılını döndürür."""
+    from okul.models import OkulBilgi
+    okul = OkulBilgi.objects.select_related("okul_egtyil").first()
+    return okul.okul_egtyil if okul else None
+
+
+# ---------------------------------------------------------------------------
+# Sınıf Seviyesi Toplam Saat
+# ---------------------------------------------------------------------------
+
+class SinifSeviyeToplamSaat(models.Model):
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="sinif_toplam_saatler",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    sinif_seviyesi = models.IntegerField(
+        choices=SINIF_SEVIYELERI,
+        verbose_name="Sınıf Seviyesi",
+    )
+    haftalik_toplam_saat = models.PositiveSmallIntegerField(
+        default=_VARSAYILAN_TOPLAM_SAAT,
+        verbose_name="Haftalık Toplam Saat",
+        help_text="Bu sınıf seviyesindeki haftalık toplam ders saati (genellikle 40).",
+    )
+
+    class Meta:
+        ordering = ["sinif_seviyesi"]
+        unique_together = [("egitim_yili", "sinif_seviyesi")]
+        verbose_name = "Sınıf Seviyesi Toplam Saat"
+        verbose_name_plural = "Sınıf Seviyesi Toplam Saatler"
+
+    def __str__(self):
+        yil = f" [{self.egitim_yili}]" if self.egitim_yili else ""
+        return f"{self.sinif_seviyesi}. Sınıf — {self.haftalik_toplam_saat} saat{yil}"
+
+
+def get_toplam_saat(sinif_seviyesi, egitim_yili=None):
+    """Sınıf seviyesi için haftalık toplam ders saatini döndürür. Kayıt yoksa 40."""
+    if egitim_yili is None:
+        egitim_yili = get_aktif_egitim_yili()
+    try:
+        return SinifSeviyeToplamSaat.objects.get(
+            sinif_seviyesi=sinif_seviyesi,
+            egitim_yili=egitim_yili,
+        ).haftalik_toplam_saat
+    except SinifSeviyeToplamSaat.DoesNotExist:
+        return _VARSAYILAN_TOPLAM_SAAT
+
+
+def get_toplam_saat_map(egitim_yili=None):
+    """Tüm sınıf seviyeleri için {sinif_seviyesi: toplam_saat} sözlüğü. Eksik kayıtlar 40 varsayılanı alır."""
+    if egitim_yili is None:
+        egitim_yili = get_aktif_egitim_yili()
+    result = {
+        obj.sinif_seviyesi: obj.haftalik_toplam_saat
+        for obj in SinifSeviyeToplamSaat.objects.filter(egitim_yili=egitim_yili)
+    }
+    for sv in (9, 10, 11, 12):
+        result.setdefault(sv, _VARSAYILAN_TOPLAM_SAAT)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Ortak (Zorunlu) Dersler
+# ---------------------------------------------------------------------------
 
 class OrtakDers(models.Model):
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ortak_dersler",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
     sinif_seviyesi = models.IntegerField(choices=SINIF_SEVIYELERI, verbose_name="Sınıf Seviyesi")
     ders_adi = models.CharField(max_length=150, verbose_name="Ders Adı")
     haftalik_saat = models.PositiveSmallIntegerField(verbose_name="Haftalık Saat")
@@ -11,14 +96,28 @@ class OrtakDers(models.Model):
 
     class Meta:
         ordering = ["sinif_seviyesi", "sira"]
+        unique_together = [("egitim_yili", "sinif_seviyesi", "ders_adi")]
         verbose_name = "Ortak Ders"
         verbose_name_plural = "Ortak Dersler"
 
     def __str__(self):
-        return f"{self.sinif_seviyesi}. Sınıf — {self.ders_adi}"
+        yil = f" [{self.egitim_yili}]" if self.egitim_yili else ""
+        return f"{self.sinif_seviyesi}. Sınıf — {self.ders_adi}{yil}"
 
+
+# ---------------------------------------------------------------------------
+# Seçmeli Ders Grupları ve Dersler
+# ---------------------------------------------------------------------------
 
 class SecmeliDersGrubu(models.Model):
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="secmeli_ders_gruplari",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
     sinif_seviyesi = models.IntegerField(choices=SINIF_SEVIYELERI, verbose_name="Sınıf Seviyesi")
     adi = models.CharField(max_length=100, verbose_name="Grup Adı")
     zorunlu_grup = models.BooleanField(
@@ -33,11 +132,13 @@ class SecmeliDersGrubu(models.Model):
 
     class Meta:
         ordering = ["sinif_seviyesi", "sira"]
+        unique_together = [("egitim_yili", "sinif_seviyesi", "adi")]
         verbose_name = "Seçmeli Ders Grubu"
         verbose_name_plural = "Seçmeli Ders Grupları"
 
     def __str__(self):
-        return f"{self.sinif_seviyesi}. Sınıf — {self.adi}"
+        yil = f" [{self.egitim_yili}]" if self.egitim_yili else ""
+        return f"{self.sinif_seviyesi}. Sınıf — {self.adi}{yil}"
 
 
 class SecmeliDers(models.Model):
@@ -78,8 +179,20 @@ class SecmeliDers(models.Model):
         return len(self.saat_listesi) > 1
 
 
+# ---------------------------------------------------------------------------
+# Alan (11–12. Sınıf)
+# ---------------------------------------------------------------------------
+
 class Alan(models.Model):
     SINIF_CHOICES = [(11, "11. Sınıf"), (12, "12. Sınıf")]
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="alanlar",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
     sinif_seviyesi = models.IntegerField(choices=SINIF_CHOICES, verbose_name="Sınıf Seviyesi")
     adi = models.CharField(max_length=50, verbose_name="Alan Adı")
     dersler = models.ManyToManyField(
@@ -93,12 +206,13 @@ class Alan(models.Model):
 
     class Meta:
         ordering = ["sinif_seviyesi", "sira"]
-        unique_together = [("sinif_seviyesi", "adi")]
+        unique_together = [("egitim_yili", "sinif_seviyesi", "adi")]
         verbose_name = "Alan"
         verbose_name_plural = "Alanlar"
 
     def __str__(self):
-        return f"{self.sinif_seviyesi}. Sınıf — {self.adi}"
+        yil = f" [{self.egitim_yili}]" if self.egitim_yili else ""
+        return f"{self.sinif_seviyesi}. Sınıf — {self.adi}{yil}"
 
 
 class AlanDers(models.Model):
@@ -115,27 +229,50 @@ class AlanDers(models.Model):
         return f"{self.alan.adi} — {self.ders.ders_adi} ({self.secilen_saat}s)"
 
 
-class OgrenciSecim(models.Model):
-    ogrenci = models.ForeignKey(
-        "ogrenci.Ogrenci",
-        on_delete=models.CASCADE,
-        related_name="secmeli_dersler",
-        verbose_name="Öğrenci",
+# ---------------------------------------------------------------------------
+# Katalog (global havuz — EÖY bağımsız)
+# ---------------------------------------------------------------------------
+
+class OrtakDersHavuzu(models.Model):
+    ders_adi = models.CharField(max_length=200, unique=True, verbose_name="Ders Adı")
+    derssaati = models.CharField(
+        max_length=50,
+        default="",
+        verbose_name="Ders Saati",
+        help_text="Virgülle ayrılmış saat seçenekleri. Örn: '4' veya '2,4' veya '1,2,3'",
     )
-    ders = models.ForeignKey(
-        SecmeliDers,
-        on_delete=models.CASCADE,
-        related_name="secimler",
-        verbose_name="Seçmeli Ders",
-    )
-    secilen_saat = models.PositiveSmallIntegerField(verbose_name="Seçilen Saat")
-    olusturma_tarihi = models.DateTimeField(auto_now_add=True)
-    guncelleme_tarihi = models.DateTimeField(auto_now=True)
+    sira = models.PositiveSmallIntegerField(default=0, verbose_name="Sıra")
+    aktif = models.BooleanField(default=True, verbose_name="Aktif")
 
     class Meta:
-        unique_together = [("ogrenci", "ders")]
-        verbose_name = "Öğrenci Seçmeli Ders Seçimi"
-        verbose_name_plural = "Öğrenci Seçmeli Ders Seçimleri"
+        ordering = ["sira", "ders_adi"]
+        verbose_name = "Ortak Ders (Havuz)"
+        verbose_name_plural = "Ortak Ders Havuzu"
 
     def __str__(self):
-        return f"{self.ogrenci} — {self.ders.ders_adi} ({self.secilen_saat}s)"
+        return self.ders_adi
+
+
+class SecmeliDersHavuzu(models.Model):
+    ders_adi = models.CharField(max_length=200, unique=True, verbose_name="Ders Adı")
+    derssaati = models.CharField(
+        max_length=50,
+        default="",
+        verbose_name="Ders Saati",
+        help_text="Virgülle ayrılmış saat seçenekleri. Örn: '4' veya '2,4' veya '1,2,3'",
+    )
+    secimsayisi = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Seçim Sayısı",
+        help_text="Öğrencinin bu dersi kaç defa seçebileceği (genellikle 1).",
+    )
+    sira = models.PositiveSmallIntegerField(default=0, verbose_name="Sıra")
+    aktif = models.BooleanField(default=True, verbose_name="Aktif")
+
+    class Meta:
+        ordering = ["sira", "ders_adi"]
+        verbose_name = "Seçmeli Ders (Havuz)"
+        verbose_name_plural = "Seçmeli Ders Havuzu"
+
+    def __str__(self):
+        return self.ders_adi

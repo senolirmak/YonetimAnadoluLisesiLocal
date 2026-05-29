@@ -1,0 +1,467 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #417690;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.88em;
+        color: #2d5469;
+        margin-bottom: 16px;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        margin-left: 10px;
+        background: #fff;
+    }
+
+    /* ── Seviye nav ── */
+    .seviye-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px 0 14px;
+        border-bottom: 1px solid #dee2e6;
+        margin-bottom: 20px;
+    }
+    .seviye-nav a {
+        display: inline-block;
+        padding: 5px 18px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1.5px solid #417690;
+        color: #417690;
+        transition: background .15s, color .15s;
+    }
+    .seviye-nav a:hover { background: #417690; color: #fff; }
+    .seviye-nav a.aktif { background: #417690; color: #fff; }
+
+    /* ── İki kartlı düzen ── */
+    .iki-kart-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        align-items: start;
+    }
+    @media (max-width: 860px) {
+        .iki-kart-layout { grid-template-columns: 1fr; }
+    }
+
+    /* ── Kart ── */
+    .kart {
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .kart-baslik {
+        background: #2d5469;
+        color: #fff;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+    .kart-baslik-metin {
+        font-weight: 700;
+        font-size: 0.9em;
+    }
+    .kart-govde { padding: 0; }
+
+    .sil-form { display: inline; }
+    .btn-cikar {
+        display: inline-block;
+        cursor: pointer;
+        color: #dc3545;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1.5px solid #dc3545;
+        border-radius: 4px;
+        padding: 2px 10px;
+        background: #fff;
+        line-height: 1.5;
+    }
+    .btn-cikar:hover { background: #dc3545; color: #fff; }
+
+    /* ── Sol kart: sınıf tablosu ── */
+    .sinif-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .sinif-tablo thead th {
+        background: #417690;
+        color: #fff;
+        padding: 8px 14px;
+        font-size: 0.82em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+    }
+    .sinif-tablo thead th.col-saat { text-align: center; }
+    .sinif-tablo tbody tr:hover { background: #f8fbff; }
+    .sinif-tablo td { padding: 8px 14px; border-bottom: 1px solid #f1f3f5; }
+    .sinif-tablo td.col-saat { text-align: center; }
+    .sinif-tablo tfoot td {
+        background: #e9ecef;
+        font-weight: 700;
+        font-size: 0.88em;
+        color: #2d5469;
+        padding: 8px 14px;
+        border-top: 2px solid #dee2e6;
+        text-align: center;
+    }
+    .sinif-tablo tfoot td.col-ders { text-align: right; color: #495057; }
+    .saat-deger {
+        font-size: 1.15em;
+        font-weight: 700;
+        color: #2d5469;
+    }
+    .toplam-chip {
+        display: inline-block;
+        background: #417690;
+        color: #fff;
+        border-radius: 10px;
+        padding: 2px 13px;
+        font-size: 0.85em;
+        font-weight: 700;
+    }
+
+    /* ── Boş durum ── */
+    .bos-kart {
+        padding: 32px 20px;
+        text-align: center;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    .bos-kart p { margin: 0 0 6px; }
+
+    /* ── Sağ kart: havuz tablosu ── */
+    .havuz-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .havuz-tablo thead th {
+        background: #6f42c1;
+        color: #fff;
+        padding: 8px 14px;
+        font-size: 0.82em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+    }
+    .havuz-tablo thead th.col-aksiyon { text-align: center; }
+    .havuz-tablo tbody tr:hover { background: #fdf9ff; }
+    .havuz-tablo td { padding: 7px 14px; border-bottom: 1px solid #f1f3f5; vertical-align: middle; }
+    .havuz-tablo td.col-aksiyon { text-align: right; white-space: nowrap; }
+    .atanmis-satir td { background: #f0fff4; }
+    .atanmis-satir:hover td { background: #e6ffed !important; }
+    .atanmis-satir td.col-ders { font-weight: 600; color: #155724; }
+    .pasif-havuz-satir td { color: #adb5bd; }
+    .pasif-etiket {
+        display: inline-block;
+        background: #e9ecef;
+        color: #6c757d;
+        border-radius: 4px;
+        padding: 0 6px;
+        font-size: 0.75em;
+        font-weight: 600;
+        vertical-align: middle;
+        margin-left: 6px;
+    }
+    .btn-ekle-pasif {
+        display: inline-block;
+        color: #ced4da;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1.5px solid #ced4da;
+        border-radius: 4px;
+        padding: 2px 10px;
+        background: #fff;
+        line-height: 1.5;
+        cursor: not-allowed;
+    }
+    .kart-havuz-link {
+        font-size: 0.78em;
+        color: rgba(255,255,255,.85);
+        text-decoration: none;
+        border: 1px solid rgba(255,255,255,.35);
+        border-radius: 4px;
+        padding: 2px 10px;
+    }
+    .kart-havuz-link:hover { color: #fff; border-color: #fff; text-decoration: none; }
+
+    .atanmis-chip {
+        display: inline-block;
+        background: #28a745;
+        color: #fff;
+        border-radius: 10px;
+        padding: 1px 10px;
+        font-size: 0.8em;
+        font-weight: 700;
+        vertical-align: middle;
+        margin-right: 4px;
+    }
+    .atanmis-aksiyon { display: inline-flex; align-items: center; gap: 6px; }
+
+    .btn-ekle {
+        display: inline-block;
+        cursor: pointer;
+        color: #28a745;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1.5px solid #28a745;
+        border-radius: 4px;
+        padding: 2px 10px;
+        background: #fff;
+        line-height: 1.5;
+    }
+    .btn-ekle:hover { background: #28a745; color: #fff; }
+
+    /* ── Cross-tab tablo ── */
+    .cizelge-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .cizelge-tablo thead th {
+        background: #2d5469;
+        color: #fff;
+        padding: 8px 14px;
+        font-size: 0.85em;
+        font-weight: 700;
+        text-align: center;
+        border: 1px solid #1e3a4a;
+    }
+    .cizelge-tablo thead th.col-ders { text-align: left; width: 38%; }
+    .cizelge-tablo tbody tr { border-bottom: 1px solid #e9ecef; }
+    .cizelge-tablo tbody tr:hover { background: #f8fbff; }
+    .cizelge-tablo td { padding: 7px 14px; border: 1px solid #e9ecef; }
+    .cizelge-tablo td.col-ders { font-weight: 500; color: #212529; }
+    .cizelge-tablo td.col-sinif { text-align: center; vertical-align: middle; }
+    .cizelge-tablo tfoot td {
+        background: #e9ecef;
+        font-weight: 700;
+        font-size: 0.88em;
+        color: #2d5469;
+        padding: 8px 14px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+    }
+    .cizelge-tablo tfoot td.col-ders { text-align: right; color: #495057; }
+    .bos-hucre { color: #ced4da; font-size: 1.1em; }
+    .baslik-btn {
+        display: inline-block;
+        color: #fff;
+        font-size: 0.85em;
+        font-weight: 700;
+        text-decoration: none;
+        border: 1.5px solid rgba(255,255,255,.5);
+        border-radius: 4px;
+        padding: 3px 14px;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        transition: background .15s, border-color .15s;
+    }
+    .baslik-btn:hover {
+        background: rgba(255,255,255,.18);
+        border-color: #fff;
+        color: #fff;
+        text-decoration: none;
+    }
+    .bos-durum {
+        text-align: center;
+        padding: 48px 24px;
+        color: #6c757d;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        margin-top: 8px;
+    }
+    .bos-durum p { margin-bottom: 8px; font-size: 0.95em; }
+</style>
+
+<div class="container-fluid py-3">
+    <h5 class="mb-2">{{ title }}</h5>
+    <p class="bilgi-notu">
+        MEB haftalık ders çizelgesindeki <strong>zorunlu (ortak) dersler</strong> tablosudur.
+        Toplam ortak ders saati, öğrenci seçim formundaki seçmeli ders saat limitini belirler.
+    </p>
+
+    {% if secili_sinif %}
+    {# ── İki kartlı seviye görünümü ── #}
+    <a href="{% url 'secmeli_ortak_ders_listesi' %}" class="geri-btn" style="margin-left:0;margin-bottom:16px;">← Tüm Tablo</a>
+
+    <div class="iki-kart-layout">
+
+        {# ── Sol kart: bu sınıfın dersleri ── #}
+        <div class="kart">
+            <div class="kart-baslik">
+                <span class="kart-baslik-metin">{{ secili_sinif }}. Sınıf Zorunlu Dersler</span>
+            </div>
+            <div class="kart-govde">
+                {% if veri_var %}
+                <table class="sinif-tablo">
+                    <thead>
+                        <tr>
+                            <th>Ders Adı</th>
+                            <th class="col-saat">Saat</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ders in sinif_dersleri %}
+                        <tr>
+                            <td>{{ ders.ders_adi }}</td>
+                            <td class="col-saat">
+                                <span class="saat-deger">{{ ders.haftalik_saat }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td class="col-ders" style="text-align:right;color:#495057;">TOPLAM ORTAK DERS SAATİ</td>
+                            <td class="col-saat"><span class="toplam-chip">{{ sinif_toplam }}</span></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% else %}
+                <div class="bos-kart">
+                    <p>{{ secili_sinif }}. sınıf için henüz ders eklenmemiş.</p>
+                    <p>Sağdaki havuzdan ders ekleyebilirsiniz.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# ── Sağ kart: ortak ders havuzu ── #}
+        <div class="kart">
+            <div class="kart-baslik" style="background:#2d5469;">
+                <span class="kart-baslik-metin">Ortak Ders Havuzu</span>
+                <a href="{% url 'ortak_havuz_listesi' %}" class="kart-havuz-link">Havuzu Yönet →</a>
+            </div>
+            <div class="kart-govde">
+                {% if havuz %}
+                <table class="havuz-tablo">
+                    <thead>
+                        <tr>
+                            <th>Ders Adı</th>
+                            <th class="col-aksiyon">{{ secili_sinif }}. Sınıf</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in havuz %}
+                        <tr class="{% if item.atanmis %}atanmis-satir{% elif not item.aktif %}pasif-havuz-satir{% endif %}">
+                            <td class="col-ders">
+                                {{ item.ders_adi }}
+                                {% if not item.aktif %}<span class="pasif-etiket">Pasif</span>{% endif %}
+                            </td>
+                            <td class="col-aksiyon">
+                                {% if item.atanmis %}
+                                <div class="atanmis-aksiyon">
+                                    <span class="atanmis-chip">{{ item.ders_obj.haftalik_saat }}s</span>
+                                    <form method="post" action="{% url 'secmeli_ortak_ders_sil' item.ders_obj.pk %}" class="sil-form"
+                                          onsubmit="return confirm('{{ item.ders_adi }} dersini {{ secili_sinif }}. sınıftan çıkarmak istediğinizden emin misiniz?')">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="ref_sinif" value="{{ secili_sinif }}">
+                                        <button type="submit" class="btn-cikar">Çıkar</button>
+                                    </form>
+                                </div>
+                                {% elif item.aktif %}
+                                <form method="post" action="{% url 'secmeli_ortak_ders_ekle' %}" class="sil-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="sinif_seviyesi" value="{{ secili_sinif }}">
+                                    <input type="hidden" name="ders_adi" value="{{ item.ders_adi }}">
+                                    <input type="hidden" name="haftalik_saat" value="{{ item.havuz_ders.derssaati|default:'1' }}">
+                                    <button type="submit" class="btn-ekle">Ekle</button>
+                                </form>
+                                {% else %}
+                                <span class="btn-ekle-pasif">Ekle</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="bos-kart">
+                    <p>Havuz boş.</p>
+                    <p><a href="{% url 'ortak_havuz_listesi' %}">Ortak Ders Havuzu</a>'na ders ekleyin.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    {% else %}
+    {# ── Cross-tab (tüm seviyeler) görünümü ── #}
+    <a href="{% url 'secmeli_index' %}" class="geri-btn" style="margin-left:0;margin-bottom:16px;">← Seçmeli Dersler</a>
+
+    {% if veri_var %}
+    <table class="cizelge-tablo">
+        <thead>
+            <tr>
+                <th class="col-ders">Ders Adı</th>
+                {% for sinif in siniflar %}
+                <th>
+                    <a href="{% url 'secmeli_ortak_ders_listesi' %}?sinif={{ sinif }}" class="baslik-btn">
+                        {{ sinif }}. Sınıf
+                    </a>
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for ders_adi, hucreler in satirlar %}
+            <tr>
+                <td class="col-ders">{{ ders_adi }}</td>
+                {% for ders in hucreler %}
+                <td class="col-sinif">
+                    {% if ders %}
+                    <span class="saat-deger">{{ ders.haftalik_saat }}</span>
+                    {% else %}
+                    <span class="bos-hucre">—</span>
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td class="col-ders">TOPLAM ORTAK DERS SAATİ</td>
+                {% for toplam in toplamlar %}
+                <td>
+                    {% if toplam %}<span class="toplam-chip">{{ toplam }}</span>{% else %}—{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+        </tfoot>
+    </table>
+
+    {% else %}
+    <div class="bos-durum">
+        <p>Henüz zorunlu ders tanımlanmamış.</p>
+        <p>Sınıf seviyesi seçerek havuzdan ders ekleyebilirsiniz.</p>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+{% endblock %}

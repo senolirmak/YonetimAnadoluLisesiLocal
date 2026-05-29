@@ -225,13 +225,12 @@
                     <thead><tr><th>Ders Grubu</th><th>Saat</th></tr></thead>
                     <tbody>
                         <tr><td>Zorunlu (Ortak) Dersler</td><td>{{ ozet.ortak }}</td></tr>
-                        <tr><td>Rehberlik ve Yönlendirme</td><td>{{ ozet.rehberlik }}</td></tr>
                         <tr style="font-weight:700;color:#417690;">
                             <td>Seçmeli Dersler (maks.)</td><td>{{ ozet.secmeli_maks }}</td>
                         </tr>
                     </tbody>
                     <tfoot>
-                        <tr><td>TOPLAM</td><td>40</td></tr>
+                        <tr><td>TOPLAM</td><td>{{ ozet.toplam }}</td></tr>
                     </tfoot>
                 </table>
                 {% endfor %}

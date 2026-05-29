@@ -1,0 +1,156 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<style>
+    .form-sayfa { max-width: 480px; margin: 0 auto; padding: 20px 16px; }
+    .form-kart { border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden; }
+    .form-kart-baslik {
+        background: #6f42c1;
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.9em;
+        padding: 9px 16px;
+    }
+    .form-kart-govde { padding: 18px 16px; }
+    .form-grup { margin-bottom: 16px; }
+    .form-grup label {
+        display: block;
+        font-size: 0.82em;
+        font-weight: 700;
+        color: #495057;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        margin-bottom: 4px;
+    }
+    .form-grup input[type=text],
+    .form-grup input[type=number] {
+        width: 100%;
+        padding: 7px 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.95em;
+        color: #212529;
+        box-sizing: border-box;
+    }
+    .form-grup input:focus {
+        outline: none;
+        border-color: #6f42c1;
+        box-shadow: 0 0 0 2px rgba(111,66,193,.15);
+    }
+    .form-grup .field-hata { color: #dc3545; font-size: 0.8em; margin-top: 3px; }
+    .form-grup .yardim-metni { color: #6c757d; font-size: 0.8em; margin-top: 3px; }
+    .checkbox-satir {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .checkbox-satir input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+    .checkbox-satir label {
+        font-size: 0.9em;
+        font-weight: 600;
+        color: #212529;
+        text-transform: none;
+        letter-spacing: 0;
+        margin: 0;
+        cursor: pointer;
+    }
+    .hata-listesi {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        padding: 10px 16px;
+        margin-bottom: 14px;
+        font-size: 0.9em;
+        color: #721c24;
+    }
+    .hata-listesi ul { margin: 0; padding-left: 18px; }
+    .eylem-cubugu { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+    .btn-kaydet {
+        background: #28a745;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 28px;
+        font-size: 0.95em;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-kaydet:hover { background: #218838; }
+    .btn-geri {
+        background: #fff;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 7px 16px;
+        font-size: 0.9em;
+        text-decoration: none;
+    }
+</style>
+
+<div class="form-sayfa">
+    <h5 class="mb-3">{{ title }}</h5>
+
+    {% if form.non_field_errors %}
+    <div class="hata-listesi">
+        <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <div class="form-kart">
+        <div class="form-kart-baslik">DERS BİLGİLERİ</div>
+        <div class="form-kart-govde">
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="form-grup">
+                    <label for="{{ form.ders_adi.id_for_label }}">{{ form.ders_adi.label }}</label>
+                    {{ form.ders_adi }}
+                    {% if form.ders_adi.errors %}<div class="field-hata">{{ form.ders_adi.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="form-grup">
+                    <label for="{{ form.derssaati.id_for_label }}">{{ form.derssaati.label }}</label>
+                    {{ form.derssaati }}
+                    {% if form.derssaati.errors %}<div class="field-hata">{{ form.derssaati.errors.0 }}</div>{% endif %}
+                    <div class="ornek-kutu">
+                        <code>4</code> → sabit 4 saat &nbsp;|&nbsp;
+                        <code>2,4</code> → 2 veya 4 saat &nbsp;|&nbsp;
+                        <code>1,2,3</code> → 1, 2 veya 3 saat
+                    </div>
+                </div>
+
+                <div class="form-grup">
+                    <label for="{{ form.secimsayisi.id_for_label }}">{{ form.secimsayisi.label }}</label>
+                    {{ form.secimsayisi }}
+                    <div class="yardim-metni">{{ form.secimsayisi.help_text }}</div>
+                    {% if form.secimsayisi.errors %}<div class="field-hata">{{ form.secimsayisi.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="form-grup">
+                    <label for="{{ form.sira.id_for_label }}">{{ form.sira.label }}</label>
+                    {{ form.sira }}
+                    <div class="yardim-metni">Küçük sayı önce gösterilir.</div>
+                    {% if form.sira.errors %}<div class="field-hata">{{ form.sira.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="form-grup">
+                    <div class="checkbox-satir">
+                        {{ form.aktif }}
+                        <label for="{{ form.aktif.id_for_label }}">{{ form.aktif.label }}</label>
+                    </div>
+                    <div class="yardim-metni">Pasif dersler grup detay sayfasındaki havuzda görünür ama gruba eklenemez.</div>
+                    {% if form.aktif.errors %}<div class="field-hata">{{ form.aktif.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="eylem-cubugu">
+                    <button type="submit" class="btn-kaydet">Kaydet</button>
+                    <a href="{% url 'secmeli_havuz_listesi' %}" class="btn-geri">← İptal</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

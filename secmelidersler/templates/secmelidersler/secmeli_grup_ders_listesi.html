@@ -1,0 +1,409 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .bilgi-satir {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+    }
+    .grup-meta-chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-left: auto; }
+    .zorunlu-chip {
+        display: inline-block;
+        background: #e67e22;
+        color: #fff;
+        border-radius: 10px;
+        padding: 2px 12px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    .duzenle-link {
+        font-size: 0.82em;
+        color: #417690;
+        text-decoration: none;
+        border: 1px solid #c5d8e8;
+        border-radius: 4px;
+        padding: 4px 12px;
+        background: #fff;
+    }
+    .duzenle-link:hover { background: #e8f4fd; }
+    .sil-form-inline { display: inline; }
+    .sil-grup-btn {
+        font-size: 0.82em;
+        color: #dc3545;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        padding: 4px 12px;
+        background: #fff;
+        cursor: pointer;
+    }
+    .sil-grup-btn:hover { background: #f8d7da; }
+
+    /* ── EÖY ── */
+    .eoy-satir {
+        font-size: 0.82em;
+        color: #2e7d32;
+        background: #e8f5e9;
+        border: 1px solid #c8e6c9;
+        border-radius: 4px;
+        padding: 3px 10px;
+        white-space: nowrap;
+    }
+
+    /* ── İki kartlı düzen ── */
+    .iki-kart-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        align-items: start;
+    }
+    @media (max-width: 860px) {
+        .iki-kart-layout { grid-template-columns: 1fr; }
+    }
+
+    /* ── Kart ── */
+    .kart {
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .kart-baslik {
+        background: #2d5469;
+        color: #fff;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+    .kart-baslik-metin { font-weight: 700; font-size: 0.9em; }
+    .kart-govde { padding: 0; }
+    .kart-havuz-link {
+        font-size: 0.78em;
+        color: rgba(255,255,255,.85);
+        text-decoration: none;
+        border: 1px solid rgba(255,255,255,.35);
+        border-radius: 4px;
+        padding: 2px 10px;
+        white-space: nowrap;
+    }
+    .kart-havuz-link:hover { color: #fff; border-color: #fff; text-decoration: none; }
+
+    /* ── Sol kart: ders tablosu ── */
+    .ders-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .ders-tablo thead th {
+        background: #417690;
+        color: #fff;
+        padding: 8px 14px;
+        font-size: 0.82em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+    }
+    .ders-tablo thead th.col-saat,
+    .ders-tablo thead th.col-aktif { text-align: center; }
+    .ders-tablo tbody tr:hover { background: #f8fbff; }
+    .ders-tablo td { padding: 8px 14px; border-bottom: 1px solid #f1f3f5; vertical-align: middle; }
+    .ders-tablo td.col-saat,
+    .ders-tablo td.col-aktif { text-align: center; }
+    .saat-chip {
+        display: inline-block;
+        background: #17a2b8;
+        color: #fff;
+        border-radius: 10px;
+        padding: 1px 11px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    .saat-chip.coklu { background: #6f42c1; }
+    .aktif-badge { color: #28a745; font-weight: 700; }
+    .pasif-badge { color: #adb5bd; }
+    .sayac-chip {
+        display: inline-block;
+        background: #e9ecef;
+        color: #495057;
+        border-radius: 10px;
+        padding: 1px 10px;
+        font-size: 0.78em;
+        font-weight: 600;
+    }
+
+    /* Boş durum */
+    .bos-kart {
+        padding: 32px 20px;
+        text-align: center;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    .bos-kart p { margin: 0 0 6px; }
+
+    /* ── Sağ kart: havuz tablosu ── */
+    .havuz-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .havuz-tablo thead th {
+        background: #5a3e91;
+        color: #fff;
+        padding: 8px 14px;
+        font-size: 0.82em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+    }
+    .havuz-tablo thead th.col-saat { text-align: center; }
+    .havuz-tablo thead th.col-aksiyon { text-align: center; }
+    .havuz-tablo tbody tr:hover { background: #fdf9ff; }
+    .havuz-tablo td { padding: 7px 14px; border-bottom: 1px solid #f1f3f5; vertical-align: middle; }
+    .havuz-tablo td.col-saat { text-align: center; }
+    .havuz-tablo td.col-aksiyon { text-align: right; white-space: nowrap; }
+    .atanmis-satir td { background: #f0fff4; }
+    .atanmis-satir:hover td { background: #e6ffed !important; }
+    .atanmis-satir td.col-ders { font-weight: 600; color: #155724; }
+    .pasif-havuz-satir td { color: #adb5bd; }
+    .pasif-etiket {
+        display: inline-block;
+        background: #e9ecef;
+        color: #6c757d;
+        border-radius: 4px;
+        padding: 0 6px;
+        font-size: 0.75em;
+        font-weight: 600;
+        vertical-align: middle;
+        margin-left: 6px;
+    }
+    .atanmis-chip {
+        display: inline-block;
+        background: #28a745;
+        color: #fff;
+        border-radius: 10px;
+        padding: 1px 10px;
+        font-size: 0.8em;
+        font-weight: 700;
+        vertical-align: middle;
+        margin-right: 4px;
+    }
+    .atanmis-aksiyon { display: inline-flex; align-items: center; gap: 6px; }
+    .sil-form { display: inline; }
+    .btn-cikar {
+        display: inline-block;
+        cursor: pointer;
+        color: #dc3545;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1.5px solid #dc3545;
+        border-radius: 4px;
+        padding: 2px 10px;
+        background: #fff;
+        line-height: 1.5;
+    }
+    .btn-cikar:hover { background: #dc3545; color: #fff; }
+    .btn-ekle {
+        display: inline-block;
+        cursor: pointer;
+        color: #28a745;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1.5px solid #28a745;
+        border-radius: 4px;
+        padding: 2px 10px;
+        background: #fff;
+        line-height: 1.5;
+    }
+    .btn-ekle:hover { background: #28a745; color: #fff; }
+    .btn-ekle-pasif {
+        display: inline-block;
+        color: #ced4da;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1.5px solid #ced4da;
+        border-radius: 4px;
+        padding: 2px 10px;
+        background: #fff;
+        line-height: 1.5;
+        cursor: not-allowed;
+    }
+
+    /* Messages */
+    .mesaj-listesi { margin-bottom: 12px; }
+    .mesaj-satir {
+        padding: 7px 14px;
+        border-radius: 4px;
+        font-size: 0.87em;
+        margin-bottom: 6px;
+        border-left: 4px solid;
+    }
+    .mesaj-success { background: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
+    .mesaj-warning { background: #fff8e1; color: #e65100; border-color: #e65100; }
+    .mesaj-error   { background: #fde8e8; color: #c0392b; border-color: #c0392b; }
+</style>
+
+<div class="container-fluid py-3">
+    <h5 class="mb-2">{{ title }}</h5>
+
+    <div class="bilgi-satir">
+        <a href="{% url 'secmeli_grup_listesi' %}" class="geri-btn">← Gruplar</a>
+        <div class="grup-meta-chips">
+            {% if grup.egitim_yili %}
+            <span class="eoy-satir">📅 {{ grup.egitim_yili }}</span>
+            {% endif %}
+            {% if grup.zorunlu_grup %}<span class="zorunlu-chip">Zorunlu Grup</span>{% endif %}
+            <a href="{% url 'secmeli_grup_duzenle' grup.pk %}" class="duzenle-link">Grubu Düzenle</a>
+            <form method="post" action="{% url 'secmeli_grup_sil' grup.pk %}" class="sil-form-inline"
+                  onsubmit="return confirm('{{ grup.adi }} grubunu ve tüm derslerini silmek istediğinizden emin misiniz?')">
+                {% csrf_token %}
+                <button type="submit" class="sil-grup-btn">Grubu Sil</button>
+            </form>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="mesaj-listesi">
+        {% for msg in messages %}
+        <div class="mesaj-satir {% if msg.tags == 'error' %}mesaj-error{% elif msg.tags == 'warning' %}mesaj-warning{% else %}mesaj-success{% endif %}">
+            {{ msg }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="iki-kart-layout">
+
+        {# ── Sol kart: grubun dersleri ── #}
+        <div class="kart">
+            <div class="kart-baslik">
+                <span class="kart-baslik-metin">{{ grup.sinif_seviyesi }}. Sınıf — {{ grup.adi }}</span>
+                {% if grup_dersleri %}
+                <span class="sayac-chip">{{ grup_dersleri|length }} ders</span>
+                {% endif %}
+            </div>
+            <div class="kart-govde">
+                {% if veri_var %}
+                <table class="ders-tablo">
+                    <thead>
+                        <tr>
+                            <th>Ders Adı</th>
+                            <th class="col-saat">Saat</th>
+                            <th class="col-aktif">Aktif</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ders in grup_dersleri %}
+                        <tr>
+                            <td>{{ ders.ders_adi }}</td>
+                            <td class="col-saat">
+                                {% if ders.secimli_saat %}
+                                <span class="saat-chip coklu">{{ ders.saat_secenekleri }}</span>
+                                {% else %}
+                                <span class="saat-chip">{{ ders.sabit_saat }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="col-aktif">
+                                {% if ders.aktif %}
+                                <span class="aktif-badge" title="Aktif">✓</span>
+                                {% else %}
+                                <span class="pasif-badge" title="Pasif">✕</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="bos-kart">
+                    <p>Bu grup için henüz ders eklenmemiş.</p>
+                    <p>Sağdaki havuzdan ders ekleyebilirsiniz.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# ── Sağ kart: seçmeli ders havuzu ── #}
+        <div class="kart">
+            <div class="kart-baslik" style="background:#5a3e91;">
+                <span class="kart-baslik-metin">Seçmeli Ders Havuzu</span>
+                <a href="{% url 'secmeli_havuz_listesi' %}" class="kart-havuz-link">Havuzu Yönet →</a>
+            </div>
+            <div class="kart-govde">
+                {% if havuz %}
+                <table class="havuz-tablo">
+                    <thead>
+                        <tr>
+                            <th>Ders Adı</th>
+                            <th class="col-saat">Saat</th>
+                            <th class="col-aksiyon">Bu Grup</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in havuz %}
+                        <tr class="{% if item.atanmis %}atanmis-satir{% elif not item.aktif %}pasif-havuz-satir{% endif %}">
+                            <td class="col-ders">
+                                {{ item.ders_adi }}
+                                {% if not item.aktif %}<span class="pasif-etiket">Pasif</span>{% endif %}
+                            </td>
+                            <td class="col-saat">
+                                {% if item.saat_str %}
+                                <span class="saat-chip {% if item.atanmis %}{% if ',' in item.saat_str %}coklu{% endif %}{% endif %}" style="font-size:0.75em;">{{ item.saat_str }}</span>
+                                {% else %}
+                                <span style="color:#ced4da;">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="col-aksiyon">
+                                {% if item.atanmis %}
+                                <div class="atanmis-aksiyon">
+                                    <span class="atanmis-chip">✓</span>
+                                    <form method="post" action="{% url 'secmeli_ders_sil' grup.pk item.ders_obj.pk %}" class="sil-form"
+                                          onsubmit="return confirm('{{ item.ders_adi }} dersini bu gruptan çıkarmak istediğinizden emin misiniz?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn-cikar">Çıkar</button>
+                                    </form>
+                                </div>
+                                {% elif item.aktif and item.saat_str %}
+                                <form method="post" action="{% url 'secmeli_ders_ekle' grup.pk %}" class="sil-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="ders_adi" value="{{ item.ders_adi }}">
+                                    <input type="hidden" name="saat_secenekleri" value="{{ item.saat_str }}">
+                                    <button type="submit" class="btn-ekle">Ekle</button>
+                                </form>
+                                {% else %}
+                                <span class="btn-ekle-pasif">Ekle</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="bos-kart">
+                    <p>Havuz boş.</p>
+                    <p><a href="{% url 'secmeli_havuz_listesi' %}">Seçmeli Ders Havuzu</a>'na ders ekleyin.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,196 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #417690;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.88em;
+        color: #2d5469;
+        margin-bottom: 16px;
+    }
+    .ust-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+    }
+    .yeni-btn {
+        display: inline-block;
+        background: #28a745;
+        color: #fff;
+        border-radius: 4px;
+        padding: 7px 20px;
+        font-size: 0.9em;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .yeni-btn:hover { background: #218838; color: #fff; }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+    }
+    .havuz-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .havuz-tablo thead th {
+        background: #6f42c1;
+        color: #fff;
+        padding: 9px 14px;
+        font-size: 0.82em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+    }
+    .havuz-tablo thead th.col-sira,
+    .havuz-tablo thead th.col-aktif,
+    .havuz-tablo thead th.col-aksiyon { text-align: center; }
+    .havuz-tablo tbody tr { border-bottom: 1px solid #f1f3f5; }
+    .havuz-tablo tbody tr:hover { background: #fdf9ff; }
+    .havuz-tablo tbody tr.pasif-satir td { color: #adb5bd; }
+    .havuz-tablo td { padding: 8px 14px; vertical-align: middle; }
+    .havuz-tablo td.col-sira,
+    .havuz-tablo td.col-aktif { text-align: center; }
+    .havuz-tablo td.col-aksiyon { text-align: center; white-space: nowrap; }
+    .sira-chip {
+        display: inline-block;
+        background: #e9ecef;
+        color: #6c757d;
+        border-radius: 4px;
+        padding: 1px 8px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    .aktif-badge { color: #28a745; font-size: 1em; }
+    .pasif-badge { color: #adb5bd; font-size: 1em; }
+    .btn-duzenle {
+        display: inline-block;
+        color: #417690;
+        font-size: 0.82em;
+        text-decoration: none;
+        font-weight: 600;
+        border: 1.5px solid #417690;
+        border-radius: 4px;
+        padding: 2px 10px;
+        background: #fff;
+        line-height: 1.5;
+    }
+    .btn-duzenle:hover { background: #417690; color: #fff; text-decoration: none; }
+    .sil-form { display: inline; }
+    .btn-sil {
+        display: inline-block;
+        cursor: pointer;
+        color: #dc3545;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1.5px solid #dc3545;
+        border-radius: 4px;
+        padding: 2px 10px;
+        background: #fff;
+        line-height: 1.5;
+    }
+    .btn-sil:hover { background: #dc3545; color: #fff; }
+    .bos-durum {
+        text-align: center;
+        padding: 48px 24px;
+        color: #6c757d;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        margin-top: 8px;
+    }
+    .bos-durum p { margin-bottom: 16px; font-size: 0.95em; }
+    .bos-durum .bas-btn {
+        display: inline-block;
+        background: #28a745;
+        color: #fff;
+        border-radius: 4px;
+        padding: 8px 24px;
+        font-size: 0.9em;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .bos-durum .bas-btn:hover { background: #218838; }
+    .sayac-chip {
+        display: inline-block;
+        background: #e9ecef;
+        color: #495057;
+        border-radius: 10px;
+        padding: 2px 12px;
+        font-size: 0.82em;
+        font-weight: 600;
+        margin-left: auto;
+    }
+</style>
+
+<div class="container-fluid py-3">
+    <h5 class="mb-2">{{ title }}</h5>
+    <p class="bilgi-notu">
+        Seçmeli ders gruplarına eklenebilecek derslerin merkezi listesidir.
+        Buraya eklenen dersler, grup detay sayfasındaki <strong>Seçmeli Ders Havuzu</strong> kartında görünür.
+        Pasif dersler havuzda görünür ancak gruba eklenemez.
+    </p>
+
+    <div class="ust-bar">
+        <a href="{% url 'secmeli_havuz_yeni' %}" class="yeni-btn">+ Yeni Ders</a>
+        <a href="{% url 'secmeli_index' %}" class="geri-btn">← Seçmeli Dersler</a>
+        {% if dersler %}<span class="sayac-chip">{{ dersler.count }} ders</span>{% endif %}
+    </div>
+
+    {% if dersler %}
+    <table class="havuz-tablo">
+        <thead>
+            <tr>
+                <th class="col-sira">Sıra</th>
+                <th>Ders Adı</th>
+                <th class="col-aktif">Aktif</th>
+                <th class="col-aksiyon">İşlem</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ders in dersler %}
+            <tr class="{% if not ders.aktif %}pasif-satir{% endif %}">
+                <td class="col-sira"><span class="sira-chip">{{ ders.sira }}</span></td>
+                <td>{{ ders.ders_adi }}</td>
+                <td class="col-aktif">
+                    {% if ders.aktif %}
+                    <span class="aktif-badge" title="Aktif">✓</span>
+                    {% else %}
+                    <span class="pasif-badge" title="Pasif">✕</span>
+                    {% endif %}
+                </td>
+                <td class="col-aksiyon">
+                    <a href="{% url 'secmeli_havuz_duzenle' ders.pk %}" class="btn-duzenle">Düzenle</a>
+                    <form method="post" action="{% url 'secmeli_havuz_sil' ders.pk %}" class="sil-form"
+                          onsubmit="return confirm('{{ ders.ders_adi }} dersini havuzdan silmek istediğinizden emin misiniz?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-sil">Sil</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% else %}
+    <div class="bos-durum">
+        <p>Havuzda henüz ders tanımlanmamış.</p>
+        <a href="{% url 'secmeli_havuz_yeni' %}" class="bas-btn">+ İlk Dersi Ekle</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

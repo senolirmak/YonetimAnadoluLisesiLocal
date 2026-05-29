@@ -1,0 +1,358 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    /* ── Genel ── */
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 5px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+        margin-bottom: 14px;
+    }
+    .ogr-header {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 10px 16px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .ogr-header .ad { font-size: 1.05em; font-weight: 700; color: #212529; }
+    .ogr-header .sinif-chip {
+        display: inline-block;
+        background: #e9ecef;
+        color: #495057;
+        border-radius: 4px;
+        padding: 2px 10px;
+        font-size: 0.88em;
+        font-weight: 600;
+    }
+    .bolum-baslik {
+        font-size: 0.78em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: #6c757d;
+        margin: 24px 0 10px;
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 5px;
+    }
+
+    /* ── Kartlar ── */
+    .iki-kart {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        align-items: start;
+    }
+    @media (max-width: 900px) { .iki-kart { grid-template-columns: 1fr; } }
+    .kart {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .kart-baslik {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 14px;
+        font-weight: 700;
+        font-size: 0.88em;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #fff;
+    }
+    .kart-baslik.yesil  { background: #20894b; }
+    .kart-baslik.mavi   { background: #0891b2; }
+    .kart-baslik.mor    { background: #6f42c1; }
+
+    /* ── Satırlar ── */
+    .ders-satir {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px 14px;
+        border-bottom: 1px solid #f1f3f5;
+        font-size: 0.9em;
+    }
+    .ders-satir:last-child { border-bottom: none; }
+    .ders-satir:hover { background: #f8fbff; }
+    .grup-baslik {
+        padding: 5px 14px;
+        font-size: 0.78em;
+        font-weight: 700;
+        color: #6f42c1;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        background: #f8f6ff;
+        border-bottom: 1px solid #e9e4ff;
+    }
+
+    /* ── Chip'ler ── */
+    .saat-chip {
+        display: inline-block;
+        border-radius: 10px;
+        padding: 1px 10px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    .saat-chip.gri  { background: #e9ecef; color: #495057; }
+    .saat-chip.mavi { background: #0891b2; color: #fff; }
+    .saat-chip.mor  { background: #6f42c1; color: #fff; }
+    .saat-chip.yesil { background: #20894b; color: #fff; }
+    .tam-badge {
+        display: inline-block;
+        background: #28a745;
+        color: #fff;
+        border-radius: 10px;
+        padding: 1px 10px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+
+    /* ── Toplamlar / Aksiyonlar ── */
+    .toplam-satir {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 14px;
+        background: #f8f9fa;
+        border-top: 2px solid #dee2e6;
+        font-size: 0.88em;
+        font-weight: 700;
+        color: #495057;
+    }
+    .aksiyon-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-top: 1px solid #dee2e6;
+        background: #fafbfc;
+        flex-wrap: wrap;
+    }
+    .btn-ata {
+        display: inline-block;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 6px 16px;
+        font-size: 0.88em;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .btn-ata.yesil { background: #20894b; }
+    .btn-ata.yesil:hover { background: #166637; }
+    .btn-ata.mavi { background: #0891b2; }
+    .btn-ata.mavi:hover { background: #0e7490; }
+    .btn-ata.mor { background: #6f42c1; }
+    .btn-ata.mor:hover { background: #5a2d9e; }
+
+    .btn-sil-kk {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #dc3545;
+        font-size: 0.82em;
+        padding: 1px 6px;
+        border-radius: 3px;
+        line-height: 1.5;
+    }
+    .btn-sil-kk:hover { background: #dc3545; color: #fff; }
+    .sil-form { display: inline; }
+    .bos-durum {
+        padding: 24px;
+        text-align: center;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+
+    /* ── Mevcut yıl tablo (geniş kart) ── */
+    .mevcut-tablo { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+    .mevcut-tablo td { padding: 6px 14px; border-bottom: 1px solid #f1f3f5; }
+    .mevcut-tablo tr:last-child td { border-bottom: none; }
+    .mevcut-tablo tr:hover td { background: #f0faf4; }
+</style>
+
+<div class="container-fluid py-3">
+    <a href="{% url 'ogrdrs_listesi' %}" class="geri-btn">← Öğrenci Listesi</a>
+
+    <!-- Öğrenci başlık -->
+    <div class="ogr-header">
+        <span class="ad">{{ ogrenci.adi }} {{ ogrenci.soyadi }}</span>
+        <span class="sinif-chip">{{ ogrenci.okulno }}</span>
+        <span class="sinif-chip">{{ ogrenci.sinif }}/{{ ogrenci.sube }}</span>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         BÖLÜM 1 — Mevcut Eğitim Öğretim Yılı Dersleri
+    ══════════════════════════════════════════════════════ -->
+    <div class="bolum-baslik">Mevcut Eğitim Öğretim Yılı — {{ ogrenci.sinif }}. Sınıf</div>
+
+    <div class="kart">
+        <div class="kart-baslik yesil">
+            <span>{{ ogrenci.sinif }}/{{ ogrenci.sube }} Ders Programı</span>
+            {% if mevcut_tamamlandi %}
+            <span class="tam-badge">Tamamlandı ✓</span>
+            {% elif mevcut_dersler %}
+            <span style="font-size:0.82em;font-weight:400;">{{ mevcut_dersler|length }} / {{ dp_ders_sayisi }} ders</span>
+            {% endif %}
+        </div>
+        <div>
+            {% if mevcut_dersler %}
+            <table class="mevcut-tablo">
+                <tbody>
+                {% for md in mevcut_dersler %}
+                <tr>
+                    <td>{{ md.ders.ders_adi }}</td>
+                    <td style="text-align:right;width:90px;">
+                        <span class="saat-chip yesil">{{ md.haftalik_saat }} saat</span>
+                    </td>
+                    <td style="width:40px;text-align:center;">
+                        <form method="post" action="{% url 'ogrdrs_mevcut_sil' ogrenci.pk md.ders.pk %}" class="sil-form"
+                              onsubmit="return confirm('{{ md.ders.ders_adi }} kaldırılsın mı?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-sil-kk" title="Kaldır">✕</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <div class="toplam-satir">
+                <span>Toplam</span>
+                <span class="saat-chip yesil">{{ mevcut_toplam_saat }} saat</span>
+            </div>
+            {% else %}
+            <div class="bos-durum">Mevcut yıl ders ataması yapılmamış.</div>
+            {% endif %}
+        </div>
+        <div class="aksiyon-bar">
+            {% if sinif_sube_obj %}
+            <form method="post" action="{% url 'ogrdrs_mevcut_ata' ogrenci.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-ata yesil"
+                        onclick="return {% if mevcut_dersler %}confirm('Mevcut atamalar silinip ders programından yeniden oluşturulsun mu?'){% else %}true{% endif %}">
+                    {% if mevcut_dersler %}Ders Programından Güncelle{% else %}Ders Programından Ata{% endif %}
+                </button>
+            </form>
+            {% else %}
+            <span style="font-size:0.85em;color:#dc3545;">
+                {{ ogrenci.sinif }}/{{ ogrenci.sube }} sınıf/şubesi ders programında tanımlı değil.
+            </span>
+            {% endif %}
+            {% if dp_ders_sayisi %}
+            <span style="font-size:0.82em;color:#6c757d;">
+                Ders programında {{ dp_ders_sayisi }} ders mevcut.
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         BÖLÜM 2 — Sonraki Eğitim Öğretim Yılı Planlaması
+    ══════════════════════════════════════════════════════ -->
+    <div class="bolum-baslik">Sonraki Eğitim Öğretim Yılı Planlaması — {{ gelecek_sinif }}. Sınıf</div>
+
+    <div class="iki-kart">
+
+        <!-- Zorunlu Dersler -->
+        <div class="kart">
+            <div class="kart-baslik mavi">
+                <span>Zorunlu Dersler</span>
+                {% if tum_zorunlu_atandi and zorunlu_atamalar %}
+                <span class="tam-badge">Tamamlandı ✓</span>
+                {% endif %}
+            </div>
+            <div>
+                {% if zorunlu_atamalar %}
+                {% for atama in zorunlu_atamalar %}
+                <div class="ders-satir">
+                    <span>{{ atama.ortak_ders.ders_adi }}</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <span class="saat-chip mavi">{{ atama.ortak_ders.haftalik_saat }} saat</span>
+                        <form method="post" action="{% url 'ogrdrs_zorunlu_sil' ogrenci.pk atama.ortak_ders.pk %}" class="sil-form"
+                              onsubmit="return confirm('{{ atama.ortak_ders.ders_adi }} ataması kaldırılsın mı?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-sil-kk">✕</button>
+                        </form>
+                    </span>
+                </div>
+                {% endfor %}
+                <div class="toplam-satir">
+                    <span>Toplam</span>
+                    <span class="saat-chip mavi">{{ zorunlu_toplam_saat }} saat</span>
+                </div>
+                {% else %}
+                <div class="bos-durum">Henüz zorunlu ders atanmamış.</div>
+                {% endif %}
+            </div>
+            <div class="aksiyon-bar">
+                <form method="post" action="{% url 'ogrdrs_zorunlu_ata' ogrenci.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-ata mavi">
+                        {% if zorunlu_atamalar %}Eksikleri Tamamla{% else %}Tüm Dersleri Ata{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Seçmeli Dersler -->
+        <div class="kart">
+            <div class="kart-baslik mor">
+                <span>Seçmeli Dersler</span>
+                {% if secmeli_maks_saat > 0 and secmeli_toplam_saat >= secmeli_maks_saat %}
+                <span class="tam-badge">Tamamlandı ✓</span>
+                {% elif secmeli_maks_saat > 0 %}
+                <span style="font-size:0.82em;font-weight:400;">maks. {{ secmeli_maks_saat }} saat</span>
+                {% endif %}
+            </div>
+            <div>
+                {% if secmeli_secimler %}
+                {% regroup secmeli_secimler by ders.grup as secimler_gruplu %}
+                {% for grup_item in secimler_gruplu %}
+                <div class="grup-baslik">{{ grup_item.grouper.adi }}</div>
+                {% for secim in grup_item.list %}
+                <div class="ders-satir">
+                    <span>{{ secim.ders.ders_adi }}</span>
+                    <span class="saat-chip mor">{{ secim.secilen_saat }} saat</span>
+                </div>
+                {% endfor %}
+                {% endfor %}
+                <div class="toplam-satir">
+                    <span>Toplam</span>
+                    <span class="saat-chip mor">{{ secmeli_toplam_saat }} saat</span>
+                </div>
+                {% else %}
+                <div class="bos-durum">Henüz seçmeli ders seçimi yapılmamış.</div>
+                {% endif %}
+            </div>
+            <div class="aksiyon-bar">
+                <a href="{% url 'ogrdrs_secmeli_form' ogrenci.pk %}" class="btn-ata mor">
+                    {% if secmeli_secimler %}Seçimleri Düzenle{% else %}Ders Seç{% endif %}
+                </a>
+                {% if secmeli_secimler %}
+                <a href="{% url 'ogrdrs_secmeli_pdf' ogrenci.pk %}" target="_blank"
+                   style="color:#6c757d;font-size:0.85em;text-decoration:none;border:1px solid #dee2e6;border-radius:4px;padding:5px 12px;background:#fff;">
+                    PDF
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

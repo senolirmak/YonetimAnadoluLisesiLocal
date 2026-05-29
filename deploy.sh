@@ -84,17 +84,17 @@ basari "Paketler güncellendi."
 
 # ── 5. Migration ──────────────────────────────────────────────
 bilgi "Migration çalıştırılıyor..."
-python manage.py migrate --run-syncdb
+python manage.py migrate --run-syncdb --settings=config.settings.production
 basari "Migration tamamlandı."
 
 # ── 6. Kullanıcı gruplarını güncelle ─────────────────────────
 bilgi "Kullanıcı grupları güncelleniyor..."
-python manage.py kullanici_gruplari_olustur
+python manage.py kullanici_gruplari_olustur --settings=config.settings.production
 basari "Kullanıcı grupları güncellendi."
 
 # ── 7. Static dosyalar ────────────────────────────────────────
 bilgi "Static dosyalar toplanıyor..."
-python manage.py collectstatic --noinput --clear -v 0
+python manage.py collectstatic --noinput --clear -v 0 --settings=config.settings.production
 basari "Static dosyalar güncellendi."
 
 # ── 8. Nginx reload ──────────────────────────────────────────
@@ -123,7 +123,7 @@ echo ""
 bilgi "Kritik tablo kayıt sayıları:"
 python - <<'PYEOF'
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
 django.setup()
 from django.db import connection
 

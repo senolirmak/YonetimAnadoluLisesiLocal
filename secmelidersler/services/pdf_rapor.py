@@ -111,9 +111,11 @@ _CW = [72*mm, 18*mm, 8*mm, 60*mm, 16*mm, 10*mm]
 def secmeli_ders_pdf(buffer, ogrenci, gelecek_sinif,
                      ortak_dersler, secmeli_gruplar,
                      secilen_ders_ids, secilen_saatler,
-                     okul_bilgi, egitim_yili):
+                     okul_bilgi, egitim_yili,
+                     toplam_saat=40):
     """
     Seçmeli ders form PDF'i üretir; buffer'a yazar.
+    toplam_saat: Sınıf seviyesinin haftalık toplam ders saati (SinifSeviyeToplamSaat modelinden gelir).
     """
     doc = SimpleDocTemplate(
         buffer,
@@ -124,7 +126,7 @@ def secmeli_ders_pdf(buffer, ogrenci, gelecek_sinif,
     els = []
     ortak_list = list(ortak_dersler)
     ortak_toplam = sum(od.haftalik_saat for od in ortak_list)
-    maks_saat = 39 - ortak_toplam  # Rehberlik (1 saat) hariç 40
+    maks_saat = toplam_saat - ortak_toplam
 
     okul_adi = _tr_upper(okul_bilgi.okul_adi if okul_bilgi else "OKUL ADI")
 

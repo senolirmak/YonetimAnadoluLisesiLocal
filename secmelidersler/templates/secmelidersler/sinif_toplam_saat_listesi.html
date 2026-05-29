@@ -1,0 +1,213 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .sayfa { max-width: 600px; margin: 0 auto; padding: 20px 16px; }
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #2d5469;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.88em;
+        color: #2d5469;
+        margin-bottom: 20px;
+    }
+    .ust-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+    }
+    .kart {
+        background: #fff;
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .kart-baslik {
+        background: #2d5469;
+        color: #fff;
+        padding: 10px 18px;
+        font-size: 0.85em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+    .saat-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.92em;
+    }
+    .saat-tablo thead th {
+        background: #f1f5f8;
+        color: #495057;
+        padding: 9px 18px;
+        font-size: 0.82em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .saat-tablo thead th.col-saat,
+    .saat-tablo thead th.col-aksiyon { text-align: center; }
+    .saat-tablo tbody tr { border-bottom: 1px solid #f1f3f5; }
+    .saat-tablo tbody tr:hover { background: #f8fbff; }
+    .saat-tablo td { padding: 10px 18px; vertical-align: middle; }
+    .saat-tablo td.col-saat,
+    .saat-tablo td.col-aksiyon { text-align: center; }
+    .sinif-rozet {
+        display: inline-block;
+        background: #2d5469;
+        color: #fff;
+        border-radius: 6px;
+        padding: 3px 14px;
+        font-size: 0.88em;
+        font-weight: 700;
+    }
+    .saat-input {
+        width: 70px;
+        text-align: center;
+        border: 1.5px solid #c5d8e8;
+        border-radius: 4px;
+        padding: 5px 8px;
+        font-size: 0.92em;
+        font-weight: 600;
+        color: #2d5469;
+        transition: border-color .15s;
+    }
+    .saat-input:focus { outline: none; border-color: #417690; box-shadow: 0 0 0 2px rgba(65,118,144,.15); }
+    .kaydet-btn {
+        background: #417690;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 16px;
+        font-size: 0.82em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .15s;
+    }
+    .kaydet-btn:hover { background: #2d5469; }
+    .degisti-isaret {
+        display: none;
+        font-size: 0.78em;
+        color: #e67e22;
+        font-weight: 600;
+        margin-right: 6px;
+    }
+    .degisti .degisti-isaret { display: inline; }
+</style>
+
+<div class="sayfa">
+    <h5 class="mb-2">{{ title }}</h5>
+
+    {% if aktif_yil %}
+    <div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border-left:4px solid #2e7d32;border-radius:4px;padding:7px 14px;font-size:0.87em;color:#1b5e20;margin-bottom:14px;">
+        <span>📅</span>
+        <span>Eğitim-Öğretim Yılı: <strong>{{ aktif_yil }}</strong></span>
+    </div>
+    {% else %}
+    <div style="display:flex;align-items:center;gap:8px;background:#fff3e0;border-left:4px solid #e65100;border-radius:4px;padding:7px 14px;font-size:0.87em;color:#bf360c;margin-bottom:14px;">
+        <span>⚠️</span>
+        <span>Aktif eğitim-öğretim yılı tanımlanmamış. Kayıtlar yıldan bağımsız oluşturulacak.</span>
+    </div>
+    {% endif %}
+
+    <p class="bilgi-notu">
+        Her sınıf seviyesi için haftalık toplam ders saatini belirleyin. Bu değer,
+        seçmeli ders limitini hesaplamak için <strong>Zorunlu (Ortak) Derslerin</strong>
+        toplamından çıkarılır. Standart değer <strong>40</strong> saattir.
+    </p>
+
+    <div class="ust-bar">
+        <a href="{% url 'secmeli_index' %}" class="geri-btn">← Seçmeli Dersler</a>
+    </div>
+
+    {% if messages %}
+    <div style="margin-bottom:16px;">
+        {% for msg in messages %}
+        <div style="padding:8px 14px;border-radius:4px;font-size:0.88em;margin-bottom:6px;
+                    background:{% if msg.tags == 'error' %}#fde8e8;color:#c0392b;border-left:4px solid #c0392b
+                    {% else %}#e8f5e9;color:#2e7d32;border-left:4px solid #2e7d32{% endif %};">
+            {{ msg }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="kart">
+        <div class="kart-baslik">Sınıf Seviyesi — Haftalık Toplam Saat</div>
+        <table class="saat-tablo">
+            <thead>
+                <tr>
+                    <th>Sınıf Seviyesi</th>
+                    <th class="col-saat">Toplam Saat</th>
+                    <th class="col-aksiyon">Kaydet</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for satir in satırlar %}
+                <tr class="saat-satiri" id="satir-{{ satir.obj.pk }}">
+                    <td>
+                        <span class="sinif-rozet">{{ satir.obj.sinif_seviyesi }}. Sınıf</span>
+                    </td>
+                    <td class="col-saat">
+                        <form method="post" action="{% url 'secmeli_sinif_toplam_saat' %}" class="saat-formu" id="form-{{ satir.obj.pk }}">
+                            {% csrf_token %}
+                            <input type="hidden" name="pk" value="{{ satir.obj.pk }}">
+                            <input
+                                type="number"
+                                name="haftalik_toplam_saat"
+                                value="{{ satir.obj.haftalik_toplam_saat }}"
+                                min="1" max="99"
+                                class="saat-input"
+                                data-baslangic="{{ satir.obj.haftalik_toplam_saat }}"
+                                data-pk="{{ satir.obj.pk }}"
+                            >
+                        </form>
+                    </td>
+                    <td class="col-aksiyon">
+                        <span class="degisti-isaret" id="degisti-{{ satir.obj.pk }}">● değişti</span>
+                        <button type="submit" form="form-{{ satir.obj.pk }}" class="kaydet-btn">Kaydet</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll(".saat-input").forEach(function (inp) {
+    inp.addEventListener("input", function () {
+        const pk = inp.dataset.pk;
+        const baslangic = parseInt(inp.dataset.baslangic, 10);
+        const guncel = parseInt(inp.value, 10);
+        const isaret = document.getElementById("degisti-" + pk);
+        const satir = document.getElementById("satir-" + pk);
+        if (!isNaN(guncel) && guncel !== baslangic) {
+            isaret.style.display = "inline";
+            satir.style.background = "#fffbf0";
+        } else {
+            isaret.style.display = "none";
+            satir.style.background = "";
+        }
+    });
+});
+</script>
+{% endblock %}

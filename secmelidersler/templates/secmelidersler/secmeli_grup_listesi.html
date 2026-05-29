@@ -1,0 +1,203 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #417690;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.88em;
+        color: #2d5469;
+        margin-bottom: 20px;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+        margin-bottom: 24px;
+    }
+
+    /* ── Seviye bölümü ── */
+    .sinif-bolum { margin-bottom: 28px; }
+    .sinif-bolum-baslik {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 2px solid #417690;
+        padding-bottom: 6px;
+        margin-bottom: 14px;
+    }
+    .sinif-bolum-baslik-metin {
+        font-size: 1em;
+        font-weight: 700;
+        color: #2d5469;
+    }
+    .yeni-grup-btn {
+        display: inline-block;
+        background: #28a745;
+        color: #fff;
+        border-radius: 4px;
+        padding: 4px 14px;
+        font-size: 0.82em;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .yeni-grup-btn:hover { background: #218838; color: #fff; text-decoration: none; }
+
+    /* ── Grup buton ızgarası ── */
+    .grup-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    /* ── Tek grup kartı ── */
+    .grup-kart {
+        border: 1.5px solid #c5d8e8;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+        min-width: 200px;
+        max-width: 260px;
+        flex: 1 1 200px;
+        display: flex;
+        flex-direction: column;
+        transition: box-shadow .15s, transform .15s;
+    }
+    .grup-kart:hover {
+        box-shadow: 0 4px 14px rgba(65,118,144,.18);
+        transform: translateY(-2px);
+    }
+    .grup-kart-ana {
+        display: block;
+        padding: 14px 16px 10px;
+        text-decoration: none;
+        flex: 1;
+    }
+    .grup-kart-ana:hover { text-decoration: none; }
+    .grup-kart-adi {
+        font-size: 0.93em;
+        font-weight: 700;
+        color: #2d5469;
+        margin-bottom: 6px;
+        line-height: 1.3;
+    }
+    .grup-kart-meta {
+        font-size: 0.8em;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .zorunlu-etiket {
+        display: inline-block;
+        background: #e67e22;
+        color: #fff;
+        border-radius: 10px;
+        padding: 1px 9px;
+        font-size: 0.82em;
+        font-weight: 600;
+    }
+    .ders-sayisi-chip {
+        display: inline-block;
+        background: #e9ecef;
+        color: #495057;
+        border-radius: 10px;
+        padding: 1px 9px;
+        font-size: 0.82em;
+        font-weight: 600;
+    }
+
+    /* ── Kart alt aksiyonlar ── */
+    .grup-kart-aksiyonlar {
+        border-top: 1px solid #e9ecef;
+        padding: 6px 12px;
+        background: #f8f9fa;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .aksiyon-link {
+        font-size: 0.78em;
+        font-weight: 600;
+        color: #417690;
+        text-decoration: none;
+    }
+    .aksiyon-link:hover { text-decoration: underline; }
+    .sil-form-inline { display: inline; }
+    .aksiyon-sil {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #dc3545;
+        font-size: 0.78em;
+        font-weight: 600;
+        padding: 0;
+    }
+    .aksiyon-sil:hover { text-decoration: underline; }
+    .ayirici { color: #dee2e6; }
+
+    /* Boş durum */
+    .yok-mesaj {
+        color: #adb5bd;
+        font-style: italic;
+        font-size: 0.85em;
+        padding: 8px 0;
+    }
+</style>
+
+<div class="container-fluid py-3">
+    <h5 class="mb-2">{{ title }}</h5>
+    <p class="bilgi-notu">
+        MEB haftalık ders çizelgesindeki seçmeli ders gruplarını buradan yönetebilirsiniz.
+        Bir gruba tıklayarak dersleri görüntüleyin ve düzenleyin.
+    </p>
+
+    <a href="{% url 'secmeli_index' %}" class="geri-btn">← Seçmeli Dersler</a>
+
+    {% for sinif, gruplar in sinif_gruplari %}
+    <div class="sinif-bolum">
+        <div class="sinif-bolum-baslik">
+            <span class="sinif-bolum-baslik-metin">{{ sinif }}. Sınıf</span>
+            <a href="{% url 'secmeli_grup_yeni' %}?sinif={{ sinif }}" class="yeni-grup-btn">+ Yeni Grup</a>
+        </div>
+
+        <div class="grup-grid">
+            {% for grup in gruplar %}
+            <div class="grup-kart">
+                <a href="{% url 'secmeli_grup_ders_listesi' grup_pk=grup.pk %}" class="grup-kart-ana">
+                    <div class="grup-kart-adi">{{ grup.adi }}</div>
+                    <div class="grup-kart-meta">
+                        <span class="ders-sayisi-chip">{{ grup.ders_sayisi }} ders</span>
+                        {% if grup.zorunlu_grup %}<span class="zorunlu-etiket">Zorunlu</span>{% endif %}
+                    </div>
+                </a>
+                <div class="grup-kart-aksiyonlar">
+                    <a href="{% url 'secmeli_grup_duzenle' grup.pk %}" class="aksiyon-link">Düzenle</a>
+                    <span class="ayirici">|</span>
+                    <form method="post" action="{% url 'secmeli_grup_sil' grup.pk %}" class="sil-form-inline"
+                          onsubmit="return confirm('{{ grup.adi }} grubunu ve tüm derslerini silmek istediğinizden emin misiniz?')">
+                        {% csrf_token %}
+                        <button type="submit" class="aksiyon-sil">Sil</button>
+                    </form>
+                </div>
+            </div>
+            {% empty %}
+            <p class="yok-mesaj">Bu sınıf için henüz grup tanımlanmamış.</p>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

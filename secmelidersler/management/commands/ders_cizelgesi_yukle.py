@@ -17,7 +17,7 @@ try:
 except ImportError:
     pdfplumber = None  # type: ignore
 
-from secmelidersler.models import OrtakDers, SecmeliDers, SecmeliDersGrubu
+from secmelidersler.models import OrtakDers, SecmeliDers, SecmeliDersGrubu, get_aktif_egitim_yili
 
 # Sınıf → tablo sütun indeksi
 _SINIF_KOLON = {9: 3, 10: 4, 11: 5, 12: 6}
@@ -37,7 +37,6 @@ _ATLA = {
     "ORTAK DERS SAATİ TOPLAMI",
     "SEÇİLEBİLECEK DERS SAATİ SAYISI",
     "TOPLAM DERS SAATİ",
-    "REHBERLİK VE YÖNLENDİRME",
     "SOSYAL SORUMLULUK PROGRAMI",
     "HAYAT BOYU ÖĞRENME/SERTİFİKASYON",
 }
@@ -220,12 +219,31 @@ class Command(BaseCommand):
             action="store_true",
             help="Veritabanına yazmadan sadece ayrıştırma sonuçlarını gösterir.",
         )
+        parser.add_argument(
+            "--egitim-yili",
+            type=str,
+            default=None,
+            metavar="YIL",
+            help="Eğitim-öğretim yılı (örn: 2025-2026). Belirtilmezse OkulBilgi'deki aktif yıl kullanılır.",
+        )
 
     def handle(self, *args, **options):
         pdf_yolu = options["pdf"]
         siniflar = sorted(set(options["siniflar"]))
         temizle = options["temizle"]
         kuru = options["kuru_calistir"]
+
+        # Eğitim-öğretim yılı
+        yil_str = options.get("egitim_yili")
+        if yil_str:
+            from okul.models import EgitimOgretimYili
+            try:
+                egitim_yili = EgitimOgretimYili.objects.get(egitim_yili=yil_str)
+            except EgitimOgretimYili.DoesNotExist:
+                raise CommandError(f"Eğitim-öğretim yılı bulunamadı: {yil_str!r}")
+        else:
+            egitim_yili = get_aktif_egitim_yili()
+        self.stdout.write(f"Eğitim-öğretim yılı: {egitim_yili or '(tanımlanmamış)'}")
 
         self.stdout.write(f"PDF okunuyor: {pdf_yolu}")
         tablo = _pdf_tablo_oku(pdf_yolu)
@@ -253,37 +271,41 @@ class Command(BaseCommand):
         # ── Temizle ──
         if temizle:
             for sinif in siniflar:
-                silinecek_od = OrtakDers.objects.filter(sinif_seviyesi=sinif).count()
-                silinecek_sg = SecmeliDersGrubu.objects.filter(sinif_seviyesi=sinif).count()
-                OrtakDers.objects.filter(sinif_seviyesi=sinif).delete()
-                SecmeliDersGrubu.objects.filter(sinif_seviyesi=sinif).delete()
+                od_qs = OrtakDers.objects.filter(sinif_seviyesi=sinif, egitim_yili=egitim_yili)
+                sg_qs = SecmeliDersGrubu.objects.filter(sinif_seviyesi=sinif, egitim_yili=egitim_yili)
+                silinecek_od = od_qs.count()
+                silinecek_sg = sg_qs.count()
+                od_qs.delete()
+                sg_qs.delete()
                 self.stdout.write(
                     f"  {sinif}. sınıf: {silinecek_od} ortak ders, "
                     f"{silinecek_sg} grup silindi."
                 )
 
         # ── Ortak dersler kaydet ──
-        self._ortak_kaydet(ortak, siniflar, temizle)
+        self._ortak_kaydet(ortak, siniflar, temizle, egitim_yili)
 
         # ── Seçmeli dersler kaydet ──
-        self._secmeli_kaydet(secmeli, siniflar, temizle)
+        self._secmeli_kaydet(secmeli, siniflar, temizle, egitim_yili)
 
         self.stdout.write(self.style.SUCCESS("\nYükleme başarıyla tamamlandı."))
 
     # ── Yardımcı: kaydetme ──────────────────────────────
 
-    def _ortak_kaydet(self, ortak, siniflar, temizle):
+    def _ortak_kaydet(self, ortak, siniflar, temizle, egitim_yili):
         for sinif in siniflar:
             dersler = ortak.get(sinif, [])
             sayac = 0
             for ders_adi, saat, sira in dersler:
                 if temizle:
                     OrtakDers.objects.create(
+                        egitim_yili=egitim_yili,
                         sinif_seviyesi=sinif, ders_adi=ders_adi,
                         haftalik_saat=saat, sira=sira,
                     )
                 else:
                     OrtakDers.objects.update_or_create(
+                        egitim_yili=egitim_yili,
                         sinif_seviyesi=sinif, ders_adi=ders_adi,
                         defaults={"haftalik_saat": saat, "sira": sira},
                     )
@@ -291,12 +313,11 @@ class Command(BaseCommand):
             if sayac:
                 self.stdout.write(f"  Ortak — {sinif}. sınıf: {sayac} ders kaydedildi.")
 
-    def _secmeli_kaydet(self, secmeli, siniflar, temizle):
+    def _secmeli_kaydet(self, secmeli, siniflar, temizle, egitim_yili):
         for sinif in siniflar:
             grup_sira = 1
             for grup_adi in _GRUP_SIRALI:
                 ders_listesi = secmeli.get(grup_adi, [])
-                # Bu sınıf için dersler
                 sinif_dersleri = [
                     (dn, saatler[sinif])
                     for dn, saatler in ders_listesi
@@ -308,11 +329,13 @@ class Command(BaseCommand):
                 meta = _GRUP_META[grup_adi]
                 if temizle:
                     grup_obj = SecmeliDersGrubu.objects.create(
+                        egitim_yili=egitim_yili,
                         sinif_seviyesi=sinif, adi=grup_adi,
                         zorunlu_grup=meta["zorunlu"], sira=grup_sira,
                     )
                 else:
                     grup_obj, _ = SecmeliDersGrubu.objects.get_or_create(
+                        egitim_yili=egitim_yili,
                         sinif_seviyesi=sinif, adi=grup_adi,
                         defaults={"zorunlu_grup": meta["zorunlu"], "sira": grup_sira},
                     )

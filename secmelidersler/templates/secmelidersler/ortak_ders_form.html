@@ -1,0 +1,169 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<style>
+    .form-sayfa { max-width: 520px; margin: 0 auto; padding: 20px 16px; }
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #417690;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.88em;
+        color: #2d5469;
+        margin-bottom: 18px;
+    }
+    .form-kart {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .form-kart-baslik {
+        background: #417690;
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.9em;
+        padding: 9px 16px;
+    }
+    .form-kart-govde { padding: 18px 16px; }
+    .form-grup {
+        margin-bottom: 16px;
+    }
+    .form-grup label {
+        display: block;
+        font-size: 0.82em;
+        font-weight: 700;
+        color: #495057;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        margin-bottom: 4px;
+    }
+    .form-grup select,
+    .form-grup input[type=text],
+    .form-grup input[type=number] {
+        width: 100%;
+        padding: 7px 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.95em;
+        color: #212529;
+        box-sizing: border-box;
+    }
+    .form-grup select:focus,
+    .form-grup input:focus {
+        outline: none;
+        border-color: #417690;
+        box-shadow: 0 0 0 2px rgba(65,118,144,.15);
+    }
+    .form-grup .field-hata {
+        color: #dc3545;
+        font-size: 0.8em;
+        margin-top: 3px;
+    }
+    .form-grup .yardim-metni {
+        color: #6c757d;
+        font-size: 0.8em;
+        margin-top: 3px;
+    }
+    .hata-listesi {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        padding: 10px 16px;
+        margin-bottom: 14px;
+        font-size: 0.9em;
+        color: #721c24;
+    }
+    .hata-listesi ul { margin: 0; padding-left: 18px; }
+    .eylem-cubugu {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 20px;
+    }
+    .btn-kaydet {
+        background: #28a745;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 28px;
+        font-size: 0.95em;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-kaydet:hover { background: #218838; }
+    .btn-geri {
+        background: #fff;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 7px 16px;
+        font-size: 0.9em;
+        text-decoration: none;
+    }
+</style>
+
+<div class="form-sayfa">
+    <h5 class="mb-3">{{ title }}</h5>
+
+    <p class="bilgi-notu">
+        Zorunlu (ortak) dersler tüm öğrencilerin okuduğu derslerdir.
+        Toplam saatleri, öğrenci seçim formundaki <strong>seçmeli ders saat limitini</strong> doğrudan etkiler.
+    </p>
+
+    {% if form.non_field_errors %}
+    <div class="hata-listesi">
+        <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <div class="form-kart">
+        <div class="form-kart-baslik">DERS BİLGİLERİ</div>
+        <div class="form-kart-govde">
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="form-grup">
+                    <label for="{{ form.sinif_seviyesi.id_for_label }}">{{ form.sinif_seviyesi.label }}</label>
+                    {{ form.sinif_seviyesi }}
+                    {% if form.sinif_seviyesi.errors %}
+                    <div class="field-hata">{{ form.sinif_seviyesi.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="form-grup">
+                    <label for="{{ form.ders_adi.id_for_label }}">{{ form.ders_adi.label }}</label>
+                    {{ form.ders_adi }}
+                    {% if form.ders_adi.errors %}
+                    <div class="field-hata">{{ form.ders_adi.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="form-grup">
+                    <label for="{{ form.haftalik_saat.id_for_label }}">{{ form.haftalik_saat.label }}</label>
+                    {{ form.haftalik_saat }}
+                    {% if form.haftalik_saat.errors %}
+                    <div class="field-hata">{{ form.haftalik_saat.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="form-grup">
+                    <label for="{{ form.sira.id_for_label }}">{{ form.sira.label }}</label>
+                    {{ form.sira }}
+                    <div class="yardim-metni">Küçük sayı önce gösterilir. Aynı sınıftaki dersler bu değere göre sıralanır.</div>
+                    {% if form.sira.errors %}
+                    <div class="field-hata">{{ form.sira.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="eylem-cubugu">
+                    <button type="submit" class="btn-kaydet">Kaydet</button>
+                    <a href="{% url 'secmeli_ortak_ders_listesi' %}" class="btn-geri">← İptal</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
