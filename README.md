@@ -274,3 +274,7 @@ Bu proje [GNU General Public License v3.0](LICENSE) kapsamında lisanslanmışt�
 Kaynak kodu özgürce kullanabilir, değiştirebilir ve dağıtabilirsiniz; ancak türev çalışmaların da aynı lisans altında yayımlanması zorunludur.
 
 Daha fazla bilgi için [https://www.gnu.org/licenses/gpl-3.0.html](https://www.gnu.org/licenses/gpl-3.0.html) adresine bakın.
+
+---
+
+Bu proje [Claude](https://claude.ai) ile birlikte üretilmiştir.
