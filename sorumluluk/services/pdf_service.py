@@ -47,13 +47,13 @@ def _mudur_onay_blogu(okul):
     mudur_adi = (okul.okul_muduru if okul and okul.okul_muduru else "").strip()
     if not mudur_adi:
         return None
-    s = ParagraphStyle('MudurOnay', fontName=_FONT, fontSize=10, alignment=1, leading=18)
+    s = ParagraphStyle('MudurOnay', fontName=_FONT, fontSize=9, alignment=1, leading=16)
     return KeepTogether([
-        Spacer(1, 36),
+        Spacer(1, 12),
         Paragraph("UYGUNDUR", s),
-        Spacer(1, 6),
+        Spacer(1, 4),
         Paragraph("... / ... / 2026", s),
-        Spacer(1, 6),
+        Spacer(1, 4),
         Paragraph(_tr_upper(mudur_adi), s),
         Paragraph("Okul Müdürü", s),
     ])
@@ -450,13 +450,13 @@ def gorevlendirme_pdf_uret(buf, sinav, okul):
         topMargin=TB, bottomMargin=TB,
     )
 
-    s_okul    = ParagraphStyle('GROkul',    fontName=_FONT, fontSize=12, alignment=1, spaceAfter=2, leading=16)
-    s_sinav   = ParagraphStyle('GRSinav',   fontName=_FONT, fontSize=9,  alignment=1, spaceAfter=2, textColor=_GRAY)
-    s_baslik  = ParagraphStyle('GRBaslik',  fontName=_FONT, fontSize=10, alignment=1, spaceAfter=5, leading=14)
-    s_oturum  = ParagraphStyle('GROturum',  fontName=_FONT, fontSize=9,  textColor=colors.white, leading=12)
-    s_bolum   = ParagraphStyle('GRBolum',   fontName=_FONT, fontSize=8,  leading=11)
-    s_hucre   = ParagraphStyle('GRHucre',   fontName=_FONT, fontSize=8.5, leading=12)
-    s_bos     = ParagraphStyle('GRBos',     fontName=_FONT, fontSize=8,  textColor=_GRAY, leading=11)
+    s_okul    = ParagraphStyle('GROkul',    fontName=_FONT, fontSize=10, alignment=1, spaceAfter=2, leading=14)
+    s_sinav   = ParagraphStyle('GRSinav',   fontName=_FONT, fontSize=8,  alignment=1, spaceAfter=2, textColor=_GRAY)
+    s_baslik  = ParagraphStyle('GRBaslik',  fontName=_FONT, fontSize=9,  alignment=1, spaceAfter=5, leading=12)
+    s_oturum  = ParagraphStyle('GROturum',  fontName=_FONT, fontSize=8,  textColor=colors.white, leading=11)
+    s_bolum   = ParagraphStyle('GRBolum',   fontName=_FONT, fontSize=7,  leading=10)
+    s_hucre   = ParagraphStyle('GRHucre',   fontName=_FONT, fontSize=7.5, leading=11)
+    s_bos     = ParagraphStyle('GRBos',     fontName=_FONT, fontSize=7,  textColor=_GRAY, leading=10)
 
     okul_adi    = _tr_upper(okul.okul_adi if okul and okul.okul_adi else "")
     donem_str   = sinav.get_donem_turu_display()   # type: ignore[attr-defined]
@@ -484,8 +484,8 @@ def gorevlendirme_pdf_uret(buf, sinav, okul):
         return TableStyle([
             ("BACKGROUND",    (0, 0), (-1, 0), bg),
             ("FONTNAME",      (0, 0), (-1, -1), _FONT),
-            ("FONTSIZE",      (0, 0), (-1, 0),  8),
-            ("FONTSIZE",      (0, 1), (-1, -1), 8.5),
+            ("FONTSIZE",      (0, 0), (-1, 0),  7),
+            ("FONTSIZE",      (0, 1), (-1, -1), 7.5),
             ("TOPPADDING",    (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("LEFTPADDING",   (0, 0), (-1, -1), 6),
@@ -550,7 +550,7 @@ def gorevlendirme_pdf_uret(buf, sinav, okul):
                     Paragraph(uye1_str,   s_hucre),
                     Paragraph(uye2_str,   s_hucre),
                 ])
-            kom_tbl = Table(kom_data, colWidths=[avail_w * 0.38, avail_w * 0.31, avail_w * 0.31])
+            kom_tbl = Table(kom_data, colWidths=[avail_w * 0.50, avail_w * 0.25, avail_w * 0.25])
             style = _hdr_style(_HDR_KOM)
             for i in range(1, len(kom_data)):
                 style.add("BACKGROUND", (0, i), (-1, i), _KOM_BG)
@@ -600,3 +600,179 @@ def gorevlendirme_pdf_uret(buf, sinav, okul):
         canvas.restoreState()
 
     doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)
+
+
+# ---------------------------------------------------------------------------
+# Öğretmen Görev Raporu PDF  (komisyon + gözetmen, öğretmene göre gruplu)
+# ---------------------------------------------------------------------------
+
+def ogretmen_gorev_raporu_pdf_uret(buf, sinav, okul):
+    """Komisyon üyesi ve gözetmen atamalarını öğretmene göre gruplayarak PDF üretir."""
+    W, _ = A4
+    LR = 1.5 * cm
+    TB = 1.0 * cm
+    avail_w = W - 2 * LR
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=LR, rightMargin=LR,
+        topMargin=TB, bottomMargin=TB,
+    )
+
+    s_okul   = ParagraphStyle('OGROkul',   fontName=_FONT, fontSize=11, alignment=1, spaceAfter=2, leading=14)
+    s_sinav  = ParagraphStyle('OGRSinav',  fontName=_FONT, fontSize=8,  alignment=1, spaceAfter=4, textColor=_GRAY)
+    s_baslik = ParagraphStyle('OGRBaslik', fontName=_FONT, fontSize=10, alignment=1, spaceAfter=5, leading=13)
+    s_ogr    = ParagraphStyle('OGROgr',    fontName=_FONT, fontSize=9,  textColor=colors.white, leading=12)
+    s_brans  = ParagraphStyle('OGRBrans',  fontName=_FONT, fontSize=7.5, textColor=colors.HexColor("#cbd5e1"), leading=10)
+    s_hucre  = ParagraphStyle('OGRHucre',  fontName=_FONT, fontSize=8,  leading=11)
+
+    okul_adi    = _tr_upper(okul.okul_adi if okul and okul.okul_adi else "")
+    donem_str   = sinav.get_donem_turu_display()   # type: ignore[attr-defined]
+    egitim_yili = str(sinav.egitim_yili) if sinav.egitim_yili else ""
+    _GUNLER     = {0: "Pzt", 1: "Sal", 2: "Çar", 3: "Per", 4: "Cum", 5: "Cmt", 6: "Paz"}
+
+    takvim_saatler = {
+        (t.tarih, t.oturum_no): (t.saat_baslangic, t.saat_bitis)
+        for t in SorumluTakvim.objects.filter(sinav=sinav).order_by("tarih", "oturum_no")
+    }
+
+    personel_gorevler: dict = defaultdict(list)
+    personel_bilgi: dict    = {}
+
+    for ku in (SorumluKomisyonUyesi.objects
+               .filter(sinav=sinav)
+               .select_related("uye1", "uye2")
+               .order_by("tarih", "oturum_no", "ders_adi")):
+        saatler = takvim_saatler.get((ku.tarih, ku.oturum_no))
+        row = {
+            "tarih":          ku.tarih,
+            "oturum_no":      ku.oturum_no,
+            "saat_baslangic": saatler[0] if saatler else None,
+            "saat_bitis":     saatler[1] if saatler else None,
+            "tur":            "Komisyon Üyesi",
+            "detay":          ku.ders_adi or "—",
+        }
+        for uye in (ku.uye1, ku.uye2):
+            if uye:
+                personel_gorevler[uye.pk].append(dict(row))
+                personel_bilgi[uye.pk] = (uye.adi_soyadi, uye.brans or "")
+
+    for gz in (SorumluGozetmen.objects
+               .filter(sinav=sinav)
+               .select_related("gozetmen")
+               .order_by("tarih", "oturum_no")):
+        if not gz.gozetmen:
+            continue
+        saatler = takvim_saatler.get((gz.tarih, gz.oturum_no))
+        personel_gorevler[gz.gozetmen.pk].append({
+            "tarih":          gz.tarih,
+            "oturum_no":      gz.oturum_no,
+            "saat_baslangic": saatler[0] if saatler else None,
+            "saat_bitis":     saatler[1] if saatler else None,
+            "tur":            "Gözetmen",
+            "detay":          _SALON_LABEL.get(gz.salon, gz.salon),
+        })
+        personel_bilgi[gz.gozetmen.pk] = (gz.gozetmen.adi_soyadi, gz.gozetmen.brans or "")
+
+    sorted_pks = sorted(
+        personel_bilgi.keys(),
+        key=lambda pk: (personel_bilgi[pk][1], personel_bilgi[pk][0]),
+    )
+
+    COL_W = [70, 42, 78, 88, avail_w - 70 - 42 - 78 - 88]
+
+    def _tablo_stili(gorevler):
+        ts = TableStyle([
+            ("FONTNAME",      (0, 0), (-1, -1), _FONT),
+            ("FONTSIZE",      (0, 0), (-1, 0),  7.5),
+            ("FONTSIZE",      (0, 1), (-1, -1), 8),
+            ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#e2e8f0")),
+            ("ALIGN",         (0, 0), (-1, 0),  "CENTER"),
+            ("ALIGN",         (0, 1), (3, -1),  "CENTER"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
+            ("GRID",          (0, 0), (-1, -1), 0.3, _LIGHT),
+            ("LINEBELOW",     (0, 0), (-1, 0),  0.6, _GRAY),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ])
+        for i, r in enumerate(gorevler, start=1):
+            bg = colors.HexColor("#fffbf0") if r["tur"] == "Komisyon Üyesi" else colors.HexColor("#f0fdf4")
+            ts.add("BACKGROUND", (0, i), (-1, i), bg)
+        return ts
+
+    elements = []
+    if okul_adi:
+        elements.append(Paragraph(okul_adi, s_okul))
+    donem_bilgi = "  ·  ".join(filter(None, [egitim_yili, donem_str]))
+    if donem_bilgi:
+        elements.append(Paragraph(donem_bilgi, s_sinav))
+    elements.append(Paragraph(f"{sinav.sinav_adi}  —  Öğretmen Görev Raporu", s_baslik))
+    elements.append(HRFlowable(width="100%", thickness=1, color=_GRAY, spaceAfter=6))
+
+    for pk in sorted_pks:
+        adi_soyadi, brans = personel_bilgi[pk]
+        gorevler = sorted(
+            personel_gorevler[pk],
+            key=lambda x: (x["tarih"], x["oturum_no"], x["tur"]),
+        )
+
+        hdr_tbl = Table(
+            [[Paragraph(_tr_upper(adi_soyadi), s_ogr), Paragraph(brans, s_brans)]],
+            colWidths=[avail_w * 0.65, avail_w * 0.35],
+        )
+        hdr_tbl.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#1e3a5f")),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+            ("FONTNAME",      (0, 0), (-1, -1), _FONT),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN",         (1, 0), (1, 0),   "RIGHT"),
+        ]))
+
+        data = [[
+            Paragraph("Tarih",        s_hucre),
+            Paragraph("Oturum",       s_hucre),
+            Paragraph("Saat",         s_hucre),
+            Paragraph("Görev",        s_hucre),
+            Paragraph("Ders / Salon", s_hucre),
+        ]]
+        for r in gorevler:
+            gun = _GUNLER.get(r["tarih"].weekday(), "")
+            tarih_str = f"{gun} {r['tarih'].strftime('%d.%m.%Y')}"
+            saat_str = (
+                f"{r['saat_baslangic'].strftime('%H:%M')} – {r['saat_bitis'].strftime('%H:%M')}"
+                if r["saat_baslangic"] else "—"
+            )
+            data.append([
+                Paragraph(tarih_str,           s_hucre),
+                Paragraph(str(r["oturum_no"]), s_hucre),
+                Paragraph(saat_str,            s_hucre),
+                Paragraph(r["tur"],            s_hucre),
+                Paragraph(r["detay"],          s_hucre),
+            ])
+
+        tbl = Table(data, colWidths=COL_W)
+        tbl.setStyle(_tablo_stili(gorevler))
+
+        elements.append(KeepTogether([hdr_tbl, tbl]))
+        elements.append(Spacer(1, 14))
+
+    mudur = _mudur_onay_blogu(okul)
+    if mudur:
+        elements.append(mudur)
+
+    _state2 = {"page": 0}
+
+    def on_page2(canvas, doc):
+        _state2["page"] += 1
+        canvas.saveState()
+        canvas.setFont(_FONT, 7.5)
+        canvas.setFillColor(_GRAY)
+        canvas.drawRightString(W - LR, TB * 0.6, f"Sayfa {_state2['page']}")
+        canvas.restoreState()
+
+    doc.build(elements, onFirstPage=on_page2, onLaterPages=on_page2)

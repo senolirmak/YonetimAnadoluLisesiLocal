@@ -28,8 +28,9 @@ urlpatterns = [
     path("<int:sinav_pk>/takvim/tarih-guncelle/", views.takvim_oturum_tarihi_guncelle, name="takvim_oturum_tarihi_guncelle"),
 
     # Görevlendirme
-    path("<int:sinav_pk>/gorevlendirme/",     views.gorevlendirme,     name="gorevlendirme"),
-    path("<int:sinav_pk>/gorevlendirme/pdf/", views.gorevlendirme_pdf, name="gorevlendirme_pdf"),
+    path("<int:sinav_pk>/gorevlendirme/",                    views.gorevlendirme,               name="gorevlendirme"),
+    path("<int:sinav_pk>/gorevlendirme/pdf/",               views.gorevlendirme_pdf,           name="gorevlendirme_pdf"),
+    path("<int:sinav_pk>/gorevlendirme/ogretmen-gorev-pdf/", views.ogretmen_gorev_raporu_pdf,  name="ogretmen_gorev_raporu_pdf"),
 
     # Takvim & Rapor
     path("<int:sinav_pk>/takvim/",            views.takvim_detay,      name="takvim_detay"),

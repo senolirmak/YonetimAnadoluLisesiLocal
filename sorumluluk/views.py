@@ -275,8 +275,11 @@ def takvim_olustur(request, sinav_pk):
             saatler_dict = {}
             for i, slot_str in enumerate(oturum_saatleri_str.split(",")):
                 parts = slot_str.split("-")
-                bas   = parts[0].strip()
-                bit   = parts[1].strip() if len(parts) > 1 else bas
+                if len(parts) != 2:
+                    messages.error(request, f"Oturum saati hatalı format: '{slot_str.strip()}'. Örnek: 08:50-09:30")
+                    return redirect("sorumluluk:gorevlendirme", sinav_pk=sinav_pk)
+                bas = parts[0].strip()
+                bit = parts[1].strip()
                 slot_no = i + 1
                 time_slots.append(slot_no)
                 saatler_dict[slot_no] = (bas, bit)
@@ -951,6 +954,26 @@ def gorevlendirme_pdf(request, sinav_pk):
     donem  = sinav.get_donem_turu_display()  # type: ignore[attr-defined]
     egitim = str(sinav.egitim_yili) if sinav.egitim_yili else ""
     fname  = f"Gorevlendirme_{egitim}_{donem}.pdf".replace(" ", "_")
+    return HttpResponse(
+        buf.read(), content_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{fname}"'},
+    )
+
+
+@login_required
+def ogretmen_gorev_raporu_pdf(request, sinav_pk):
+    import io
+    from sorumluluk.services.pdf_service import ogretmen_gorev_raporu_pdf_uret
+
+    sinav = get_object_or_404(SorumluSinav.objects.select_related("egitim_yili"), pk=sinav_pk)
+    okul  = OkulBilgi.get()
+    buf   = io.BytesIO()
+    ogretmen_gorev_raporu_pdf_uret(buf, sinav, okul)
+    buf.seek(0)
+
+    donem  = sinav.get_donem_turu_display()  # type: ignore[attr-defined]
+    egitim = str(sinav.egitim_yili) if sinav.egitim_yili else ""
+    fname  = f"OgretmenGorevRaporu_{egitim}_{donem}.pdf".replace(" ", "_")
     return HttpResponse(
         buf.read(), content_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{fname}"'},
