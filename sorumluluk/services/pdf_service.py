@@ -776,3 +776,198 @@ def ogretmen_gorev_raporu_pdf_uret(buf, sinav, okul):
         canvas.restoreState()
 
     doc.build(elements, onFirstPage=on_page2, onLaterPages=on_page2)
+
+
+# ---------------------------------------------------------------------------
+# Öğretmen Görev & İmza Formu — Yatay (Landscape) A4
+# ---------------------------------------------------------------------------
+
+def ogretmen_gorev_imza_pdf_uret(buf, sinav, okul):
+    """Landscape A4 — Tarih/Oturum sırası, tek tablo.
+    Komisyon: Evrak Alındı / Evrak Teslim | Gözetmen: İmza sütunu.
+    """
+    from reportlab.lib.pagesizes import landscape
+
+    PAGE    = landscape(A4)
+    W, H    = PAGE
+    LR      = 1.5 * cm
+    TB      = 1.2 * cm
+    avail_w = W - 2 * LR
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=PAGE,
+        leftMargin=LR, rightMargin=LR,
+        topMargin=TB, bottomMargin=TB,
+    )
+
+    _GRAY_BG = colors.HexColor("#f1f5f9")
+    _GUNLER  = {0: "Pzt", 1: "Sal", 2: "Çar", 3: "Per", 4: "Cum", 5: "Cmt", 6: "Paz"}
+
+    s_okul   = ParagraphStyle('IGROkul',  fontName=_FONT, fontSize=11, alignment=1, spaceAfter=2,  leading=14)
+    s_sinav  = ParagraphStyle('IGRSinav', fontName=_FONT, fontSize=8,  alignment=1, spaceAfter=4,  textColor=_GRAY)
+    s_baslik = ParagraphStyle('IGRBas',   fontName=_FONT, fontSize=10, alignment=1, spaceAfter=5,  leading=13)
+    s_th     = ParagraphStyle('IGRTh',    fontName=_FONT, fontSize=8,  leading=11, alignment=1)
+    s_td     = ParagraphStyle('IGRTd',    fontName=_FONT, fontSize=8,  leading=11)
+    s_td_c   = ParagraphStyle('IGRTdC',   fontName=_FONT, fontSize=8,  leading=11, alignment=1)
+    s_na     = ParagraphStyle('IGRNa',    fontName=_FONT, fontSize=7,  leading=10, alignment=1,
+                               textColor=colors.HexColor("#94a3b8"))
+
+    okul_adi    = _tr_upper(okul.okul_adi if okul and okul.okul_adi else "")
+    donem_str   = sinav.get_donem_turu_display()   # type: ignore[attr-defined]
+    egitim_yili = str(sinav.egitim_yili) if sinav.egitim_yili else ""
+
+    takvim_saatler = {
+        (t.tarih, t.oturum_no): (t.saat_baslangic, t.saat_bitis)
+        for t in SorumluTakvim.objects.filter(sinav=sinav).order_by("tarih", "oturum_no")
+    }
+
+    # Tüm görevleri tek listeye topla
+    all_duties = []
+
+    for ku in (SorumluKomisyonUyesi.objects
+               .filter(sinav=sinav)
+               .select_related("uye1", "uye2")
+               .order_by("tarih", "oturum_no", "ders_adi")):
+        saatler = takvim_saatler.get((ku.tarih, ku.oturum_no))
+        base = {
+            "tarih":          ku.tarih,
+            "oturum_no":      ku.oturum_no,
+            "saat_baslangic": saatler[0] if saatler else None,
+            "saat_bitis":     saatler[1] if saatler else None,
+            "tur":            "Komisyon Üyesi",
+            "detay":          ku.ders_adi or "—",
+        }
+        for uye in (ku.uye1, ku.uye2):
+            if uye:
+                all_duties.append({**base, "ogretmen": uye.adi_soyadi})
+
+    for gz in (SorumluGozetmen.objects
+               .filter(sinav=sinav)
+               .select_related("gozetmen")
+               .order_by("tarih", "oturum_no")):
+        if not gz.gozetmen:
+            continue
+        saatler = takvim_saatler.get((gz.tarih, gz.oturum_no))
+        all_duties.append({
+            "tarih":          gz.tarih,
+            "oturum_no":      gz.oturum_no,
+            "saat_baslangic": saatler[0] if saatler else None,
+            "saat_bitis":     saatler[1] if saatler else None,
+            "tur":            "Gözetmen",
+            "detay":          _SALON_LABEL.get(gz.salon, gz.salon),
+            "ogretmen":       gz.gozetmen.adi_soyadi,
+        })
+
+    # Tarih → Oturum → Tür (Komisyon önce) → Ders/Salon → Öğretmen
+    all_duties.sort(key=lambda x: (x["tarih"], x["oturum_no"], x["tur"], x["detay"], x["ogretmen"]))
+
+    # Sütun genişlikleri (landscape avail_w ≈ 757pt)
+    # [Tarih, Oturum, Saat, Görev, Ders/Salon, Öğretmen, EvrakAlındı, EvrakTeslim, İmza]
+    C = [76, 34, 76, 85, 0, 130, 80, 80, 76]
+    C[4] = avail_w - sum(C)   # kalan → Ders/Salon (~120pt)
+
+    # Tablo verisi
+    data = [[
+        Paragraph("Tarih",        s_th),
+        Paragraph("Oturum",       s_th),
+        Paragraph("Saat",         s_th),
+        Paragraph("Görev",        s_th),
+        Paragraph("Ders / Salon", s_th),
+        Paragraph("Öğretmen",     s_th),
+        Paragraph("Evrak Alındı", s_th),
+        Paragraph("Evrak Teslim", s_th),
+        Paragraph("İmza",         s_th),
+    ]]
+    komisyon_rows = []
+    gozetmen_rows = []
+
+    for i, r in enumerate(all_duties, start=1):
+        gun     = _GUNLER.get(r["tarih"].weekday(), "")
+        tarih_s = f"{gun} {r['tarih'].strftime('%d.%m.%Y')}"
+        saat_s  = (
+            f"{r['saat_baslangic'].strftime('%H:%M')} – {r['saat_bitis'].strftime('%H:%M')}"
+            if r["saat_baslangic"] else "—"
+        )
+        if r["tur"] == "Komisyon Üyesi":
+            data.append([
+                Paragraph(tarih_s,             s_td_c),
+                Paragraph(str(r["oturum_no"]), s_td_c),
+                Paragraph(saat_s,              s_td_c),
+                Paragraph(r["tur"],            s_td),
+                Paragraph(r["detay"],          s_td),
+                Paragraph(r["ogretmen"],       s_td),
+                "",   # Evrak Alındı — imza boşluğu
+                "",   # Evrak Teslim — imza boşluğu
+                Paragraph("—", s_na),  # İmza — geçerli değil
+            ])
+            komisyon_rows.append(i)
+        else:
+            data.append([
+                Paragraph(tarih_s,             s_td_c),
+                Paragraph(str(r["oturum_no"]), s_td_c),
+                Paragraph(saat_s,              s_td_c),
+                Paragraph(r["tur"],            s_td),
+                Paragraph(r["detay"],          s_td),
+                Paragraph(r["ogretmen"],       s_td),
+                Paragraph("—", s_na),  # EvrakAlındı+Teslim birleşik — geçerli değil
+                "",
+                "",   # İmza — imza boşluğu
+            ])
+            gozetmen_rows.append(i)
+
+    ts = TableStyle([
+        ("FONTNAME",      (0, 0), (-1, -1), _FONT),
+        ("FONTSIZE",      (0, 0), (-1, 0),  7.5),
+        ("FONTSIZE",      (0, 1), (-1, -1), 8),
+        ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#e2e8f0")),
+        ("ALIGN",         (0, 0), (-1, 0),  "CENTER"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
+        ("GRID",          (0, 0), (-1, -1), 0.3, _LIGHT),
+        ("LINEBELOW",     (0, 0), (-1, 0),  0.6, _GRAY),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+    ])
+
+    for i in komisyon_rows:
+        ts.add("BACKGROUND", (0, i), (-1, i), colors.HexColor("#fffbf0"))
+        ts.add("BACKGROUND", (8, i), (8, i),  _GRAY_BG)   # İmza sütunu grileşir
+
+    for i in gozetmen_rows:
+        ts.add("BACKGROUND", (0, i), (-1, i), colors.HexColor("#f0fdf4"))
+        ts.add("BACKGROUND", (6, i), (7, i),  _GRAY_BG)   # Evrak sütunları grileşir
+        ts.add("SPAN",       (6, i), (7, i))               # iki hücre birleşir
+
+    tbl = Table(data, colWidths=C, repeatRows=1)
+    tbl.setStyle(ts)
+
+    elements = []
+    if okul_adi:
+        elements.append(Paragraph(okul_adi, s_okul))
+    donem_bilgi = "  ·  ".join(filter(None, [egitim_yili, donem_str]))
+    if donem_bilgi:
+        elements.append(Paragraph(donem_bilgi, s_sinav))
+    elements.append(Paragraph(f"{sinav.sinav_adi}  —  Öğretmen Görev & İmza Formu", s_baslik))
+    elements.append(HRFlowable(width="100%", thickness=1, color=_GRAY, spaceAfter=8))
+
+    if all_duties:
+        elements.append(tbl)
+    else:
+        elements.append(Paragraph("Henüz görevlendirme yapılmamış.", s_sinav))
+
+    mudur = _mudur_onay_blogu(okul)
+    if mudur:
+        elements.append(mudur)
+
+    _state = {"page": 0}
+
+    def on_page(canvas, doc):
+        _state["page"] += 1
+        canvas.saveState()
+        canvas.setFont(_FONT, 7.5)
+        canvas.setFillColor(_GRAY)
+        canvas.drawRightString(W - LR, TB * 0.6, f"Sayfa {_state['page']}")
+        canvas.restoreState()
+
+    doc.build(elements, onFirstPage=on_page, onLaterPages=on_page)

@@ -8,7 +8,8 @@ from okul.auth import mudur_yardimcisi_required
 
 from .forms import AlanForm, OrtakDersHavuzuForm, SecmeliDersForm, SecmeliDersGrubuForm, SecmeliDersHavuzuForm, SinifSeviyeToplamSaatForm
 from .models import (
-    Alan, AlanDers, OrtakDers, OrtakDersHavuzu,
+    Alan, AlanDers, OgrenciOrtalama, OgrenciSinifTekrari, OgrenciTasdikname,
+    OrtakDers, OrtakDersHavuzu,
     SecmeliDers, SecmeliDersGrubu, SecmeliDersHavuzu,
     SinifSeviyeToplamSaat,
     get_aktif_egitim_yili, get_toplam_saat,
@@ -527,3 +528,517 @@ def sinif_toplam_saat_listesi(request):
         "satırlar": satirlar,
         "aktif_yil": aktif_yil,
     })
+
+
+@mudur_yardimcisi_required
+def sinif_dagilimi(request):
+    import math
+    from collections import defaultdict
+    from ogrenci.models import Ogrenci
+    from ogrencidersleri.models import OgrenciSecmeliDers
+
+    MAKS = 34
+    HARFLER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    aktif_yil = get_aktif_egitim_yili()
+
+    def _sube_dagit(ogrs, gelecek_sinif, harf_idx):
+        """Öğrencileri kız/erkek dengesi korunarak şubelere dağıtır."""
+        kizlar  = sorted([o for o in ogrs if o.cinsiyet == "K"], key=lambda x: x.okulno or 0)
+        erkekler = sorted([o for o in ogrs if o.cinsiyet == "E"], key=lambda x: x.okulno or 0)
+        toplam = len(kizlar) + len(erkekler)
+        if toplam == 0:
+            return [], harf_idx
+
+        n_sube = math.ceil(toplam / MAKS)
+        G, B = len(kizlar), len(erkekler)
+        kiz_base, kiz_rem   = divmod(G, n_sube)
+        erk_base, erk_rem   = divmod(B, n_sube)
+
+        subeler = []
+        kiz_idx = erk_idx = 0
+        for i in range(n_sube):
+            kiz_al = kiz_base + (1 if i < kiz_rem else 0)
+            erk_al = erk_base + (1 if i < erk_rem else 0)
+            sube_ogrs = kizlar[kiz_idx:kiz_idx + kiz_al] + erkekler[erk_idx:erk_idx + erk_al]
+            sube_ogrs.sort(key=lambda x: x.okulno or 0)
+            kiz_idx += kiz_al
+            erk_idx += erk_al
+            harf = HARFLER[harf_idx] if harf_idx < 26 else str(harf_idx + 1)
+            subeler.append({
+                "sube": harf,
+                "label": f"{gelecek_sinif}/{harf}",
+                "ogrenciler": sube_ogrs,
+                "kiz_sayi": kiz_al,
+                "erkek_sayi": erk_al,
+            })
+            harf_idx += 1
+        return subeler, harf_idx
+
+    def _plan(sinif_no, gelecek_sinif):
+        alanlar = list(
+            _yf(Alan.objects.filter(sinif_seviyesi=gelecek_sinif), aktif_yil)
+            .order_by("sira", "adi")
+        )
+        alan_ders_map = {
+            a.pk: set(AlanDers.objects.filter(alan=a).values_list("ders_id", flat=True))
+            for a in alanlar
+        }
+
+        ogrenciler = list(Ogrenci.objects.filter(sinif=sinif_no).order_by("okulno"))
+        ogr_ids = [o.pk for o in ogrenciler]
+
+        # Sınıf tekrarı: modelden oku
+        sinif_tekrari_ids = set(
+            OgrenciSinifTekrari.objects.filter(
+                ogrenci_id__in=ogr_ids,
+            ).values_list("ogrenci_id", flat=True)
+        )
+        # Tasdikname: okuma hakkı biten
+        tasdikname_ids = set(
+            OgrenciTasdikname.objects.filter(
+                ogrenci_id__in=ogr_ids,
+            ).values_list("ogrenci_id", flat=True)
+        )
+
+        ogr_secim: dict = defaultdict(set)
+        for ogr_id, ders_id in OgrenciSecmeliDers.objects.filter(
+            ogrenci_id__in=ogr_ids
+        ).values_list("ogrenci_id", "ders_id"):
+            ogr_secim[ogr_id].add(ders_id)
+
+        alan_ogr: dict = defaultdict(list)
+        alan_yok = []
+        sinif_tekrari_liste = []
+        tasdikname_liste = []
+        for ogr in ogrenciler:
+            if ogr.pk in tasdikname_ids:
+                tasdikname_liste.append(ogr)
+                continue
+            if ogr.pk in sinif_tekrari_ids:
+                sinif_tekrari_liste.append(ogr)
+                continue
+            secimler = ogr_secim.get(ogr.pk, set())
+            if not secimler:
+                alan_yok.append(ogr)
+                continue
+            en_iyi_pk, en_iyi_skor = None, 0
+            for a_pk, d_ids in alan_ders_map.items():
+                skor = len(secimler & d_ids)
+                if skor > en_iyi_skor:
+                    en_iyi_skor, en_iyi_pk = skor, a_pk
+            (alan_ogr[en_iyi_pk] if en_iyi_pk else alan_yok).append(ogr)
+
+        harf_idx = 0
+        alan_gruplari = []
+        for a in alanlar:
+            ogrs = alan_ogr.get(a.pk, [])
+            subeler, harf_idx = _sube_dagit(ogrs, gelecek_sinif, harf_idx)
+            toplam_kiz    = sum(1 for o in ogrs if o.cinsiyet == "K")
+            toplam_erkek  = sum(1 for o in ogrs if o.cinsiyet == "E")
+            alan_gruplari.append({
+                "alan": a,
+                "ogrenci_sayisi": len(ogrs),
+                "toplam_kiz": toplam_kiz,
+                "toplam_erkek": toplam_erkek,
+                "sube_sayisi": len(subeler),
+                "subeler": subeler,
+            })
+
+        return {
+            "sinif": sinif_no,
+            "gelecek_sinif": gelecek_sinif,
+            "alan_gruplari": alan_gruplari,
+            "alan_yok": alan_yok,
+            "sinif_tekrari": sinif_tekrari_liste,
+            "tasdikname": tasdikname_liste,
+            "toplam_ogr": sum(g["ogrenci_sayisi"] for g in alan_gruplari),
+            "toplam_sube": sum(g["sube_sayisi"] for g in alan_gruplari),
+        }
+
+    plan_11 = _plan(10, 11)
+    plan_12 = _plan(11, 12)
+
+    return render(request, "secmelidersler/sinif_dagilimi.html", {
+        "title": "Sınıf Dağılımı",
+        "aktif_yil": aktif_yil,
+        "plan_11": plan_11,
+        "plan_12": plan_12,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Öğrenci Dönem Ağırlıklı Ortalaması — CRUD
+# ---------------------------------------------------------------------------
+
+def _excel_satirlari_oku(dosya):
+    """
+    XLS veya XLSX dosyasından tüm satırları liste olarak döndürür.
+    Her satır: [hücre1, hücre2, ...] (ham değer).
+    İlk satır başlık satırı olarak döndürülür.
+    """
+    adi = dosya.name.lower()
+    if adi.endswith(".xlsx"):
+        from openpyxl import load_workbook
+        wb = load_workbook(dosya, read_only=True, data_only=True)
+        ws = wb.active
+        satirlar = [[c.value for c in row] for row in ws.iter_rows()]
+        wb.close()
+    elif adi.endswith(".xls"):
+        import xlrd, tempfile, os
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xls")
+        for chunk in dosya.chunks():
+            tmp.write(chunk)
+        tmp.close()
+        wb = xlrd.open_workbook(tmp.name)
+        ws = wb.sheet_by_index(0)
+        satirlar = [ws.row_values(r) for r in range(ws.nrows)]
+        os.unlink(tmp.name)
+    else:
+        raise ValueError("Desteklenmeyen dosya formatı. Lütfen .xls veya .xlsx yükleyin.")
+    return satirlar
+
+
+def _sutun_indeksleri_bul(baslik_satiri):
+    """Başlık satırından okulno ve a_ortalama sütun indekslerini bulur."""
+    normalize = lambda s: str(s).strip().lower().replace(" ", "_").replace("ı", "i").replace("ö", "o").replace("ü", "u")
+    basliklar = [normalize(h) for h in baslik_satiri]
+    okulno_idx = a_ort_idx = None
+    for i, h in enumerate(basliklar):
+        if "okulno" in h or h == "okul_no":
+            okulno_idx = i
+        if "a_ortalama" in h or "agirlikli" in h or "ortalama" in h:
+            a_ort_idx = i
+    return okulno_idx, a_ort_idx
+
+
+@mudur_yardimcisi_required
+def ortalama_listesi(request):
+    from django.core.paginator import Paginator
+
+    aktif_yil = get_aktif_egitim_yili()
+    qs = (
+        OgrenciOrtalama.objects
+        .filter(egitim_yili=aktif_yil)
+        .select_related("ogrenci")
+        .order_by("ogrenci__okulno")
+    )
+
+    arama = request.GET.get("q", "").strip()
+    if arama:
+        from django.db.models import Q
+        qs = qs.filter(
+            Q(ogrenci__okulno__icontains=arama)
+            | Q(ogrenci__adi__icontains=arama)
+            | Q(ogrenci__soyadi__icontains=arama)
+        )
+
+    paginator = Paginator(qs, 50)
+    sayfa = paginator.get_page(request.GET.get("sayfa"))
+
+    return render(request, "secmelidersler/ortalama_listesi.html", {
+        "title": "Dönem Ağırlıklı Ortalamalar",
+        "aktif_yil": aktif_yil,
+        "sayfa": sayfa,
+        "arama": arama,
+        "toplam": qs.count(),
+    })
+
+
+@mudur_yardimcisi_required
+def ortalama_yukle(request):
+    if request.method != "POST":
+        return redirect("ortalama_listesi")
+
+    aktif_yil = get_aktif_egitim_yili()
+    dosya = request.FILES.get("excel_dosya")
+    if not dosya:
+        messages.error(request, "Dosya seçilmedi.")
+        return redirect("ortalama_listesi")
+
+    from ogrenci.models import Ogrenci
+
+    try:
+        satirlar = _excel_satirlari_oku(dosya)
+    except Exception as e:
+        messages.error(request, f"Dosya okunamadı: {e}")
+        return redirect("ortalama_listesi")
+
+    if len(satirlar) < 2:
+        messages.warning(request, "Dosya boş veya yalnızca başlık satırı içeriyor.")
+        return redirect("ortalama_listesi")
+
+    okulno_idx, a_ort_idx = _sutun_indeksleri_bul(satirlar[0])
+    if okulno_idx is None or a_ort_idx is None:
+        messages.error(
+            request,
+            "Başlık satırında 'okulno' ve 'a_ortalama' sütunları bulunamadı. "
+            "Lütfen Excel dosyanızın başlık satırını kontrol edin."
+        )
+        return redirect("ortalama_listesi")
+
+    ogrenci_map = {o.okulno: o for o in Ogrenci.objects.all()}
+
+    olusturulan = guncellenen = bulunamayan = hatali = 0
+    bulunamayan_liste = []
+
+    for satir_no, satir in enumerate(satirlar[1:], start=2):
+        try:
+            ham_okulno = satir[okulno_idx]
+            ham_ort    = satir[a_ort_idx]
+            if ham_okulno is None or ham_ort is None:
+                continue
+            okulno   = int(float(str(ham_okulno).strip()))
+            a_ort    = round(float(str(ham_ort).strip().replace(",", ".")), 2)
+        except (ValueError, TypeError, IndexError):
+            hatali += 1
+            continue
+
+        ogr = ogrenci_map.get(okulno)
+        if ogr is None:
+            bulunamayan += 1
+            bulunamayan_liste.append(okulno)
+            continue
+
+        obj, created = OgrenciOrtalama.objects.update_or_create(
+            ogrenci=ogr,
+            egitim_yili=aktif_yil,
+            defaults={"a_ortalama": a_ort},
+        )
+        if created:
+            olusturulan += 1
+        else:
+            guncellenen += 1
+
+    ozet = f"{olusturulan} yeni kayıt eklendi, {guncellenen} kayıt güncellendi."
+    if bulunamayan:
+        ozet += f" {bulunamayan} okul no sistemde bulunamadı."
+    if hatali:
+        ozet += f" {hatali} satır hatalı format nedeniyle atlandı."
+
+    if olusturulan + guncellenen > 0:
+        messages.success(request, ozet)
+    else:
+        messages.warning(request, ozet)
+
+    if bulunamayan_liste:
+        request.session["bulunamayan_okulno"] = bulunamayan_liste[:50]
+
+    return redirect("ortalama_listesi")
+
+
+@mudur_yardimcisi_required
+def ortalama_sil(request, pk):
+    obj = OgrenciOrtalama.objects.filter(pk=pk).first()
+    if obj:
+        obj.delete()
+        messages.success(request, f"{obj.ogrenci} kaydı silindi.")
+    return redirect("ortalama_listesi")
+
+
+@mudur_yardimcisi_required
+def ortalama_toplu_sil(request):
+    if request.method == "POST":
+        aktif_yil = get_aktif_egitim_yili()
+        sayi, _ = OgrenciOrtalama.objects.filter(egitim_yili=aktif_yil).delete()
+        messages.success(request, f"{sayi} kayıt silindi.")
+    return redirect("ortalama_listesi")
+
+
+# ---------------------------------------------------------------------------
+# Tasdikname CRUD — Okuma Hakkı Biten Öğrenciler
+# ---------------------------------------------------------------------------
+
+@mudur_yardimcisi_required
+def tasdikname_listesi(request):
+    from ogrenci.models import Ogrenci
+
+    aktif_yil = get_aktif_egitim_yili()
+    kayitlar = (
+        OgrenciTasdikname.objects
+        .select_related("ogrenci")
+        .order_by("ogrenci__sinif", "ogrenci__sube", "ogrenci__okulno")
+    )
+
+    arama = request.GET.get("q", "").strip()
+    arama_sonuclari = []
+    if arama:
+        from django.db.models import Q
+        mevcut_ids = set(kayitlar.values_list("ogrenci_id", flat=True))
+        arama_sonuclari = list(
+            Ogrenci.objects.filter(
+                Q(okulno__icontains=arama)
+                | Q(adi__icontains=arama)
+                | Q(soyadi__icontains=arama)
+            ).exclude(pk__in=mevcut_ids).order_by("sinif", "sube", "okulno")[:20]
+        )
+
+    return render(request, "secmelidersler/tasdikname_listesi.html", {
+        "title": "Tasdikname — Okuma Hakkı Biten Öğrenciler",
+        "aktif_yil": aktif_yil,
+        "kayitlar": kayitlar,
+        "arama": arama,
+        "arama_sonuclari": arama_sonuclari,
+        "toplam": kayitlar.count(),
+    })
+
+
+@mudur_yardimcisi_required
+def tasdikname_ekle(request):
+    if request.method != "POST":
+        return redirect("tasdikname_listesi")
+
+    from ogrenci.models import Ogrenci
+    ogrenci_pk = request.POST.get("ogrenci_pk")
+    tarih = request.POST.get("tarih") or None
+    aciklama = request.POST.get("aciklama", "").strip()
+    aktif_yil = get_aktif_egitim_yili()
+
+    ogr = Ogrenci.objects.filter(pk=ogrenci_pk).first()
+    if not ogr:
+        messages.error(request, "Öğrenci bulunamadı.")
+        return redirect("tasdikname_listesi")
+
+    _, created = OgrenciTasdikname.objects.get_or_create(
+        ogrenci=ogr,
+        defaults={"egitim_yili": aktif_yil, "tarih": tarih, "aciklama": aciklama},
+    )
+    if created:
+        messages.success(request, f"{ogr.adi} {ogr.soyadi} tasdikname listesine eklendi.")
+    else:
+        messages.warning(request, f"{ogr.adi} {ogr.soyadi} zaten tasdikname listesinde.")
+
+    from django.urls import reverse as _rev
+    q = request.POST.get("q", "")
+    return redirect(f"{_rev('tasdikname_listesi')}?q={q}")
+
+
+@mudur_yardimcisi_required
+def tasdikname_sil(request, pk):
+    if request.method == "POST":
+        kayit = OgrenciTasdikname.objects.filter(pk=pk).select_related("ogrenci").first()
+        if kayit:
+            ad = f"{kayit.ogrenci.adi} {kayit.ogrenci.soyadi}"
+            kayit.delete()
+            messages.success(request, f"{ad} tasdikname listesinden çıkarıldı.")
+    return redirect("tasdikname_listesi")
+
+
+# ---------------------------------------------------------------------------
+# Sınıf Tekrarı CRUD
+# ---------------------------------------------------------------------------
+
+@mudur_yardimcisi_required
+def sinif_tekrari_listesi(request):
+    from ogrenci.models import Ogrenci
+
+    aktif_yil = get_aktif_egitim_yili()
+    kayitlar = (
+        OgrenciSinifTekrari.objects
+        .select_related("ogrenci")
+        .order_by("ogrenci__sinif", "ogrenci__sube", "ogrenci__okulno")
+    )
+
+    arama = request.GET.get("q", "").strip()
+    arama_sonuclari = []
+    if arama:
+        from django.db.models import Q
+        mevcut_ids = set(kayitlar.values_list("ogrenci_id", flat=True))
+        arama_sonuclari = list(
+            Ogrenci.objects.filter(
+                Q(okulno__icontains=arama)
+                | Q(adi__icontains=arama)
+                | Q(soyadi__icontains=arama)
+            ).exclude(pk__in=mevcut_ids).order_by("sinif", "sube", "okulno")[:20]
+        )
+
+    # a_ortalama < 50 olanların kaçının henüz listede olmadığını göster
+    oneri_sayisi = 0
+    if aktif_yil:
+        mevcut_tekrari_ids = set(kayitlar.values_list("ogrenci_id", flat=True))
+        oneri_sayisi = OgrenciOrtalama.objects.filter(
+            egitim_yili=aktif_yil,
+            a_ortalama__lt=50,
+        ).exclude(ogrenci_id__in=mevcut_tekrari_ids).count()
+
+    return render(request, "secmelidersler/sinif_tekrari_listesi.html", {
+        "title": "Sınıf Tekrarı Öğrencileri",
+        "aktif_yil": aktif_yil,
+        "kayitlar": kayitlar,
+        "arama": arama,
+        "arama_sonuclari": arama_sonuclari,
+        "toplam": kayitlar.count(),
+        "oneri_sayisi": oneri_sayisi,
+    })
+
+
+@mudur_yardimcisi_required
+def sinif_tekrari_ekle(request):
+    if request.method != "POST":
+        return redirect("sinif_tekrari_listesi")
+
+    from ogrenci.models import Ogrenci
+    ogrenci_pk = request.POST.get("ogrenci_pk")
+    aciklama = request.POST.get("aciklama", "").strip()
+    aktif_yil = get_aktif_egitim_yili()
+
+    ogr = Ogrenci.objects.filter(pk=ogrenci_pk).first()
+    if not ogr:
+        messages.error(request, "Öğrenci bulunamadı.")
+        return redirect("sinif_tekrari_listesi")
+
+    _, created = OgrenciSinifTekrari.objects.get_or_create(
+        ogrenci=ogr,
+        defaults={"egitim_yili": aktif_yil, "aciklama": aciklama},
+    )
+    if created:
+        messages.success(request, f"{ogr.adi} {ogr.soyadi} sınıf tekrarı listesine eklendi.")
+    else:
+        messages.warning(request, f"{ogr.adi} {ogr.soyadi} zaten listede.")
+
+    from django.urls import reverse as _rev
+    q = request.POST.get("q", "")
+    return redirect(f"{_rev('sinif_tekrari_listesi')}?q={q}")
+
+
+@mudur_yardimcisi_required
+def sinif_tekrari_sil(request, pk):
+    if request.method == "POST":
+        kayit = OgrenciSinifTekrari.objects.filter(pk=pk).select_related("ogrenci").first()
+        if kayit:
+            ad = f"{kayit.ogrenci.adi} {kayit.ogrenci.soyadi}"
+            kayit.delete()
+            messages.success(request, f"{ad} sınıf tekrarı listesinden çıkarıldı.")
+    return redirect("sinif_tekrari_listesi")
+
+
+@mudur_yardimcisi_required
+def sinif_tekrari_otomatik_ekle(request):
+    """a_ortalama < 50 olan öğrencileri sınıf tekrarı listesine otomatik ekler."""
+    if request.method != "POST":
+        return redirect("sinif_tekrari_listesi")
+
+    aktif_yil = get_aktif_egitim_yili()
+    if not aktif_yil:
+        messages.error(request, "Aktif eğitim-öğretim yılı tanımlanmamış.")
+        return redirect("sinif_tekrari_listesi")
+
+    dusuk_ort = OgrenciOrtalama.objects.filter(
+        egitim_yili=aktif_yil,
+        a_ortalama__lt=50,
+    ).select_related("ogrenci")
+
+    eklenen = 0
+    for kayit in dusuk_ort:
+        _, created = OgrenciSinifTekrari.objects.get_or_create(
+            ogrenci=kayit.ogrenci,
+            defaults={"egitim_yili": aktif_yil},
+        )
+        if created:
+            eklenen += 1
+
+    if eklenen:
+        messages.success(request, f"{eklenen} öğrenci sınıf tekrarı listesine eklendi.")
+    else:
+        messages.info(request, "Eklenecek yeni öğrenci bulunamadı (hepsi zaten listede).")
+    return redirect("sinif_tekrari_listesi")
+

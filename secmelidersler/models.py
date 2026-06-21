@@ -276,3 +276,100 @@ class SecmeliDersHavuzu(models.Model):
 
     def __str__(self):
         return self.ders_adi
+
+
+# ---------------------------------------------------------------------------
+# Sınıf Tekrarı
+# ---------------------------------------------------------------------------
+
+class OgrenciSinifTekrari(models.Model):
+    ogrenci = models.OneToOneField(
+        "ogrenci.Ogrenci",
+        on_delete=models.CASCADE,
+        related_name="sinif_tekrari",
+        verbose_name="Öğrenci",
+    )
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="sinif_tekrarilar",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    aciklama = models.CharField(max_length=300, blank=True, verbose_name="Açıklama")
+    olusturma = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Sınıf Tekrarı"
+        verbose_name_plural = "Sınıf Tekrarları"
+
+    def __str__(self):
+        return f"{self.ogrenci} — Sınıf Tekrarı"
+
+
+# ---------------------------------------------------------------------------
+# Tasdikname (Okuma Hakkı Biten Öğrenciler)
+# ---------------------------------------------------------------------------
+
+class OgrenciTasdikname(models.Model):
+    ogrenci = models.OneToOneField(
+        "ogrenci.Ogrenci",
+        on_delete=models.CASCADE,
+        related_name="tasdikname",
+        verbose_name="Öğrenci",
+    )
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="tasdiknameler",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    tarih = models.DateField(null=True, blank=True, verbose_name="Tasdikname Tarihi")
+    aciklama = models.CharField(max_length=300, blank=True, verbose_name="Açıklama")
+    olusturma = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Tasdikname"
+        verbose_name_plural = "Tasdiknameler"
+
+    def __str__(self):
+        return f"{self.ogrenci} — Tasdikname"
+
+
+# ---------------------------------------------------------------------------
+# Öğrenci Dönem Ağırlıklı Ortalaması
+# ---------------------------------------------------------------------------
+
+class OgrenciOrtalama(models.Model):
+    ogrenci = models.ForeignKey(
+        "ogrenci.Ogrenci",
+        on_delete=models.CASCADE,
+        related_name="ortalamalar",
+        verbose_name="Öğrenci",
+    )
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="ogrenci_ortalamalar",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    a_ortalama = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name="Ağırlıklı Ortalama",
+    )
+    guncelleme = models.DateTimeField(auto_now=True, verbose_name="Güncellenme")
+
+    class Meta:
+        unique_together = [("ogrenci", "egitim_yili")]
+        ordering = ["ogrenci__okulno"]
+        verbose_name = "Öğrenci Ortalaması"
+        verbose_name_plural = "Öğrenci Ortalamaları"
+
+    def __str__(self):
+        return f"{self.ogrenci} — {self.a_ortalama}"

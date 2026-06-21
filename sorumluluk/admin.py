@@ -1,6 +1,8 @@
 from django.contrib import admin
 
 from sorumluluk.models import (
+    OncekiDonem,
+    OncekiDonemGorev,
     SorumluDers,
     SorumluDersHavuzu,
     SorumluOgrenci,
@@ -39,3 +41,22 @@ class SorumluTakvimAdmin(admin.ModelAdmin):
 admin.site.register(SorumluSinavParametre)
 admin.site.register(SorumluOturmaPlani)
 admin.site.register(SorumluDersHavuzu)
+
+
+class OncekiDonemGorevInline(admin.TabularInline):
+    model    = OncekiDonemGorev
+    extra    = 0
+    fields   = ["personel", "komisyon", "gozetmen"]
+    ordering = ["personel__brans", "personel__adi_soyadi"]
+
+
+@admin.register(OncekiDonem)
+class OncekiDonemAdmin(admin.ModelAdmin):
+    list_display  = ["sinav_adi", "egitim_yili", "get_donem_turu_display", "gorev_sayisi", "olusturma_tarihi"]
+    list_filter   = ["donem_turu", "egitim_yili"]
+    search_fields = ["sinav_adi", "aciklama"]
+    inlines       = [OncekiDonemGorevInline]
+
+    @admin.display(description="Görev Kaydı")
+    def gorev_sayisi(self, obj):
+        return f"{obj.gorevler.count()} öğretmen"

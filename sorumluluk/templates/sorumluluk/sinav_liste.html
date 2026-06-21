@@ -15,9 +15,12 @@
 {% endblock %}
 
 {% block sor_content %}
-<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
+<div style="display:flex; align-items:center; gap:.6rem; margin-bottom:1.5rem; flex-wrap:wrap;">
   <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Başlangıç Paneli</h1>
-  <a href="{% url 'sorumluluk:sinav_olustur' %}" class="btn btn-primary btn-sm" style="margin-left:auto;">+ Yeni Sınav Dönemi Aç</a>
+  <a href="{% url 'sorumluluk:ogretmen_gorev_ozeti' %}" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; margin-left:auto;">
+    <i class="fas fa-chalkboard-teacher"></i> Öğretmen Görev Özeti
+  </a>
+  <a href="{% url 'sorumluluk:sinav_olustur' %}" class="btn btn-primary btn-sm">+ Yeni Sınav Dönemi Aç</a>
 </div>
 
 {% if aktif_sinav %}

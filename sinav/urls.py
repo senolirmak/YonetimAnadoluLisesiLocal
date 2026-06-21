@@ -90,4 +90,7 @@ urlpatterns = [
     path("mazeret/<int:pk>/takvim/iptal/",       views.mazeret_takvim_onayli_iptal,  name="mazeret_takvim_iptal"),
     path("mazeret/<int:pk>/rapor/",              views.mazeret_rapor,                name="mazeret_rapor"),
     path("mazeret/<int:pk>/rapor/pdf/",          views.mazeret_rapor_pdf_view,       name="mazeret_rapor_pdf"),
+
+    # Öğretmen: kendi sorumluluk görevleri
+    path("sorumluluk-gorevlerim/", views.sorumluluk_gorevlerim, name="sorumluluk_gorevlerim"),
 ]

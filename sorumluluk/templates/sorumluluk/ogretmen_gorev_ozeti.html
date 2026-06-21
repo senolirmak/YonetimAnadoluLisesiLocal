@@ -1,0 +1,261 @@
+{% extends "sorumluluk/base.html" %}
+{% block sor_title %}Öğretmen Görev Özeti{% endblock %}
+
+{% block extra_css_child %}
+<style>
+  .filtre-bar {
+    display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;
+    margin-bottom:1.25rem;
+    background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:.7rem 1rem;
+  }
+  .filtre-bar label { font-size:.85rem; font-weight:600; color:#475569; white-space:nowrap; }
+  .filtre-bar select {
+    padding:.35rem .7rem; border:1px solid #cbd5e1; border-radius:5px;
+    font-size:.85rem; color:#1e293b; min-width:220px;
+  }
+
+  .ozet-kart {
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr));
+    gap:.7rem; margin-bottom:1.4rem;
+  }
+  .ozet-kutu { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:.85rem 1rem; text-align:center; }
+  .ozet-kutu .sayi { font-size:1.7rem; font-weight:700; }
+  .ozet-kutu .etiket { font-size:.72rem; font-weight:600; color:#64748b; text-transform:uppercase; margin-top:.2rem; }
+  .ozet-kutu.komisyon .sayi { color:#92400e; }
+  .ozet-kutu.gozetmen .sayi { color:#065f46; }
+  .ozet-kutu.toplam   .sayi { color:#1d4ed8; }
+
+  .sinav-bant {
+    background:#1e3a5f; color:#fff; border-radius:6px;
+    padding:.55rem 1rem; margin-bottom:1rem;
+    font-size:.88rem; font-weight:600;
+    display:flex; align-items:center; gap:.7rem; flex-wrap:wrap;
+  }
+  .sinav-bant .onay { background:#22c55e; color:#fff; border-radius:4px; font-size:.72rem; padding:.15rem .45rem; }
+
+  /* ── Ana tablo ── */
+  .brans-baslik {
+    background:#3d5a80; color:#fff; font-size:.82rem; font-weight:700;
+    padding:.42rem 1rem; border-radius:5px 5px 0 0; margin-top:1.4rem;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .brans-kisi { font-size:.72rem; color:#c7d2e8; font-weight:400; }
+
+  .gorev-tablo {
+    width:100%; border-collapse:collapse; font-size:.83rem;
+    background:#fff; border:1px solid #e2e8f0; border-top:none; margin-bottom:0;
+  }
+  .gorev-tablo thead th {
+    background:#f1f5f9; padding:.42rem .75rem; text-align:center;
+    font-size:.75rem; font-weight:700; color:#475569;
+    border-bottom:2px solid #e2e8f0; white-space:nowrap;
+  }
+  .gorev-tablo thead th.left { text-align:left; }
+  .gorev-tablo tbody tr:nth-child(even) { background:#fafafa; }
+  .gorev-tablo tbody tr:hover:not(.detay-row) { background:#f0f7ff; }
+  .gorev-tablo td { padding:.38rem .75rem; border-bottom:1px solid #f0f0f0; text-align:center; }
+  .gorev-tablo td.left { text-align:left; }
+  .sifir    { color:#d1d5db; }
+  .sayi-k   { color:#92400e; font-weight:700; }
+  .sayi-g   { color:#065f46; font-weight:700; }
+  .sayi-t   { color:#1d4ed8; font-weight:700; }
+  .sayi-m   { color:#6d28d9; font-weight:600; }
+  .sayi-onc { color:#4338ca; font-size:.78rem; }
+
+  .sep-col  { border-left:2px solid #e8edf2 !important; }
+
+  /* Detay satırı */
+  .detay-row td { padding:0; background:#f8fafc !important; border-bottom:2px solid #e2e8f0; }
+  .detay-ic { display:none; padding:.55rem 1rem .7rem 2.5rem; }
+  .detay-ic.acik { display:block; }
+  .detay-liste { display:flex; flex-wrap:wrap; gap:.4rem; }
+  .detay-pill {
+    display:inline-flex; align-items:center; gap:.35rem;
+    padding:.22rem .6rem; border-radius:4px; font-size:.76rem; font-weight:600;
+  }
+  .detay-pill.komisyon { background:#fffbf0; border:1px solid #fde68a; color:#92400e; }
+  .detay-pill.gozetmen { background:#f0fdf4; border:1px solid #a7f3d0; color:#065f46; }
+  .detay-pill .saat    { font-weight:400; color:#64748b; }
+
+  .toggle-btn {
+    background:none; border:none; cursor:pointer;
+    color:#3b82f6; font-size:.78rem; font-weight:600; padding:0;
+  }
+  .toggle-btn:hover { text-decoration:underline; }
+</style>
+{% endblock %}
+
+{% block sor_content %}
+<div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap;">
+  <h1 style="font-size:1.2rem;font-weight:700;color:#1a1a2e;margin:0;">
+    <i class="fas fa-chalkboard-teacher" style="color:#3d5a80;"></i>
+    Öğretmen Görev Özeti
+  </h1>
+  <a href="{% url 'sorumluluk:sinav_liste' %}" class="btn btn-secondary btn-sm" style="margin-left:auto;">← Başlangıç</a>
+</div>
+
+<!-- Sınav Filtresi -->
+<form method="get" class="filtre-bar">
+  <label for="sinav-sec">Sınav Dönemi:</label>
+  <select name="sinav" id="sinav-sec" onchange="this.form.submit()">
+    <option value="">— Kümülatif (Tüm Sınavlar) —</option>
+    {% for s in sinavlar %}
+    <option value="{{ s.pk }}" {% if secili_sinav and secili_sinav.pk == s.pk %}selected{% endif %}>
+      {{ s.sinav_adi }}{% if s.egitim_yili %} · {{ s.egitim_yili }}{% endif %} ({{ s.get_donem_turu_display }}){% if s.onaylandi %} ✓{% endif %}
+    </option>
+    {% endfor %}
+  </select>
+  {% if not secili_sinav %}
+  <span style="font-size:.8rem;color:#64748b;font-style:italic;">Tüm sınavların kümülatif toplamı — önceki dönem değerleri dahil.</span>
+  {% endif %}
+</form>
+
+{% if secili_sinav %}
+<div class="sinav-bant">
+  <i class="fas fa-calendar-alt"></i>
+  <span>{{ secili_sinav.sinav_adi }}</span>
+  {% if secili_sinav.egitim_yili %}<span style="opacity:.65;">{{ secili_sinav.egitim_yili }}</span>{% endif %}
+  <span style="opacity:.4;">·</span>
+  <span>{{ secili_sinav.get_donem_turu_display }}</span>
+  {% if secili_sinav.onaylandi %}<span class="onay"><i class="fas fa-check"></i> Onaylandı</span>{% endif %}
+</div>
+{% endif %}
+
+<!-- Özet kutuları -->
+<div class="ozet-kart">
+  <div class="ozet-kutu komisyon">
+    <div class="sayi">{{ toplam_komisyon }}</div>
+    <div class="etiket">{% if secili_sinav %}Bu Sınavda{% else %}Kümülatif{% endif %} Komisyon</div>
+  </div>
+  <div class="ozet-kutu gozetmen">
+    <div class="sayi">{{ toplam_gozetmen }}</div>
+    <div class="etiket">{% if secili_sinav %}Bu Sınavda{% else %}Kümülatif{% endif %} Gözetmen</div>
+  </div>
+  <div class="ozet-kutu toplam">
+    <div class="sayi">{{ toplam_komisyon|add:toplam_gozetmen }}</div>
+    <div class="etiket">{% if secili_sinav %}Bu Sınavda{% else %}Kümülatif{% endif %} Toplam</div>
+  </div>
+  <div class="ozet-kutu">
+    <div class="sayi" style="color:#334155;">{{ toplam_personel }}</div>
+    <div class="etiket">Toplam Öğretmen</div>
+  </div>
+</div>
+
+<!-- Geçmiş Dönemler Bandı -->
+{% if gecmis_donemler %}
+<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:.65rem 1rem;margin-bottom:1.4rem;font-size:.82rem;color:#4338ca;">
+  <i class="fas fa-history"></i>
+  <strong>{{ gecmis_donemler|length }} geçmiş dönem</strong> kümülatif toplama dahil:
+  {% for d in gecmis_donemler %}
+  <span style="background:#fff;border:1px solid #c7d2fe;border-radius:4px;padding:.1rem .45rem;margin-left:.3rem;display:inline-block;">{{ d.sinav_adi }}</span>
+  {% endfor %}
+  <a href="/admin/sorumluluk/oncekidonem/" target="_blank"
+     style="margin-left:.8rem;color:#6366f1;font-weight:600;text-decoration:none;font-size:.78rem;">
+    <i class="fas fa-external-link-alt"></i> Admin'de Düzenle
+  </a>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════
+     Branş Gruplu Özet Tablosu
+════════════════════════════════════════════════════════════════ -->
+{% for grup in gruplu_satirlar %}
+<div class="brans-baslik">
+  <span><i class="fas fa-tag" style="margin-right:.4rem;"></i>{{ grup.brans }}</span>
+  <span class="brans-kisi">{{ grup.satirlar|length }} öğretmen</span>
+</div>
+<table class="gorev-tablo">
+  <thead>
+    <tr>
+      <th class="left" style="min-width:170px;width:28%;">Öğretmen Adı</th>
+      {% if secili_sinav %}
+      <th title="Bu sınavdaki komisyon görevi">Komisyon</th>
+      <th title="Bu sınavdaki gözetmen görevi">Gözetmen</th>
+      <th title="Bu sınavdaki toplam">Toplam</th>
+      <th class="sep-col" title="Sistem kayıtlarındaki kümülatif komisyon">Küm.Kom.</th>
+      <th title="Sistem kayıtlarındaki kümülatif gözetmen">Küm.Göz.</th>
+      <th class="sep-col" title="Önceki dönem + sistem toplamı (komisyon)">Genel Kom.</th>
+      <th title="Önceki dönem + sistem toplamı (gözetmen)">Genel Göz.</th>
+      <th title="Genel kümülatif toplam">Genel Top.</th>
+      <th style="width:65px;"></th>
+      {% else %}
+      <th title="Sistem kayıtlarındaki komisyon">Sistem Kom.</th>
+      <th title="Sistem kayıtlarındaki gözetmen">Sistem Göz.</th>
+      <th class="sep-col" title="Önceki dönem komisyon">Önceki Kom.</th>
+      <th title="Önceki dönem gözetmen">Önceki Göz.</th>
+      <th class="sep-col" title="Genel toplam komisyon">Genel Kom.</th>
+      <th title="Genel toplam gözetmen">Genel Göz.</th>
+      <th title="Genel kümülatif toplam">Genel Top.</th>
+      {% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for satir in grup.satirlar %}
+    <tr>
+      <td class="left" style="font-weight:600;color:#1e3a5f;">{{ satir.adi_soyadi }}</td>
+      {% if secili_sinav %}
+      <td class="{% if satir.komisyon == 0 %}sifir{% else %}sayi-k{% endif %}">{{ satir.komisyon }}</td>
+      <td class="{% if satir.gozetmen == 0 %}sifir{% else %}sayi-g{% endif %}">{{ satir.gozetmen }}</td>
+      <td class="{% if satir.toplam == 0 %}sifir{% else %}sayi-t{% endif %}">{{ satir.toplam }}</td>
+      <td class="sep-col {% if satir.sys_komisyon == 0 %}sifir{% else %}sayi-m{% endif %}">{{ satir.sys_komisyon }}</td>
+      <td class="{% if satir.sys_gozetmen == 0 %}sifir{% else %}sayi-m{% endif %}">{{ satir.sys_gozetmen }}</td>
+      <td class="sep-col {% if satir.kum_komisyon == 0 %}sifir{% else %}sayi-t{% endif %}">{{ satir.kum_komisyon }}</td>
+      <td class="{% if satir.kum_gozetmen == 0 %}sifir{% else %}sayi-t{% endif %}">{{ satir.kum_gozetmen }}</td>
+      <td class="{% if satir.kum_toplam == 0 %}sifir{% else %}sayi-t{% endif %}" style="font-weight:800;">{{ satir.kum_toplam }}</td>
+      <td>
+        {% if satir.detaylar %}
+        <button class="toggle-btn" onclick="toggleDetay('d{{ satir.pk }}', this)">
+          <i class="fas fa-chevron-down"></i> Detay
+        </button>
+        {% endif %}
+      </td>
+      {% else %}
+      <td class="{% if satir.sys_komisyon == 0 %}sifir{% else %}sayi-k{% endif %}">{{ satir.sys_komisyon }}</td>
+      <td class="{% if satir.sys_gozetmen == 0 %}sifir{% else %}sayi-g{% endif %}">{{ satir.sys_gozetmen }}</td>
+      <td class="sep-col {% if satir.onc_komisyon == 0 %}sifir{% else %}sayi-onc{% endif %}"
+          title="{{ satir.onc_aciklama }}">{{ satir.onc_komisyon }}</td>
+      <td class="{% if satir.onc_gozetmen == 0 %}sifir{% else %}sayi-onc{% endif %}"
+          title="{{ satir.onc_aciklama }}">{{ satir.onc_gozetmen }}</td>
+      <td class="sep-col {% if satir.kum_komisyon == 0 %}sifir{% else %}sayi-t{% endif %}">{{ satir.kum_komisyon }}</td>
+      <td class="{% if satir.kum_gozetmen == 0 %}sifir{% else %}sayi-t{% endif %}">{{ satir.kum_gozetmen }}</td>
+      <td class="{% if satir.kum_toplam == 0 %}sifir{% else %}sayi-t{% endif %}" style="font-weight:800;">{{ satir.kum_toplam }}</td>
+      {% endif %}
+    </tr>
+    {% if secili_sinav and satir.detaylar %}
+    <tr class="detay-row">
+      <td colspan="10">
+        <div class="detay-ic" id="d{{ satir.pk }}">
+          <div class="detay-liste">
+            {% for det in satir.detaylar %}
+            <span class="detay-pill {{ det.tur }}">
+              {% if det.tur == "komisyon" %}<i class="fas fa-users"></i>{% else %}<i class="fas fa-eye"></i>{% endif %}
+              {{ det.tarih_str }} &nbsp;Ot.{{ det.oturum_no }}
+              {% if det.saat_baslangic %}
+              <span class="saat">{{ det.saat_baslangic|time:"H:i" }}–{{ det.saat_bitis|time:"H:i" }}</span>
+              {% endif %}
+              <span style="border-left:1px solid currentColor;padding-left:.4rem;margin-left:.1rem;">{{ det.detay }}</span>
+            </span>
+            {% endfor %}
+          </div>
+        </div>
+      </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+{% empty %}
+<div style="text-align:center;color:#94a3b8;padding:3rem 1rem;">Kayıtlı öğretmen bulunamadı.</div>
+{% endfor %}
+
+<script>
+function toggleDetay(id, btn) {
+  const ic = document.getElementById(id);
+  if (!ic) return;
+  const acik = ic.classList.toggle('acik');
+  btn.innerHTML = acik
+    ? '<i class="fas fa-chevron-up"></i> Gizle'
+    : '<i class="fas fa-chevron-down"></i> Detay';
+}
+</script>
+{% endblock %}

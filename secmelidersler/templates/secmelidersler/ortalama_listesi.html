@@ -1,0 +1,219 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+  .ort-sayfa { max-width: 1000px; margin: 0 auto; padding: 20px 16px; }
+  .ort-ust { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .yukle-kart {
+    background: #fff; border: 1px solid #d1dde8; border-radius: 8px;
+    padding: 1.1rem 1.2rem; margin-bottom: 1.4rem;
+  }
+  .yukle-kart h6 { font-size: .9rem; font-weight: 700; color: #1e3a5f; margin-bottom: .7rem; }
+  .yukle-form { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+  .yukle-form input[type=file] {
+    font-size: .84rem; border: 1px solid #ced4da; border-radius: 5px;
+    padding: .35rem .6rem; background: #f8fafc; color: #334155;
+    flex: 1; min-width: 220px;
+  }
+  .btn-yukle {
+    background: #1e7d32; color: #fff; border: none; border-radius: 5px;
+    padding: .4rem 1.1rem; font-size: .85rem; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; gap: .4rem;
+  }
+  .btn-yukle:hover { background: #155724; }
+  .btn-sil-hepsi {
+    background: #dc3545; color: #fff; border: none; border-radius: 5px;
+    padding: .38rem .95rem; font-size: .83rem; font-weight: 600; cursor: pointer;
+  }
+  .bilgi-notu {
+    font-size: .8rem; color: #64748b; background: #f0f7ff;
+    border-left: 3px solid #90b4d0; border-radius: 3px; padding: .4rem .7rem; margin-top: .6rem;
+  }
+  .ort-arama { display: flex; gap: .5rem; margin-bottom: 1rem; }
+  .ort-arama input {
+    border: 1px solid #ced4da; border-radius: 5px; padding: .38rem .75rem;
+    font-size: .85rem; flex: 1; max-width: 320px;
+  }
+  .ort-arama button {
+    background: #417690; color: #fff; border: none; border-radius: 5px;
+    padding: .38rem .9rem; font-size: .84rem; font-weight: 600; cursor: pointer;
+  }
+  .ort-tablo { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  .ort-tablo th {
+    background: #f1f5f9; color: #475569;
+    padding: .35rem .8rem; text-align: left;
+    font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .ort-tablo td { padding: .32rem .8rem; border-bottom: 1px solid #f1f5f9; }
+  .ort-tablo tr:hover td { background: #f8fafc; }
+  .badge-ort {
+    display: inline-block; font-size: .8rem; font-weight: 700;
+    padding: .12rem .5rem; border-radius: 4px; min-width: 3.5rem; text-align: center;
+  }
+  .badge-ort.yuksek { background: #d1fae5; color: #065f46; }
+  .badge-ort.orta   { background: #fef3c7; color: #92400e; }
+  .badge-ort.dusuk  { background: #fee2e2; color: #991b1b; }
+  .btn-sil-tek {
+    background: none; border: none; color: #dc3545; cursor: pointer;
+    font-size: .8rem; padding: .15rem .35rem; border-radius: 3px;
+  }
+  .btn-sil-tek:hover { background: #fee2e2; }
+  .sayfalama { display: flex; gap: .4rem; justify-content: center; margin-top: 1.2rem; flex-wrap: wrap; }
+  .sayfalama a, .sayfalama span {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 2rem; height: 2rem; padding: 0 .5rem;
+    border: 1px solid #d1dde8; border-radius: 4px;
+    font-size: .83rem; text-decoration: none; color: #334155;
+  }
+  .sayfalama span.aktif { background: #1e3a5f; color: #fff; border-color: #1e3a5f; font-weight: 700; }
+  .sayfalama a:hover { background: #f0f7ff; }
+  .bos-durum { text-align: center; padding: 3rem; color: #94a3b8; font-size: .9rem; }
+  .bulunamayan-blok {
+    background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px;
+    padding: .65rem 1rem; margin-bottom: 1rem; font-size: .82rem; color: #9a3412;
+  }
+</style>
+
+<div class="ort-sayfa">
+
+  <div class="ort-ust">
+    <a href="{% url 'secmeli_index' %}"
+       style="display:inline-flex;align-items:center;gap:.5rem;background:#6c757d;color:#fff;
+              padding:.4rem 1rem;border-radius:6px;text-decoration:none;font-size:.85rem;font-weight:600;">
+      ← Seçmeli Dersler
+    </a>
+    <h5 style="margin:0;font-size:1rem;font-weight:700;color:#1e3a5f;">{{ title }}</h5>
+    {% if aktif_yil %}
+    <span style="font-size:.82rem;background:#e8f5e9;color:#1b5e20;padding:.25rem .75rem;border-radius:20px;font-weight:600;margin-left:auto;">
+      {{ aktif_yil }}
+    </span>
+    {% endif %}
+  </div>
+
+  {% for m in messages %}
+  <div style="background:{% if m.tags == 'success' %}#d1fae5{% elif m.tags == 'warning' %}#fef9c3{% else %}#fee2e2{% endif %};
+              border-left:4px solid {% if m.tags == 'success' %}#16a34a{% elif m.tags == 'warning' %}#ca8a04{% else %}#dc2626{% endif %};
+              border-radius:4px;padding:.6rem 1rem;margin-bottom:.8rem;font-size:.85rem;
+              color:{% if m.tags == 'success' %}#065f46{% elif m.tags == 'warning' %}#713f12{% else %}#991b1b{% endif %};">
+    {{ m }}
+  </div>
+  {% endfor %}
+
+  {% if request.session.bulunamayan_okulno %}
+  <div class="bulunamayan-blok">
+    <strong><i class="fas fa-exclamation-triangle"></i> Sistemde Bulunamayan Okul Numaraları:</strong>
+    {{ request.session.bulunamayan_okulno|join:", " }}
+    {% if request.session.bulunamayan_okulno|length == 50 %}&hellip; (ilk 50 gösterildi){% endif %}
+  </div>
+  {% endif %}
+
+  {# ---- Excel Yükleme Kartı ---- #}
+  <div class="yukle-kart">
+    <h6><i class="fas fa-file-excel"></i> Excel'den Veri Yükle</h6>
+    <form method="post" action="{% url 'ortalama_yukle' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="yukle-form">
+        <input type="file" name="excel_dosya" accept=".xls,.xlsx" required>
+        <button type="submit" class="btn-yukle">
+          <i class="fas fa-upload"></i> Yükle ve İçe Aktar
+        </button>
+        {% if toplam > 0 %}
+        <form method="post" action="{% url 'ortalama_toplu_sil' %}" style="margin:0;"
+              onsubmit="return confirm('{{ aktif_yil }} yılına ait tüm {{ toplam }} kayıt silinecek. Emin misiniz?')">
+          {% csrf_token %}
+          <button type="submit" class="btn-sil-hepsi">
+            <i class="fas fa-trash-alt"></i> Tümünü Sil ({{ toplam }})
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+    <div class="bilgi-notu">
+      Excel dosyası en az iki sütun içermelidir: <strong>okulno</strong> ve <strong>a_ortalama</strong>
+      (başlık satırında bu isimler kullanılmalıdır). Aynı öğrenciye ait mevcut kayıt varsa güncellenir.
+      Ondalık ayracı olarak nokta <strong>.</strong> veya virgül <strong>,</strong> kullanılabilir.
+    </div>
+  </div>
+
+  {# ---- Arama ve Liste ---- #}
+  <form method="get" class="ort-arama">
+    <input type="text" name="q" value="{{ arama }}" placeholder="Ad, soyad veya okul no ara…">
+    <button type="submit"><i class="fas fa-search"></i> Ara</button>
+    {% if arama %}<a href="{% url 'ortalama_listesi' %}" style="font-size:.83rem;color:#6c757d;align-self:center;">✕ Temizle</a>{% endif %}
+  </form>
+
+  {% if not sayfa.object_list %}
+  <div class="bos-durum">
+    <i class="fas fa-inbox" style="font-size:2rem;display:block;margin-bottom:.6rem;opacity:.3;"></i>
+    {% if arama %}Aramanızla eşleşen kayıt bulunamadı.{% else %}Henüz veri yüklenmedi.{% endif %}
+  </div>
+  {% else %}
+  <div style="font-size:.8rem;color:#64748b;margin-bottom:.5rem;">
+    Toplam <strong>{{ toplam }}</strong> kayıt{% if arama %} · Aranan: "{{ arama }}"{% endif %}
+  </div>
+  <table class="ort-tablo">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Okul No</th>
+        <th>Ad Soyad</th>
+        <th>Sınıf / Şube</th>
+        <th style="text-align:center;">Ağırlıklı Ort.</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for kayit in sayfa.object_list %}
+      <tr>
+        <td style="color:#94a3b8;font-size:.76rem;">{{ forloop.counter0|add:sayfa.start_index }}</td>
+        <td style="font-family:monospace;font-weight:600;color:#475569;">{{ kayit.ogrenci.okulno }}</td>
+        <td style="font-weight:600;color:#1e3a5f;">{{ kayit.ogrenci.adi }} {{ kayit.ogrenci.soyadi }}</td>
+        <td style="color:#64748b;">{{ kayit.ogrenci.sinif }}{% if kayit.ogrenci.sube %}/{{ kayit.ogrenci.sube }}{% endif %}</td>
+        <td style="text-align:center;">
+          {% with ort=kayit.a_ortalama %}
+          <span class="badge-ort {% if ort >= 85 %}yuksek{% elif ort >= 60 %}orta{% else %}dusuk{% endif %}">
+            {{ ort }}
+          </span>
+          {% endwith %}
+        </td>
+        <td style="text-align:right;">
+          <form method="post" action="{% url 'ortalama_sil' kayit.pk %}" style="display:inline;"
+                onsubmit="return confirm('{{ kayit.ogrenci.adi }} {{ kayit.ogrenci.soyadi }} kaydı silinecek.')">
+            {% csrf_token %}
+            <button type="submit" class="btn-sil-tek" title="Kaydı sil">
+              <i class="fas fa-times"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {# ---- Sayfalama ---- #}
+  {% if sayfa.has_other_pages %}
+  <div class="sayfalama">
+    {% if sayfa.has_previous %}
+    <a href="?sayfa={{ sayfa.previous_page_number }}{% if arama %}&q={{ arama }}{% endif %}">&laquo;</a>
+    {% endif %}
+    {% for p in sayfa.paginator.page_range %}
+      {% if p == sayfa.number %}
+      <span class="aktif">{{ p }}</span>
+      {% elif p >= sayfa.number|add:"-3" and p <= sayfa.number|add:"3" %}
+      <a href="?sayfa={{ p }}{% if arama %}&q={{ arama }}{% endif %}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if sayfa.has_next %}
+    <a href="?sayfa={{ sayfa.next_page_number }}{% if arama %}&q={{ arama }}{% endif %}">&raquo;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endif %}
+
+</div>
+{% endblock %}

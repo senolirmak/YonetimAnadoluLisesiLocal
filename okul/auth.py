@@ -73,6 +73,28 @@ def mudur_yardimcisi_required(view_func):
     return wrapper
 
 
+_YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
+
+
+def is_yonetici(user) -> bool:
+    """ogretmen grubu hariç tüm yönetici gruplarını kabul eder."""
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or user.groups.filter(name__in=_YONETICI_GRUPLAR).exists()
+
+
+def yonetici_required(view_func):
+    """ogretmen grubunu reddeden, diğer yönetici gruplarına izin veren decorator."""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(settings.LOGIN_URL)
+        if not is_yonetici(request.user):
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
 class MudurYardimcisiMixin(LoginRequiredMixin):
     """Class-based view mixin."""
     def dispatch(self, request, *args, **kwargs):

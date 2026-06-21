@@ -12,7 +12,7 @@ from okul.models import OkulBilgi, SinifSube
 from ogrenci.models import Ogrenci
 from dersprogrami.models import DersProgrami
 from secmelidersler.models import (
-    Alan, AlanDers, OrtakDers, SecmeliDersGrubu,
+    Alan, AlanDers, OgrenciSinifTekrari, OgrenciTasdikname, OrtakDers, SecmeliDersGrubu,
     get_toplam_saat, get_toplam_saat_map, get_aktif_egitim_yili, _VARSAYILAN_TOPLAM_SAAT,
 )
 from secmelidersler.services.pdf_rapor import secmeli_ders_pdf
@@ -25,6 +25,24 @@ _GELECEK = lambda sinif: sinif + 1
 
 def _yf(qs, aktif_yil):
     return qs.filter(egitim_yili=aktif_yil) if aktif_yil else qs
+
+
+def _sinif_tekrari_ids(ogr_ids, aktif_yil=None):
+    """OgrenciSinifTekrari modeline kayıtlı öğrenci pk seti."""
+    return set(
+        OgrenciSinifTekrari.objects.filter(
+            ogrenci_id__in=ogr_ids,
+        ).values_list("ogrenci_id", flat=True)
+    )
+
+
+def _tasdikname_ids(ogr_ids):
+    """Tasdikname kaydı olan öğrenci pk seti."""
+    return set(
+        OgrenciTasdikname.objects.filter(
+            ogrenci_id__in=ogr_ids,
+        ).values_list("ogrenci_id", flat=True)
+    )
 
 
 def _dp_ders_saatleri(sinif_sube_obj):
@@ -99,14 +117,22 @@ def ogrenci_listesi(request):
     tum_siniflar = list(Ogrenci.objects.values_list("sinif", flat=True).distinct().order_by("sinif"))
     tum_subeler = list(Ogrenci.objects.values_list("sube", flat=True).distinct().order_by("sube"))
 
+    tum_ogr_ids = list(qs.values_list("pk", flat=True))
+    _tekrari_ids   = _sinif_tekrari_ids(tum_ogr_ids, _aktif_yil)
+    _tasdikname_ids_set = _tasdikname_ids(tum_ogr_ids)
+
     ogr_listesi = []
     for o in qs:
-        gelecek = _GELECEK(o.sinif)
+        tekrari    = o.pk in _tekrari_ids
+        tasdikname = o.pk in _tasdikname_ids_set
+        gelecek = o.sinif if tekrari else _GELECEK(o.sinif)
         secmeli_maks = secmeli_maks_map.get(gelecek, 0)
         ogr_listesi.append({
             "ogrenci": o,
             "gelecek_sinif": gelecek,
             "son_sinif": gelecek > 12,
+            "tasdikname": tasdikname,
+            "sinif_tekrari": tekrari,
             "mevcut_ders_sayi": mevcut_map.get(o.pk, 0),
             "secmeli_saat": secmeli_map.get((o.pk, gelecek), 0),
             "secmeli_maks": secmeli_maks,
@@ -156,7 +182,9 @@ def ogrenci_listesi(request):
 @mudur_yardimcisi_required
 def ogrenci_detay(request, ogrenci_pk):
     ogrenci = get_object_or_404(Ogrenci, pk=ogrenci_pk)
-    gelecek_sinif = _GELECEK(ogrenci.sinif)
+    tasdikname_var = OgrenciTasdikname.objects.filter(ogrenci=ogrenci).exists()
+    sinif_tekrari   = OgrenciSinifTekrari.objects.filter(ogrenci=ogrenci).exists()
+    gelecek_sinif = ogrenci.sinif if sinif_tekrari else _GELECEK(ogrenci.sinif)
 
     if gelecek_sinif > 12:
         return render(request, "ogrencidersleri/son_sinif.html", {
@@ -212,6 +240,8 @@ def ogrenci_detay(request, ogrenci_pk):
         "title": f"Ders Planı — {ogrenci.adi} {ogrenci.soyadi}",
         "ogrenci": ogrenci,
         "gelecek_sinif": gelecek_sinif,
+        "tasdikname_var": tasdikname_var,
+        "sinif_tekrari": sinif_tekrari,
         # Mevcut yıl
         "mevcut_dersler": mevcut_dersler,
         "mevcut_toplam_saat": mevcut_toplam_saat,
@@ -416,7 +446,18 @@ def ogrenci_zorunlu_sil(request, ogrenci_pk, ders_pk):
 @mudur_yardimcisi_required
 def ogrenci_secmeli_form(request, ogrenci_pk):
     ogrenci = get_object_or_404(Ogrenci, pk=ogrenci_pk)
-    gelecek_sinif = _GELECEK(ogrenci.sinif)
+    aktif_yil = get_aktif_egitim_yili()
+
+    # Tasdikname kontrolü — seçmeli ders seçiminden dışarıda
+    if OgrenciTasdikname.objects.filter(ogrenci=ogrenci).exists():
+        return render(request, "ogrencidersleri/tasdikname_engel.html", {
+            "title": "Seçmeli Ders Seçimi",
+            "ogrenci": ogrenci,
+        })
+
+    # Sınıf tekrarı kontrolü — aynı seviyede seçim yapar
+    sinif_tekrari = OgrenciSinifTekrari.objects.filter(ogrenci=ogrenci).exists()
+    gelecek_sinif = ogrenci.sinif if sinif_tekrari else _GELECEK(ogrenci.sinif)
 
     if gelecek_sinif > 12:
         return render(request, "ogrencidersleri/son_sinif.html", {
@@ -424,7 +465,6 @@ def ogrenci_secmeli_form(request, ogrenci_pk):
             "ogrenci": ogrenci,
         })
 
-    aktif_yil = get_aktif_egitim_yili()
     ortak_dersler = _yf(
         OrtakDers.objects.filter(sinif_seviyesi=gelecek_sinif), aktif_yil
     ).order_by("sira")

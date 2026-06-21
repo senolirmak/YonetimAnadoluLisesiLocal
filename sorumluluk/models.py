@@ -278,3 +278,59 @@ class SorumluOturmaPlani(models.Model):
             f"{self.tarih:%d.%m.%Y} Ot.{self.oturum_no} "
             f"– {self.salon}/{self.sira_no} – {self.adi_soyadi}"
         )
+
+
+class OncekiDonem(models.Model):
+    """Sisteme geçmeden önceki dönemlere ait sorumluluk sınavı kaydı."""
+    sinav_adi        = models.CharField(max_length=200, verbose_name="Sınav Adı / Dönem Adı")
+    egitim_yili      = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    donem_turu       = models.CharField(
+        max_length=10,
+        choices=DONEM_TURU_CHOICES,
+        default="HAZIRAN",
+        verbose_name="Dönem",
+    )
+    aciklama         = models.CharField(max_length=300, blank=True, verbose_name="Açıklama")
+    olusturma_tarihi = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering            = ["-olusturma_tarihi"]
+        verbose_name        = "Önceki Dönem"
+        verbose_name_plural = "Önceki Dönemler"
+
+    def __str__(self):
+        egitim = str(self.egitim_yili) if self.egitim_yili_id else ""
+        donem  = self.get_donem_turu_display()
+        return f"{self.sinav_adi} ({egitim} {donem})".strip()
+
+
+class OncekiDonemGorev(models.Model):
+    """Önceki bir dönemde öğretmenin aldığı komisyon ve gözetmen görevi sayıları."""
+    donem    = models.ForeignKey(
+        OncekiDonem,
+        on_delete=models.CASCADE,
+        related_name="gorevler",
+        verbose_name="Dönem",
+    )
+    personel = models.ForeignKey(
+        "okul.Personel",
+        on_delete=models.CASCADE,
+        related_name="onceki_donem_gorevler",
+        verbose_name="Personel",
+    )
+    komisyon = models.PositiveSmallIntegerField(default=0, verbose_name="Komisyon")
+    gozetmen = models.PositiveSmallIntegerField(default=0, verbose_name="Gözetmen")
+
+    class Meta:
+        unique_together     = [("donem", "personel")]
+        ordering            = ["personel__brans", "personel__adi_soyadi"]
+        verbose_name        = "Önceki Dönem Görevi"
+        verbose_name_plural = "Önceki Dönem Görevleri"
+
+    def __str__(self):
+        return f"{self.donem} — {self.personel}: K={self.komisyon} G={self.gozetmen}"

@@ -1,0 +1,142 @@
+{% extends "sinav/base.html" %}
+{% block sinav_title %}Sorumluluk Sınav Görevlerim{% endblock %}
+
+{% block nav %}
+<nav style="background:#1e3a5f; padding:.6rem 1.5rem; display:flex; align-items:center; gap:1rem;">
+  <span style="color:#fff; font-size:.95rem; font-weight:700;">
+    <i class="fas fa-clipboard-list"></i> Sorumluluk Sınav Görevlerim
+  </span>
+  <a href="{% url 'index' %}" style="margin-left:auto; color:#c8dce8; text-decoration:none; font-size:.85rem; font-weight:500; padding:.3rem .8rem; border:1px solid rgba(255,255,255,.3); border-radius:5px;">
+    &#8592; Ana Sayfaya Dön
+  </a>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .sgr-kart {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+    overflow: hidden; margin-bottom: 1.6rem;
+  }
+  .sgr-kart-baslik {
+    background: #1e3a5f; color: #fff;
+    padding: .6rem 1rem;
+    display: flex; align-items: center; gap: .7rem; flex-wrap: wrap;
+  }
+  .sgr-kart-baslik .sinav-adi { font-size: .95rem; font-weight: 700; }
+  .sgr-kart-baslik .sinav-meta { font-size: .78rem; opacity: .7; }
+  .sgr-onay {
+    background: #22c55e; color: #fff; border-radius: 4px;
+    font-size: .72rem; padding: .1rem .4rem; font-weight: 700;
+  }
+  .sgr-ozet {
+    display: flex; gap: .4rem; margin-left: auto; flex-shrink: 0;
+  }
+  .sgr-ozet span {
+    font-size: .75rem; font-weight: 700; padding: .15rem .5rem; border-radius: 4px;
+  }
+  .sgr-tablo {
+    width: 100%; border-collapse: collapse; font-size: .85rem;
+  }
+  .sgr-tablo th {
+    background: #f1f5f9; color: #475569;
+    padding: .42rem .8rem; text-align: left;
+    font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .sgr-tablo th.center { text-align: center; }
+  .sgr-tablo td {
+    padding: .45rem .8rem; border-bottom: 1px solid #f0f4f8; vertical-align: middle;
+  }
+  .sgr-tablo tr:last-child td { border-bottom: none; }
+  .komisyon-satir { background: #fffbf0; }
+  .gozetmen-satir { background: #f0fdf4; }
+  .tur-badge {
+    display: inline-block; font-size: .72rem; font-weight: 700;
+    padding: .15rem .45rem; border-radius: 4px;
+  }
+  .tur-komisyon { background: #fef3c7; color: #92400e; }
+  .tur-gozetmen { background: #d1fae5; color: #065f46; }
+</style>
+{% endblock %}
+
+{% block sinav_content %}
+<div style="max-width:860px;">
+
+{% if personel %}
+<div style="font-size:.88rem; color:#64748b; margin-bottom:1.2rem;">
+  <i class="fas fa-user"></i> {{ personel.adi_soyadi }}{% if personel.brans %} · {{ personel.brans }}{% endif %}
+</div>
+{% endif %}
+
+{% if not personel %}
+<div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:1.2rem 1.4rem; color:#9a3412; font-size:.9rem;">
+  <i class="fas fa-exclamation-triangle"></i>
+  Hesabınıza bağlı bir personel kaydı bulunamadı. Lütfen sistem yöneticisiyle iletişime geçin.
+</div>
+
+{% elif not sinav_gorevler %}
+<div class="sgr-kart">
+  <div style="text-align:center; padding:3rem 1rem; color:#94a3b8; font-size:.95rem;">
+    <i class="fas fa-inbox" style="font-size:2rem; display:block; margin-bottom:.6rem; opacity:.4;"></i>
+    Henüz atanmış sorumluluk sınav göreviniz bulunmuyor.
+  </div>
+</div>
+
+{% else %}
+
+{% for item in sinav_gorevler %}
+{% with sinav=item.sinav gorevler=item.gorevler %}
+<div class="sgr-kart">
+  <div class="sgr-kart-baslik">
+    <i class="fas fa-graduation-cap"></i>
+    <span class="sinav-adi">{{ sinav.sinav_adi }}</span>
+    {% if sinav.egitim_yili %}<span class="sinav-meta">{{ sinav.egitim_yili }}</span>{% endif %}
+    <span class="sinav-meta">· {{ sinav.get_donem_turu_display }}</span>
+    {% if sinav.onaylandi %}<span class="sgr-onay"><i class="fas fa-check"></i> Onaylı</span>{% endif %}
+    <div class="sgr-ozet">
+      {% if item.komisyon_sayi %}<span style="background:#fef3c7; color:#92400e;">Komisyon: {{ item.komisyon_sayi }}</span>{% endif %}
+      {% if item.gozetmen_sayi %}<span style="background:#d1fae5; color:#065f46;">Gözetmen: {{ item.gozetmen_sayi }}</span>{% endif %}
+    </div>
+  </div>
+
+  <table class="sgr-tablo">
+    <thead>
+      <tr>
+        <th>Tarih</th>
+        <th class="center">Oturum</th>
+        <th>Saat</th>
+        <th>Görev Türü</th>
+        <th>Ders / Salon</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in gorevler %}
+      <tr class="{% if g.tur == 'Komisyon Üyesi' %}komisyon-satir{% else %}gozetmen-satir{% endif %}">
+        <td style="white-space:nowrap; font-weight:600; color:#1e3a5f;">
+          {{ g.tarih|date:"d.m.Y" }}
+          <span style="font-size:.75rem; color:#94a3b8; font-weight:400; margin-left:.3rem;">{{ g.tarih|date:"l" }}</span>
+        </td>
+        <td style="text-align:center; color:#475569;">{{ g.oturum_no }}</td>
+        <td style="white-space:nowrap; color:#475569; font-size:.82rem;">
+          {% if g.saat_baslangic %}{{ g.saat_baslangic|time:"H:i" }} – {{ g.saat_bitis|time:"H:i" }}{% else %}—{% endif %}
+        </td>
+        <td>
+          <span class="tur-badge {% if g.tur == 'Komisyon Üyesi' %}tur-komisyon{% else %}tur-gozetmen{% endif %}">
+            {% if g.tur == "Komisyon Üyesi" %}<i class="fas fa-users"></i>{% else %}<i class="fas fa-eye"></i>{% endif %}
+            {{ g.tur }}
+          </span>
+        </td>
+        <td style="font-weight:600; color:#334155;">{{ g.detay }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endwith %}
+{% endfor %}
+
+{% endif %}
+
+</div>
+{% endblock %}

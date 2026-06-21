@@ -99,7 +99,18 @@
         zorunlu ders çizelgesini bu bölümden yönetebilirsiniz.
     </p>
 
-    <a href="{% url 'index' %}" class="geri-btn">← Ana Sayfa</a>
+    <div style="display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; margin-bottom:1.2rem;">
+        <a href="{% url 'index' %}"
+           style="display:inline-flex; align-items:center; gap:.5rem; background:#6c757d; color:#fff;
+                  padding:.4rem 1rem; border-radius:6px; text-decoration:none; font-size:.85rem; font-weight:600;">
+            ← Ana Sayfa
+        </a>
+        <a href="{% url 'ogrdrs_listesi' %}"
+           style="display:inline-flex; align-items:center; gap:.5rem; background:#0f766e; color:#fff;
+                  padding:.4rem 1rem; border-radius:6px; text-decoration:none; font-size:.85rem; font-weight:600;">
+            <i class="fas fa-user-graduate"></i> Öğrenci Ders Planlaması
+        </a>
+    </div>
 
     <div class="hub-grid">
 
@@ -172,6 +183,54 @@
                     grup detay sayfasındaki havuzda görünür.
                 </div>
                 <div class="hub-kart-link">Havuza git →</div>
+            </div>
+        </a>
+
+        <a href="{% url 'secmeli_sinif_dagilimi' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#b45309;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Sınıf Dağılımı Planı</div>
+                <div class="hub-kart-aciklama">
+                    10. ve 11. sınıf öğrencilerini seçmeli ders seçimlerine göre
+                    MF, TM, DİL alanlarına ayır; gelecek yıl şubelerini (A, B, C…) oluştur.
+                </div>
+                <div class="hub-kart-link">Plana git →</div>
+            </div>
+        </a>
+
+        <a href="{% url 'ortalama_listesi' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#0f766e;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Dönem Ağırlıklı Ortalamalar</div>
+                <div class="hub-kart-aciklama">
+                    Excel (XLS/XLSX) dosyasından öğrenci okul numaraları ve
+                    ağırlıklı ortalamalarını içe aktar, listele ve yönet.
+                </div>
+                <div class="hub-kart-link">Ortalamalara git →</div>
+            </div>
+        </a>
+
+        <a href="{% url 'sinif_tekrari_listesi' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#b45309;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Sınıf Tekrarı</div>
+                <div class="hub-kart-aciklama">
+                    Ağırlıklı ortalaması &lt;50 olan ya da manuel belirlenen sınıf tekrarı
+                    öğrencilerini yönet. Sınıf dağılımı planında mevcut sınıflarında bırakılırlar.
+                </div>
+                <div class="hub-kart-link">Listeye git →</div>
+            </div>
+        </a>
+
+        <a href="{% url 'tasdikname_listesi' %}" class="hub-kart">
+            <div class="hub-kart-renk" style="background:#7c2d12;"></div>
+            <div class="hub-kart-govde">
+                <div class="hub-kart-baslik">Tasdikname</div>
+                <div class="hub-kart-aciklama">
+                    Okuma hakkı biten öğrencileri (tasdikname alanları) yönet.
+                    Bu öğrenciler seçmeli ders seçiminden otomatik olarak dışarıda tutulur.
+                </div>
+                <div class="hub-kart-link">Tasdikname listesine git →</div>
             </div>
         </a>
 

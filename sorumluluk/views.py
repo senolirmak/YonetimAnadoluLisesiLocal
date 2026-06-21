@@ -4,7 +4,7 @@ from datetime import datetime
 from itertools import groupby
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from okul.auth import yonetici_required as login_required
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render, HttpResponse
 from django.utils import timezone
@@ -909,34 +909,36 @@ def gorevlendirme(request, sinav_pk):
         if gz.gozetmen_id and gz.gozetmen_id in kumulatif_sayac:
             kumulatif_sayac[gz.gozetmen_id]["gozetmen"] += 1
 
-    # Branş → satır listesi şeklinde grupla, branş içinde ada göre sırala
-    from itertools import groupby as iGroupBy
-    tum_satirlar = sorted(
-        [
-            {
-                "adi_soyadi": v["adi_soyadi"],
-                "brans": v["brans"] or "—",
-                "komisyon": v["komisyon"],
-                "gozetmen": v["gozetmen"],
-                "toplam": v["komisyon"] + v["gozetmen"],
-                "kum_komisyon": kumulatif_sayac[pk]["komisyon"],
-                "kum_gozetmen": kumulatif_sayac[pk]["gozetmen"],
-                "kum_toplam": kumulatif_sayac[pk]["komisyon"] + kumulatif_sayac[pk]["gozetmen"],
-            }
-            for pk, v in gorev_sayac.items()
-        ],
-        key=lambda x: (x["brans"], x["adi_soyadi"]),
-    )
-    gorev_ozet_gruplu = [
-        {"brans": brans, "satirlar": list(satirlar)}
-        for brans, satirlar in iGroupBy(tum_satirlar, key=lambda x: x["brans"])
-    ]
+    # Geçmiş dönem (OncekiDonemGorev) kümülatife ekle
+    from sorumluluk.models import OncekiDonemGorev
+    for og in OncekiDonemGorev.objects.filter(personel_id__in=kumulatif_sayac):
+        kumulatif_sayac[og.personel_id]["komisyon"] += og.komisyon
+        kumulatif_sayac[og.personel_id]["gozetmen"] += og.gozetmen
+
+    sinav_toplam_komisyon = sum(v["komisyon"] for v in gorev_sayac.values())
+    sinav_toplam_gozetmen = sum(v["gozetmen"] for v in gorev_sayac.values())
+    sinav_toplam_gorev    = sinav_toplam_komisyon + sinav_toplam_gozetmen
+    sinav_kbs_saat        = sinav_toplam_gorev * 5
+
+    import json
+    personel_kum_json = json.dumps({
+        str(p.pk): {
+            "k": kumulatif_sayac[p.pk]["komisyon"],
+            "g": kumulatif_sayac[p.pk]["gozetmen"],
+            "t": kumulatif_sayac[p.pk]["komisyon"] + kumulatif_sayac[p.pk]["gozetmen"],
+        }
+        for p in personel_listesi
+    })
 
     return render(request, "sorumluluk/gorevlendirme.html", {
         "sinav": sinav,
         "oturumlar": oturumlar,
         "personel_listesi": personel_listesi,
-        "gorev_ozet_gruplu": gorev_ozet_gruplu,
+        "personel_kum_json": personel_kum_json,
+        "sinav_toplam_komisyon": sinav_toplam_komisyon,
+        "sinav_toplam_gozetmen": sinav_toplam_gozetmen,
+        "sinav_toplam_gorev":    sinav_toplam_gorev,
+        "sinav_kbs_saat":        sinav_kbs_saat,
     })
 
 
@@ -998,6 +1000,208 @@ def ogrenci_takvim_pdf(request, sinav_pk):
     fname = f"Ogrenci_Sinav_Takvimi_{sinav.egitim_yili}_{sinav.get_donem_turu_display()}.pdf"
     return HttpResponse(buf.read(), content_type="application/pdf",
                         headers={"Content-Disposition": f'inline; filename="{fname}"'})
+
+
+# ─────────────────────────────────────────────────────────
+# Öğretmen Görev Özeti (Web Raporu)
+# ─────────────────────────────────────────────────────────
+
+@login_required
+def ogretmen_gorev_imza_pdf(request, sinav_pk):
+    import io
+    from sorumluluk.services.pdf_service import ogretmen_gorev_imza_pdf_uret
+
+    sinav = get_object_or_404(SorumluSinav.objects.select_related("egitim_yili"), pk=sinav_pk)
+    okul  = OkulBilgi.get()
+    buf   = io.BytesIO()
+    ogretmen_gorev_imza_pdf_uret(buf, sinav, okul)
+    buf.seek(0)
+
+    donem  = sinav.get_donem_turu_display()  # type: ignore[attr-defined]
+    egitim = str(sinav.egitim_yili) if sinav.egitim_yili else ""
+    fname  = f"OgretmenGorevImza_{egitim}_{donem}.pdf".replace(" ", "_")
+    return HttpResponse(
+        buf.read(), content_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{fname}"'},
+    )
+
+
+@login_required
+def ogretmen_gorev_ozeti(request):
+    from itertools import groupby as iGroupBy
+    from okul.models import Personel
+    from sorumluluk.models import SALON_CHOICES as _SALON_CHOICES, OncekiDonemGorev, OncekiDonem
+
+    _SALON_LABEL = dict(_SALON_CHOICES)
+    _AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+              "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
+    def _tr_tarih(d):
+        return f"{d.day} {_AYLAR[d.month - 1]} {d.year}"
+
+    sinav_pk = request.GET.get("sinav")
+    sinavlar = list(SorumluSinav.objects.select_related("egitim_yili").order_by("-olusturma_tarihi"))
+    secili_sinav = None
+
+    if sinav_pk:
+        try:
+            secili_sinav = next(s for s in sinavlar if str(s.pk) == sinav_pk)
+        except StopIteration:
+            pass
+
+    personel_listesi = list(Personel.objects.order_by("brans", "adi_soyadi"))
+    pid_set = {p.pk for p in personel_listesi}
+
+    def _komisyon_say(kayitlar_list):
+        """Union-find: aynı slot veya aynı ders adı → 1 görev."""
+        n = len(kayitlar_list)
+        parent = list(range(n))
+        for i in range(n):
+            for j in range(i + 1, n):
+                s_i, d_i, t_i, o_i = kayitlar_list[i]
+                s_j, d_j, t_j, o_j = kayitlar_list[j]
+                if s_i == s_j and ((t_i == t_j and o_i == o_j) or d_i == d_j):
+                    ri, rj = i, j
+                    while parent[ri] != ri:
+                        ri = parent[ri]
+                    while parent[rj] != rj:
+                        rj = parent[rj]
+                    if ri != rj:
+                        parent[ri] = rj
+        roots = set()
+        for i in range(n):
+            r = i
+            while parent[r] != r:
+                r = parent[r]
+            roots.add(r)
+        return len(roots)
+
+    # ── Geçmiş dönem toplamları (tüm OncekiDonem kayıtlarının toplamı) ────────
+    onceki_kum: dict = {}   # pid → {"komisyon": n, "gozetmen": n}
+    for g in OncekiDonemGorev.objects.filter(personel_id__in=pid_set):
+        entry = onceki_kum.setdefault(g.personel_id, {"komisyon": 0, "gozetmen": 0})
+        entry["komisyon"] += g.komisyon
+        entry["gozetmen"] += g.gozetmen
+
+    gecmis_donemler = list(OncekiDonem.objects.all())
+
+    # ── Kümülatif (tüm sınavlar — sistem kayıtları) ───────────────────────────
+    sistem_kum = {p.pk: {"komisyon": 0, "gozetmen": 0} for p in personel_listesi}
+
+    kum_komisyon_kayitlar: dict = {}
+    for ku in SorumluKomisyonUyesi.objects.all():
+        for pid in (ku.uye1_id, ku.uye2_id):
+            if pid and pid in pid_set:
+                kum_komisyon_kayitlar.setdefault(pid, []).append(
+                    (ku.sinav_id, ku.ders_adi, ku.tarih, ku.oturum_no)
+                )
+    for pid, kayitlar in kum_komisyon_kayitlar.items():
+        sistem_kum[pid]["komisyon"] = _komisyon_say(kayitlar)
+
+    for gz in SorumluGozetmen.objects.all():
+        if gz.gozetmen_id and gz.gozetmen_id in pid_set:
+            sistem_kum[gz.gozetmen_id]["gozetmen"] += 1
+
+    # ── Seçili sınav sayacı ve detayları ──────────────────────────────────────
+    sinav_sayac = {p.pk: {"komisyon": 0, "gozetmen": 0} for p in personel_listesi}
+    sinav_detaylar: dict = {}
+
+    if secili_sinav:
+        takvim_saatler = {
+            (t.tarih, t.oturum_no): (t.saat_baslangic, t.saat_bitis)
+            for t in SorumluTakvim.objects.filter(sinav=secili_sinav).order_by("tarih", "oturum_no")
+        }
+
+        sinav_komisyon_kayitlar: dict = {}
+        for ku in SorumluKomisyonUyesi.objects.filter(sinav=secili_sinav):
+            saatler = takvim_saatler.get((ku.tarih, ku.oturum_no))
+            for pid in (ku.uye1_id, ku.uye2_id):
+                if pid and pid in pid_set:
+                    sinav_komisyon_kayitlar.setdefault(pid, []).append(
+                        (ku.sinav_id, ku.ders_adi, ku.tarih, ku.oturum_no)
+                    )
+                    sinav_detaylar.setdefault(pid, []).append({
+                        "tarih":          ku.tarih,
+                        "tarih_str":      _tr_tarih(ku.tarih),
+                        "oturum_no":      ku.oturum_no,
+                        "saat_baslangic": saatler[0] if saatler else None,
+                        "saat_bitis":     saatler[1] if saatler else None,
+                        "tur":            "komisyon",
+                        "detay":          ku.ders_adi,
+                    })
+
+        for pid, kayitlar in sinav_komisyon_kayitlar.items():
+            sinav_sayac[pid]["komisyon"] = _komisyon_say(kayitlar)
+
+        for gz in SorumluGozetmen.objects.filter(sinav=secili_sinav).select_related("gozetmen"):
+            if gz.gozetmen_id and gz.gozetmen_id in pid_set:
+                sinav_sayac[gz.gozetmen_id]["gozetmen"] += 1
+                saatler = takvim_saatler.get((gz.tarih, gz.oturum_no))
+                sinav_detaylar.setdefault(gz.gozetmen_id, []).append({
+                    "tarih":          gz.tarih,
+                    "tarih_str":      _tr_tarih(gz.tarih),
+                    "oturum_no":      gz.oturum_no,
+                    "saat_baslangic": saatler[0] if saatler else None,
+                    "saat_bitis":     saatler[1] if saatler else None,
+                    "tur":            "gozetmen",
+                    "detay":          _SALON_LABEL.get(gz.salon, gz.salon),
+                })
+
+    # ── Tablo satırlarını oluştur ve branşa göre grupla ───────────────────────
+    def _row(p):
+        sys_k = sistem_kum[p.pk]["komisyon"]
+        sys_g = sistem_kum[p.pk]["gozetmen"]
+        onc   = onceki_kum.get(p.pk, {"komisyon": 0, "gozetmen": 0})
+        onc_k = onc["komisyon"]
+        onc_g = onc["gozetmen"]
+        kum_k = sys_k + onc_k
+        kum_g = sys_g + onc_g
+        s_k   = sinav_sayac[p.pk]["komisyon"]
+        s_g   = sinav_sayac[p.pk]["gozetmen"]
+        return {
+            "pk":           p.pk,
+            "adi_soyadi":   p.adi_soyadi,
+            "brans":        p.brans or "—",
+            "komisyon":     s_k,
+            "gozetmen":     s_g,
+            "toplam":       s_k + s_g,
+            "sys_komisyon": sys_k,
+            "sys_gozetmen": sys_g,
+            "onc_komisyon": onc_k,
+            "onc_gozetmen": onc_g,
+            "kum_komisyon": kum_k,
+            "kum_gozetmen": kum_g,
+            "kum_toplam":   kum_k + kum_g,
+            "detaylar":     sorted(
+                sinav_detaylar.get(p.pk, []),
+                key=lambda x: (x["tarih"], x["oturum_no"], x["tur"]),
+            ),
+        }
+
+    tum_satirlar = sorted(
+        [_row(p) for p in personel_listesi],
+        key=lambda x: (x["brans"], x["adi_soyadi"]),
+    )
+
+    gruplu_satirlar = [
+        {"brans": brans, "satirlar": list(s_list)}
+        for brans, s_list in iGroupBy(tum_satirlar, key=lambda x: x["brans"])
+    ]
+
+    toplam_komisyon = sum(s["komisyon"] if secili_sinav else s["kum_komisyon"] for g in gruplu_satirlar for s in g["satirlar"])
+    toplam_gozetmen = sum(s["gozetmen"] if secili_sinav else s["kum_gozetmen"] for g in gruplu_satirlar for s in g["satirlar"])
+
+    return render(request, "sorumluluk/ogretmen_gorev_ozeti.html", {
+        "sinavlar":         sinavlar,
+        "secili_sinav":     secili_sinav,
+        "gruplu_satirlar":  gruplu_satirlar,
+        "toplam_komisyon":  toplam_komisyon,
+        "toplam_gozetmen":  toplam_gozetmen,
+        "toplam_personel":  len(personel_listesi),
+        "gecmis_donemler":  gecmis_donemler,
+    })
+
+
 
 
 # ─────────────────────────────────────────────────────────
