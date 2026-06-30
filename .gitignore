@@ -35,8 +35,10 @@ SunucuTarifi.md
 config.txt
 # Veritabanı yedekleri
 backups/
+yedekler/
 *.dump
 *.sql
+*.backup
 
 # Geçici ve önbellek dosyaları
 *.cache
@@ -77,3 +79,7 @@ npm-debug.log
 *.pdf
 *.xlsx
 *.xls
+
+# Sunucu yükleme betikleri ve veri dosyaları
+sunucu_yukle.sh
+secmelidersler_data.json
