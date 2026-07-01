@@ -14,6 +14,10 @@ class Migration(migrations.Migration):
         ("okul", "0009_rename_nobetpersonel_to_personel"),
     ]
 
+    run_before = [
+        ("okul", "0010_add_veri_aktarim_gecmisi"),
+    ]
+
     operations = [
         migrations.SeparateDatabaseAndState(
             database_operations=[],

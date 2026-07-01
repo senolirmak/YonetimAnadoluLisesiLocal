@@ -14,6 +14,10 @@ class Migration(migrations.Migration):
         ("ogrenci", "0005_alter_ogrenci_options"),
     ]
 
+    run_before = [
+        ("nobet", "0019_remove_sinifsube"),
+    ]
+
     operations = [
         migrations.CreateModel(
             name="DersDefteri",

@@ -13,6 +13,10 @@ class Migration(migrations.Migration):
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
+    run_before = [
+        ("nobet", "0019_remove_sinifsube"),
+    ]
+
     operations = [
         migrations.CreateModel(
             name="Duyuru",

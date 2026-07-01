@@ -5,11 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    """
-    DB'de gozetmen ve salon_sinif_sube_id sütunları zaten mevcut.
-    SeparateDatabaseAndState ile yalnızca Django model state'i güncelleniyor;
-    gerçek DDL çalıştırılmıyor.
-    """
 
     dependencies = [
         ("okul", "0010_add_veri_aktarim_gecmisi"),
@@ -17,25 +12,20 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.SeparateDatabaseAndState(
-            state_operations=[
-                migrations.AddField(
-                    model_name="oturmaplani",
-                    name="gozetmen",
-                    field=models.CharField(blank=True, default="", max_length=200),
-                ),
-                migrations.AddField(
-                    model_name="oturmaplani",
-                    name="salon_sinif_sube",
-                    field=models.ForeignKey(
-                        blank=True,
-                        null=True,
-                        on_delete=django.db.models.deletion.SET_NULL,
-                        related_name="+",
-                        to="okul.sinifsube",
-                    ),
-                ),
-            ],
-            database_operations=[],  # Sütunlar DB'de zaten var
+        migrations.AddField(
+            model_name="oturmaplani",
+            name="gozetmen",
+            field=models.CharField(blank=True, default="", max_length=200),
+        ),
+        migrations.AddField(
+            model_name="oturmaplani",
+            name="salon_sinif_sube",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="+",
+                to="okul.sinifsube",
+            ),
         ),
     ]

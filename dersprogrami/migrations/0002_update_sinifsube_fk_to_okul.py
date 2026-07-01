@@ -16,6 +16,10 @@ class Migration(migrations.Migration):
         ("nobet", "0019_remove_sinifsube"),
     ]
 
+    run_before = [
+        ("okul", "0006_add_nobetpersonel"),
+    ]
+
     operations = [
         migrations.SeparateDatabaseAndState(
             database_operations=[],
