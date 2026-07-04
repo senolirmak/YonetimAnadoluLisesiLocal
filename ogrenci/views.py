@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 
 from dersprogrami.models import DersProgrami
 from okul.models import DersHavuzu
-from okul.utils import get_aktif_dp_tarihi
+from okul.utils import get_aktif_dp_tarihi, get_aktif_egitim_yili
 
 from .forms import OgrenciAdresForm, OgrenciDetayForm
 from .models import Ogrenci, OgrenciAdres, OgrenciDetay, OgrenciMuaf
@@ -265,6 +265,8 @@ def sureksiz_devamsiz_listesi(request):
     sinifsube = request.GET.get("sinifsube", "")
     filtre    = request.GET.get("filtre", "")  # "sureksiz" | "muaf" | "" (tümü)
 
+    aktif_yil = get_aktif_egitim_yili()
+
     ogrenciler = Ogrenci.objects.all()
     if sinifsube:
         try:
@@ -275,13 +277,16 @@ def sureksiz_devamsiz_listesi(request):
     if filtre == "sureksiz":
         ogrenciler = ogrenciler.filter(sureksiz_devamsiz=True)
     elif filtre == "muaf":
-        ogrenciler = ogrenciler.filter(muaf_dersler__isnull=False).distinct()
+        ogrenciler = ogrenciler.filter(
+            muaf_dersler__egitim_yili=aktif_yil
+        ).distinct()
 
     # Muaf ders sayısı per öğrenci (tek sorguda)
     from django.db.models import Count
     muaf_sayilari = {
         r["ogrenci_id"]: r["n"]
-        for r in OgrenciMuaf.objects.values("ogrenci_id").annotate(n=Count("id"))
+        for r in OgrenciMuaf.objects.filter(egitim_yili=aktif_yil)
+        .values("ogrenci_id").annotate(n=Count("id"))
     }
 
     sinifsube_secenekleri = [
@@ -299,7 +304,7 @@ def sureksiz_devamsiz_listesi(request):
         "secili_sinifsube":      sinifsube,
         "filtre":                filtre,
         "toplam_sureksiz":       Ogrenci.objects.filter(sureksiz_devamsiz=True).count(),
-        "toplam_muaf":           OgrenciMuaf.objects.values("ogrenci").distinct().count(),
+        "toplam_muaf":           OgrenciMuaf.objects.filter(egitim_yili=aktif_yil).values("ogrenci").distinct().count(),
     })
 
 
@@ -383,11 +388,12 @@ def ogrenci_muaf_duzenle(request, pk):
         ders_qs = DersHavuzu.objects.all().order_by("ders_adi")
 
     if request.method == "POST":
+        aktif_yil = get_aktif_egitim_yili()
         secili_ids = set(map(int, request.POST.getlist("muaf_ders")))
-        # Önce tüm mevcut muafları sil, sonra seçilileri kaydet
-        OgrenciMuaf.objects.filter(ogrenci=ogrenci).delete()
+        # Önce bu yılın mevcut muaflarını sil, sonra seçilileri kaydet (önceki yıllar korunur)
+        OgrenciMuaf.objects.filter(ogrenci=ogrenci, egitim_yili=aktif_yil).delete()
         yeniler = [
-            OgrenciMuaf(ogrenci=ogrenci, ders_id=ders_id)
+            OgrenciMuaf(ogrenci=ogrenci, ders_id=ders_id, egitim_yili=aktif_yil)
             for ders_id in secili_ids
         ]
         if yeniler:
@@ -402,7 +408,9 @@ def ogrenci_muaf_duzenle(request, pk):
         return redirect("ogrenci:sureksiz_devamsiz_listesi")
 
     mevcut_ders_ids = set(
-        OgrenciMuaf.objects.filter(ogrenci=ogrenci).values_list("ders_id", flat=True)
+        OgrenciMuaf.objects.filter(
+            ogrenci=ogrenci, egitim_yili=get_aktif_egitim_yili()
+        ).values_list("ders_id", flat=True)
     )
 
     return render(

@@ -163,6 +163,7 @@ class PersonelDuzenleForm(forms.ModelForm):
             "cinsiyet",
             "nobeti_var",
             "gorev_tipi",
+            "durum",
             "sabit_nobet",
         ]
         widgets = {
@@ -170,8 +171,6 @@ class PersonelDuzenleForm(forms.ModelForm):
             "kimlikno": forms.TextInput(
                 attrs={"class": "vTextField", "maxlength": "11", "inputmode": "numeric"}
             ),
-            "brans": forms.TextInput(attrs={"class": "vTextField"}),
-            "gorev_tipi": forms.TextInput(attrs={"class": "vTextField"}),
         }
         labels = {
             "adi_soyadi": "Adı Soyadı",
@@ -179,6 +178,7 @@ class PersonelDuzenleForm(forms.ModelForm):
             "brans": "Branş",
             "cinsiyet": "Cinsiyet",
             "nobeti_var": "Nöbeti Var",
-            "gorev_tipi": "Görev Tipi",
+            "gorev_tipi": "Görevi",
+            "durum": "Durum",
             "sabit_nobet": "Sabit Nöbet",
         }

@@ -90,9 +90,17 @@ class OgrenciMuaf(models.Model):
         "okul.DersHavuzu", on_delete=models.CASCADE,
         related_name="+", verbose_name="Ders",
     )
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
 
     class Meta:
-        unique_together = [("ogrenci", "ders")]
+        unique_together = [("egitim_yili", "ogrenci", "ders")]
         ordering = ["ogrenci", "ders__ders_adi"]
         verbose_name = "Öğrenci Muaf Ders"
         verbose_name_plural = "Öğrenci Muaf Dersleri"
@@ -128,10 +136,18 @@ class SinifOturmaDuzeni(models.Model):
         blank=True,
         verbose_name="Güncelleyen",
     )
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
 
     class Meta:
         db_table = "sinif_oturma_duzeni"
-        unique_together = [("sinif_sube", "sira_no", "kolon_no")]
+        unique_together = [("egitim_yili", "sinif_sube", "sira_no", "kolon_no")]
         verbose_name = "Sınıf Oturma Düzeni"
         verbose_name_plural = "Sınıf Oturma Düzenleri"
         ordering = ["sinif_sube", "sira_no", "kolon_no"]

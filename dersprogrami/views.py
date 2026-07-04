@@ -20,10 +20,13 @@ from .models import DersProgrami
 # Yetki yardımcıları
 # ─────────────────────────────────────────────
 
-from okul.auth import is_mudur_yardimcisi, mudur_yardimcisi_required  # noqa: E402
+from okul.auth import (  # noqa: E402
+    _UST_YONETIM_GRUPLARI as TARIH_DEGISTIREBILIR_GRUPLAR,
+    is_ust_yonetici,
+    ust_yonetici_required,
+)
 
 YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-TARIH_DEGISTIREBILIR_GRUPLAR = {"mudur_yardimcisi", "okul_muduru"}
 
 
 def _is_yonetici(user):
@@ -31,7 +34,7 @@ def _is_yonetici(user):
 
 
 def _is_tarih_degistirebilir(user):
-    return user.is_superuser or user.groups.filter(name__in=TARIH_DEGISTIREBILIR_GRUPLAR).exists()
+    return is_ust_yonetici(user)
 
 
 def yonetici_required(view_func):
@@ -792,8 +795,8 @@ def ogretmen_ders_listesi(request):
 
     qs = (
         DersProgrami.objects.aktif()
-        .select_related("ogretmen", "ders", "sinif_sube")
-        .order_by("ogretmen__brans", "ogretmen__adi_soyadi", "ders__ders_adi", "sinif_sube__sinif", "sinif_sube__sube")
+        .select_related("ogretmen", "ogretmen__brans", "ders", "sinif_sube")
+        .order_by("ogretmen__brans__ad", "ogretmen__adi_soyadi", "ders__ders_adi", "sinif_sube__sinif", "sinif_sube__sube")
     )
 
     if ara:
@@ -801,7 +804,7 @@ def ogretmen_ders_listesi(request):
     if ders_filtre:
         qs = qs.filter(ders__ders_adi__icontains=ders_filtre)
     if brans_filtre:
-        qs = qs.filter(ogretmen__brans__iexact=brans_filtre)
+        qs = qs.filter(ogretmen__brans__ad__iexact=brans_filtre)
 
     pivot = {}
     for k in qs:
@@ -830,12 +833,12 @@ def ogretmen_ders_listesi(request):
 
     ogretmen_listesi = sorted(
         ogretmen_gruplari.values(),
-        key=lambda r: (r["personel"].brans, r["personel"].adi_soyadi),
+        key=lambda r: (r["personel"].brans.ad if r["personel"].brans else "", r["personel"].adi_soyadi),
     )
 
     tum_dersler = sorted({k[1] for k in pivot.keys() if k[1] != "—"})
     tum_branslar = sorted(
-        {row["personel"].brans for row in ogretmen_gruplari.values() if row["personel"].brans}
+        {row["personel"].brans.ad for row in ogretmen_gruplari.values() if row["personel"].brans}
     )
 
     context = {
@@ -850,7 +853,7 @@ def ogretmen_ders_listesi(request):
     return render(request, "dersprogrami/ogretmen_ders_listesi.html", context)
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def dersprogrami_yukle(request):
     form = DersProgramiImportForm(request.POST or None, request.FILES or None)
 

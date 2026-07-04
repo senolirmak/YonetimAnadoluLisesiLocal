@@ -31,6 +31,7 @@ def oturma_plani_olustur(mazeret: "MazeretSinav") -> dict:
     }
     """
     from ogrenci.models import Ogrenci, OgrenciMuaf
+    from okul.utils import get_aktif_egitim_yili
     from sinav.models import (
         MazeretOturumDers, MazeretOgrenci, MazeretOturmaPlani,
     )
@@ -59,7 +60,8 @@ def oturma_plani_olustur(mazeret: "MazeretSinav") -> dict:
         {
             (str(ok), ders)
             for ok, ders in OgrenciMuaf.objects.filter(
-                ogrenci__okulno__in=_mo_okulno_ints
+                ogrenci__okulno__in=_mo_okulno_ints,
+                egitim_yili=get_aktif_egitim_yili(),
             ).values_list("ogrenci__okulno", "ders__ders_adi")
         }
         if _mo_okulno_ints else set()

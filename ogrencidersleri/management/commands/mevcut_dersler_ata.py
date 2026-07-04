@@ -21,6 +21,7 @@ from django.db import transaction
 from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci
 from okul.models import SinifSube
+from okul.utils import get_aktif_egitim_yili
 from ogrencidersleri.models import OgrenciMevcutDers
 
 
@@ -65,6 +66,7 @@ class Command(BaseCommand):
         self.stdout.write(f"İşlenecek öğrenci: {toplam}")
 
         atanan = atlanan = 0
+        aktif_yil = get_aktif_egitim_yili()
 
         with transaction.atomic():
             for ogr in ogrenciler:
@@ -88,12 +90,13 @@ class Command(BaseCommand):
                     atlanan += 1
                     continue
 
-                OgrenciMevcutDers.objects.filter(ogrenci=ogr).delete()
+                OgrenciMevcutDers.objects.filter(ogrenci=ogr, egitim_yili=aktif_yil).delete()
                 OgrenciMevcutDers.objects.bulk_create([
                     OgrenciMevcutDers(
                         ogrenci=ogr,
                         ders_id=ders_id,
                         haftalik_saat=saat,
+                        egitim_yili=aktif_yil,
                     )
                     for ders_id, saat in saat_map.items()
                 ])

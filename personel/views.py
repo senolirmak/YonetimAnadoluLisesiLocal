@@ -28,16 +28,19 @@ def personel_listesi(request):
     brans = request.GET.get("brans", "").strip()
     gorev_tipi = request.GET.get("gorev_tipi", "").strip()
 
-    qs = NobetPersonel.objects.select_related("user", "ogretmen").order_by("adi_soyadi")
+    qs = NobetPersonel.objects.select_related("user", "ogretmen", "brans").order_by("adi_soyadi")
     if q:
         qs = qs.filter(adi_soyadi__icontains=q)
     if brans:
-        qs = qs.filter(brans__iexact=brans)
+        qs = qs.filter(brans__ad__iexact=brans)
     if gorev_tipi:
         qs = qs.filter(gorev_tipi__iexact=gorev_tipi)
 
     brans_listesi = (
-        NobetPersonel.objects.values_list("brans", flat=True).distinct().order_by("brans")
+        NobetPersonel.objects.exclude(brans__isnull=True)
+        .values_list("brans__ad", flat=True)
+        .distinct()
+        .order_by("brans__ad")
     )
     gorev_tipi_listesi = (
         NobetPersonel.objects.exclude(gorev_tipi__isnull=True)
@@ -185,7 +188,7 @@ def tc_sorgula(request):
         {
             "status": "ok",
             "adi_soyadi": personel.adi_soyadi,
-            "brans": personel.brans,
+            "brans": personel.brans.ad if personel.brans else "",
             "cinsiyet": "Erkek" if personel.cinsiyet else "Kadın",
             "suggested_username": tc,
         }

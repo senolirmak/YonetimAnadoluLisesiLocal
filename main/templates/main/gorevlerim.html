@@ -1,0 +1,126 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .gorev-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        text-align: left;
+    }
+    .gorev-card {
+        flex: 1 1 320px;
+        min-width: 280px;
+        background: #fdfdfd;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .gorev-card-title {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 12px;
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 8px;
+    }
+    .gorev-bos {
+        color: #868e96;
+        font-size: 0.9em;
+    }
+    .gorev-liste {
+        margin: 4px 0 12px 0;
+        padding-left: 18px;
+        font-size: 0.9em;
+    }
+    .gorev-kutu-nobet {
+        padding: 8px 10px;
+        background: #e8f4fd;
+        border: 1px solid #bee5eb;
+        border-radius: 6px;
+        font-size: 0.9em;
+        color: #0c5460;
+        margin-bottom: 12px;
+    }
+    .gorev-kutu-ders {
+        padding: 8px 10px;
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 6px;
+        font-size: 0.9em;
+        color: #856404;
+        margin-bottom: 12px;
+    }
+</style>
+
+<div class="welcome-container">
+    <h2 class="page-title page-title-mb">Görevlerim</h2>
+    <p class="welcome-text">
+        Nöbet, ders doldurma, sınav gözetmenlik ve sorumluluk sınavı görevleriniz tek sayfada.
+    </p>
+
+    <div class="gorev-grid">
+        <div class="gorev-card">
+            <div class="gorev-card-title">Haftalık Ders Programım</div>
+            <a href="{% url 'haftalik_ders_programi' %}" class="btn btn-lg" style="background-color: #6610f2; color: white;">Ders Programımı Görüntüle</a>
+        </div>
+
+        <div class="gorev-card">
+            <div class="gorev-card-title">Nöbet Görevlerim</div>
+            {% if ogretmen_nobetleri %}
+            <ul class="gorev-liste">
+                {% for n in ogretmen_nobetleri %}
+                <li>{{ n.gun }} — {{ n.yer }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="gorev-bos">Tanımlı nöbet göreviniz yok.</p>
+            {% endif %}
+            <a href="{% url 'ogretmen_haftalik_nobet' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Haftalık Nöbet Listesi</a>
+        </div>
+
+        <div class="gorev-card">
+            <div class="gorev-card-title">Bugün Atanan Dersler</div>
+            {% if atanan_dersler %}
+            <ul class="gorev-liste">
+                {% for d in atanan_dersler %}
+                <li>{{ d.saat }}. ders — {{ d.sinif }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="gorev-bos">Bugün atanan ders doldurma göreviniz yok.</p>
+            {% endif %}
+            <a href="{% url 'ogretmen_ders_doldurma' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Atanan / Atanamayan Dersler</a>
+        </div>
+
+        {% if sinav_gozetim_var %}
+        <div class="gorev-card">
+            <div class="gorev-card-title">Sınav Gözetmenlik</div>
+            <p class="gorev-bos">Aktif ortak sınavda gözetmenlik göreviniz var.</p>
+            <a href="{% url 'ogretmen_sinav_gozetim' %}" class="btn btn-lg" style="background-color: #4f46e5; color: white;">Sınav Gözetim Listem</a>
+        </div>
+        {% endif %}
+
+        {% if sorumluluk_gorev_var %}
+        <div class="gorev-card">
+            <div class="gorev-card-title">Sorumluluk Sınavı Görevlerim</div>
+            <p class="gorev-bos">Komisyon üyeliği veya gözetmenlik göreviniz var.</p>
+            <a href="{% url 'ogretmen_sorumluluk_gorevleri' %}" class="btn btn-lg" style="background-color: #0f766e; color: white;">Sorumluluk Görevlerim</a>
+        </div>
+        {% endif %}
+
+        {% if sorumluluk_takvim_var %}
+        <div class="gorev-card">
+            <div class="gorev-card-title">Rehberlik Sınıfım Sınav Takvimi</div>
+            <p class="gorev-bos">Rehberlik sınıfınızın sorumluluk sınavı takvimi hazır.</p>
+            <a href="{% url 'ogretmen_ogrenci_sinav_takvimi' %}" class="btn btn-lg" style="background-color: #7c3aed; color: white;">Öğrenci Sınav Takvimi</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

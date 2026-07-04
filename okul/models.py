@@ -187,6 +187,23 @@ class DersSaatleri(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Branş modeli
+# ---------------------------------------------------------------------------
+
+class Brans(models.Model):
+    ad = models.CharField(max_length=50, unique=True, verbose_name="Branş Adı")
+
+    class Meta:
+        db_table = "okul_brans"
+        ordering = ["ad"]
+        verbose_name = "Branş"
+        verbose_name_plural = "Branşlar"
+
+    def __str__(self):
+        return self.ad
+
+
+# ---------------------------------------------------------------------------
 # Personel modeli
 # ---------------------------------------------------------------------------
 
@@ -201,14 +218,42 @@ class Personel(models.Model):
     )
     kimlikno = models.CharField(max_length=11, unique=True)
     adi_soyadi = models.CharField(max_length=100, unique=True)
-    brans = models.CharField(max_length=50)
+    brans = models.ForeignKey(
+        "Brans",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="personeller",
+        verbose_name="Branş",
+    )
     CINSIYET_CHOICES = (
         (True, "Erkek"),
         (False, "Kadın"),
     )
     cinsiyet = models.BooleanField(default=True, choices=CINSIYET_CHOICES)
     nobeti_var = models.BooleanField(default=True)
-    gorev_tipi = models.CharField(max_length=50, blank=True, null=True)
+    GOREVI_CHOICES = (
+        ("Öğretmen", "Öğretmen"),
+        ("Müdür", "Müdür"),
+        ("Okul Müdürü", "Okul Müdürü"),
+        ("Müdür Yardımcısı", "Müdür Yardımcısı"),
+        ("Ücretli Öğretmen", "Ücretli Öğretmen"),
+        ("Görevlendirme", "Görevlendirme"),
+        ("Rehberlik", "Rehberlik"),
+        ("YEĞİTEK Okul Sorumlusu", "YEĞİTEK Okul Sorumlusu"),
+    )
+    gorev_tipi = models.CharField(
+        max_length=50, choices=GOREVI_CHOICES, blank=True, null=True, verbose_name="Görevi",
+    )
+    DURUM_CHOICES = (
+        ("Görevde", "Görevde"),
+        ("Dış Görevde", "Dış Görevde"),
+        ("Aylıksız İzinli", "Aylıksız İzinli"),
+        ("Analık İzinli", "Analık İzinli"),
+    )
+    durum = models.CharField(
+        max_length=20, choices=DURUM_CHOICES, default="Görevde", verbose_name="Durum",
+    )
     sabit_nobet = models.BooleanField(default=False)
 
     class Meta:

@@ -4,7 +4,8 @@ from datetime import datetime
 from itertools import groupby
 
 from django.contrib import messages
-from okul.auth import yonetici_required as login_required
+from django.contrib.auth.decorators import login_required
+from okul.auth import ust_yonetici_required
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render, HttpResponse
 from django.utils import timezone
@@ -38,7 +39,7 @@ from sorumluluk.services.takvim_service import oturma_plani_olustur
 
 # ─── Sınav CRUD ────────────────────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def sinav_liste(request):
     sinavlar = SorumluSinav.objects.select_related("egitim_yili").all()
     aktif_sinav = sinavlar.first()
@@ -62,7 +63,7 @@ def sinav_liste(request):
     })
 
 
-@login_required
+@ust_yonetici_required
 def sinav_olustur(request):
     okul = OkulBilgi.get()
     initial = {}
@@ -76,7 +77,7 @@ def sinav_olustur(request):
     return render(request, "sorumluluk/sinav_form.html", {"form": form, "baslik": "Yeni Sorumluluk Sınavı"})
 
 
-@login_required
+@ust_yonetici_required
 def sinav_duzenle(request, pk):
     sinav = get_object_or_404(SorumluSinav, pk=pk)
     form  = SorumluSinavForm(request.POST or None, instance=sinav)
@@ -87,7 +88,7 @@ def sinav_duzenle(request, pk):
     return render(request, "sorumluluk/sinav_form.html", {"form": form, "baslik": "Sınavı Düzenle", "sinav": sinav})
 
 
-@login_required
+@ust_yonetici_required
 def sinav_detay(request, pk):
     sinav = get_object_or_404(SorumluSinav.objects.select_related("egitim_yili"), pk=pk)
 
@@ -109,7 +110,7 @@ def sinav_detay(request, pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def sinav_sil(request, pk):
     sinav = get_object_or_404(SorumluSinav, pk=pk)
@@ -120,7 +121,7 @@ def sinav_sil(request, pk):
 
 # ─── Excel Import (sınava özgü) ────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def ogr_aktar(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
     form  = XlsAktarForm(request.POST or None, request.FILES or None)
@@ -148,7 +149,7 @@ def ogr_aktar(request, sinav_pk):
 
 # ─── Öğrenci Listesi & CRUD ────────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def ogr_liste(request, sinav_pk):
     sinav     = get_object_or_404(SorumluSinav, pk=sinav_pk)
     ogrenciler = (
@@ -162,7 +163,7 @@ def ogr_liste(request, sinav_pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 def ogr_ekle(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
     form  = SorumluOgrenciForm(request.POST or None)
@@ -180,7 +181,7 @@ def ogr_ekle(request, sinav_pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 def ogr_duzenle(request, pk):
     ogr  = get_object_or_404(SorumluOgrenci, pk=pk)
     form = SorumluOgrenciForm(request.POST or None, instance=ogr)
@@ -193,7 +194,7 @@ def ogr_duzenle(request, pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def ogr_sil(request, pk):
     ogr = get_object_or_404(SorumluOgrenci, pk=pk)
@@ -203,7 +204,7 @@ def ogr_sil(request, pk):
     return redirect("sorumluluk:ogr_liste", sinav_pk=sinav_pk)
 
 
-@login_required
+@ust_yonetici_required
 def ogr_ders_ekle(request, ogr_pk):
     ogr  = get_object_or_404(SorumluOgrenci, pk=ogr_pk)
     form = SorumluDersForm(request.POST or None, ogr=ogr)
@@ -221,7 +222,7 @@ def ogr_ders_ekle(request, ogr_pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 def ogr_ders_duzenle(request, pk):
     ders = get_object_or_404(SorumluDers, pk=pk)
     form = SorumluDersForm(request.POST or None, instance=ders, ogr=ders.ogrenci)
@@ -234,7 +235,7 @@ def ogr_ders_duzenle(request, pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def ogr_ders_sil(request, pk):
     ders = get_object_or_404(SorumluDers, pk=pk)
@@ -246,7 +247,7 @@ def ogr_ders_sil(request, pk):
 
 # ─── Takvim ────────────────────────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def takvim_olustur(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
     if sinav.onaylandi:
@@ -436,7 +437,7 @@ def _get_oturumlar_veri(sinav):
     return oturumlar_veri
 
 
-@login_required
+@ust_yonetici_required
 def takvim_detay(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav.objects.select_related("egitim_yili"), pk=sinav_pk)
 
@@ -448,7 +449,7 @@ def takvim_detay(request, sinav_pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def takvim_onayla(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
@@ -459,7 +460,7 @@ def takvim_onayla(request, sinav_pk):
     return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
 
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def takvim_onay_iptal(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
@@ -470,7 +471,7 @@ def takvim_onay_iptal(request, sinav_pk):
     return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
 
 
-@login_required
+@ust_yonetici_required
 def rapor(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav.objects.select_related("egitim_yili"), pk=sinav_pk)
     if not sinav.onaylandi:
@@ -487,7 +488,7 @@ def rapor(request, sinav_pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 def rapor_pdf(request, sinav_pk):
     import io
     from sorumluluk.services.pdf_service import rapor_pdf_uret
@@ -513,7 +514,7 @@ def rapor_pdf(request, sinav_pk):
     )
 
 
-@login_required
+@ust_yonetici_required
 def rapor_imza_pdf(request, sinav_pk):
     import io
     from sorumluluk.services.pdf_service import rapor_pdf_uret
@@ -538,7 +539,7 @@ def rapor_imza_pdf(request, sinav_pk):
         headers={"Content-Disposition": f'inline; filename="{fname}"'},
     )
 
-@login_required
+@ust_yonetici_required
 def rapor_genel_takvim_pdf(request, sinav_pk):
     import io
     from sorumluluk.services.pdf_service import genel_takvim_pdf_uret
@@ -563,7 +564,7 @@ def rapor_genel_takvim_pdf(request, sinav_pk):
         headers={"Content-Disposition": f'inline; filename="{fname}"'},
     )
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def takvim_oturum_tarihi_guncelle(request, sinav_pk):
     from datetime import date as _date
@@ -706,7 +707,7 @@ def takvim_oturum_tarihi_guncelle(request, sinav_pk):
     return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
 
 
-@login_required
+@ust_yonetici_required
 def gorevlendirme(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
 
@@ -807,7 +808,7 @@ def gorevlendirme(request, sinav_pk):
         return redirect("sorumluluk:gorevlendirme", sinav_pk=sinav_pk)
 
     from okul.models import Personel as OkulPersonel
-    personel_listesi = list(OkulPersonel.objects.order_by("adi_soyadi"))
+    personel_listesi = list(OkulPersonel.objects.select_related("brans").order_by("adi_soyadi"))
 
     oturumlar = []
     for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
@@ -837,7 +838,7 @@ def gorevlendirme(request, sinav_pk):
         })
 
     # Görev sayısı özeti — tüm personel dahil, branş bazında gruplu
-    gorev_sayac: dict = {p.pk: {"adi_soyadi": p.adi_soyadi, "brans": p.brans, "komisyon": 0, "gozetmen": 0} for p in personel_listesi}
+    gorev_sayac: dict = {p.pk: {"adi_soyadi": p.adi_soyadi, "brans": p.brans.ad if p.brans else "", "komisyon": 0, "gozetmen": 0} for p in personel_listesi}
 
     # Komisyon sayımı (union-find):
     #  - Aynı (tarih, oturum_no) slotundaki farklı dersler → 1 görev
@@ -942,7 +943,7 @@ def gorevlendirme(request, sinav_pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 def gorevlendirme_pdf(request, sinav_pk):
     import io
     from sorumluluk.services.pdf_service import gorevlendirme_pdf_uret
@@ -962,7 +963,7 @@ def gorevlendirme_pdf(request, sinav_pk):
     )
 
 
-@login_required
+@ust_yonetici_required
 def ogretmen_gorev_raporu_pdf(request, sinav_pk):
     import io
     from sorumluluk.services.pdf_service import ogretmen_gorev_raporu_pdf_uret
@@ -982,7 +983,7 @@ def ogretmen_gorev_raporu_pdf(request, sinav_pk):
     )
 
 
-@login_required
+@ust_yonetici_required
 def ogrenci_takvim_pdf(request, sinav_pk):
     import io
     from sorumluluk.services.pdf_service import ogrenci_takvim_pdf_uret
@@ -1006,7 +1007,7 @@ def ogrenci_takvim_pdf(request, sinav_pk):
 # Öğretmen Görev Özeti (Web Raporu)
 # ─────────────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def ogretmen_gorev_imza_pdf(request, sinav_pk):
     import io
     from sorumluluk.services.pdf_service import ogretmen_gorev_imza_pdf_uret
@@ -1026,7 +1027,7 @@ def ogretmen_gorev_imza_pdf(request, sinav_pk):
     )
 
 
-@login_required
+@ust_yonetici_required
 def ogretmen_gorev_ozeti(request):
     from itertools import groupby as iGroupBy
     from okul.models import Personel
@@ -1049,7 +1050,7 @@ def ogretmen_gorev_ozeti(request):
         except StopIteration:
             pass
 
-    personel_listesi = list(Personel.objects.order_by("brans", "adi_soyadi"))
+    personel_listesi = list(Personel.objects.select_related("brans").order_by("brans__ad", "adi_soyadi"))
     pid_set = {p.pk for p in personel_listesi}
 
     def _komisyon_say(kayitlar_list):
@@ -1161,7 +1162,7 @@ def ogretmen_gorev_ozeti(request):
         return {
             "pk":           p.pk,
             "adi_soyadi":   p.adi_soyadi,
-            "brans":        p.brans or "—",
+            "brans":        p.brans.ad if p.brans else "—",
             "komisyon":     s_k,
             "gozetmen":     s_g,
             "toplam":       s_k + s_g,

@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci
-from okul.utils import get_aktif_dp_tarihi
+from okul.utils import get_aktif_dp_tarihi, get_aktif_egitim_yili
 
 from .models import OgrenciDevamsizlik
 
@@ -208,8 +208,9 @@ def ogretmen_devamsizlik(request, ders_saati=None):
             sinif=sinif_sube.sinif, sube=sinif_sube.sube
         )
         duzeni = list(
-            SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube_obj)
-            .select_related("ogrenci")
+            SinifOturmaDuzeni.objects.filter(
+                sinif_sube=sinif_sube_obj, egitim_yili=get_aktif_egitim_yili()
+            ).select_related("ogrenci")
         )
     except Exception:
         duzeni = []

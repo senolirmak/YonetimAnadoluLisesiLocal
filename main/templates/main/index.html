@@ -102,6 +102,7 @@
                         <a href="/admin/" class="btn btn-primary btn-lg">Yönetici Paneline Git</a>
                         <a href="{% url 'sinav:index' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Ortak Sınav Yönetimi</a>
                         <a href="{% url 'okul_ayarlari' %}" class="btn btn-lg" style="background-color: #495057; color: white;">Okul Yapılandırması</a>
+                        <a href="{% url 'okul:yonetim_index' %}" class="btn btn-lg" style="background-color: #417690; color: white;">Okul Yönetimi (CRUD)</a>
                         <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" class="btn btn-lg"
                            style="background-color:#fd7e14;color:#fff;position:relative;">
                             Faaliyet Onayları
@@ -128,6 +129,15 @@
                     <div class="menu-button-group">
                         <a href="{% url 'sinav:sinav_yoklama_raporu' %}" class="btn btn-lg"
                            style="background-color:#0891b2; color:white;">Sınav Yoklama Listeleri</a>
+                    </div>
+                </div>
+                <hr class="menu-divider">
+                {% endif %}
+
+                {% if is_ogretmen_menu %}
+                <div class="menu-section">
+                    <div class="menu-button-group">
+                        <a href="{% url 'gorevlerim' %}" class="btn btn-lg" style="background-color: #4f46e5; color: white; font-weight: 600;">Görevlerim</a>
                     </div>
                 </div>
                 <hr class="menu-divider">
@@ -559,31 +569,6 @@
             </div>
         </div>
 
-        <!-- 3. Kolon: Personel Bilgileri ve İstatistikler -->
-        <div class="index-col-side">
-            <div class="menu-group">
-                <div class="menu-group-title">Personel Bilgileri</div>
-                <div class="info-item"><strong>Toplam Öğretmen:</strong> <span class="badge bg-primary">{{ personel_istatistik.toplam }}</span></div>
-                <div class="info-item"><strong>Ücretli Öğretmen:</strong> <span class="badge badge-secondary">{{ personel_istatistik.ucretli }}</span></div>
-                <div class="info-item"><strong>Bugün Devamsız:</strong> <span class="text-danger font-bold">{{ personel_istatistik.devamsiz }}</span></div>
-                <div class="info-item mb-20"><strong>Bugün Nöbetçi:</strong> <span class="text-success-bold">{{ personel_istatistik.nobetci }}</span></div>
-                
-                <div class="hr-divider" style="margin: 10px 0;"></div>
-                <div class="menu-group-title" style="font-size: 1rem; margin-bottom: 10px;">Branş Dağılımı</div>
-                
-                <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
-                    <ul class="list-group">
-                        {% for brans in personel_istatistik.brans_dagilimi %}
-                        <li class="list-item" style="padding: 6px 0; border-bottom: 1px solid #f9f9f9; display: flex; justify-content: space-between;">
-                            <span style="font-size: 0.9em;">{{ brans.brans|default:"Belirtilmemiş"|truncatechars:25 }}</span>
-                            <span class="badge badge-info">{{ brans.sayi }}</span>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-        </div>
-        
     </div>
 </div>
 {% endblock %}

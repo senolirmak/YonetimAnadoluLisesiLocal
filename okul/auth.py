@@ -101,3 +101,47 @@ class MudurYardimcisiMixin(LoginRequiredMixin):
         if not is_mudur_yardimcisi(request.user):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
+
+
+_UST_YONETIM_GRUPLARI = {"mudur_yardimcisi", "okul_muduru"}
+
+
+def is_ust_yonetici(user) -> bool:
+    """
+    Kullanıcının Müdür Yardımcısı VEYA Okul Müdürü yetkisine sahip olup olmadığını döndürür.
+
+    Planlama modüllerinde (nöbet, ders doldurma, ortak/mazeret/sorumluluk sınav,
+    haftalık program) bu iki rol aynı tam yetkiye sahiptir.
+    """
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+
+    if not user.groups.filter(name__in=_UST_YONETIM_GRUPLARI).exists():
+        return False
+
+    try:
+        return user.okul_yonetici.aktif
+    except Exception:
+        return True
+
+
+def ust_yonetici_required(view_func):
+    """Function-based view decorator."""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(settings.LOGIN_URL)
+        if not is_ust_yonetici(request.user):
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+class UstYoneticiMixin(LoginRequiredMixin):
+    """Class-based view mixin."""
+    def dispatch(self, request, *args, **kwargs):
+        if not is_ust_yonetici(request.user):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)

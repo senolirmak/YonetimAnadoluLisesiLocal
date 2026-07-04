@@ -243,7 +243,7 @@ def _generate_gunun_nobetcileri_pdf_bytes(target_date):
                 data_rows.append([
                     str(counter),
                     gorev.ogretmen.personel.adi_soyadi,
-                    gorev.ogretmen.personel.brans,
+                    gorev.ogretmen.personel.brans.ad if gorev.ogretmen.personel.brans else "",
                     str(gorev.nobet_yeri) if gorev.nobet_yeri else "",
                 ])
                 counter += 1
@@ -435,9 +435,9 @@ def download_unassigned_ders_png(request):
     all_ids = set()
     for item in unassigned:
         all_ids.add(item.get("absent_teacher_id"))
-    personeller = NobetPersonel.objects.filter(id__in=all_ids)
+    personeller = NobetPersonel.objects.select_related("brans").filter(id__in=all_ids)
     personel_map = {p.pk: p.adi_soyadi for p in personeller}
-    brans_map = {p.pk: p.brans for p in personeller}
+    brans_map = {p.pk: (p.brans.ad if p.brans else "") for p in personeller}
 
     pdf_buffer = BytesIO()
     page_width, _ = A4

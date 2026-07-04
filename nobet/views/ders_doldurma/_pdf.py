@@ -92,9 +92,9 @@ def generate_pdf_bytes(request, dynamic_height=False):
         return None, None
 
     all_ids      = {a.get("teacher_id") for a in assignments} | {a.get("absent_teacher_id") for a in assignments}
-    personeller  = NobetPersonel.objects.filter(id__in=all_ids)
+    personeller  = NobetPersonel.objects.select_related("brans").filter(id__in=all_ids)
     personel_map = {p.pk: p.adi_soyadi for p in personeller}
-    brans_map    = {p.pk: p.brans for p in personeller}
+    brans_map    = {p.pk: (p.brans.ad if p.brans else "") for p in personeller}
 
     pdf_buffer = BytesIO()
     baslik = (

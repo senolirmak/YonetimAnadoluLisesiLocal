@@ -17,7 +17,7 @@ from .forms import (
     PersonelImportForm,
     SinifSubeImportForm,
 )
-from okul.auth import mudur_yardimcisi_required
+from okul.auth import ust_yonetici_required
 
 from .services.default_path_service import DefaultPath
 from .services.ders_programi_import_service import DersProgramiIsleyici
@@ -36,7 +36,7 @@ def _save_file(f, dp):
 
 
 @login_required
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def veriaktar_ana(request):
     mevcut_okul = OkulBilgi.objects.first()
     okul_initial = {

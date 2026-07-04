@@ -1,0 +1,104 @@
+<style>
+  .ay-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+  .ay-kart {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    padding: 1.25rem 1.5rem;
+  }
+  .ay-kart-full { width: 100%; }
+  .ay-kart-half { flex: 1; min-width: 260px; }
+  .ay-baslik {
+    font-size: 1rem; font-weight: 700; color: #1a1a2e;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: .6rem; margin-bottom: 1rem;
+  }
+  .ay-ust-link { font-size: .85rem; margin-bottom: 1rem; display: inline-block; }
+  .ay-form-row { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; }
+  .ay-form-group { display: flex; flex-direction: column; gap: .25rem; flex: 1; min-width: 180px; }
+  .ay-form-group label { font-size: .82rem; font-weight: 600; color: #374151; }
+  .ay-form-group input, .ay-form-group select {
+    padding: .45rem .65rem;
+    border: 1px solid #ced4da; border-radius: 6px;
+    font-size: .9rem;
+  }
+  .ay-form-group input:focus, .ay-form-group select:focus {
+    outline: 2px solid #417690; border-color: transparent;
+  }
+  .ay-error { color: #dc2626; font-size: .78rem; margin-top: .15rem; }
+  .ay-btn-row { display: flex; gap: .75rem; margin-top: 1rem; flex-wrap: wrap; }
+  .btn-kaydet {
+    display: inline-block;
+    padding: .45rem 1.2rem;
+    background: #417690; color: #fff;
+    border: none; border-radius: 6px;
+    font-size: .9rem; font-weight: 600; cursor: pointer;
+    text-decoration: none;
+  }
+  .btn-kaydet:hover { background: #345f75; color: #fff; }
+  .btn-vazgec {
+    background: #6b7280;
+  }
+  .btn-vazgec:hover { background: #4b5563; }
+  .btn-tehlike {
+    background: #dc2626;
+  }
+  .btn-tehlike:hover { background: #b91c1c; }
+
+  .ay-tablo { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .ay-tablo th, .ay-tablo td {
+    border-bottom: 1px solid #e5e7eb;
+    padding: .55rem .7rem; text-align: left;
+  }
+  .ay-tablo th { color: #6b7280; font-weight: 600; font-size: .8rem; text-transform: uppercase; }
+  .ay-tablo tr:hover td { background: #f9fafb; }
+  .ay-satir-eylem a { font-size: .82rem; margin-right: .6rem; }
+  .ay-satir-eylem a.ay-sil-link { color: #dc2626; }
+  .ay-bos { color: #9ca3af; font-size: .9rem; padding: .5rem 0; }
+
+  .ay-mesajlar { list-style: none; padding: 0; margin-bottom: 1rem; }
+  .ay-mesajlar li { padding: .55rem 1rem; border-radius: 6px; margin-bottom: .35rem; }
+  .ay-mesaj-success { background: #d1fae5; color: #065f46; }
+  .ay-mesaj-info { background: #dbeafe; color: #1e40af; }
+  .ay-mesaj-error { background: #fee2e2; color: #991b1b; }
+
+  .ay-etkilenen { margin-top: .5rem; }
+  .ay-etkilenen ul { margin: .4rem 0 0 1.1rem; padding: 0; }
+
+  .ay-grup-grid { display: flex; flex-wrap: wrap; gap: 1rem; }
+  .ay-grup-kart {
+    flex: 1; min-width: 220px;
+    background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: .9rem 1rem;
+  }
+  .ay-grup-baslik {
+    font-weight: 700; font-size: .88rem; color: #1a1a2e;
+    margin-bottom: .6rem; padding-bottom: .4rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .ay-grup-kart .ay-tablo th, .ay-grup-kart .ay-tablo td { padding: .4rem .5rem; }
+
+  .ay-grup-buton-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: .75rem;
+  }
+  .ay-grup-buton {
+    display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+    background: #fff; border: 1px solid #ced4da; border-radius: 8px;
+    padding: .65rem 1.1rem;
+    font-size: .9rem; font-weight: 600; color: #1a1a2e;
+    text-decoration: none;
+    transition: border-color .15s, background .15s;
+  }
+  .ay-grup-buton span:first-child {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ay-grup-buton:hover { border-color: #417690; background: #f0f7fa; color: #1a1a2e; }
+  .ay-grup-sayi {
+    flex: none;
+    background: #417690; color: #fff;
+    border-radius: 999px; min-width: 1.6rem; text-align: center;
+    padding: .1rem .45rem; font-size: .78rem;
+  }
+</style>

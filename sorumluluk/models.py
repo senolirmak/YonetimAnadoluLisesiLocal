@@ -328,7 +328,7 @@ class OncekiDonemGorev(models.Model):
 
     class Meta:
         unique_together     = [("donem", "personel")]
-        ordering            = ["personel__brans", "personel__adi_soyadi"]
+        ordering            = ["personel__brans__ad", "personel__adi_soyadi"]
         verbose_name        = "Önceki Dönem Görevi"
         verbose_name_plural = "Önceki Dönem Görevleri"
 

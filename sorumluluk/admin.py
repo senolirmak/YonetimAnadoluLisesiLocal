@@ -47,7 +47,7 @@ class OncekiDonemGorevInline(admin.TabularInline):
     model    = OncekiDonemGorev
     extra    = 0
     fields   = ["personel", "komisyon", "gozetmen"]
-    ordering = ["personel__brans", "personel__adi_soyadi"]
+    ordering = ["personel__brans__ad", "personel__adi_soyadi"]
 
 
 @admin.register(OncekiDonem)

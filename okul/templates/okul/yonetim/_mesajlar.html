@@ -1,0 +1,9 @@
+{% if messages %}
+<ul class="ay-mesajlar">
+  {% for m in messages %}
+  <li class="{% if 'success' in m.tags %}ay-mesaj-success{% elif 'info' in m.tags %}ay-mesaj-info{% else %}ay-mesaj-error{% endif %}">
+    {{ m }}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

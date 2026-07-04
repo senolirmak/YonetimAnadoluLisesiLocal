@@ -17,6 +17,7 @@ from nobet.models import (
     NobetPersonel,
     SinifSube,
 )
+from okul.models import Brans
 
 
 def _generate_kimlikno() -> str:
@@ -39,10 +40,11 @@ def _get_or_create_eksik_personel(adi_soyadi: str):
     personel = NobetPersonel.objects.filter(adi_soyadi=adi_soyadi).first()
     personel_created = False
     if not personel:
+        bilinmiyor_brans, _ = Brans.objects.get_or_create(ad="Bilinmiyor")
         personel = NobetPersonel.objects.create(
             adi_soyadi=adi_soyadi,
             kimlikno=_generate_kimlikno(),
-            brans="Bilinmiyor",
+            brans=bilinmiyor_brans,
             gorev_tipi="Öğretmen",
             nobeti_var=True,
             sabit_nobet=False,
@@ -86,11 +88,12 @@ class EOkulVeriAktar:
             with transaction.atomic():
                 for _, row in personel_df.iterrows():
                     try:
+                        brans_obj, _ = Brans.objects.get_or_create(ad=str(row["brans"]).strip())
                         obj, created = NobetPersonel.objects.update_or_create(
                             kimlikno=str(row["kimlikno"]),
                             defaults={
                                 "adi_soyadi": row["adi_soyadi"],
-                                "brans": row["brans"],
+                                "brans": brans_obj,
                                 "gorev_tipi": row["gorev_tipi"],
                                 "cinsiyet": row["cinsiyet"],
                             },
@@ -164,7 +167,8 @@ class EOkulVeriAktar:
                             continue
 
                         # Personel bilgilerini güncelle
-                        personel.brans = row["brans"]
+                        brans_obj, _ = Brans.objects.get_or_create(ad=str(row["brans"]).strip())
+                        personel.brans = brans_obj
                         personel.gorev_tipi = row["gorev_tipi"]
                         personel.cinsiyet = row["cinsiyet"]
                         personel.nobeti_var = nobeti_var

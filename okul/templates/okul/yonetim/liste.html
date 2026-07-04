@@ -1,0 +1,98 @@
+{% extends "layouts/base.html" %}
+{% load static okul_extras %}
+
+{% block title %}{{ entry.title }} – Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+{% include "okul/yonetim/_style.html" %}
+
+<div class="container">
+  <h2 class="page-title mb-20">{{ entry.title }}</h2>
+  {% include "okul/yonetim/_mesajlar.html" %}
+
+  <div class="ay-kart ay-kart-full">
+    {% if grup_deger %}
+    <a class="ay-ust-link" href="{% url 'okul:yonetim_list' slug=slug %}">← {{ entry.title }}</a>
+    <div class="ay-baslik" style="display:flex;align-items:center;gap:.75rem;justify-content:space-between;">
+      <span>{% if entry.group_label %}{{ entry.group_label }} {% endif %}{{ grup_deger }}</span>
+      <a class="btn-kaydet" href="{% url 'okul:yonetim_create' slug=slug %}">+ Yeni {{ entry.singular }}</a>
+    </div>
+    {% else %}
+    <a class="ay-ust-link" href="{% url 'okul:yonetim_index' %}">← Okul Yönetimi</a>
+    <div class="ay-baslik" style="display:flex;align-items:center;gap:.75rem;justify-content:space-between;">
+      <span>{{ entry.title }}</span>
+      <a class="btn-kaydet" href="{% url 'okul:yonetim_create' slug=slug %}">+ Yeni {{ entry.singular }}</a>
+    </div>
+    {% endif %}
+
+    {% if gruplar %}
+    <div class="ay-grup-buton-grid">
+      {% for g in gruplar %}
+      <a class="ay-grup-buton" href="{% url 'okul:yonetim_list' slug=slug %}?grup={{ g.deger|urlencode }}">
+        <span>{% if entry.group_label %}{{ entry.group_label }} {% endif %}{{ g.deger }}</span>
+        <span class="ay-grup-sayi">{{ g.sayi }}</span>
+      </a>
+      {% empty %}
+      <p class="ay-bos">Henüz kayıt eklenmemiş.</p>
+      {% endfor %}
+    </div>
+
+    {% elif grouped %}
+    <div class="ay-grup-grid">
+      {% for grup_deger, grup_objeler in grouped %}
+      <div class="ay-grup-kart">
+        <div class="ay-grup-baslik">{{ entry.group_label }} {{ grup_deger }}</div>
+        <table class="ay-tablo">
+          <thead>
+            <tr>
+              {% for field, label in entry.list_fields %}{% if field != entry.group_by %}<th>{{ label }}</th>{% endif %}{% endfor %}
+              <th>İşlemler</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for obj in grup_objeler %}
+            <tr>
+              {% for field, label in entry.list_fields %}{% if field != entry.group_by %}<td>{{ obj|get_attr:field }}</td>{% endif %}{% endfor %}
+              <td class="ay-satir-eylem">
+                <a href="{% url 'okul:yonetim_update' slug=slug pk=obj.pk %}">Düzenle</a>
+                <a class="ay-sil-link" href="{% url 'okul:yonetim_delete' slug=slug pk=obj.pk %}">Sil</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% empty %}
+      <p class="ay-bos">Henüz kayıt eklenmemiş.</p>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div style="overflow-x:auto;">
+    <table class="ay-tablo">
+      <thead>
+        <tr>
+          {% for field, label in entry.list_fields %}<th>{{ label }}</th>{% endfor %}
+          <th>İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for obj in objects %}
+        <tr>
+          {% for field, label in entry.list_fields %}<td>{{ obj|get_attr:field }}</td>{% endfor %}
+          <td class="ay-satir-eylem">
+            <a href="{% url 'okul:yonetim_update' slug=slug pk=obj.pk %}">Düzenle</a>
+            <a class="ay-sil-link" href="{% url 'okul:yonetim_delete' slug=slug pk=obj.pk %}">Sil</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="{{ entry.list_fields|length|add:1 }}" class="ay-bos">Henüz kayıt eklenmemiş.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

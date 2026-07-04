@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
-from okul.utils import get_aktif_dp_tarihi
+from okul.utils import get_aktif_dp_tarihi, get_aktif_egitim_yili
 from main.utils import _ogretmen_menu_gorumu
 
 
@@ -885,8 +885,10 @@ def sinif_oturma_plani(request):
     N_KOLON = N_GRUP * N_KOLON_PER_GRUP
     N_SIRA  = 6
 
+    aktif_yil = get_aktif_egitim_yili()
+
     if request.method == "POST":
-        SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube).delete()
+        SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube, egitim_yili=aktif_yil).delete()
         yeni_kayitlar = []
         for sira in range(1, N_SIRA + 1):
             for kolon in range(1, N_KOLON + 1):
@@ -901,6 +903,7 @@ def sinif_oturma_plani(request):
                                 sira_no=sira,
                                 kolon_no=kolon,
                                 guncelleyen=user,
+                                egitim_yili=aktif_yil,
                             )
                         )
                     except (ValueError, TypeError):
@@ -912,7 +915,7 @@ def sinif_oturma_plani(request):
 
     mevcut = {
         (d.sira_no, d.kolon_no): d.ogrenci
-        for d in SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube)
+        for d in SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube, egitim_yili=aktif_yil)
         .select_related("ogrenci")
     }
 

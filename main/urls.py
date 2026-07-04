@@ -17,6 +17,7 @@ from okul.views import okul_ayarlari
 
 urlpatterns = [
     path("", main_views.index, name="index"),
+    path("gorevlerim/", main_views.gorevlerim, name="gorevlerim"),
     path("nobet/haftalik/", nobet_views.ogretmen_haftalik_nobet, name="ogretmen_haftalik_nobet"),
     path("nobet/gunun-nobetcileri/", nobet_views.ogretmen_gunun_nobetcileri, name="ogretmen_gunun_nobetcileri"),
     path("nobet/ders-doldurma/", nobet_views.ogretmen_ders_doldurma, name="ogretmen_ders_doldurma"),

@@ -15,9 +15,9 @@ from ..forms import NobetDagitimForm
 from ..models import GunlukNobetCizelgesi, NobetGorevi, NobetOgretmen
 from ..services.pdf_rapor import get_report_header_info as _get_report_header_info
 from .permissions import (
-    is_mudur_yardimcisi,
+    is_ust_yonetici,
     is_yonetici,
-    mudur_yardimcisi_required,
+    ust_yonetici_required,
 )
 
 # ─────────────────────────────────────────────
@@ -65,7 +65,7 @@ def nobet_dagitim(request):
         if request.method == "POST" and any(
             k in request.POST for k in ["rotasyon_onizle", "rotasyon_kaydet", "rotasyon_iptal"]
         ):
-            if not is_mudur_yardimcisi(request.user):
+            if not is_ust_yonetici(request.user):
                 raise PermissionDenied
 
         if "rotasyon_onizle" in request.POST:
@@ -185,7 +185,7 @@ def nobet_dagitim(request):
 # ─────────────────────────────────────────────
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def manuel_dagitim(request):
     from datetime import datetime, time
 

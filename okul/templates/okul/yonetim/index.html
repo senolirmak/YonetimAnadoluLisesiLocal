@@ -1,0 +1,24 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}Okul Yönetimi – Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+{% include "okul/yonetim/_style.html" %}
+
+<div class="container">
+  <h2 class="page-title mb-20">Okul Yönetimi</h2>
+  {% include "okul/yonetim/_mesajlar.html" %}
+
+  <div class="ay-grid">
+    {% for k in kartlar %}
+    <div class="ay-kart ay-kart-half">
+      <div class="ay-baslik">{{ k.title }}</div>
+      <p style="color:#6b7280;font-size:.9rem;margin:0 0 1rem;">{{ k.count }} kayıt</p>
+      <a class="btn-kaydet" href="{% url 'okul:yonetim_list' slug=k.slug %}">Yönet</a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

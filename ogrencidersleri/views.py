@@ -89,6 +89,8 @@ def ogrenci_listesi(request):
     if sube_filtre:
         qs = qs.filter(sube__iexact=sube_filtre)
 
+    _aktif_yil = get_aktif_egitim_yili()
+
     secmeli_map = {
         (row["ogrenci_id"], row["ders__grup__sinif_seviyesi"]): row["toplam"]
         for row in OgrenciSecmeliDers.objects.values(
@@ -101,11 +103,11 @@ def ogrenci_listesi(request):
     }
     mevcut_map = {
         row["ogrenci_id"]: row["sayi"]
-        for row in OgrenciMevcutDers.objects.values("ogrenci_id").annotate(sayi=Count("pk"))
+        for row in OgrenciMevcutDers.objects.filter(egitim_yili=_aktif_yil)
+        .values("ogrenci_id").annotate(sayi=Count("pk"))
     }
 
     # Gelecek sınıf seviyesi → maks seçmeli saat (toplam - zorunlu)
-    _aktif_yil = get_aktif_egitim_yili()
     _toplam_map = get_toplam_saat_map(_aktif_yil)
     secmeli_maks_map = {
         row["sinif_seviyesi"]: _toplam_map.get(row["sinif_seviyesi"], _VARSAYILAN_TOPLAM_SAAT) - (row["zorunlu"] or 0)
@@ -195,7 +197,7 @@ def ogrenci_detay(request, ogrenci_pk):
     # --- Mevcut Yıl ---
     mevcut_dersler = (
         OgrenciMevcutDers.objects
-        .filter(ogrenci=ogrenci)
+        .filter(ogrenci=ogrenci, egitim_yili=get_aktif_egitim_yili())
         .select_related("ders")
         .order_by("ders__ders_adi")
     )
@@ -291,11 +293,15 @@ def sinif_toplu_ders_ata(request):
         messages.warning(request, f"{sinif}/{sube} şubesinde öğrenci bulunamadı.")
         return redirect(f"{reverse('ogrdrs_listesi')}?sinif={sinif}&sube={sube}#ogr-tablo")
 
-    # Şubedeki tüm öğrencilerin mevcut atamalarını silip ders programından yeniden oluştur
+    # Şubedeki tüm öğrencilerin mevcut yıl atamalarını silip ders programından yeniden oluştur
+    aktif_yil = get_aktif_egitim_yili()
     ogr_ids = [o.pk for o in ogrenciler]
-    OgrenciMevcutDers.objects.filter(ogrenci_id__in=ogr_ids).delete()
+    OgrenciMevcutDers.objects.filter(ogrenci_id__in=ogr_ids, egitim_yili=aktif_yil).delete()
     yeni_atamalar = [
-        OgrenciMevcutDers(ogrenci=ogr, ders_id=row["ders_id"], haftalik_saat=row["haftalik_saat"])
+        OgrenciMevcutDers(
+            ogrenci=ogr, ders_id=row["ders_id"], haftalik_saat=row["haftalik_saat"],
+            egitim_yili=aktif_yil,
+        )
         for ogr in ogrenciler
         for row in dp_dersler
     ]
@@ -329,13 +335,15 @@ def ogrenci_mevcutyil_ata(request, ogrenci_pk):
         messages.warning(request, "Bu sınıf/şube için aktif ders programında kayıt bulunamadı.")
         return redirect("ogrdrs_detay", ogrenci_pk=ogrenci_pk)
 
-    # Mevcut atamaları sil, ders programından yeniden oluştur
-    OgrenciMevcutDers.objects.filter(ogrenci=ogrenci).delete()
+    # Mevcut yıl atamalarını sil, ders programından yeniden oluştur
+    aktif_yil = get_aktif_egitim_yili()
+    OgrenciMevcutDers.objects.filter(ogrenci=ogrenci, egitim_yili=aktif_yil).delete()
     for row in dp_dersler:
         OgrenciMevcutDers.objects.create(
             ogrenci=ogrenci,
             ders_id=row["ders_id"],
             haftalik_saat=row["haftalik_saat"],
+            egitim_yili=aktif_yil,
         )
 
     messages.success(request, f"{len(dp_dersler)} ders atandı ({ogrenci.sinif}/{ogrenci.sube} ders programından).")
@@ -348,7 +356,10 @@ def ogrenci_mevcutyil_sil(request, ogrenci_pk, ders_pk):
     if request.method != "POST":
         return redirect("ogrdrs_detay", ogrenci_pk=ogrenci_pk)
 
-    atama = get_object_or_404(OgrenciMevcutDers, ogrenci_id=ogrenci_pk, ders_id=ders_pk)
+    atama = get_object_or_404(
+        OgrenciMevcutDers,
+        ogrenci_id=ogrenci_pk, ders_id=ders_pk, egitim_yili=get_aktif_egitim_yili(),
+    )
     ders_adi = atama.ders.ders_adi
     atama.delete()
     messages.success(request, f"'{ders_adi}' mevcut yıl listesinden kaldırıldı.")

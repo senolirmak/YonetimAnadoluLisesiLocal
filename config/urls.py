@@ -60,3 +60,10 @@ urlpatterns = [
     path("", include("main.urls")),
     path("", include("nobet.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Yerel geliştirici araçları — sadece devtools/ klasörü diskte varsa (bkz.
+# config/settings/development.py) INSTALLED_APPS'e eklenir; bu yüzden burada
+# "devtools" app'i yüklü değilse include() hiç çağrılmaz ve başka bir
+# ortamda (devtools klasörü olmadan) hata oluşmaz.
+if "devtools" in settings.INSTALLED_APPS:
+    urlpatterns += [path("devtools/", include("devtools.urls"))]

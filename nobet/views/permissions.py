@@ -4,10 +4,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 
-from okul.auth import is_mudur_yardimcisi  # noqa: F401 — re-export
+from okul.auth import (  # noqa: F401 — re-export
+    _UST_YONETIM_GRUPLARI as TARIH_DEGISTIREBILIR_GRUPLAR,
+    is_mudur_yardimcisi,
+    is_ust_yonetici,
+    ust_yonetici_required,
+)
 
 YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-TARIH_DEGISTIREBILIR_GRUPLAR = {"mudur_yardimcisi", "okul_muduru"}
 
 
 def is_yonetici(user):
@@ -15,7 +19,7 @@ def is_yonetici(user):
 
 
 def is_tarih_degistirebilir(user):
-    return user.is_superuser or user.groups.filter(name__in=TARIH_DEGISTIREBILIR_GRUPLAR).exists()
+    return is_ust_yonetici(user)
 
 
 def mudur_required(view_func):

@@ -45,9 +45,17 @@ class OgrenciMevcutDers(models.Model):
         verbose_name="Ders",
     )
     haftalik_saat = models.PositiveSmallIntegerField(verbose_name="Haftalık Saat")
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
 
     class Meta:
-        unique_together = [("ogrenci", "ders")]
+        unique_together = [("egitim_yili", "ogrenci", "ders")]
         ordering = ["ogrenci", "ders__ders_adi"]
         verbose_name = "Öğrenci Mevcut Ders"
         verbose_name_plural = "Öğrenci Mevcut Dersleri"

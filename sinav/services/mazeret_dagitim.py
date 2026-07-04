@@ -23,6 +23,7 @@ from typing import List, Tuple
 from django.db.models import Subquery, OuterRef
 
 from ogrenci.models import Ogrenci, OgrenciMuaf
+from okul.utils import get_aktif_egitim_yili
 
 from sinav.models import (
     MazeretSinav,
@@ -177,7 +178,9 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> tuple[int, int]:
     # ogrenci__okulno int döner → str'ye normalize et
     muaf_okulno_ders: set[tuple[str, str]] = {
         (str(ok), ders)
-        for ok, ders in OgrenciMuaf.objects.values_list("ogrenci__okulno", "ders__ders_adi")
+        for ok, ders in OgrenciMuaf.objects.filter(
+            egitim_yili=get_aktif_egitim_yili()
+        ).values_list("ogrenci__okulno", "ders__ders_adi")
     }
 
     absent_rows = list(
@@ -326,7 +329,8 @@ def dagit(mazeret_sinav: MazeretSinav) -> Tuple[bool, str]:
         {
             (str(ok), ders)
             for ok, ders in OgrenciMuaf.objects.filter(
-                ogrenci__okulno__in=_mo_okulno_ints
+                ogrenci__okulno__in=_mo_okulno_ints,
+                egitim_yili=get_aktif_egitim_yili(),
             ).values_list("ogrenci__okulno", "ders__ders_adi")
         }
         if _mo_okulno_ints else set()

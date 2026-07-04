@@ -6,6 +6,7 @@ from datetime import datetime, date
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Subquery, OuterRef
+from okul.auth import ust_yonetici_required
 from .utils import gozetmen_bul, onceki_ders_saati
 
 from django.contrib import messages
@@ -1893,16 +1894,10 @@ def ogrenci_sinav_yeri(request):
 @login_required
 def sinav_yoklama_raporu(request):
     """Seviye ve Ders filtreli sınav yoklama listesi — yöneticiler için."""
-    from okul.auth import is_mudur_yardimcisi as _mudur_mi
+    from okul.auth import is_ust_yonetici
     from django.core.exceptions import PermissionDenied
 
-    gruplar = set(request.user.groups.values_list("name", flat=True))
-    yetkili = (
-        request.user.is_superuser
-        or _mudur_mi(request.user)
-        or "okul_muduru" in gruplar
-    )
-    if not yetkili:
+    if not is_ust_yonetici(request.user):
         raise PermissionDenied
 
     from django.db.models import Count, Q
@@ -2052,17 +2047,11 @@ def sinav_yoklama_raporu(request):
 
 def sinav_yoklama_yok_detay(request):
     """Belirli (seviye, ders_adi, tarih) için 'yok' durumundaki öğrencilerin listesi."""
-    from okul.auth import is_mudur_yardimcisi as _mudur_mi
+    from okul.auth import is_ust_yonetici
     from django.core.exceptions import PermissionDenied
     from collections import defaultdict
 
-    gruplar = set(request.user.groups.values_list("name", flat=True))
-    yetkili = (
-        request.user.is_superuser
-        or _mudur_mi(request.user)
-        or "okul_muduru" in gruplar
-    )
-    if not yetkili:
+    if not is_ust_yonetici(request.user):
         raise PermissionDenied
 
     from sinav.models import TakvimUretim, OturmaPlani, SinavSalonYoklama
@@ -2161,14 +2150,15 @@ def mazeret_yoklama_simule(request):
     - Sürekli Devamsız (Ogrenci.sureksiz_devamsiz=True) → simülasyonda devamsız seçilmez
     - Muaf (OgrenciMuaf) → o ders için devamsız seçilmez
     """
-    from okul.auth import is_mudur_yardimcisi as _mudur_mi
+    from okul.auth import is_ust_yonetici
     from django.core.exceptions import PermissionDenied
     import random
     import re
     from collections import defaultdict
     from ogrenci.models import Ogrenci as _Ogrenci, OgrenciMuaf as _OgrenciMuaf
+    from okul.utils import get_aktif_egitim_yili
 
-    if not (request.user.is_superuser or _mudur_mi(request.user)):
+    if not is_ust_yonetici(request.user):
         raise PermissionDenied
 
     aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
@@ -2188,7 +2178,8 @@ def mazeret_yoklama_simule(request):
         _Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
     )
     muaf_okulno_ders: set[tuple[str, str]] = set(
-        _OgrenciMuaf.objects.values_list("ogrenci__okulno", "ders__ders_adi")
+        _OgrenciMuaf.objects.filter(egitim_yili=get_aktif_egitim_yili())
+        .values_list("ogrenci__okulno", "ders__ders_adi")
     )
 
     def _ozel_durum(okulno: str, ders_adi_full: str) -> str:
@@ -2387,7 +2378,7 @@ def mazeret_yoklama_simule(request):
 # Mazeret Sınavı
 # ===========================================================================
 
-@login_required
+@ust_yonetici_required
 def mazeret_sinav_listesi(request):
     """Aktif sınava ait mazeret sınav planlarını listeler."""
     from django.db.models import Exists, OuterRef as _OuterRef
@@ -2429,7 +2420,7 @@ def mazeret_sinav_listesi(request):
     })
 
 
-@login_required
+@ust_yonetici_required
 def mazeret_sinav_olustur(request):
     """
     Yeni mazeret sınav planı oluşturur.
@@ -2514,7 +2505,7 @@ def mazeret_sinav_olustur(request):
     })
 
 
-@login_required
+@ust_yonetici_required
 def mazeret_sinav_detay(request, pk):
     """Mazeret sınav planının detayını gösterir (günler, oturumlar, dersler, öğrenciler)."""
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
@@ -2578,7 +2569,7 @@ def mazeret_sinav_detay(request, pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 def mazeret_ogrenci_listesi(request, pk):
     """
     Mazeret sınavına aday öğrencilerin listesi:
@@ -2651,6 +2642,7 @@ def mazeret_ogrenci_listesi(request, pk):
 
     # Muaf (ders bazında): subquery yerine Python listesi (int↔varchar tip uyumu)
     from ogrenci.models import OgrenciMuaf
+    from okul.utils import get_aktif_egitim_yili
     _mo_ok_ints = [
         int(x) for x in
         MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
@@ -2660,7 +2652,8 @@ def mazeret_ogrenci_listesi(request, pk):
         {
             (str(ok), ders)
             for ok, ders in OgrenciMuaf.objects.filter(
-                ogrenci__okulno__in=_mo_ok_ints
+                ogrenci__okulno__in=_mo_ok_ints,
+                egitim_yili=get_aktif_egitim_yili(),
             ).values_list("ogrenci__okulno", "ders__ders_adi")
         }
         if _mo_ok_ints else set()
@@ -2707,7 +2700,7 @@ def mazeret_ogrenci_listesi(request, pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def mazeret_sinav_dagit(request, pk):
     """
@@ -2757,7 +2750,7 @@ def mazeret_sinav_dagit(request, pk):
     return redirect("sinav:mazeret_detay", pk=pk)
 
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def mazeret_sinav_sil(request, pk):
     """Mazeret sınav planını siler."""
@@ -2771,7 +2764,7 @@ def mazeret_sinav_sil(request, pk):
 # Mazeret Sınav Takvimi
 # ---------------------------------------------------------------------------
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def mazeret_takvim_olustur(request, pk):
     """Mazeret oturma planını oluşturur (Mazeret1/Mazeret2 salon ataması)."""
@@ -2795,7 +2788,7 @@ def mazeret_takvim_olustur(request, pk):
     return redirect("sinav:mazeret_takvim", pk=pk)
 
 
-@login_required
+@ust_yonetici_required
 def mazeret_takvim_detay(request, pk):
     """Mazeret oturma planını gösterir ve düzenleme imkânı sunar."""
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
@@ -2850,7 +2843,7 @@ def mazeret_takvim_detay(request, pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def mazeret_takvim_onayla(request, pk):
     """Mazeret takvimini onaylar; onaydan sonra düzenleme devre dışı kalır."""
@@ -2868,7 +2861,7 @@ def mazeret_takvim_onayla(request, pk):
     return redirect("sinav:mazeret_takvim", pk=pk)
 
 
-@login_required
+@ust_yonetici_required
 @require_POST
 def mazeret_takvim_onayli_iptal(request, pk):
     """Onayı geri alır (düzenleme için)."""
@@ -2880,7 +2873,7 @@ def mazeret_takvim_onayli_iptal(request, pk):
     return redirect("sinav:mazeret_takvim", pk=pk)
 
 
-@login_required
+@ust_yonetici_required
 def mazeret_rapor(request, pk):
     """Onaylanmış mazeret takviminin yazdırılabilir raporu."""
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
@@ -2918,7 +2911,7 @@ def mazeret_rapor(request, pk):
     })
 
 
-@login_required
+@ust_yonetici_required
 def mazeret_rapor_pdf_view(request, pk):
     """Mazeret oturma planını PDF olarak indirir (ReportLab)."""
     import io

@@ -1,0 +1,46 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ entry.singular }} Sil – Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+{% include "okul/yonetim/_style.html" %}
+
+<div class="container">
+  <h2 class="page-title mb-20">{{ entry.singular }} Sil</h2>
+  {% include "okul/yonetim/_mesajlar.html" %}
+
+  <div class="ay-kart ay-kart-full">
+    <a class="ay-ust-link" href="{% url 'okul:yonetim_list' slug=slug %}">← {{ entry.title }}</a>
+
+    <p><strong>{{ instance }}</strong> kaydını silmek istediğinize emin misiniz?</p>
+
+    {% if engellenen %}
+    <div class="ay-error ay-etkilenen">
+      Bu kayıt silinemez — aşağıdaki kayıtlarla korumalı (PROTECT) ilişkisi var, önce onları düzenlemeniz gerekir:
+      <ul>
+        {% for isim, sayi in engellenen.items %}<li>{{ isim }}: {{ sayi }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% elif etkilenen %}
+    <div class="ay-error ay-etkilenen">
+      Bu işlem, ilişkili olduğu için aşağıdaki kayıtları da silecek:
+      <ul>
+        {% for isim, sayi in etkilenen.items %}<li>{{ isim }}: {{ sayi }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="ay-btn-row">
+        {% if not engellenen %}
+        <button type="submit" class="btn-kaydet btn-tehlike">Evet, Sil</button>
+        {% endif %}
+        <a class="btn-kaydet btn-vazgec" href="{% url 'okul:yonetim_list' slug=slug %}">Vazgeç</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

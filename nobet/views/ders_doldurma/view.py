@@ -27,7 +27,7 @@ from ...models import (
     NobetOgretmen,
     NobetPersonel,
 )
-from ..permissions import is_mudur_yardimcisi, is_yonetici
+from ..permissions import is_ust_yonetici, is_yonetici
 from ._mazeret import mazeret_ctx
 from ._queries import (
     DAYS_MAP,
@@ -298,7 +298,7 @@ def nobet_ders_doldurma(request):
             (k for k in ("kaydet", "sil", "mazeret_kaydet", "hesapla") if k in request.POST),
             None,
         )
-        if action in ("kaydet", "sil", "mazeret_kaydet") and not is_mudur_yardimcisi(request.user):
+        if action in ("kaydet", "sil", "mazeret_kaydet") and not is_ust_yonetici(request.user):
             raise PermissionDenied
 
         if action == "kaydet":

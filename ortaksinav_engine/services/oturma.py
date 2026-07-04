@@ -93,6 +93,7 @@ class OturmaPlanService(BaseService):
 
     def generate_oturum(self, tarih: str, saat: str, oturum: int, aktif_sinav=None, aktif_uretim=None):
         from ogrenci.models import Ogrenci as OgrenciModel, OgrenciMuaf
+        from okul.utils import get_aktif_egitim_yili
         from sinav.models import Takvim, OturmaPlani
 
         self.log(f"\nOturum yerlesimi: {tarih} {saat} (Oturum {oturum})")
@@ -166,8 +167,10 @@ class OturmaPlanService(BaseService):
 
         oturum_base_ders = {_base_ders(v) for v in sube_to_ders.values()}
         muaf_pairs: set[tuple] = set(
-            OgrenciMuaf.objects.filter(ders__ders_adi__in=oturum_base_ders)
-            .values_list("ogrenci__okulno", "ders__ders_adi")
+            OgrenciMuaf.objects.filter(
+                ders__ders_adi__in=oturum_base_ders,
+                egitim_yili=get_aktif_egitim_yili(),
+            ).values_list("ogrenci__okulno", "ders__ders_adi")
         )
         if muaf_pairs:
             df_o["_ders_base"] = df_o["ders"].apply(_base_ders)

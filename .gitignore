@@ -83,3 +83,6 @@ npm-debug.log
 # Sunucu yükleme betikleri ve veri dosyaları
 sunucu_yukle.sh
 secmelidersler_data.json
+
+# Yerel geliştirici araçları (asla GitHub'a gitmez)
+/devtools/

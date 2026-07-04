@@ -641,7 +641,7 @@ def ogretmen_gorev_raporu_pdf_uret(buf, sinav, okul):
 
     for ku in (SorumluKomisyonUyesi.objects
                .filter(sinav=sinav)
-               .select_related("uye1", "uye2")
+               .select_related("uye1__brans", "uye2__brans")
                .order_by("tarih", "oturum_no", "ders_adi")):
         saatler = takvim_saatler.get((ku.tarih, ku.oturum_no))
         row = {
@@ -655,11 +655,11 @@ def ogretmen_gorev_raporu_pdf_uret(buf, sinav, okul):
         for uye in (ku.uye1, ku.uye2):
             if uye:
                 personel_gorevler[uye.pk].append(dict(row))
-                personel_bilgi[uye.pk] = (uye.adi_soyadi, uye.brans or "")
+                personel_bilgi[uye.pk] = (uye.adi_soyadi, uye.brans.ad if uye.brans else "")
 
     for gz in (SorumluGozetmen.objects
                .filter(sinav=sinav)
-               .select_related("gozetmen")
+               .select_related("gozetmen__brans")
                .order_by("tarih", "oturum_no")):
         if not gz.gozetmen:
             continue
@@ -672,7 +672,7 @@ def ogretmen_gorev_raporu_pdf_uret(buf, sinav, okul):
             "tur":            "Gözetmen",
             "detay":          _SALON_LABEL.get(gz.salon, gz.salon),
         })
-        personel_bilgi[gz.gozetmen.pk] = (gz.gozetmen.adi_soyadi, gz.gozetmen.brans or "")
+        personel_bilgi[gz.gozetmen.pk] = (gz.gozetmen.adi_soyadi, gz.gozetmen.brans.ad if gz.gozetmen.brans else "")
 
     sorted_pks = sorted(
         personel_bilgi.keys(),

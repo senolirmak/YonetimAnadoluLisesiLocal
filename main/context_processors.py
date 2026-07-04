@@ -1,5 +1,6 @@
+from okul.auth import is_ust_yonetici as _is_ust_yonetici
+
 YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-TARIH_DEGISTIREBILIR_GRUPLAR = {"mudur_yardimcisi", "okul_muduru"}
 
 
 def kullanici_rol(request):
@@ -16,11 +17,11 @@ def kullanici_rol(request):
             bekleyen_faaliyet = Faaliyet.objects.filter(durum=Faaliyet.DURUM_BEKLEMEDE).count()
 
         is_yonetici = superuser or bool(gruplar & YONETICI_GRUPLAR)
-        is_ust_yonetici = superuser or "mudur_yardimcisi" in gruplar or "okul_muduru" in gruplar
+        is_ust_yonetici = _is_ust_yonetici(request.user)
         return {
             "is_mudur_yardimcisi": mudur_yardimcisi,
             "is_yonetici": is_yonetici,
-            "is_tarih_degistirebilir": superuser or bool(gruplar & TARIH_DEGISTIREBILIR_GRUPLAR),
+            "is_tarih_degistirebilir": is_ust_yonetici,
             "bekleyen_faaliyet_sayisi": bekleyen_faaliyet,
             "is_rehber_ogretmen": superuser or "rehber_ogretmen" in gruplar,
             "is_disiplin_kurulu": superuser or "disiplin_kurulu" in gruplar,
