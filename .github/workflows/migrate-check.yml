@@ -1,0 +1,52 @@
+name: Migration Check
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  migrate-fresh-db:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nobet_ci
+          POSTGRES_USER: nobet_ci
+          POSTGRES_PASSWORD: nobet_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nobet_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      SECRET_KEY: ci-only-secret-key
+      DEBUG: "False"
+      ALLOWED_HOSTS: "localhost"
+      DB_NAME: nobet_ci
+      DB_USER: nobet_ci
+      DB_PASSWORD: nobet_ci
+      DB_HOST: localhost
+      DB_PORT: "5432"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bağımlılıkları kur
+        run: pip install -r requirements.txt
+
+      - name: Sıfır veritabanında migrate
+        run: python manage.py migrate --settings=config.settings.production
+
+      - name: Eksik migration kontrolü
+        run: python manage.py makemigrations --check --dry-run --settings=config.settings.production
