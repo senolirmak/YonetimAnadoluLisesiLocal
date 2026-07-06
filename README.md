@@ -137,13 +137,20 @@ python manage.py ogretmen_kullanici_olustur --kaydet
 python manage.py createsuperuser
 ```
 
-### 10. Statik Dosyaları Toplayın
+### 10. Okul Bilgisi Kaydı Oluşturun
+
+Admin panelinden (`/admin/`) **Okul → Okul Bilgisi** ve **Eğitim-Öğretim Yılı**
+kaydını oluşturun. Bu kayıt olmadan seçmeli dersler, ders programı ve dönem
+bazlı raporlama gibi birçok modül aktif eğitim-öğretim yılını bulamadığı için
+boş görünür.
+
+### 11. Statik Dosyaları Toplayın
 
 ```bash
 python manage.py collectstatic
 ```
 
-### 11. Geliştirme Sunucusunu Başlatın
+### 12. Geliştirme Sunucusunu Başlatın
 
 ```bash
 python manage.py runserver
