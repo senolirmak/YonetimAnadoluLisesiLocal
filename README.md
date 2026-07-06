@@ -43,6 +43,18 @@ Okul personelinin haftalık nöbet görevlerini, ders doldurma listelerini, deva
 - Python 3.12+
 - PostgreSQL
 - pip
+- poppler (PDF → PNG dönüştürme için; `pdf2image` bu sistem paketini kullanır)
+
+  ```bash
+  # Fedora / RHEL
+  sudo dnf install poppler-utils
+
+  # Ubuntu / Debian
+  sudo apt install poppler-utils
+
+  # macOS (Homebrew)
+  brew install poppler
+  ```
 
 ### 1. Depoyu Klonlayın
 
