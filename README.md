@@ -214,13 +214,11 @@ python manage.py kullanici_gruplari_olustur
 python manage.py ogretmen_kullanici_olustur
 # Uygula:
 python manage.py ogretmen_kullanici_olustur --kaydet
-
-# Veri aktarma komutları (yönetici için)
-python manage.py PersonelAktar
-python manage.py NobetciAktar
-python manage.py OkulDersProgramiAktar
-python manage.py SinifSubeAktar
 ```
+
+Personel, nöbet, ders programı ve sınıf/şube verilerini içeri aktarmak için
+`/veriaktar/` altındaki 5 adımlı Excel import sihirbazını kullanın (bkz.
+"Uygulama Modülleri" tablosu).
 
 ---
 
