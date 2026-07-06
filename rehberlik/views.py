@@ -3,7 +3,6 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from cagri.models import OgrenciCagri
 from nobet.models import NobetPersonel
 from ogrenci.models import Ogrenci
 
@@ -133,14 +132,6 @@ def gorusme_olustur(request):
         messages.error(request, "Bu kullanıcıya bağlı personel kaydı bulunamadı.")
         return redirect("index")
 
-    # Çağrısız görüşme açılamaz — önce çağrı oluşturulmalı
-    cagri_id_kontrol = (
-        request.GET.get("cagri_id", "").strip() or request.POST.get("cagri_id", "").strip()
-    )
-    if not cagri_id_kontrol:
-        messages.warning(request, "Görüşme oluşturmak için önce öğrenci çağrısı oluşturun.")
-        return redirect("rehberlik:cagri_olustur")
-
     ogrenciler = Ogrenci.objects.select_related("detay").order_by("sinif", "sube", "okulno")
     personeller = NobetPersonel.objects.all().order_by("adi_soyadi")
     sinifsube_secenekleri = _sinifsube_secenekleri()
@@ -205,49 +196,13 @@ def gorusme_olustur(request):
             )
             if tur == "grup" and grup_ids:
                 gorusme.grup_ogrencileri.set(grup_ids)
-            # Çağrıdan gelindiyse çağrıyı görüşmeye bağla ve devamsızlık kaydı oluştur
-            cagri_id_post = request.POST.get("cagri_id", "").strip()
-            if cagri_id_post:
-                from devamsizlik.models import OgrenciDevamsizlik
-
-                try:
-                    cagri_obj = OgrenciCagri.objects.get(
-                        pk=int(cagri_id_post),
-                        kayit_eden=personel,
-                        servis=OgrenciCagri.SERVIS_REHBERLIK,
-                    )
-                    cagri_obj.gorusme_rehberlik = gorusme  # type: ignore[assignment]
-                    cagri_obj.save(update_fields=["gorusme_rehberlik"])
-                    if cagri_obj.ogrenci and cagri_obj.ders_saati:
-                        from okul.models import DersSaatleri as _DersSaatleri
-                        _ds_obj = _DersSaatleri.objects.filter(
-                            derssaati_no=cagri_obj.ders_saati
-                        ).first()
-                        OgrenciDevamsizlik.objects.update_or_create(
-                            ogrenci=cagri_obj.ogrenci,
-                            tarih=cagri_obj.tarih,
-                            ders_saati=_ds_obj,
-                            defaults={
-                                "ders_adi": cagri_obj.ders_adi or "Rehberlik",
-                                "ogretmen_adi": personel.adi_soyadi,
-                                "aciklama": "Rehberlik Servisi",
-                            },
-                        )
-                except (OgrenciCagri.DoesNotExist, ValueError):
-                    pass
             messages.success(request, "Görüşme kaydı oluşturuldu.")
             return redirect("rehberlik:gorusme_detay", pk=gorusme.pk)
 
-    # Çağrı listesinden gelen ön-seçimler
     secili_tur = request.GET.get("tur", "").strip()
     secili_ogrenci_id = ""
     try:
         secili_ogrenci_id = str(int(request.GET.get("ogrenci_id", "")))
-    except (ValueError, TypeError):
-        pass
-    cagri_id = ""
-    try:
-        cagri_id = str(int(request.GET.get("cagri_id", "")))
     except (ValueError, TypeError):
         pass
 
@@ -260,7 +215,6 @@ def gorusme_olustur(request):
         "bugun": timezone.localdate().isoformat(),
         "secili_tur": secili_tur,
         "secili_ogrenci_id": secili_ogrenci_id,
-        "cagri_id": cagri_id,
     }
     return render(request, "rehberlik/gorusme_form.html", context)
 

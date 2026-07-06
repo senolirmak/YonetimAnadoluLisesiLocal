@@ -160,17 +160,6 @@
                         <a href="{% url 'disiplin:gorusme_sil' g.pk %}"
                            class="btn btn-danger" style="padding:3px 9px;font-size:0.82em;">Sil</a>
                         {% endif %}
-                        {% if kullanici_disiplin %}
-                            {% if g.tur == 'bireysel' or g.tur == 'veli' %}
-                                {% if g.ogrenci %}
-                                <a href="{% url 'disiplin:cagri_olustur' %}?ogrenci_id={{ g.ogrenci.pk }}"
-                                   class="btn btn-success" style="padding:3px 9px;font-size:0.82em;">Çağrı</a>
-                                {% endif %}
-                            {% elif g.tur == 'grup' %}
-                                <a href="{% url 'disiplin:cagri_olustur' %}?gorusme_id={{ g.pk }}"
-                                   class="btn btn-success" style="padding:3px 9px;font-size:0.82em;">Çağrı</a>
-                            {% endif %}
-                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

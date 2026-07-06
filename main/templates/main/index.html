@@ -232,10 +232,9 @@
                 {% if is_tarih_degistirebilir %}
                 <hr class="menu-divider">
                 <div class="menu-section">
-                    <div class="menu-group-title">Müdüriyet Çağrısı</div>
+                    <div class="menu-group-title">Müdüriyet Görüşmeleri</div>
                     <div class="menu-button-group">
-                        <a href="{% url 'muduriyetcagri:cagri_olustur' %}" class="btn btn-lg" style="background-color: #343a40; color: white;">Öğrenci Çağır</a>
-                        <a href="{% url 'muduriyetcagri:cagri_liste' %}" class="btn btn-lg" style="background-color: #6c757d; color: white;">Çağrı Listesi</a>
+                        <a href="{% url 'muduriyetcagri:gorusme_liste' %}" class="btn btn-lg" style="background-color: #343a40; color: white;">Görüşme Listesi</a>
                     </div>
                 </div>
                 {% endif %}
@@ -268,14 +267,6 @@
                         <a href="{% url 'sinav_oturum_istatistik' %}" class="btn btn-lg" style="background-color: #6366f1; color: white;">Sınav Oturum İstatistikleri</a>
                         <a href="{% url 'sinav:sinav_yoklama_raporu' %}" class="btn btn-lg" style="background-color: #0891b2; color: white;">Sınav Yoklama Raporu</a>
                         {% endif %}
-                    </div>
-                </div>
-                <hr class="menu-divider">
-                <div class="menu-section">
-                    <div class="menu-group-title">Tahta Bildirimleri</div>
-                    <div class="menu-button-group">
-                        <a href="{% url 'bildirim:tahta_listesi' %}" class="btn btn-lg" style="background-color: #0891b2; color: white;">Sınıf Tahtaları</a>
-                        <a href="{% url 'bildirim:bildirim_gecmisi' %}" class="btn btn-lg" style="background-color: #0e7490; color: white;">Bildirim Geçmişi</a>
                     </div>
                 </div>
                 {% endif %}
@@ -357,44 +348,22 @@
                     </div>
                 </div>
 
-                {% if is_rehber_ogretmen %}
-                <hr class="menu-divider">
-                <div class="menu-section">
-                    <div class="menu-group-title">Rehberlik Servisi</div>
-                    <div class="menu-button-group">
-                        <a href="{% url 'rehberlik:cagri_olustur' %}" class="btn btn-lg" style="background-color: #17a2b8; color: white;">Öğrenci Çağrısı</a>
-                        <a href="{% url 'rehberlik:cagri_liste' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Çağrı Listesi</a>
-                        <a href="{% url 'rehberlik:gorusme_liste' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Görüşme Listesi</a>
-                    </div>
-                </div>
-                {% elif is_mudur_yardimcisi %}
+                {% if is_rehber_ogretmen or is_mudur_yardimcisi %}
                 <hr class="menu-divider">
                 <div class="menu-section">
                     <div class="menu-group-title">Rehberlik Servisi</div>
                     <div class="menu-button-group">
                         <a href="{% url 'rehberlik:gorusme_liste' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Görüşme Listesi</a>
-                        <a href="{% url 'rehberlik:cagri_liste' %}" class="btn btn-lg" style="background-color: #17a2b8; color: white;">Çağrı Listesi</a>
                     </div>
                 </div>
                 {% endif %}
 
-                {% if is_disiplin_kurulu %}
-                <hr class="menu-divider">
-                <div class="menu-section">
-                    <div class="menu-group-title">Disiplin Kurulu</div>
-                    <div class="menu-button-group">
-                        <a href="{% url 'disiplin:cagri_olustur' %}" class="btn btn-lg" style="background-color: #dc3545; color: white;">Öğrenci Çağrısı</a>
-                        <a href="{% url 'disiplin:cagri_liste' %}" class="btn btn-lg" style="background-color: #c82333; color: white;">Çağrı Listesi</a>
-                        <a href="{% url 'disiplin:gorusme_liste' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Görüşme Listesi</a>
-                    </div>
-                </div>
-                {% elif is_mudur_yardimcisi %}
+                {% if is_disiplin_kurulu or is_mudur_yardimcisi %}
                 <hr class="menu-divider">
                 <div class="menu-section">
                     <div class="menu-group-title">Disiplin Kurulu</div>
                     <div class="menu-button-group">
                         <a href="{% url 'disiplin:gorusme_liste' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Görüşme Listesi</a>
-                        <a href="{% url 'disiplin:cagri_liste' %}" class="btn btn-lg" style="background-color: #dc3545; color: white;">Çağrı Listesi</a>
                     </div>
                 </div>
                 {% endif %}
@@ -417,22 +386,10 @@
                 </div>
 
                 <div class="hr-divider" style="margin:10px 0;"></div>
-                <div class="menu-group-title" style="font-size:0.9rem;color:#6c757d;margin-bottom:6px;">Servis Çağrıları</div>
+                <div class="menu-group-title" style="font-size:0.9rem;color:#6c757d;margin-bottom:6px;">Faaliyet</div>
                 <div class="info-item">
                     <span>Faaliyet Öğrencisi</span>
                     <span class="badge" style="background-color:#fd7e14;color:#fff;">{{ ogrenci_istatistik.faaliyet }}</span>
-                </div>
-                <div class="info-item">
-                    <span>Rehberlik Çağrısı</span>
-                    <span class="badge" style="background-color:#20c997;color:#fff;">{{ ogrenci_istatistik.rehberlik_cagri }}</span>
-                </div>
-                <div class="info-item">
-                    <span>Disiplin Çağrısı</span>
-                    <span class="badge" style="background-color:#dc3545;color:#fff;">{{ ogrenci_istatistik.disiplin_cagri }}</span>
-                </div>
-                <div class="info-item">
-                    <span>Müdüriyet Çağrısı</span>
-                    <span class="badge" style="background-color:#343a40;color:#fff;">{{ ogrenci_istatistik.muduriyetcagri_cagri }}</span>
                 </div>
 
                 {% if user.is_superuser or is_mudur_yardimcisi %}

@@ -2,7 +2,6 @@
 Öğrenci verileri içeren tabloları temizler:
   - Öğrenci Devamsızlık
   - Faaliyet
-  - Çağrı (tüm servisler)
   - Rehberlik Görüşmeleri
   - Disiplin Görüşmeleri
   - Müdüriyet Görüşmeleri
@@ -10,7 +9,7 @@
 Kullanım:
   python manage.py veri_temizle
   python manage.py veri_temizle --evet     (onay sormadan çalıştır)
-  python manage.py veri_temizle --sadece devamsizlik cagri
+  python manage.py veri_temizle --sadece devamsizlik rehberlik_gorusme
 """
 
 from django.core.management.base import BaseCommand
@@ -26,11 +25,6 @@ TABLOLAR = {
         "model": "Faaliyet",
         "aciklama": "Faaliyet",
         "m2m": ["ogrenciler"],
-    },
-    "cagri": {
-        "app": "cagri",
-        "model": "OgrenciCagri",
-        "aciklama": "Öğrenci Çağrı (tüm servisler)",
     },
     "rehberlik_gorusme": {
         "app": "rehberlik",
@@ -54,7 +48,7 @@ TABLOLAR = {
 
 
 class Command(BaseCommand):
-    help = "Öğrenci Devamsızlık, Faaliyet, Çağrı ve Görüşme tablolarını temizler."
+    help = "Öğrenci Devamsızlık, Faaliyet ve Görüşme tablolarını temizler."
 
     def add_arguments(self, parser):
         parser.add_argument(

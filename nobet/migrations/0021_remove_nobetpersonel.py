@@ -14,7 +14,6 @@ class Migration(migrations.Migration):
         ("faaliyet", "0004_update_nobetpersonel_fk_to_okul"),
         ("rehberlik", "0007_update_nobetpersonel_fk_to_okul"),
         ("disiplin", "0004_update_nobetpersonel_fk_to_okul"),
-        ("cagri", "0004_update_nobetpersonel_fk_to_okul"),
         ("dersprogrami", "0003_update_nobetpersonel_fk_to_okul"),
         ("dersdefteri", "0003_update_nobetpersonel_fk_to_okul"),
     ]

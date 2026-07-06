@@ -31,21 +31,16 @@ INSTALLED_APPS = [
     "rehberlik",
     "disiplin",
     "muduriyetcagri",
-    "cagri",
     "ogrencinobet",
     "pano",
     "sinav",
     "dersdefteri",
     "sinavmedia",
-    "bildirim_gonderici",
     "sorumluluk",
     "ekders",
     "secmelidersler",
     "ogrencidersleri",
 ]
-
-BILDIRIM_ANAHTAR = os.getenv("BILDIRIM_ANAHTAR", "")
-BILDIRIM_TIMEOUT = 4
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

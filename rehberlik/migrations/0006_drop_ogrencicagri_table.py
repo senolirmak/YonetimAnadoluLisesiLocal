@@ -8,7 +8,6 @@ from django.db import migrations
 class Migration(migrations.Migration):
     dependencies = [
         ("rehberlik", "0005_remove_ogrencicagri_state"),
-        ("cagri", "0002_migrate_data"),
     ]
 
     operations = [

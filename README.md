@@ -13,7 +13,7 @@ Okul personelinin haftalık nöbet görevlerini, ders doldurma listelerini, deva
 - **Ders Programı** — Öğretmen ve sınıf bazlı ders programı yönetimi
 - **Veri Aktarma** — 5 adımlı Excel import sihirbazı (personel, sınıf/şube, ders programı, nöbet verileri)
 - **Dijital Pano** — Duyuru, etkinlik ve medya içerik yönetimi (kiosk)
-- **Öğrenci Modülü** — Öğrenci bilgileri, rehberlik, disiplin, müdüriyet çağrı kayıtları
+- **Öğrenci Modülü** — Öğrenci bilgileri, rehberlik, disiplin, müdüriyet görüşme kayıtları
 - **Ortak Sınav Yönetimi (Kelebek)** — ILP tabanlı sınav takvimi, oturma planı üretimi, salon ve sıra ataması, PDF raporlama; katılacak sınıf seviyeleri (9–12), kelebek/kendi sınıfı dağılımı ve günde maks. sınav sayısı yapılandırılabilir
 - **Sınav Gözetim** — Öğretmenlere sınav günü kendi sınıflarının Kelebek yerleşim listesini gösterir
 - **Raporlama** — PDF, PNG ve Excel dışa aktarma
@@ -192,8 +192,7 @@ Uygulama `http://127.0.0.1:8000/` adresinde çalışacaktır.
 | `faaliyet` | `/faaliyet/` | Faaliyet kayıtları |
 | `rehberlik` | `/rehberlik/` | Rehberlik görüşmeleri |
 | `disiplin` | `/disiplin/` | Disiplin görüşmeleri |
-| `muduriyetcagri` | `/muduriyetcagri/` | Müdüriyet çağrı kayıtları |
-| `cagri` | `/cagri/` | Öğrenci çağrı yönlendirme |
+| `muduriyetcagri` | `/muduriyetcagri/` | Müdüriyet görüşme kayıtları |
 | `ogrencinobet` | `/ogrencinobet/` | Öğrenci nöbet görevleri |
 | `pano` | `/pano/` | Dijital pano / kiosk |
 | `admin` | `/admin/` | Django yönetim paneli |
@@ -264,8 +263,7 @@ nobet_proje/
 ├── faaliyet/                # Faaliyet kayıtları
 ├── rehberlik/               # Rehberlik görüşmeleri
 ├── disiplin/                # Disiplin
-├── muduriyetcagri/          # Müdüriyet çağrıları
-├── cagri/                   # Öğrenci çağrı yönlendirme
+├── muduriyetcagri/          # Müdüriyet görüşmeleri
 ├── ogrencinobet/            # Öğrenci nöbetleri
 ├── pano/                    # Dijital pano
 ├── duyuru/                  # Duyurular

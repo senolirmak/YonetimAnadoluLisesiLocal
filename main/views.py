@@ -3,7 +3,6 @@ from django.db.models import Count
 from django.shortcuts import render
 from django.utils import timezone
 
-from cagri.models import OgrenciCagri
 from devamsizlik.models import OgrenciDevamsizlik
 from faaliyet.models import Faaliyet
 from main.utils import get_ogretmen_gorev_verileri
@@ -41,16 +40,6 @@ def index(request):
         )["sayi"]
         or 0
     )
-    rehberlik_cagri = OgrenciCagri.objects.filter(
-        tarih=today, servis=OgrenciCagri.SERVIS_REHBERLIK
-    ).count()
-    disiplin_cagri = OgrenciCagri.objects.filter(
-        tarih=today, servis=OgrenciCagri.SERVIS_DISIPLIN
-    ).count()
-    muduriyetcagri_cagri = OgrenciCagri.objects.filter(
-        tarih=today, servis=OgrenciCagri.SERVIS_MUDURIYETCAGRI
-    ).count()
-
     _gorev = get_ogretmen_gorev_verileri(request.user, today)
     personel_bagli = _gorev["personel_bagli"]
     rehberlik_sinif_sube = _gorev["rehberlik_sinif_sube"]
@@ -120,9 +109,6 @@ def index(request):
                 "devamsiz_kiz": devamsiz_kiz,
                 "devamsiz_erkek": devamsiz_erkek,
                 "faaliyet": faaliyet_ogrenci,
-                "rehberlik_cagri": rehberlik_cagri,
-                "disiplin_cagri": disiplin_cagri,
-                "muduriyetcagri_cagri": muduriyetcagri_cagri,
             },
             "ogrenci_seviye_listesi": ogrenci_seviye_listesi,
             "ogrenci_genel_toplam":   ogrenci_genel_toplam,

@@ -15,7 +15,6 @@
         <h2 class="page-title">Rehberlik Görüşme Listesi</h2>
         <div style="display:flex;gap:8px;">
             {% if kullanici_rehber %}
-            <a href="{% url 'rehberlik:cagri_liste' %}" class="btn btn-primary">Çağrı Listesi</a>
             <a href="{% url 'rehberlik:gorusme_olustur' %}" class="btn btn-success">+ Yeni Görüşme</a>
             {% endif %}
         </div>
@@ -167,17 +166,6 @@
                            class="btn btn-warning" style="padding:3px 9px;font-size:0.82em;">Düzenle</a>
                         <a href="{% url 'rehberlik:gorusme_sil' g.pk %}"
                            class="btn btn-danger" style="padding:3px 9px;font-size:0.82em;">Sil</a>
-                        {% endif %}
-                        {% if kullanici_rehber %}
-                            {% if g.tur == 'bireysel' or g.tur == 'veli' %}
-                                {% if g.ogrenci %}
-                                <a href="{% url 'rehberlik:cagri_olustur' %}?ogrenci_id={{ g.ogrenci.pk }}"
-                                   class="btn btn-success" style="padding:3px 9px;font-size:0.82em;">Çağrı</a>
-                                {% endif %}
-                            {% elif g.tur == 'grup' %}
-                                <a href="{% url 'rehberlik:cagri_olustur' %}?gorusme_id={{ g.pk }}"
-                                   class="btn btn-success" style="padding:3px 9px;font-size:0.82em;">Çağrı</a>
-                            {% endif %}
                         {% endif %}
                     </td>
                 </tr>

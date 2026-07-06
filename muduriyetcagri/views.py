@@ -97,14 +97,6 @@ def gorusme_olustur(request):
         messages.error(request, "Bu işlem için yetkiniz yok.")
         return redirect("index")
 
-    # Çağrısız görüşme açılamaz — önce çağrı oluşturulmalı
-    cagri_id_kontrol = (
-        request.GET.get("cagri_id", "").strip() or request.POST.get("cagri_id", "").strip()
-    )
-    if not cagri_id_kontrol:
-        messages.warning(request, "Görüşme oluşturmak için önce öğrenci çağrısı oluşturun.")
-        return redirect("muduriyetcagri:cagri_olustur")
-
     ogrenciler = Ogrenci.objects.select_related("detay").order_by("sinif", "sube", "okulno")
     sinifsube_secenekleri = _sinifsube_secenekleri()
 
@@ -158,39 +150,6 @@ def gorusme_olustur(request):
             if tur == "grup" and grup_ids:
                 gorusme.grup_ogrencileri.set(grup_ids)
 
-            # Çağrıdan gelindiyse çağrıyı görüşmeye bağla ve devamsızlık kaydı oluştur
-            cagri_id_post = request.POST.get("cagri_id", "").strip()
-            if cagri_id_post:
-                from cagri.models import OgrenciCagri
-                from devamsizlik.models import OgrenciDevamsizlik
-
-                try:
-                    cagri_obj = OgrenciCagri.objects.get(
-                        pk=int(cagri_id_post),
-                        kayit_eden_kullanici=request.user,
-                        servis=OgrenciCagri.SERVIS_MUDURIYETCAGRI,
-                    )
-                    cagri_obj.gorusme_muduriyetcagri = gorusme  # type: ignore[assignment]
-                    cagri_obj.save(update_fields=["gorusme_muduriyetcagri"])
-                    if cagri_obj.ogrenci and cagri_obj.ders_saati:
-                        from okul.models import DersSaatleri as _DersSaatleri
-                        _ds_obj = _DersSaatleri.objects.filter(
-                            derssaati_no=cagri_obj.ders_saati
-                        ).first()
-                        OgrenciDevamsizlik.objects.update_or_create(
-                            ogrenci=cagri_obj.ogrenci,
-                            tarih=cagri_obj.tarih,
-                            ders_saati=_ds_obj,
-                            defaults={
-                                "ders_adi": cagri_obj.ders_adi or "Müdüriyet",
-                                "ogretmen_adi": request.user.get_full_name()
-                                or request.user.username,
-                                "aciklama": "Müdüriyet",
-                            },
-                        )
-                except (OgrenciCagri.DoesNotExist, ValueError):
-                    pass
-
             messages.success(request, "Görüşme kaydı oluşturuldu.")
             return redirect("muduriyetcagri:gorusme_detay", pk=gorusme.pk)
 
@@ -199,11 +158,6 @@ def gorusme_olustur(request):
     secili_ogrenci_id = ""
     try:
         secili_ogrenci_id = str(int(request.GET.get("ogrenci_id", "")))
-    except (ValueError, TypeError):
-        pass
-    cagri_id = ""
-    try:
-        cagri_id = str(int(request.GET.get("cagri_id", "")))
     except (ValueError, TypeError):
         pass
 
@@ -218,7 +172,6 @@ def gorusme_olustur(request):
             "bugun": timezone.localdate().isoformat(),
             "secili_tur": secili_tur,
             "secili_ogrenci_id": secili_ogrenci_id,
-            "cagri_id": cagri_id,
             "secili_grup_ids": [],
         },
     )

@@ -8,7 +8,6 @@ from django.db import migrations
 class Migration(migrations.Migration):
     dependencies = [
         ("disiplin", "0002_remove_disiplincagri_state"),
-        ("cagri", "0002_migrate_data"),
     ]
 
     operations = [
