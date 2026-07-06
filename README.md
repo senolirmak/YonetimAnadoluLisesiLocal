@@ -65,9 +65,21 @@ source .venv/bin/activate        # Linux/macOS
 pip install -r requirements.txt
 ```
 
-### 4. Ortam Değişkenlerini Ayarlayın
+### 4. PostgreSQL Veritabanı ve Kullanıcısını Oluşturun
 
-Proje kök dizininde `.env` dosyası oluşturun:
+`.env` dosyasına yazacağınız `DB_NAME`/`DB_USER`/`DB_PASSWORD` PostgreSQL'de önceden
+var olmalıdır. `psql` ile bağlanıp oluşturun:
+
+```sql
+CREATE DATABASE nobet_db;
+CREATE USER nobet_user WITH PASSWORD 'your-db-password';
+GRANT ALL PRIVILEGES ON DATABASE nobet_db TO nobet_user;
+ALTER DATABASE nobet_db OWNER TO nobet_user;
+```
+
+### 5. Ortam Değişkenlerini Ayarlayın
+
+Proje kök dizininde `.env` dosyası oluşturun (`.env.example` şablon olarak kullanılabilir):
 
 ```env
 SECRET_KEY=your-secret-key-here
@@ -80,13 +92,13 @@ DB_HOST=localhost
 DB_PORT=5432
 ```
 
-### 5. Veritabanı Migrations
+### 6. Veritabanı Migrations
 
 ```bash
 python manage.py migrate
 ```
 
-### 6. Kullanıcı Gruplarını Oluşturun
+### 7. Kullanıcı Gruplarını Oluşturun
 
 ```bash
 python manage.py kullanici_gruplari_olustur
@@ -95,7 +107,7 @@ python manage.py kullanici_gruplari_olustur
 python manage.py kullanici_gruplari_olustur --ornek-kullanici
 ```
 
-### 7. Öğretmen Kullanıcılarını Oluşturun
+### 8. Öğretmen Kullanıcılarını Oluşturun
 
 NobetPersonel kayıtlarından otomatik kullanıcı oluşturur:
 
@@ -107,19 +119,19 @@ python manage.py ogretmen_kullanici_olustur
 python manage.py ogretmen_kullanici_olustur --kaydet
 ```
 
-### 8. Süper Kullanıcı Oluşturun
+### 9. Süper Kullanıcı Oluşturun
 
 ```bash
 python manage.py createsuperuser
 ```
 
-### 9. Statik Dosyaları Toplayın
+### 10. Statik Dosyaları Toplayın
 
 ```bash
 python manage.py collectstatic
 ```
 
-### 10. Geliştirme Sunucusunu Başlatın
+### 11. Geliştirme Sunucusunu Başlatın
 
 ```bash
 python manage.py runserver
