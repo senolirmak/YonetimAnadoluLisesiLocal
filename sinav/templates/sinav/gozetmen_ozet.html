@@ -68,12 +68,16 @@
             {% endif %}
           </td>
           <td style="padding:.45rem .75rem;">
+            {% if g.pk %}
             <a href="{% url 'ogretmen_sinav_gozetim' %}?preview_ogretmen_id={{ g.pk }}"
                target="_blank"
                class="btn btn-sm"
                style="background:#6366f1;color:#fff;text-decoration:none;">
               Önizle
             </a>
+            {% else %}
+            <span style="color:#d1d5db; font-size:.8rem;" title="Bu öğretmen için personel kaydı bulunamadı">—</span>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

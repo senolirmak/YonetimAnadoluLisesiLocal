@@ -165,7 +165,7 @@ def ders_sinav_eslestir(
     return result
 
 
-def tum_siniflistesi_eslestir(aktif_uretim, **_ignored) -> dict[str, list[dict]]:
+def tum_siniflistesi_eslestir(aktif_uretim, **_ignored) -> dict[int, list[dict]]:
     """
     Aktif TakvimUretim'deki her sınav slotu için, o sınav saatinden önce biten
     son dersin öğretmenini bulur ve DersProgrami'nde eşleşen tüm öğretmenleri döndürür.
@@ -176,7 +176,10 @@ def tum_siniflistesi_eslestir(aktif_uretim, **_ignored) -> dict[str, list[dict]]
       - Bu yaklaşım, öğle arası gibi farklı uzunluktaki molalarda da doğru çalışır.
         Örnek: 13:35 sınavı → 6. ders bitis 12:50 < 13:35 → baslangic 12:10 ile eşleşir.
 
-    Döner: { ogretmen_adi_soyadi: [{"tarih", "saat", "oturum", "sinifsube", "salonlar"}, ...] }
+    Döner: { ogretmen_id (okul.Personel pk): [{"tarih", "saat", "oturum", "sinifsube", "salonlar"}, ...] }
+
+    Anahtar isim yerine Personel ID'sidir — isim eşleşmesi (yazım/format farkı, aynı adı
+    taşıyan farklı kişiler) atama kaybına yol açmasın diye eşleştirme FK üzerinden yapılır.
     """
     from dersprogrami.models import DersProgrami
     from okul.models import DersSaatleri as _DS
@@ -249,21 +252,20 @@ def tum_siniflistesi_eslestir(aktif_uretim, **_ignored) -> dict[str, list[dict]]
     dp_rows = (
         DersProgrami.objects
         .filter(conditions)
-        .select_related("ogretmen", "sinif_sube", "ders_saati")
         .values(
             "gun",
             "sinif_sube_id",
             "ders_saati__derssaati_baslangic",
-            "ogretmen__adi_soyadi",
+            "ogretmen_id",
         )
         .distinct()
     )
 
-    # 4. Öğretmen → slotlar haritası
-    result: dict[str, list[dict]] = {}
+    # 4. Öğretmen (ID) → slotlar haritası
+    result: dict[int, list[dict]] = {}
     for dp in dp_rows:
-        ogr_adi = dp["ogretmen__adi_soyadi"]
-        if not ogr_adi:
+        ogr_id = dp["ogretmen_id"]
+        if not ogr_id:
             continue
         gun      = dp["gun"]
         saat_str = dp["ders_saati__derssaati_baslangic"].strftime("%H:%M")
@@ -278,11 +280,11 @@ def tum_siniflistesi_eslestir(aktif_uretim, **_ignored) -> dict[str, list[dict]]
         salonlar = [{"ham": s, "ad": salon_goster(s)} for s in sorted(bilgi["salonlar"])]
         sinifsube = f"{sinif}/{sube}" if sinif and sube else ""
 
-        result.setdefault(ogr_adi, [])
+        result.setdefault(ogr_id, [])
         # Aynı slot tekrar eklenmesini önle
-        mevcut_anahtarlar = {(s["tarih"], s["saat"], s["oturum"]) for s in result[ogr_adi]}
+        mevcut_anahtarlar = {(s["tarih"], s["saat"], s["oturum"]) for s in result[ogr_id]}
         if (tarih, saat, oturum) not in mevcut_anahtarlar:
-            result[ogr_adi].append({
+            result[ogr_id].append({
                 "tarih":      tarih,
                 "saat":       saat,
                 "oturum":     oturum,

@@ -130,6 +130,8 @@ def _nobetci_gozetim_slotlari(personel, aktif_uretim):
 def ogretmen_sinav_gozetim(request):
     is_admin = request.user.is_staff or request.user.is_superuser
     preview_id = request.GET.get("preview_ogretmen_id", "").strip()
+    if not preview_id.isdigit():
+        preview_id = ""
     if not is_admin and not _ogretmen_menu_gorumu(request.user):
         raise PermissionDenied
 
@@ -283,7 +285,7 @@ def ogretmen_sinav_gozetim(request):
     from sinav.services.ders_sinav_eslestir import tum_siniflistesi_eslestir
 
     _siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim)
-    siniflistesi_slotlari = _siniflistesi_map.get(ogretmen_adi, [])
+    siniflistesi_slotlari = _siniflistesi_map.get(personel.pk, []) if personel else []
 
     slot_listesi_aktif_isle(gozetim_slotlari,     "gozetim",      bugun, simdi_str)
     slot_listesi_aktif_isle(siniflistesi_slotlari, "siniflistesi", bugun, simdi_str)
@@ -332,7 +334,7 @@ def ogretmen_sinav_medya(request):
     from sinavmedia.views import TOLERANS_DAKIKA
 
     preview_id = request.GET.get("preview_ogretmen_id", "").strip()
-    if preview_id and is_admin:
+    if preview_id and preview_id.isdigit() and is_admin:
         from okul.models import Personel as _Personel
         personel = _Personel.objects.filter(pk=preview_id).first()
     else:
