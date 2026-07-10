@@ -3,7 +3,7 @@
 
 {% block sinav_content %}
 <div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem;">
-  <a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary btn-sm">&#8592; Listeye Dön</a>
+  <a href="{% url 'sinav:mazeret_planlama' %}" class="btn btn-secondary btn-sm">&#8592; Listeye Dön</a>
   <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Yeni Mazeret Sınav Planı</h1>
 </div>
 
@@ -49,12 +49,30 @@
       {% endif %}
     </div>
 
-    <div class="form-group" style="margin-bottom:1.5rem;">
+    <div class="form-group" style="margin-bottom:1rem;">
       <label for="{{ form.salon_config_text.id_for_label }}">{{ form.salon_config_text.label }}</label>
       {{ form.salon_config_text }}
       <div class="helptext">{{ form.salon_config_text.help_text }}</div>
       {% if form.salon_config_text.errors %}
         {% for e in form.salon_config_text.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="form-group" style="margin-bottom:1rem;">
+      <label for="{{ form.max_sinav_per_gun.id_for_label }}">{{ form.max_sinav_per_gun.label }}</label>
+      {{ form.max_sinav_per_gun }}
+      <div class="helptext">{{ form.max_sinav_per_gun.help_text }}</div>
+      {% if form.max_sinav_per_gun.errors %}
+        {% for e in form.max_sinav_per_gun.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="form-group" style="margin-bottom:1.5rem;">
+      <label for="{{ form.tatil_gunleri.id_for_label }}">{{ form.tatil_gunleri.label }}</label>
+      {{ form.tatil_gunleri }}
+      <div class="helptext">{{ form.tatil_gunleri.help_text }}</div>
+      {% if form.tatil_gunleri.errors %}
+        {% for e in form.tatil_gunleri.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
       {% endif %}
     </div>
 
@@ -70,7 +88,7 @@
               {% if not aktif_uretim %}disabled title="Aktif takvim üretimi yok"{% endif %}>
         ILP ile Planı Oluştur
       </button>
-      <a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary">İptal</a>
+      <a href="{% url 'sinav:mazeret_planlama' %}" class="btn btn-secondary">İptal</a>
     </div>
   </form>
 </div>

@@ -521,7 +521,8 @@ _TR_AYLAR_MAZ = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
 
 def mazeret_rapor_pdf(oturumlar_veri: list, out, okul, mazeret) -> None:
     """
-    oturumlar_veri: [{"oturum": MazeretOturum, "dersler": [...], "salon1": [...], "salon2": [...]}, ...]
+    oturumlar_veri: [{"oturum": MazeretOturum, "dersler": [...],
+                       "salonlar": [{"ad": str, "kayitlar": [...]}, ...]}, ...]
     out: dosya yolu veya BytesIO
     Her sayfaya en fazla 36 öğrenci sığacak şekilde A4 PDF üretir.
     """
@@ -594,10 +595,9 @@ def mazeret_rapor_pdf(oturumlar_veri: list, out, okul, mazeret) -> None:
             b.append(Spacer(1, 0.08*cm))
             return b
 
-        for salon_no, kayitlar in (
-            ("Mazeret 1", ot_veri.get("salon1", [])),
-            ("Mazeret 2", ot_veri.get("salon2", [])),
-        ):
+        for salon_grubu in ot_veri.get("salonlar", []):
+            salon_no = salon_grubu["ad"]
+            kayitlar = salon_grubu["kayitlar"]
             if not kayitlar:
                 continue
 
@@ -670,6 +670,126 @@ def mazeret_rapor_pdf(oturumlar_veri: list, out, okul, mazeret) -> None:
             doc.leftMargin, 0.7 * cm,
             f"Mazeret Plan #{mazeret.pk}  ·  "
             f"Onay: {mazeret.onay_tarihi.strftime('%d.%m.%Y %H:%M') if mazeret.onay_tarihi else '-'}"
+        )
+        canvas.restoreState()
+
+    doc = BaseDocTemplate(
+        out, pagesize=A4,
+        leftMargin=1.2*cm, rightMargin=1.2*cm,
+        topMargin=1.2*cm,  bottomMargin=1.8*cm,
+    )
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="n")
+    doc.addPageTemplates([PageTemplate(id="main", frames=frame, onPage=_footer)])
+    doc.build(story)
+
+
+# ---------------------------------------------------------------------------
+# 5. MAZERET SINAVI İLAN TAKVİMİ PDF (öğrenci/salon detayı olmadan)
+# ---------------------------------------------------------------------------
+
+def mazeret_ilan_pdf(oturumlar_veri: list, out, okul, mazeret) -> None:
+    """
+    oturumlar_veri: [{"oturum": MazeretOturum, "dersler": [MazeretOturumDers, ...]}, ...]
+    out: dosya yolu veya BytesIO
+    Panoya asılabilir, öğrenci/salon detayı olmayan gün-oturum-ders ilan takvimi PDF'i üretir.
+    """
+    if not oturumlar_veri:
+        return
+
+    h_okul  = ParagraphStyle("iho", fontName="DejaVuSans-Bold", fontSize=13, leading=16, alignment=1)
+    h_sub   = ParagraphStyle("ihs", fontName="DejaVuSans",      fontSize=9,  leading=12, alignment=1)
+    h_bas   = ParagraphStyle("ihb", fontName="DejaVuSans-Bold", fontSize=12, leading=15, alignment=1)
+    cell_st = ParagraphStyle("ic",  fontName="DejaVuSans",      fontSize=8,  leading=11, alignment=0)
+    ctr_st  = ParagraphStyle("ict", fontName="DejaVuSans",      fontSize=8,  leading=10, alignment=1)
+
+    # Tarih(3.5) | Ot.(1.4) | Saat(2.6) | Tür(2.6) | Dersler(7.5) = 17.6 cm
+    col_ws = [3.5*cm, 1.4*cm, 2.6*cm, 2.6*cm, 7.5*cm]
+
+    story = []
+    story.append(Paragraph(okul.okul_adi if okul else "", h_okul))
+    story.append(Spacer(1, 0.15*cm))
+    story.append(Paragraph(str(mazeret.sinav), h_sub))
+    story.append(Spacer(1, 0.1*cm))
+    if mazeret.aciklama:
+        story.append(Spacer(1, 0.05*cm))
+        story.append(Paragraph(mazeret.aciklama, h_sub))
+    story.append(Spacer(1, 0.3*cm))
+
+    tbl_data = [[
+        Paragraph("<b>TARİH</b>", ctr_st),
+        Paragraph("<b>OT.</b>", ctr_st),
+        Paragraph("<b>SAAT</b>", ctr_st),
+        Paragraph("<b>TÜR</b>", ctr_st),
+        Paragraph("<b>DERSLER</b>", ctr_st),
+    ]]
+    style_cmds = [
+        ("FONTNAME",      (0, 0), (-1, -1), "DejaVuSans"),
+        ("FONTSIZE",      (0, 0), (-1, -1), 8),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID",          (0, 0), (-1, -1), 0.4, colors.grey),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
+        ("TOPPADDING",    (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#4a7ab5")),
+        ("TEXTCOLOR",     (0, 0), (-1, 0),  colors.white),
+        ("FONTSIZE",      (0, 0), (-1, 0),  10),
+        ("ALIGN",         (0, 0), (-1, 0),  "CENTER"),
+    ]
+
+    gun_gruplari: dict = {}
+    for ot_veri in oturumlar_veri:
+        gun_gruplari.setdefault(ot_veri["oturum"].gun.tarih, []).append(ot_veri)
+
+    row_idx = 1
+    _BEYAZ, _ACIK = colors.white, colors.HexColor("#f0f4ff")
+
+    for tarih, satirlar in gun_gruplari.items():
+        gun_str = _GUNLER.get(tarih.weekday(), "")
+        tarih_p = Paragraph(f"<b>{tarih.day} {_TR_AYLAR_MAZ[tarih.month-1]}</b><br/>{gun_str}", ctr_st)
+        gun_row_start = row_idx
+
+        for i, ot_veri in enumerate(satirlar):
+            oturum = ot_veri["oturum"]
+            ders_str = "<br/>".join(
+                od.ders.ders_adi + (f" ({od.sinav_turu})" if od.sinav_turu else "")
+                for od in ot_veri["dersler"]
+            ) or "—"
+            tbl_data.append([
+                tarih_p if i == 0 else "",
+                Paragraph(str(oturum.oturum_no), ctr_st),
+                Paragraph(
+                    f"{oturum.saat_baslangic.strftime('%H:%M')}–{oturum.saat_bitis.strftime('%H:%M')}",
+                    ctr_st,
+                ),
+                Paragraph(oturum.get_sinav_turu_display(), ctr_st),
+                Paragraph(ders_str, cell_st),
+            ])
+            bg = _BEYAZ if i % 2 == 0 else _ACIK
+            style_cmds.append(("BACKGROUND", (0, row_idx), (-1, row_idx), bg))
+            row_idx += 1
+
+        if len(satirlar) > 1:
+            style_cmds += [
+                ("SPAN",       (0, gun_row_start), (0, row_idx - 1)),
+                ("VALIGN",     (0, gun_row_start), (0, row_idx - 1), "MIDDLE"),
+                ("BACKGROUND", (0, gun_row_start), (0, row_idx - 1), colors.HexColor("#dbeafe")),
+            ]
+
+    tbl = Table(tbl_data, colWidths=col_ws, repeatRows=1)
+    tbl.setStyle(TableStyle(style_cmds))
+    story.append(tbl)
+
+    okul_muduru = okul.okul_muduru if okul else ""
+
+    def _footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("DejaVuSans", 7.5)
+        w = doc.leftMargin + doc.width
+        canvas.drawRightString(w, 0.7 * cm, f"Okul Müdürü: {okul_muduru}")
+        canvas.drawString(
+            doc.leftMargin, 0.7 * cm,
+            f"Mazeret Plan #{mazeret.pk}  ·  Sayfa {doc.page}"
         )
         canvas.restoreState()
 

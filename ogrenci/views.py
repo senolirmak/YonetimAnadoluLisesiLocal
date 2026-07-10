@@ -372,16 +372,26 @@ def ogrenci_muaf_duzenle(request, pk):
 
     ogrenci = get_object_or_404(Ogrenci, pk=pk)
 
-    # Aktif sınavdan ders havuzunu çek; yoksa tüm DersHavuzu
+    # Aktif sınavdan, öğrencinin sınıf/şubesine ait ders havuzunu çek; yoksa tüm DersHavuzu
     try:
+        from ortaksinav_engine.utils import normalize_sube_cell
         from sinav.models import TakvimUretim, Takvim
+
         aktif_uretim = TakvimUretim.objects.filter(aktif=True).first()
         if aktif_uretim:
-            ders_qs = (
-                DersHavuzu.objects.filter(
-                    takvim__uretim=aktif_uretim
-                ).distinct().order_by("ders_adi")
-            )
+            ogrenci_sinifsube = ogrenci.sinifsube.upper().replace(" ", "")
+            uygun_ders_ids = {
+                ders_id
+                for ders_id, subeler in Takvim.objects
+                .filter(uretim=aktif_uretim)
+                .values_list("ders_id", "subeler")
+                if ogrenci_sinifsube in normalize_sube_cell(subeler)
+            }
+            ders_qs = DersHavuzu.objects.filter(
+                pk__in=uygun_ders_ids
+            ).order_by("ders_adi") if uygun_ders_ids else DersHavuzu.objects.filter(
+                takvim__uretim=aktif_uretim
+            ).distinct().order_by("ders_adi")
         else:
             ders_qs = DersHavuzu.objects.all().order_by("ders_adi")
     except Exception:

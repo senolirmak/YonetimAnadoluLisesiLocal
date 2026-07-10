@@ -82,12 +82,22 @@
     margin-bottom: 1rem;
   }
   .ozet-satir span { display: flex; align-items: center; gap: .3rem; }
+  #ilp-yeniden-form input[type=date],
+  #ilp-yeniden-form input[type=text],
+  #ilp-yeniden-form input[type=number] {
+    height: 2.35rem;
+    box-sizing: border-box;
+  }
+  #ilp-yeniden-form button.btn {
+    height: 2.35rem;
+    box-sizing: border-box;
+  }
 </style>
 {% endblock %}
 
 {% block sinav_content %}
 <div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem; flex-wrap:wrap;">
-  <a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary btn-sm">&#8592; Listeye Dön</a>
+  <a href="{% url 'sinav:mazeret_planlama' %}" class="btn btn-secondary btn-sm">&#8592; Listeye Dön</a>
   <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">
     Mazeret Planı #{{ mazeret.pk }}
     {% if mazeret.aciklama %}<span style="font-weight:400; font-size:1rem; color:#555;">— {{ mazeret.aciklama }}</span>{% endif %}
@@ -99,6 +109,9 @@
     <a href="{% url 'sinav:mazeret_takvim' mazeret.pk %}" class="btn btn-info btn-sm"
        style="background:#0ea5e9; color:#fff; border-color:#0ea5e9;">
       {% if mazeret.onaylandi %}Takvimi Görüntüle{% else %}Takvim Oluştur{% endif %}
+    </a>
+    <a href="{% url 'sinav:mazeret_ilan' mazeret.pk %}" class="btn btn-secondary btn-sm" target="_blank">
+      İlan Takvimi
     </a>
     {% if mazeret.onaylandi %}
     <a href="{% url 'sinav:mazeret_rapor' mazeret.pk %}" class="btn btn-success btn-sm" target="_blank">
@@ -125,6 +138,10 @@
     {% if mazeret.baslangic_tarihi %}
     <span>🚀 <strong>ILP Başlangıç:</strong> {{ mazeret.baslangic_tarihi|date:"d.m.Y" }}</span>
     {% endif %}
+    <span>📊 <strong>Günde Maks. Oturum:</strong> {{ mazeret.efektif_max_sinav_per_gun }}</span>
+    {% if mazeret.tatil_gunleri %}
+    <span>🚫 <strong>Ek Tatil Günü:</strong> {{ mazeret.tatil_gunleri|linebreaksbr }}</span>
+    {% endif %}
     {% if mazeret.efektif_salon_config %}
     <span>🏛
       {% for salon, kap in mazeret.efektif_salon_config.items %}
@@ -147,11 +164,11 @@
           onsubmit="return confirm('ILP yeniden çalıştırılsın mı? Mevcut takvim tamamen silinecek.');">
       {% csrf_token %}
       <div style="display:flex; align-items:flex-end; gap:.8rem; flex-wrap:wrap;">
-        <div class="form-group" style="margin:0;">
+        <div class="form-group" style="margin:0; min-width:170px;">
           <label style="font-size:.83rem;">Başlangıç Tarihi</label>
           <input type="date" name="baslangic_tarihi"
                  value="{{ mazeret.baslangic_tarihi|date:'Y-m-d' }}"
-                 required style="margin-top:.2rem;">
+                 required style="margin-top:.2rem; width:100%;">
         </div>
         <div class="form-group" style="margin:0; flex:1; min-width:220px;">
           <label style="font-size:.83rem;">Oturum Saatleri</label>
@@ -160,11 +177,27 @@
                  placeholder="08:50,10:30,12:10,13:35,14:25"
                  style="margin-top:.2rem;">
         </div>
+        <div class="form-group" style="margin:0; min-width:130px;">
+          <label style="font-size:.83rem;">Günde Maks. Oturum</label>
+          <input type="number" name="max_sinav_per_gun" min="1"
+                 value="{{ mazeret.efektif_max_sinav_per_gun }}"
+                 style="margin-top:.2rem; width:100%;">
+        </div>
         <button type="submit" class="btn btn-primary btn-sm">ILP Çalıştır</button>
         <button type="button" class="btn btn-secondary btn-sm"
                 onclick="document.getElementById('ilp-yeniden-form').style.display='none'">
           İptal
         </button>
+      </div>
+      <div class="form-group" style="margin:.8rem 0 0;">
+        <label style="font-size:.83rem;">Tatil Günleri</label>
+        <textarea name="tatil_gunleri" rows="2"
+                  placeholder="2026-01-01, 2026-04-23"
+                  style="margin-top:.2rem; resize:vertical;">{{ mazeret.tatil_gunleri }}</textarea>
+        <span class="helptext">
+          Virgülle veya satırla ayrılmış YYYY-MM-DD listesi. Bu günlere sınav planlanmaz.
+          Sınavın genel tatil günlerine ek olarak uygulanır.
+        </span>
       </div>
     </form>
   </div>

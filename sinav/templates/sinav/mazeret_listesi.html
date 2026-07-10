@@ -1,111 +1,62 @@
 {% extends "sinav/base.html" %}
-{% block sinav_title %}Mazeret Sınavları{% endblock %}
+{% block sinav_title %}Mazeret Sınavı{% endblock %}
 
 {% block sinav_content %}
-<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.6rem; margin-bottom:1.2rem;">
-  <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e;">Mazeret Sınavı Planları</h1>
-  {% if aktif_sinav %}
-  <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
-    <a href="{% url 'sinav:mazeret_yoklama_simule' %}" class="btn btn-secondary btn-sm"
-       title="Test amaçlı devamsızlık simülasyonu oluştur">
-      🧪 Yoklama Simülasyonu
-    </a>
-    <a href="{% url 'sinav:mazeret_olustur' %}" class="btn btn-primary">+ Yeni Plan</a>
-  </div>
-  {% endif %}
-</div>
-
-{% if eksik_yoklama %}
-<div style="background:#fffbeb; border:1px solid #f59e0b; border-left:4px solid #f59e0b;
-            border-radius:6px; padding:.9rem 1.1rem; margin-bottom:1.2rem;">
-  <div style="font-weight:700; color:#92400e; margin-bottom:.5rem;">
-    Yoklaması Girilmemiş Salon(lar)
-  </div>
-  <p style="font-size:.85rem; color:#78350f; margin:0 0 .7rem;">
-    Aşağıdaki salonların yoklaması sisteme girilmemiş. Mazeret listesinin doğru oluşturulması için
-    önce bu yoklamaların tamamlanması önerilir.
-  </p>
-  <table style="font-size:.83rem; border-collapse:collapse; width:100%;">
-    <thead>
-      <tr style="background:#fef3c7;">
-        <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #fcd34d;">Tarih</th>
-        <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #fcd34d;">Saat</th>
-        <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #fcd34d;">Salon</th>
-        <th style="padding:.35rem .7rem; border-bottom:1px solid #fcd34d;"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for slot in eksik_yoklama %}
-      <tr style="border-bottom:1px solid #fef3c7;">
-        <td style="padding:.3rem .7rem; color:#78350f;">{{ slot.tarih|date:"d.m.Y" }}</td>
-        <td style="padding:.3rem .7rem; color:#78350f;">{{ slot.saat }}</td>
-        <td style="padding:.3rem .7rem; font-weight:600; color:#92400e;">{{ slot.salon }}</td>
-        <td style="padding:.3rem .7rem; text-align:right;">
-          <a href="{% url 'sinav_salon_yoklama' %}?tarih={{ slot.tarih|date:'Y-m-d' }}&saat={{ slot.saat }}&salon={{ slot.salon }}"
-             class="btn btn-sm"
-             style="background:#f59e0b; color:#fff; font-size:.78rem; padding:.2rem .6rem;">
-            Yoklama Gir
-          </a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
+<h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin-bottom:.3rem;">Mazeret Sınavı</h1>
+<p style="font-size:.85rem; color:#6b7280; margin:0 0 1.2rem;">
+  Mazeret sınavı planlama akışı: önce yoklama girilir, sonra hangi devamsızlıkların geçerli
+  belgesi olduğu işaretlenir, en son mazeret takvimi planlanır.
+</p>
 
 {% if not aktif_sinav %}
 <div class="card">
   <p style="color:#666;">Aktif sınav seçilmedi. Önce bir sınav aktif yapın.</p>
 </div>
-{% elif not planlar %}
-<div class="card">
-  <p style="color:#666; text-align:center; padding:1rem 0;">
-    Bu sınav için henüz mazeret planı oluşturulmamış.
-  </p>
-  <div style="text-align:center;">
-    <a href="{% url 'sinav:mazeret_olustur' %}" class="btn btn-primary">Yeni Plan Oluştur</a>
-  </div>
-</div>
 {% else %}
-{% for plan in planlar %}
-<div class="card">
-  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.5rem;">
-    <div>
-      <div style="font-weight:600; font-size:1rem; margin-bottom:.3rem;">
-        Mazeret Planı #{{ plan.pk }}
-        {% if plan.aciklama %}<span style="font-weight:400; color:#666; font-size:.9rem;"> — {{ plan.aciklama }}</span>{% endif %}
-      </div>
-      <div style="font-size:.82rem; color:#888;">
-        Oluşturulma: {{ plan.olusturma_tarihi|date:"d.m.Y H:i" }}
-      </div>
-
-      <div style="margin-top:.7rem; display:flex; flex-wrap:wrap; gap:.5rem;">
-        {% for gun in plan.gunler.all %}
-        <span style="background:#e0f2fe; color:#0369a1; font-size:.8rem; font-weight:600;
-                     padding:.2rem .6rem; border-radius:99px;">
-          {{ gun.tarih|date:"d.m.Y" }}
-          ({{ gun.oturumlar.count }} oturum)
-        </span>
-        {% endfor %}
-      </div>
-    </div>
-
-    <div style="display:flex; gap:.5rem; align-items:flex-start;">
-      <a href="{% url 'sinav:mazeret_detay' plan.pk %}" class="btn btn-secondary btn-sm">Detay</a>
-      <form method="post" action="{% url 'sinav:mazeret_dagit' plan.pk %}"
-            onsubmit="return confirm('Dağıtım yeniden çalıştırılsın mı?');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary btn-sm">Yeniden Dağıt</button>
-      </form>
-      <form method="post" action="{% url 'sinav:mazeret_sil' plan.pk %}"
-            onsubmit="return confirm('Plan silinsin mi?');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger btn-sm">Sil</button>
-      </form>
-    </div>
-  </div>
+<div class="akis-grid">
+  <a href="{% url 'sinav:mazeret_yoklama' %}" class="akis-kart">
+    <span class="akis-num">Adım 1</span>
+    <span class="akis-baslik">Yoklama Gir/Düzenle</span>
+    <span class="akis-aciklama">Okulno veya adı-soyadı ile öğrenci arayıp tüm oturumlarının yoklamasını gir</span>
+    <span class="akis-durum {% if yok_sayisi > 0 %}durum-ok{% else %}durum-bos{% endif %}">
+      {% if yok_sayisi > 0 %}{{ yok_sayisi }} öğrenci devamsız{% else %}Devamsız kaydı yok{% endif %}
+    </span>
+  </a>
+  <a href="{% url 'sinav:mazeret_belge' %}" class="akis-kart">
+    <span class="akis-num">Adım 2</span>
+    <span class="akis-baslik">Mazeret Belge / Özel Durum</span>
+    <span class="akis-aciklama">Geçerli mazeret belgesi teslim edenleri ve sürekli devamsız/muaf durumlarını işaretle</span>
+    <span class="akis-durum {% if son_mazeret %}durum-ok{% else %}durum-bos{% endif %}">
+      {% if son_mazeret %}{{ uygun_n }}/{{ toplam }} uygun{% else %}Plan bekleniyor{% endif %}
+    </span>
+  </a>
+  <a href="{% url 'sinav:mazeret_planlama' %}" class="akis-kart">
+    <span class="akis-num">Adım 3</span>
+    <span class="akis-baslik">Planlama</span>
+    <span class="akis-aciklama">Mazeret sınav planlarını görüntüle, yeni plan oluştur veya yeniden dağıt</span>
+    <span class="akis-durum {% if planlar %}durum-ok{% else %}durum-bos{% endif %}">
+      {% if planlar %}{{ planlar|length }} plan{% else %}Henüz plan yok{% endif %}
+    </span>
+  </a>
 </div>
-{% endfor %}
 {% endif %}
+
+<style>
+  .akis-grid {
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem;
+  }
+  .akis-kart {
+    display:flex; flex-direction:column; gap:.4rem;
+    border:1px solid #e5e7eb; border-radius:8px; padding:1rem 1.1rem;
+    background:#fafafa; text-decoration:none; color:inherit;
+    transition:box-shadow .15s, border-color .15s;
+  }
+  .akis-kart:hover { border-color:#6366f1; box-shadow:0 3px 12px rgba(99,102,241,.12); }
+  .akis-num { font-size:.72rem; color:#9ca3af; font-weight:500; }
+  .akis-baslik { font-size:.95rem; font-weight:700; color:#1a1a2e; }
+  .akis-aciklama { font-size:.78rem; color:#6b7280; line-height:1.4; flex:1; }
+  .akis-durum { font-size:.75rem; font-weight:600; margin-top:.3rem; }
+  .durum-ok  { color:#16a34a; }
+  .durum-bos { color:#9ca3af; }
+</style>
 {% endblock %}

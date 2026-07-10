@@ -5,7 +5,7 @@ import traceback
 from datetime import datetime, date
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Subquery, OuterRef
+from django.db.models import Subquery, OuterRef, Min, Max
 from okul.auth import ust_yonetici_required
 from .utils import gozetmen_bul, onceki_ders_saati
 
@@ -202,6 +202,38 @@ def _db_ozeti():
 
 
 
+def _sinav_takvim_araliklari(sinavlar) -> dict:
+    """
+    Her sınav için aktif TakvimUretim'in kapsadığı gerçek (üretilmiş) takvimin
+    ilk ve son gününü döner: { sinav_id: (baslangic_tarihi, bitis_tarihi) }.
+
+    sinav_baslangic_tarihi alanı elle girilir ve ILP'ye başlangıç noktası olarak
+    verilir; üretilen takvim tatil/çakışma yüzünden daha ileri bir tarihte
+    başlayabilir veya beklenenden uzun sürebilir. Bu yüzden gerçek aralık,
+    manuel alanla karıştırılmadan, üretilen Takvim kayıtlarından hesaplanır.
+    """
+    uretimler = {
+        u.sinav_id: u
+        for u in TakvimUretim.objects.filter(sinav__in=sinavlar, aktif=True)
+    }
+    if not uretimler:
+        return {}
+
+    araliklar = (
+        Takvim.objects
+        .filter(uretim__in=uretimler.values())
+        .values("uretim")
+        .annotate(baslangic=Min("tarih"), bitis=Max("tarih"))
+    )
+    aralik_by_uretim = {a["uretim"]: (a["baslangic"], a["bitis"]) for a in araliklar}
+
+    return {
+        sinav_id: aralik_by_uretim[u.pk]
+        for sinav_id, u in uretimler.items()
+        if u.pk in aralik_by_uretim
+    }
+
+
 def _dosya_durumu(request):
     """DB-first modelde dosya durumu artık kullanılmamaktadır."""
     return {
@@ -252,9 +284,14 @@ def index(request):
     kurulum = _kurulum_durumu()
     db = _db_ozeti()
     dosya = _dosya_durumu(request)
+    liste = SinavBilgisi.objects.all()
+    takvim_araliklari = _sinav_takvim_araliklari(liste)
+    for s in liste:
+        s.otomatik_baslangic, s.otomatik_bitis = takvim_araliklari.get(s.pk, (None, None))
+    liste_formlar = [(s, SinavBilgisiForm(instance=s)) for s in liste]
     return render(request, "sinav/index.html", {
         "aktif_sinav":   aktif,
-        "sinav_listesi": SinavBilgisi.objects.all(),
+        "liste_formlar": liste_formlar,
         "db_ozeti":      db,
         **kurulum,
         **dosya,
@@ -474,21 +511,19 @@ def gozetmen_ozet(request):
     siniflistesi_map: dict = {}
 
     if aktif_uretim:
-        # Gözetmen listesi + slot sayıları (FK üzerinden)
+        from okul.models import Personel
+
+        # Gözetmen listesi + slot sayıları (FK üzerinden, ID bazlı)
         personel_rows = (
             OturmaPlani.objects
             .filter(uretim=aktif_uretim, gozetmen_fk__isnull=False)
-            .values("gozetmen_fk_id", "gozetmen_fk__adi_soyadi")
+            .values("gozetmen_fk_id")
             .distinct()
-            .order_by("gozetmen_fk__adi_soyadi")
         )
-        gozetmen_slot_sayisi = {}  # ad → slot_sayisi
-        pk_map = {}               # ad → pk (önizleme linki için)
+        gozetmen_slot_sayisi = {}  # pk → slot_sayisi
         for row in personel_rows:
             pk = row["gozetmen_fk_id"]
-            ad = row["gozetmen_fk__adi_soyadi"]
-            pk_map[ad] = pk
-            gozetmen_slot_sayisi[ad] = (
+            gozetmen_slot_sayisi[pk] = (
                 OturmaPlani.objects
                 .filter(uretim=aktif_uretim, gozetmen_fk_id=pk)
                 .values("tarih", "saat", "oturum")
@@ -496,18 +531,23 @@ def gozetmen_ozet(request):
                 .count()
             )
 
-        # Sınıf Listesi PDF: sınav öncesi son dersin öğretmeni (bitis bazlı eşleşme)
+        # Sınıf Listesi PDF: sınav öncesi son dersin öğretmeni (bitis bazlı eşleşme, ID bazlı)
         siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim)
 
-        # Tüm adları birleştir (gozetmen_fk + siniflistesi sahibi)
-        tum_adlar = sorted(set(gozetmen_slot_sayisi) | set(siniflistesi_map))
-        for ad in tum_adlar:
+        # Tüm personel ID'lerini birleştir (gozetmen_fk + siniflistesi sahibi) ve
+        # isimleri tek sorguda çek (isim yalnızca gösterim için, eşleştirme ID ile yapılır)
+        tum_pkler = set(gozetmen_slot_sayisi) | set(siniflistesi_map)
+        ad_map = dict(
+            Personel.objects.filter(pk__in=tum_pkler).values_list("pk", "adi_soyadi")
+        )
+        for pk in tum_pkler:
             gozetmenler.append({
-                "ad":               ad,
-                "pk":               pk_map.get(ad),
-                "slot_sayisi":      gozetmen_slot_sayisi.get(ad, 0),
-                "siniflistesi_adet": len(siniflistesi_map.get(ad, [])),
+                "ad":               ad_map.get(pk, "—"),
+                "pk":               pk,
+                "slot_sayisi":      gozetmen_slot_sayisi.get(pk, 0),
+                "siniflistesi_adet": len(siniflistesi_map.get(pk, [])),
             })
+        gozetmenler.sort(key=lambda g: g["ad"])
 
     return render(request, "sinav/gozetmen_ozet.html", {
         "aktif_sinav":      aktif_sinav,
@@ -1427,16 +1467,18 @@ def sinav_bilgisi_listesi(request):
         form = SinavBilgisiForm()
 
     liste = SinavBilgisi.objects.all()
-    liste_formlar = [(s, SinavBilgisiForm(instance=s)) for s in liste]
     dosya = _dosya_durumu(request)
+    aktif_sinav = _aktif_sinav()
+    mazeret_sayisi = MazeretSinav.objects.filter(sinav=aktif_sinav).count() if aktif_sinav else 0
 
     return render(request, "sinav/sinav_bilgisi.html", {
-        "form":          form,
-        "liste_formlar": liste_formlar,
-        "aktif_sinav":   _aktif_sinav(),
-        "okul":          okul,
-        "okul_tamam":    okul_tamam,
-        "db_ozeti":      _db_ozeti(),
+        "form":           form,
+        "liste":          liste,
+        "aktif_sinav":    aktif_sinav,
+        "okul":           okul,
+        "okul_tamam":     okul_tamam,
+        "db_ozeti":       _db_ozeti(),
+        "mazeret_sayisi": mazeret_sayisi,
         **kurulum,
         **dosya,
     })
@@ -2380,9 +2422,10 @@ def mazeret_yoklama_simule(request):
 
 @ust_yonetici_required
 def mazeret_sinav_listesi(request):
-    """Aktif sınava ait mazeret sınav planlarını listeler."""
-    from django.db.models import Exists, OuterRef as _OuterRef
-
+    """
+    Mazeret Sınavı ana sayfası (hub): Yoklama / Belge-Özel Durum / Planlama adımlarına
+    giden, her biri kendi sayfasına yönlendiren üç kart gösterir.
+    """
     aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
     aktif_uretim = (
         TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
@@ -2390,33 +2433,170 @@ def mazeret_sinav_listesi(request):
     )
     planlar = (
         MazeretSinav.objects.filter(sinav=aktif_sinav)
+        if aktif_sinav else []
+    )
+    son_mazeret = planlar.first() if planlar else None
+
+    yok_sayisi = (
+        SinavSalonYoklama.objects.filter(uretim=aktif_uretim, durum="yok")
+        .values("okulno").distinct().count()
+        if aktif_uretim else 0
+    )
+    belge_ctx = _mazeret_belge_ctx(son_mazeret) if son_mazeret else {}
+
+    return render(request, "sinav/mazeret_listesi.html", {
+        "aktif_sinav":  aktif_sinav,
+        "planlar":      planlar,
+        "son_mazeret":  son_mazeret,
+        "yok_sayisi":   yok_sayisi,
+        "toplam":       belge_ctx.get("toplam", 0),
+        "uygun_n":      belge_ctx.get("uygun_n", 0),
+    })
+
+
+@ust_yonetici_required
+def mazeret_yoklama(request):
+    """
+    Okulno veya adı-soyadı ile öğrenci arayıp, o öğrencinin aktif sınavdaki TÜM
+    oturumlarının yoklamasını (mevcut/yok/geç) tek ekrandan girmeyi/düzenlemeyi
+    sağlar (oda/salon bazlı gezinmek yerine).
+    """
+    from django.db.models import Q
+
+    aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
+    aktif_uretim = (
+        TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+        if aktif_sinav else None
+    )
+
+    if request.method == "POST" and request.POST.get("form") == "yoklama_kaydet":
+        okulno = request.POST.get("okulno", "").strip()
+        n = int(request.POST.get("satir_sayisi", 0) or 0)
+        if aktif_uretim and okulno:
+            op_lookup = {
+                (o.tarih, o.saat, o.salon): o
+                for o in OturmaPlani.objects.filter(uretim=aktif_uretim, okulno=okulno)
+            }
+            adi_soyadi = ""
+            for i in range(n):
+                tarih_str = request.POST.get(f"tarih_{i}", "")
+                saat      = request.POST.get(f"saat_{i}", "")
+                salon     = request.POST.get(f"salon_{i}", "")
+                durum     = request.POST.get(f"durum_{i}", "mevcut")
+                try:
+                    tarih = date.fromisoformat(tarih_str)
+                except ValueError:
+                    continue
+                o = op_lookup.get((tarih, saat, salon))
+                if not o:
+                    continue
+                adi_soyadi = o.adi_soyadi
+                SinavSalonYoklama.objects.update_or_create(
+                    uretim=aktif_uretim, tarih=tarih, saat=saat, salon=salon, okulno=okulno,
+                    defaults={
+                        "adi_soyadi": o.adi_soyadi,
+                        "sinifsube":  o.sinifsube,
+                        "sira_no":    o.sira_no,
+                        "durum":      durum,
+                        "kaydeden":   request.user,
+                    },
+                )
+            messages.success(request, f"{adi_soyadi or okulno} için yoklama kaydedildi.")
+        return redirect(f"{reverse('sinav:mazeret_yoklama')}?q={okulno}")
+
+    yoklama_q       = request.GET.get("q", "").strip()
+    yoklama_adaylar = []
+    yoklama_ogrenci = None
+    yoklama_oturumlar = []
+
+    if aktif_uretim and yoklama_q:
+        adaylar = list(
+            OturmaPlani.objects.filter(uretim=aktif_uretim)
+            .filter(Q(okulno__icontains=yoklama_q) | Q(adi_soyadi__icontains=yoklama_q))
+            .values("okulno", "adi_soyadi", "sinifsube")
+            .distinct()
+            .order_by("adi_soyadi")
+        )
+        if len(adaylar) == 1:
+            yoklama_ogrenci = adaylar[0]
+        else:
+            yoklama_adaylar = adaylar
+
+    if aktif_uretim and yoklama_ogrenci:
+        okulno = yoklama_ogrenci["okulno"]
+        qs = (
+            OturmaPlani.objects
+            .filter(uretim=aktif_uretim, okulno=okulno)
+            .order_by("tarih", "saat")
+        )
+        mevcut_yoklama = {
+            (y.tarih, y.saat, y.salon): y.durum
+            for y in SinavSalonYoklama.objects.filter(uretim=aktif_uretim, okulno=okulno)
+        }
+        for o in qs:
+            yoklama_oturumlar.append({
+                "tarih":     o.tarih,
+                "saat":      o.saat,
+                "salon":     o.salon,
+                "ders_adi":  o.ders_adi,
+                "durum":     mevcut_yoklama.get((o.tarih, o.saat, o.salon), "mevcut"),
+            })
+
+    return render(request, "sinav/mazeret_yoklama.html", {
+        "aktif_sinav":       aktif_sinav,
+        "yoklama_q":         yoklama_q,
+        "yoklama_adaylar":   yoklama_adaylar,
+        "yoklama_ogrenci":   yoklama_ogrenci,
+        "yoklama_oturumlar": yoklama_oturumlar,
+    })
+
+
+@ust_yonetici_required
+def mazeret_belge(request):
+    """
+    Aktif sınavın en son mazeret planı için belge teslim ve özel durum
+    (sürekli devamsız / muaf) işaretlemesini sağlar.
+    """
+    aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
+    planlar = (
+        MazeretSinav.objects.filter(sinav=aktif_sinav)
+        if aktif_sinav else []
+    )
+    son_mazeret = planlar.first() if planlar else None
+
+    if request.method == "POST" and request.POST.get("form") == "belge_kaydet":
+        if son_mazeret:
+            guncellenen_belge, guncellenen_ogr = _mazeret_belge_kaydet(request, son_mazeret)
+            messages.success(
+                request,
+                f"Güncellendi: {guncellenen_belge} belge teslim, {guncellenen_ogr} öğrenci durumu."
+            )
+        belge_q = request.POST.get("belge_q", "").strip()
+        return redirect(f"{reverse('sinav:mazeret_belge')}?belge_q={belge_q}")
+
+    belge_q = request.GET.get("belge_q", "").strip()
+    belge_ctx = _mazeret_belge_ctx(son_mazeret, belge_q) if son_mazeret else {}
+
+    return render(request, "sinav/mazeret_belge.html", {
+        "aktif_sinav": aktif_sinav,
+        "belge_q":     belge_q,
+        "son_mazeret": son_mazeret,
+        **belge_ctx,
+    })
+
+
+@ust_yonetici_required
+def mazeret_planlama(request):
+    """Aktif sınava ait mazeret sınav planlarını listeler."""
+    aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
+    planlar = (
+        MazeretSinav.objects.filter(sinav=aktif_sinav)
         .prefetch_related("gunler__oturumlar__dersler__ders")
         if aktif_sinav else []
     )
-
-    # Yoklaması hiç girilmemiş (tarih, saat, salon) slotları tespit et
-    eksik_yoklama = []
-    if aktif_uretim:
-        yoklama_var = SinavSalonYoklama.objects.filter(
-            uretim=aktif_uretim,
-            tarih=_OuterRef("tarih"),
-            saat=_OuterRef("saat"),
-            salon=_OuterRef("salon"),
-        )
-        eksik_yoklama = list(
-            OturmaPlani.objects
-            .filter(uretim=aktif_uretim)
-            .values("tarih", "saat", "salon")
-            .distinct()
-            .annotate(yoklama_var=Exists(yoklama_var))
-            .filter(yoklama_var=False)
-            .order_by("tarih", "saat", "salon")
-        )
-
-    return render(request, "sinav/mazeret_listesi.html", {
-        "aktif_sinav":    aktif_sinav,
-        "planlar":        planlar,
-        "eksik_yoklama":  eksik_yoklama,
+    return render(request, "sinav/mazeret_planlama.html", {
+        "aktif_sinav": aktif_sinav,
+        "planlar":     planlar,
     })
 
 
@@ -2443,6 +2623,7 @@ def mazeret_sinav_olustur(request):
 
             baslangic = form.cleaned_data["baslangic_tarihi"]
             oturum_saatleri = form.cleaned_data["oturum_saatleri"]
+            tatil_gunleri = form.cleaned_data["tatil_gunleri"]
 
             # Öğrenci listesini yoklama verilerinden doldur
             # (sureksiz_devamsiz ve muaf öğrenciler otomatik hariç tutulur)
@@ -2450,13 +2631,17 @@ def mazeret_sinav_olustur(request):
 
             # ILP ile çakışmasız takvim üret
             svc = MazeretILPService(
-                config={"TIME_LIMIT": 120},
+                config={
+                    "TIME_LIMIT": 120,
+                    "MAX_SINAV_PER_GUN": mazeret.efektif_max_sinav_per_gun,
+                },
                 log_fn=lambda m: None,
             )
             basarili, mesaj = svc.calistir(
                 mazeret_sinav=mazeret,
                 baslangic_tarih=baslangic,
                 oturum_saatleri_str=oturum_saatleri,
+                tatil_gunleri_str=tatil_gunleri,
             )
 
             if basarili:
@@ -2467,10 +2652,12 @@ def mazeret_sinav_olustur(request):
 
             return redirect("sinav:mazeret_detay", pk=mazeret.pk)
     else:
-        # Varsayılan oturum saatlerini AlgoritmaParametreleri'nden al
+        # Varsayılan oturum saatlerini ve günlük oturum sınırını AlgoritmaParametreleri'nden al
         varsayilan_saatler = "08:50,10:30,12:10,13:35,14:25"
+        varsayilan_max_gun = MazeretSinav.VARSAYILAN_MAX_SINAV_PER_GUN
         try:
             varsayilan_saatler = aktif_sinav.parametreler.oturum_saatleri
+            varsayilan_max_gun = aktif_sinav.parametreler.max_sinav_per_gun
         except Exception:
             pass
 
@@ -2495,6 +2682,7 @@ def mazeret_sinav_olustur(request):
             "oturum_saatleri": varsayilan_saatler,
             "baslangic_tarihi": oneri_tarih,
             "salon_config_text": "Mazeret 1:36\nMazeret 2:36",
+            "max_sinav_per_gun": varsayilan_max_gun,
         })
 
     aktif_uretim = TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
@@ -2569,70 +2757,72 @@ def mazeret_sinav_detay(request, pk):
     })
 
 
-@ust_yonetici_required
-def mazeret_ogrenci_listesi(request, pk):
+def _mazeret_belge_kaydet(request, mazeret: MazeretSinav) -> tuple[int, int]:
     """
-    Mazeret sınavına aday öğrencilerin listesi:
-    - Sürekli devamsız işaretleme (Ogrenci.sureksiz_devamsiz)
-    - Belge teslim işaretleme (MazeretOgrenci.belge_teslim)
+    POST'taki belge_teslim / sureksiz_devamsiz checkbox listelerinden MazeretOgrenci ve
+    Ogrenci kayıtlarını günceller; belge_teslim değişikliklerini kalıcı MazeretBelgeTeslim
+    tablosuna da yansıtır. (güncellenen_belge, güncellenen_ogr) döner.
     """
     from ogrenci.models import Ogrenci as OgrenciModel
 
-    mazeret = get_object_or_404(MazeretSinav, pk=pk)
-
-    if request.method == "POST":
-        belge_isaretli    = set(map(int, request.POST.getlist("belge_teslim")))
-        sureksiz_isaretli = set(request.POST.getlist("sureksiz_devamsiz"))
-        guncellenen_belge = 0
-        belge_ekle = []
-        belge_sil_keys = []
-        for mo in MazeretOgrenci.objects.filter(mazeret_sinav=mazeret):
-            yeni_belge = mo.pk in belge_isaretli
-            if mo.belge_teslim != yeni_belge:
-                mo.belge_teslim = yeni_belge
-                mo.save(update_fields=["belge_teslim"])
-                guncellenen_belge += 1
-            # Kalıcı tabloya da yansıt
-            if yeni_belge:
-                belge_ekle.append(
-                    MazeretBelgeTeslim(
-                        okulno=mo.okulno,
-                        ders_adi=mo.ders_adi,
-                        sinav_turu=mo.sinav_turu,
-                    )
+    belge_isaretli    = set(map(int, request.POST.getlist("belge_teslim")))
+    sureksiz_isaretli = set(request.POST.getlist("sureksiz_devamsiz"))
+    guncellenen_belge = 0
+    belge_ekle = []
+    belge_sil_keys = []
+    for mo in MazeretOgrenci.objects.filter(mazeret_sinav=mazeret):
+        yeni_belge = mo.pk in belge_isaretli
+        if mo.belge_teslim != yeni_belge:
+            mo.belge_teslim = yeni_belge
+            mo.save(update_fields=["belge_teslim"])
+            guncellenen_belge += 1
+        # Kalıcı tabloya da yansıt
+        if yeni_belge:
+            belge_ekle.append(
+                MazeretBelgeTeslim(
+                    okulno=mo.okulno,
+                    ders_adi=mo.ders_adi,
+                    sinav_turu=mo.sinav_turu,
                 )
-            else:
-                belge_sil_keys.append((mo.okulno, mo.ders_adi, mo.sinav_turu))
+            )
+        else:
+            belge_sil_keys.append((mo.okulno, mo.ders_adi, mo.sinav_turu))
 
-        sinav = mazeret.sinav
-        if belge_ekle:
-            for b in belge_ekle:
-                b.sinav = sinav
-            MazeretBelgeTeslim.objects.bulk_create(belge_ekle, ignore_conflicts=True)
-        for okulno, ders_adi, sinav_turu in belge_sil_keys:
-            MazeretBelgeTeslim.objects.filter(
-                sinav=sinav, okulno=okulno, ders_adi=ders_adi, sinav_turu=sinav_turu
-            ).delete()
+    sinav = mazeret.sinav
+    if belge_ekle:
+        for b in belge_ekle:
+            b.sinav = sinav
+        MazeretBelgeTeslim.objects.bulk_create(belge_ekle, ignore_conflicts=True)
+    for okulno, ders_adi, sinav_turu in belge_sil_keys:
+        MazeretBelgeTeslim.objects.filter(
+            sinav=sinav, okulno=okulno, ders_adi=ders_adi, sinav_turu=sinav_turu
+        ).delete()
 
-        # Subquery yerine Python listesi: Ogrenci.okulno (int) ↔ MazeretOgrenci.okulno (varchar)
-        _mo_okulno_ints = [
-            int(x) for x in
-            MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
-            .values_list("okulno", flat=True).distinct() if x
-        ]
-        guncellenen_ogr = 0
-        for ogr in (OgrenciModel.objects.filter(okulno__in=_mo_okulno_ints) if _mo_okulno_ints else OgrenciModel.objects.none()):
-            yeni_sureksiz = str(ogr.okulno) in sureksiz_isaretli
-            if ogr.sureksiz_devamsiz != yeni_sureksiz:
-                ogr.sureksiz_devamsiz = yeni_sureksiz
-                ogr.save(update_fields=["sureksiz_devamsiz"])
-                guncellenen_ogr += 1
+    # Subquery yerine Python listesi: Ogrenci.okulno (int) ↔ MazeretOgrenci.okulno (varchar)
+    _mo_okulno_ints = [
+        int(x) for x in
+        MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
+        .values_list("okulno", flat=True).distinct() if x
+    ]
+    guncellenen_ogr = 0
+    for ogr in (OgrenciModel.objects.filter(okulno__in=_mo_okulno_ints) if _mo_okulno_ints else OgrenciModel.objects.none()):
+        yeni_sureksiz = str(ogr.okulno) in sureksiz_isaretli
+        if ogr.sureksiz_devamsiz != yeni_sureksiz:
+            ogr.sureksiz_devamsiz = yeni_sureksiz
+            ogr.save(update_fields=["sureksiz_devamsiz"])
+            guncellenen_ogr += 1
 
-        messages.success(
-            request,
-            f"Güncellendi: {guncellenen_belge} belge teslim, {guncellenen_ogr} öğrenci durumu."
-        )
-        return redirect("sinav:mazeret_ogrenci_listesi", pk=pk)
+    return guncellenen_belge, guncellenen_ogr
+
+
+def _mazeret_belge_ctx(mazeret: MazeretSinav, q: str = "") -> dict:
+    """
+    MazeretOgrenci tablosundan ders bazlı gruplu belge-teslim verisini (sureksiz/muaf
+    bayrakları ve özet sayılarla) hazırlar. q verilirse okulno/adı-soyadı ile filtreler.
+    """
+    from django.db.models import Q
+    from ogrenci.models import Ogrenci as OgrenciModel, OgrenciMuaf
+    from okul.utils import get_aktif_egitim_yili
 
     # Sürekli devamsız okulnoları — int → str (MazeretOgrenci.okulno CharField)
     sureksiz_okulnolari = {
@@ -2641,8 +2831,6 @@ def mazeret_ogrenci_listesi(request, pk):
     }
 
     # Muaf (ders bazında): subquery yerine Python listesi (int↔varchar tip uyumu)
-    from ogrenci.models import OgrenciMuaf
-    from okul.utils import get_aktif_egitim_yili
     _mo_ok_ints = [
         int(x) for x in
         MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
@@ -2659,10 +2847,10 @@ def mazeret_ogrenci_listesi(request, pk):
         if _mo_ok_ints else set()
     )
 
-    tum_ogrenciler = list(
-        MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
-        .order_by("ders_adi", "sinav_turu", "sinifsube", "okulno")
-    )
+    qs = MazeretOgrenci.objects.filter(mazeret_sinav=mazeret)
+    if q:
+        qs = qs.filter(Q(okulno__icontains=q) | Q(adi_soyadi__icontains=q))
+    tum_ogrenciler = list(qs.order_by("ders_adi", "sinav_turu", "sinifsube", "okulno"))
 
     ders_map: dict[tuple, dict] = {}
     for mo in tum_ogrenciler:
@@ -2690,13 +2878,35 @@ def mazeret_ogrenci_listesi(request, pk):
         and (mo.okulno, mo.ders_adi) not in muaf_okulno_ders
     )
 
-    return render(request, "sinav/mazeret_ogrenci_listesi.html", {
-        "mazeret":        mazeret,
+    return {
         "ders_gruplar":   list(ders_map.values()),
         "toplam":         toplam,
         "belge_teslim_n": belge_teslim_n,
         "haric_n":        haric_n,
         "uygun_n":        uygun_n,
+    }
+
+
+@ust_yonetici_required
+def mazeret_ogrenci_listesi(request, pk):
+    """
+    Mazeret sınavına aday öğrencilerin listesi:
+    - Sürekli devamsız işaretleme (Ogrenci.sureksiz_devamsiz)
+    - Belge teslim işaretleme (MazeretOgrenci.belge_teslim)
+    """
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+
+    if request.method == "POST":
+        guncellenen_belge, guncellenen_ogr = _mazeret_belge_kaydet(request, mazeret)
+        messages.success(
+            request,
+            f"Güncellendi: {guncellenen_belge} belge teslim, {guncellenen_ogr} öğrenci durumu."
+        )
+        return redirect("sinav:mazeret_ogrenci_listesi", pk=pk)
+
+    return render(request, "sinav/mazeret_ogrenci_listesi.html", {
+        "mazeret": mazeret,
+        **_mazeret_belge_ctx(mazeret),
     })
 
 
@@ -2729,13 +2939,35 @@ def mazeret_sinav_dagit(request, pk):
 
     oturum_saatleri = mazeret.oturum_saatleri or request.POST.get("oturum_saatleri", "")
 
+    max_gun_raw = request.POST.get("max_sinav_per_gun", "").strip()
+    if max_gun_raw:
+        try:
+            max_gun = max(1, int(max_gun_raw))
+        except ValueError:
+            max_gun = mazeret.efektif_max_sinav_per_gun
+        else:
+            if max_gun != mazeret.max_sinav_per_gun:
+                mazeret.max_sinav_per_gun = max_gun
+                mazeret.save(update_fields=["max_sinav_per_gun"])
+    else:
+        max_gun = mazeret.efektif_max_sinav_per_gun
+
+    tatil_raw = request.POST.get("tatil_gunleri")
+    if tatil_raw is not None and tatil_raw.strip() != mazeret.tatil_gunleri.strip():
+        mazeret.tatil_gunleri = tatil_raw.strip()
+        mazeret.save(update_fields=["tatil_gunleri"])
+
     eklenen, haric = populate_ogrenciler(mazeret)
 
-    svc = MazeretILPService(config={"TIME_LIMIT": 120}, log_fn=lambda m: None)
+    svc = MazeretILPService(
+        config={"TIME_LIMIT": 120, "MAX_SINAV_PER_GUN": max_gun},
+        log_fn=lambda m: None,
+    )
     basarili, mesaj = svc.calistir(
         mazeret_sinav=mazeret,
         baslangic_tarih=baslangic,
         oturum_saatleri_str=oturum_saatleri,
+        tatil_gunleri_str=mazeret.tatil_gunleri,
     )
 
     haric_notu = f" ({haric} özel durumlu öğrenci hariç tutuldu.)" if haric else ""
@@ -2757,17 +2989,33 @@ def mazeret_sinav_sil(request, pk):
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
     mazeret.delete()
     messages.success(request, "Mazeret sınav planı silindi.")
-    return redirect("sinav:mazeret_listesi")
+    return redirect("sinav:mazeret_planlama")
 
 
 # ---------------------------------------------------------------------------
 # Mazeret Sınav Takvimi
 # ---------------------------------------------------------------------------
 
+def _mazeret_salon_gruplari(mazeret: MazeretSinav, kayitlar: list) -> list[dict]:
+    """
+    kayitlar listesini (MazeretOturmaPlani) salon adına göre gruplar.
+    Sıralama önce mazeret.efektif_salon_config'deki salon adlarını, sonra kayıtlarda
+    olup config'de olmayan (elle düzenlenmiş) salon adlarını takip eder.
+    """
+    salon_adlari = list(mazeret.efektif_salon_config.keys())
+    for k in kayitlar:
+        if k.salon not in salon_adlari:
+            salon_adlari.append(k.salon)
+    return [
+        {"ad": ad, "kayitlar": [k for k in kayitlar if k.salon == ad]}
+        for ad in salon_adlari
+    ]
+
+
 @ust_yonetici_required
 @require_POST
 def mazeret_takvim_olustur(request, pk):
-    """Mazeret oturma planını oluşturur (Mazeret1/Mazeret2 salon ataması)."""
+    """Mazeret oturma planını oluşturur (salon atamaları kelebek dağılımla yapılır)."""
     from .services.mazeret_takvim import oturma_plani_olustur
 
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
@@ -2777,9 +3025,10 @@ def mazeret_takvim_olustur(request, pk):
         messages.warning(request, "Takvime yerleştirilecek uygun öğrenci bulunamadı. "
                          "Öğrencilerin belge teslim durumunu kontrol edin.")
     else:
-        msg = (f"Takvim oluşturuldu: {sonuc['toplam']} öğrenci — "
-               f"Mazeret 1: {sonuc['salonlar'].get('Mazeret 1', 0)}, "
-               f"Mazeret 2: {sonuc['salonlar'].get('Mazeret 2', 0)}.")
+        salon_ozet = ", ".join(
+            f"{ad}: {sayi}" for ad, sayi in sonuc["salonlar"].items()
+        )
+        msg = f"Takvim oluşturuldu: {sonuc['toplam']} öğrenci — {salon_ozet}."
         if sonuc["uyari"]:
             messages.warning(request, msg + " " + sonuc["uyari"])
         else:
@@ -2821,8 +3070,6 @@ def mazeret_takvim_detay(request, pk):
     oturumlar_veri = []
     for oturum in oturumlar_qs:
         kayitlar = list(oturum.oturma_plani.order_by("salon", "sira_no"))
-        salon1 = [k for k in kayitlar if k.salon == "Mazeret 1"]
-        salon2 = [k for k in kayitlar if k.salon == "Mazeret 2"]
         dersler = list(
             MazeretOturumDers.objects
             .filter(oturum=oturum)
@@ -2832,8 +3079,7 @@ def mazeret_takvim_detay(request, pk):
         oturumlar_veri.append({
             "oturum": oturum,
             "dersler": dersler,
-            "salon1": salon1,
-            "salon2": salon2,
+            "salonlar": _mazeret_salon_gruplari(mazeret, kayitlar),
             "toplam": len(kayitlar),
         })
 
@@ -2888,8 +3134,6 @@ def mazeret_rapor(request, pk):
     oturumlar_veri = []
     for oturum in oturumlar_qs:
         kayitlar = list(oturum.oturma_plani.order_by("salon", "sira_no"))
-        salon1 = [k for k in kayitlar if k.salon == "Mazeret 1"]
-        salon2 = [k for k in kayitlar if k.salon == "Mazeret 2"]
         dersler = list(
             MazeretOturumDers.objects
             .filter(oturum=oturum)
@@ -2899,8 +3143,8 @@ def mazeret_rapor(request, pk):
         oturumlar_veri.append({
             "oturum": oturum,
             "dersler": dersler,
-            "salon1": salon1,
-            "salon2": salon2,
+            "salonlar": _mazeret_salon_gruplari(mazeret, kayitlar),
+            "toplam": len(kayitlar),
         })
 
     okul = OkulBilgi.get()
@@ -2937,8 +3181,7 @@ def mazeret_rapor_pdf_view(request, pk):
                 .select_related("ders")
                 .order_by("ders__ders_adi")
             ),
-            "salon1": [k for k in kayitlar if k.salon == "Mazeret 1"],
-            "salon2": [k for k in kayitlar if k.salon == "Mazeret 2"],
+            "salonlar": _mazeret_salon_gruplari(mazeret, kayitlar),
         })
 
     okul = OkulBilgi.get()
@@ -2947,6 +3190,57 @@ def mazeret_rapor_pdf_view(request, pk):
     buf.seek(0)
 
     dosya_adi = f"mazeret_rapor_{pk}.pdf"
+    response = HttpResponse(buf, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{dosya_adi}"'
+    return response
+
+
+def _mazeret_ilan_oturumlar_veri(mazeret: MazeretSinav) -> list[dict]:
+    """İlan takvimi için gün/oturum/ders verisini (öğrenci/salon detayı olmadan) hazırlar."""
+    oturumlar_qs = (
+        MazeretOturum.objects
+        .filter(gun__mazeret_sinav=mazeret)
+        .select_related("gun")
+        .order_by("gun__tarih", "oturum_no")
+    )
+    return [
+        {
+            "oturum": oturum,
+            "dersler": list(
+                MazeretOturumDers.objects
+                .filter(oturum=oturum)
+                .select_related("ders")
+                .order_by("ders__ders_adi")
+            ),
+        }
+        for oturum in oturumlar_qs
+    ]
+
+
+@ust_yonetici_required
+def mazeret_ilan_takvimi(request, pk):
+    """Mazeret sınavı gün/oturum/ders takvimini panoya asılabilir ilan formatında gösterir."""
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+    return render(request, "sinav/mazeret_ilan.html", {
+        "mazeret": mazeret,
+        "oturumlar_veri": _mazeret_ilan_oturumlar_veri(mazeret),
+        "okul": OkulBilgi.get(),
+    })
+
+
+@ust_yonetici_required
+def mazeret_ilan_takvimi_pdf(request, pk):
+    """Mazeret sınavı ilan takvimini PDF olarak indirir (ReportLab)."""
+    import io
+    from django.http import HttpResponse
+    from ortaksinav_engine.services.pdf_rapor import mazeret_ilan_pdf
+
+    mazeret = get_object_or_404(MazeretSinav, pk=pk)
+    buf = io.BytesIO()
+    mazeret_ilan_pdf(_mazeret_ilan_oturumlar_veri(mazeret), buf, OkulBilgi.get(), mazeret)
+    buf.seek(0)
+
+    dosya_adi = f"mazeret_ilan_{pk}.pdf"
     response = HttpResponse(buf, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{dosya_adi}"'
     return response

@@ -97,30 +97,89 @@
       <span class="sinav-info-val">{{ aktif_sinav.eokul_veri_tarihi|date:"d.m.Y" }}</span>
     </div>
   </div>
-
-  {% if sinav_listesi|length > 1 %}
-  <div class="sinav-secim-liste">
-    <span class="sinav-secim-baslik">Kayıtlı Sınavlar:</span>
-    {% for s in sinav_listesi %}
-    {% if s.aktif %}
-    <span class="sinav-secim-chip sinav-secim-aktif">
-      ✓ {{ s.egitim_ogretim_yili }} {{ s.get_donem_display }} – {{ s.get_sinav_adi_display }}
-    </span>
-    {% else %}
-    <form method="post" action="{% url 'sinav:sinav_bilgisi_aktif_yap' s.pk %}" style="display:inline">
-      {% csrf_token %}
-      <input type="hidden" name="next" value="index">
-      <button type="submit" class="sinav-secim-chip sinav-secim-pasif">
-        {{ s.egitim_ogretim_yili }} {{ s.get_donem_display }} – {{ s.get_sinav_adi_display }}
-      </button>
-    </form>
-    {% endif %}
-    {% endfor %}
-  </div>
-  {% endif %}
 </div>
 
 {% endif %}{# aktif_sinav #}
+
+<!-- ===== KAYITLI SINAVLAR ===== -->
+<div class="card">
+  <h2>Kayıtlı Sınavlar</h2>
+
+  {% if liste_formlar %}
+  <div class="sinav-liste">
+    {% for sinav, duzenle_form in liste_formlar %}
+
+    <div class="sinav-blok {% if sinav.aktif %}sinav-aktif{% endif %}">
+
+      <!-- Özet satır -->
+      <div class="sinav-satir">
+        <div class="sinav-satir-bilgi">
+          {% if sinav.aktif %}<span class="badge badge-done">Aktif</span>{% endif %}
+          <span class="sinav-yil">{{ sinav.egitim_ogretim_yili }}</span>
+          <span class="sinav-sep">|</span>
+          <span class="sinav-donem">{{ sinav.get_donem_display }}</span>
+          <span class="sinav-sep">|</span>
+          <span class="sinav-ad">{{ sinav.get_sinav_adi_display }}</span>
+          <span class="sinav-tarih">Başlangıç: {{ sinav.sinav_baslangic_tarihi|date:"d.m.Y" }}</span>
+          <span class="sinav-tarih">Veri: {{ sinav.eokul_veri_tarihi|date:"d.m.Y" }}</span>
+          {% if sinav.otomatik_baslangic %}
+          <span class="sinav-tarih sinav-tarih-oto" title="Üretilen sınav takviminden hesaplandı">
+            Takvim: {{ sinav.otomatik_baslangic|date:"d.m.Y" }} – {{ sinav.otomatik_bitis|date:"d.m.Y" }}
+          </span>
+          {% endif %}
+        </div>
+        <div class="sinav-satir-butonlar">
+          {% if not sinav.aktif %}
+          <form method="post" action="{% url 'sinav:sinav_bilgisi_aktif_yap' sinav.pk %}" style="display:inline">
+            {% csrf_token %}
+            <button class="btn btn-success btn-sm" type="submit">Aktif Yap</button>
+          </form>
+          {% endif %}
+          <button class="btn btn-secondary btn-sm"
+                  onclick="toggleEdit({{ sinav.pk }})" type="button">Düzenle</button>
+          {% if not sinav.aktif %}
+          <form method="post" action="{% url 'sinav:sinav_bilgisi_sil' sinav.pk %}" style="display:inline"
+                onsubmit="return confirm('{{ sinav }} silinsin mi?')">
+            {% csrf_token %}
+            <button class="btn btn-danger btn-sm" type="submit">Sil</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Inline düzenleme paneli -->
+      <div id="edit-panel-{{ sinav.pk }}" class="sinav-edit-panel" style="display:none;">
+        <form method="post" action="{% url 'sinav:sinav_bilgisi_duzenle' sinav.pk %}">
+          {% csrf_token %}
+          <div class="grid-2" style="margin-top:.75rem;">
+            {% for field in duzenle_form %}
+            <div class="form-group">
+              {{ field.label_tag }}
+              {{ field }}
+              {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+              {% for err in field.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+          <div style="display:flex; gap:.5rem; margin-top:.75rem;">
+            <button type="submit" class="btn btn-primary btn-sm">Kaydet</button>
+            <button type="button" class="btn btn-secondary btn-sm"
+                    onclick="toggleEdit({{ sinav.pk }})">İptal</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <p style="color:#6b7280; font-size:.9rem;">
+    Henüz sınav bilgisi eklenmedi.
+    <a href="{% url 'sinav:sinav_bilgisi_listesi' %}">İlk sınavı ekleyin.</a>
+  </p>
+  {% endif %}
+</div>
 
 <style>
 /* Kurulum adımları */
@@ -156,28 +215,38 @@
   border-left: 4px solid #f59e0b; color: #92400e; background: #fffbeb;
   padding: .9rem 1.5rem;
 }
-.sinav-secim-liste {
-  display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
-  margin-top: .75rem; padding-top: .75rem;
-  border-top: 1px solid #d1fae5;
+.sinav-liste { display:flex; flex-direction:column; gap:.5rem; }
+.sinav-blok {
+  border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;
+  background:#fafafa;
 }
-.sinav-secim-baslik { font-size: .75rem; color: #6b7280; margin-right: .2rem; }
-.sinav-secim-chip {
-  display: inline-block;
-  padding: .25rem .7rem;
-  border-radius: 99px;
-  font-size: .78rem; font-weight: 500;
-  border: none; cursor: pointer;
+.sinav-blok.sinav-aktif { border-color:#16a34a; background:#f0fdf4; }
+.sinav-satir {
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:.5rem; padding:.75rem 1rem;
 }
-.sinav-secim-aktif {
-  background: #d1fae5; color: #065f46;
-  font-weight: 700;
+.sinav-satir-bilgi { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+.sinav-sep { color:#d1d5db; }
+.sinav-yil  { font-weight:700; color:#1a1a2e; font-size:.9rem; }
+.sinav-donem, .sinav-ad { font-size:.88rem; color:#374151; }
+.sinav-tarih { font-size:.75rem; color:#6b7280; }
+.sinav-tarih-oto {
+  background:#eef2ff; color:#4338ca; padding:.1rem .5rem; border-radius:6px;
+  font-weight:600;
 }
-.sinav-secim-pasif {
-  background: #f3f4f6; color: #374151;
-  transition: background .15s;
+.sinav-satir-butonlar { display:flex; gap:.4rem; flex-shrink:0; }
+.sinav-edit-panel {
+  border-top:1px solid #e5e7eb; padding:.75rem 1rem 1rem;
+  background:#fff;
 }
-.sinav-secim-pasif:hover { background: #e0e7ff; color: #3730a3; }
+.btn-danger { background:#dc2626; color:#fff; }
 </style>
+
+<script>
+function toggleEdit(pk) {
+  const panel = document.getElementById("edit-panel-" + pk);
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+}
+</script>
 
 {% endblock %}

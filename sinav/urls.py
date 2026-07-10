@@ -78,6 +78,9 @@ urlpatterns = [
 
     # Mazeret Sınavı
     path("mazeret/",                        views.mazeret_sinav_listesi,    name="mazeret_listesi"),
+    path("mazeret/yoklama/",                views.mazeret_yoklama,          name="mazeret_yoklama"),
+    path("mazeret/belge/",                  views.mazeret_belge,            name="mazeret_belge"),
+    path("mazeret/planlama/",               views.mazeret_planlama,         name="mazeret_planlama"),
     path("mazeret/yoklama-simule/",         views.mazeret_yoklama_simule,   name="mazeret_yoklama_simule"),
     path("mazeret/olustur/",                views.mazeret_sinav_olustur,    name="mazeret_olustur"),
     path("mazeret/<int:pk>/",               views.mazeret_sinav_detay,      name="mazeret_detay"),
@@ -90,6 +93,8 @@ urlpatterns = [
     path("mazeret/<int:pk>/takvim/iptal/",       views.mazeret_takvim_onayli_iptal,  name="mazeret_takvim_iptal"),
     path("mazeret/<int:pk>/rapor/",              views.mazeret_rapor,                name="mazeret_rapor"),
     path("mazeret/<int:pk>/rapor/pdf/",          views.mazeret_rapor_pdf_view,       name="mazeret_rapor_pdf"),
+    path("mazeret/<int:pk>/ilan/",               views.mazeret_ilan_takvimi,         name="mazeret_ilan"),
+    path("mazeret/<int:pk>/ilan/pdf/",           views.mazeret_ilan_takvimi_pdf,     name="mazeret_ilan_pdf"),
 
     # Öğretmen: kendi sorumluluk görevleri
     path("sorumluluk-gorevlerim/", views.sorumluluk_gorevlerim, name="sorumluluk_gorevlerim"),

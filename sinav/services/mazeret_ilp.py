@@ -4,6 +4,8 @@ Mazeret Sınav ILP Planlama Servisi
 MazeretOgrenci (belge_teslim=True, uygun) kayıtlarından çakışmasız mazeret
 takvimi üretir. Çakışma kuralı: aynı öğrencinin iki sınavı aynı slotta olamaz.
 Uygulama dersleri exclusive slot alır (başka hiçbir ders aynı slotta olamaz).
+Ayrıca bir öğrenci aynı günde en fazla config["MAX_SINAV_PER_GUN"] (varsayılan 2)
+oturuma girebilir.
 
 Çıktı: MazeretGun + MazeretOturum + MazeretOturumDers kayıtları.
 """
@@ -92,6 +94,11 @@ class MazeretILPService(BaseService):
         if not saatler:
             saatler = VARSAYILAN_SAATLER
         K_gun = len(saatler)  # oturum/gün
+
+        # Öğrenci başına günlük oturum üst sınırı (varsayılan MazeretSinav.efektif_max_sinav_per_gun)
+        max_gun = int(self.config.get("MAX_SINAV_PER_GUN", 2))
+        if max_gun < 1:
+            max_gun = 1
 
         # Tatil günlerini topla
         tatil: set[date] = _parse_tatil(tatil_gunleri_str)
@@ -211,13 +218,12 @@ class MazeretILPService(BaseService):
                     if v != ui:
                         G.add_edge(ui, v)
 
-        # Öğrenci-paylaşan alt graf: günlük çakışma için minimum gün sayısını belirler
-        G_student = nx.Graph()
-        G_student.add_nodes_from(range(N))
-        for ia, ib in student_pairs:
-            G_student.add_edge(ia, ib)
-        student_greedy = nx.coloring.greedy_color(G_student, strategy="largest_first")
-        min_days_ogrenci = (max(student_greedy.values()) + 1) if student_greedy else 1
+        # Öğrenci başına gün alt sınırı: bir öğrenci günde en fazla max_gun oturuma girebilir,
+        # dolayısıyla en çok dersi olan öğrenci ceil(ders_sayısı / max_gun) gün gerektirir.
+        min_days_ogrenci = 1
+        if ogr_dersler:
+            max_ders_sayisi = max(len(dersler) for dersler in ogr_dersler.values())
+            min_days_ogrenci = (max_ders_sayisi + max_gun - 1) // max_gun
 
         self.log(
             f"Mazeret ILP: {N} ders, "
@@ -263,8 +269,6 @@ class MazeretILPService(BaseService):
                 <= toplam_kapasite
             )
 
-        # Öğrenci bazlı günlük çakışma kısıtı:
-        # Ortak öğrencisi olan iki dersin aynı güne atanması engellenir.
         # u_gün[i][d] = 1 ⟺ ders i, gün d'de planlandı
         num_days = (K + K_gun - 1) // K_gun
         u_gun = {
@@ -277,14 +281,20 @@ class MazeretILPService(BaseService):
                 slots_in_day = [t for t in range(K) if t // K_gun == d]
                 prob += u_gun[(i, d)] == lpSum(x[i][t] for t in slots_in_day)
 
-        for ia, ib in student_pairs:
+        # Öğrenci bazlı günlük kısıt: bir öğrenci aynı günde en fazla max_gun oturuma girebilir.
+        gunluk_kisit_sayisi = 0
+        for dersler_seti in ogr_dersler.values():
+            ders_idxs = sorted({ders_idx[d] for d in dersler_seti if d in ders_idx})
+            if len(ders_idxs) <= max_gun:
+                continue
             for d in range(num_days):
-                prob += u_gun[(ia, d)] + u_gun[(ib, d)] <= 1
+                prob += lpSum(u_gun[(i, d)] for i in ders_idxs) <= max_gun
+                gunluk_kisit_sayisi += 1
 
-        if student_pairs:
+        if gunluk_kisit_sayisi:
             self.log(
-                f"  Günlük çakışma kısıtı: {len(student_pairs)} öğrenci-paylaşan ders çifti, "
-                f"{num_days} gün × çift = {len(student_pairs) * num_days} kısıt eklendi."
+                f"  Günlük kısıt: öğrenci başına günde en fazla {max_gun} oturum — "
+                f"{gunluk_kisit_sayisi} kısıt eklendi."
             )
 
         for t in range(K):
@@ -313,13 +323,19 @@ class MazeretILPService(BaseService):
                     ders_to_slot[i] = t
                     break
 
-        # Kullanılan slotları sıralı konumlara sıkıştır
-        kullanilan = sorted(set(ders_to_slot.values()))
-        slot_konum = {t: idx for idx, t in enumerate(kullanilan)}
-        ders_to_konum = {i: slot_konum[ders_to_slot[i]] for i in range(N)}
+        # Kullanılan slotları GÜN SINIRLARINI KORUYARAK sıkıştır: önce hangi orijinal
+        # günlerin kullanıldığını bul (boş günler atlanır), sonra her günün içindeki
+        # kullanılan slotları o gün için sıralı oturum konumlarına eşle. Günler arası
+        # düz bir sıkıştırma (t → sıra no) günlük kısıtın (öğrenci başına en fazla 2
+        # oturum/gün) hesaba kattığı gün sınırlarını bozar — ILP bilerek bir günün
+        # slotlarını boş bırakıp dersleri başka güne yaymış olabilir.
+        gun_to_slotlar: dict[int, list[int]] = {}
+        for t in sorted(set(ders_to_slot.values())):
+            gun_to_slotlar.setdefault(t // K_gun, []).append(t)
 
-        toplam_oturum = len(kullanilan)
-        toplam_gun = (toplam_oturum - 1) // K_gun + 1
+        kullanilan_gunler = sorted(gun_to_slotlar.keys())
+        toplam_gun = len(kullanilan_gunler)
+        toplam_oturum = sum(len(v) for v in gun_to_slotlar.values())
 
         self.log(
             f"ILP tamamlandı: {toplam_oturum} oturum → {toplam_gun} gün."
@@ -330,48 +346,37 @@ class MazeretILPService(BaseService):
         # ──────────────────────────────────────────────
         mazeret_sinav.gunler.all().delete()
 
-        gun_objects: dict[int, MazeretGun] = {}
-        slot_to_oturum: dict[int, MazeretOturum] = {}
-        oturum_sayaci: dict[int, int] = {}  # day_idx → oturum_no
+        slot_to_oturum: dict[int, MazeretOturum] = {}  # orijinal slot t → MazeretOturum
 
-        for konum in range(toplam_oturum):
-            day_idx = konum // K_gun
-            slot_in_day = konum % K_gun
+        for day_idx, orijinal_gun in enumerate(kullanilan_gunler):
+            tarih = _nth_is_gunu(baslangic_tarih, day_idx, tatil)
+            gun = MazeretGun.objects.create(mazeret_sinav=mazeret_sinav, tarih=tarih)
 
-            if day_idx not in gun_objects:
-                tarih = _nth_is_gunu(baslangic_tarih, day_idx, tatil)
-                gun_objects[day_idx] = MazeretGun.objects.create(
-                    mazeret_sinav=mazeret_sinav,
-                    tarih=tarih,
+            for oturum_no, t in enumerate(gun_to_slotlar[orijinal_gun], start=1):
+                slot_in_day = t % K_gun
+
+                ders_in_slot = [DERSLER[i] for i, tt in ders_to_slot.items() if tt == t]
+                sinav_turu = (
+                    "Uygulama"
+                    if any(d[1] == "Uygulama" for d in ders_in_slot)
+                    else "Yazili"
                 )
-                oturum_sayaci[day_idx] = 0
 
-            gun = gun_objects[day_idx]
-            oturum_sayaci[day_idx] += 1
+                saat_bas = _str_to_time(saatler[slot_in_day])
+                saat_bit = _time_add_dk(saat_bas, OTURUM_SURESI_DK)
 
-            # Bu konumdaki derslerin sinav_turu'nu belirle
-            ders_in_konum = [DERSLER[i] for i, k in ders_to_konum.items() if k == konum]
-            sinav_turu = (
-                "Uygulama"
-                if any(d[1] == "Uygulama" for d in ders_in_konum)
-                else "Yazili"
-            )
-
-            saat_bas = _str_to_time(saatler[slot_in_day])
-            saat_bit = _time_add_dk(saat_bas, OTURUM_SURESI_DK)
-
-            slot_to_oturum[konum] = MazeretOturum.objects.create(
-                gun=gun,
-                oturum_no=oturum_sayaci[day_idx],
-                saat_baslangic=saat_bas,
-                saat_bitis=saat_bit,
-                sinav_turu=sinav_turu,
-            )
+                slot_to_oturum[t] = MazeretOturum.objects.create(
+                    gun=gun,
+                    oturum_no=oturum_no,
+                    saat_baslangic=saat_bas,
+                    saat_bitis=saat_bit,
+                    sinav_turu=sinav_turu,
+                )
 
         # MazeretOturumDers
         atamalar = [
             MazeretOturumDers(
-                oturum=slot_to_oturum[ders_to_konum[i]],
+                oturum=slot_to_oturum[ders_to_slot[i]],
                 ders_id=ders_key_to_id[DERSLER[i]],
                 sinav_turu=DERSLER[i][1],
             )

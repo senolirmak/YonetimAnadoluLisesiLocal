@@ -1,0 +1,160 @@
+{% extends "sinav/base.html" %}
+{% block sinav_title %}Mazeret — Belge / Özel Durum{% endblock %}
+
+{% block sinav_content %}
+<a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary btn-sm">← Mazeret Sınavı</a>
+<h1 style="font-size:1.2rem; font-weight:700; color:#1a1a2e; margin:.5rem 0 1rem;">
+  <span class="mazeret-adim-no">2</span> Mazeret Belge / Özel Durum Gir/Düzenle
+</h1>
+
+{% if not aktif_sinav %}
+<div class="card">
+  <p style="color:#666;">Aktif sınav seçilmedi. Önce bir sınav aktif yapın.</p>
+</div>
+{% elif not son_mazeret %}
+<div class="card">
+  <p style="color:#666;">
+    Belge teslim durumunu işaretleyebilmek için önce bir mazeret planı oluşturun.
+  </p>
+  <a href="{% url 'sinav:mazeret_planlama' %}" class="btn btn-primary btn-sm">Planlama Sayfasına Git</a>
+</div>
+{% else %}
+<div class="card">
+  <p style="font-size:.85rem; color:#4b5563; margin:0 0 .7rem;">
+    En son plan (<a href="{% url 'sinav:mazeret_detay' son_mazeret.pk %}">#{{ son_mazeret.pk }}</a>) için,
+    hangi devamsız öğrencilerin geçerli mazeret belgesi teslim ettiğini ve sürekli devamsız/muaf gibi
+    özel durumlarını işaretleyin. Yalnızca belgesi olan öğrenciler Mazeret Sınavına dahil edilir.
+  </p>
+
+  <div class="ozet-kart">
+    <div class="ozet-kutu">
+      <div class="sayi">{{ toplam }}</div>
+      <div class="etiket">Toplam Devamsız</div>
+    </div>
+    <div class="ozet-kutu belge">
+      <div class="sayi">{{ belge_teslim_n }}</div>
+      <div class="etiket">Belge Teslim</div>
+    </div>
+    <div class="ozet-kutu sureksiz">
+      <div class="sayi">{{ haric_n }}</div>
+      <div class="etiket">Hariç (Sürekli Dev. / Muaf)</div>
+    </div>
+    <div class="ozet-kutu uygun">
+      <div class="sayi">{{ uygun_n }}</div>
+      <div class="etiket">Mazeret Sınavına Uygun</div>
+    </div>
+  </div>
+
+  <form method="get" style="display:flex; gap:.5rem; margin-bottom:.8rem;">
+    <input type="text" name="belge_q" value="{{ belge_q }}" placeholder="Okul No veya Ad Soyad ile filtrele…"
+           style="flex:1; max-width:320px; padding:.4rem .6rem; border:1px solid #d1d5db; border-radius:6px; font-size:.85rem;">
+    <button type="submit" class="btn btn-secondary btn-sm">Filtrele</button>
+  </form>
+
+  {% if ders_gruplar %}
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="form" value="belge_kaydet">
+    <input type="hidden" name="belge_q" value="{{ belge_q }}">
+    {% for grp in ders_gruplar %}
+    <div class="ders-baslik" onclick="toggleDers(this)">
+      <span>{{ grp.ders_adi }}{% if grp.sinav_turu %} <em style="font-weight:400; font-size:.8rem;">({{ grp.sinav_turu }})</em>{% endif %}</span>
+      <span style="margin-left:auto; font-weight:400; font-size:.78rem; color:#64748b;">{{ grp.ogrenciler|length }} öğrenci</span>
+      <span style="font-size:.7rem; color:#94a3b8;">▼</span>
+    </div>
+    <div class="ders-icerik">
+      <div class="ogr-baslik">
+        <span></span>
+        <span>Okul No</span>
+        <span>Sınıf</span>
+        <span>Adı Soyadı</span>
+        <span style="text-align:center;">Belge Teslim</span>
+        <span style="text-align:center;">Sürekli Dev.</span>
+        <span style="text-align:center;">Muaf</span>
+      </div>
+      {% for item in grp.ogrenciler %}
+      <div class="ogr-satir {% if item.sureksiz or item.muaf %}haric-satir{% endif %}">
+        <span class="cb-center" style="color:#94a3b8; font-size:.75rem;">{{ forloop.counter }}</span>
+        <span>{{ item.mo.okulno }}</span>
+        <span>{{ item.mo.sinifsube }}</span>
+        <span>{{ item.mo.adi_soyadi }}</span>
+        <span class="cb-center">
+          {% if not item.sureksiz and not item.muaf %}
+          <input type="checkbox" name="belge_teslim" value="{{ item.mo.pk }}" {% if item.mo.belge_teslim %}checked{% endif %}>
+          {% else %}
+          <span style="font-size:.72rem; color:#dc2626;">—</span>
+          {% endif %}
+        </span>
+        <span class="cb-center">
+          <input type="checkbox" name="sureksiz_devamsiz" value="{{ item.mo.okulno }}" {% if item.sureksiz %}checked{% endif %}>
+        </span>
+        <span class="cb-center">
+          {% if item.muaf %}
+          <span style="font-size:.75rem; color:#dc2626;" title="Bu ders için muaf">✓</span>
+          {% else %}
+          <span style="font-size:.72rem; color:#94a3b8;">—</span>
+          {% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary btn-sm" style="margin-top:.5rem;">Belge Durumunu Kaydet</button>
+  </form>
+  {% elif belge_q %}
+  <p style="font-size:.85rem; color:#991b1b;">"{{ belge_q }}" ile eşleşen devamsız öğrenci bulunamadı.</p>
+  {% else %}
+  <p style="font-size:.85rem; color:#6b7280;">Bu plan için devamsız öğrenci kaydı yok.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<style>
+  .mazeret-adim-no {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:1.3rem; height:1.3rem; border-radius:50%;
+    background:#4338ca; color:#fff; font-size:.72rem; font-weight:700;
+    margin-right:.3rem; vertical-align:middle;
+  }
+  .ozet-kart { display: flex; gap: .8rem; flex-wrap: wrap; margin-bottom: .9rem; }
+  .ozet-kutu {
+    flex: 1; min-width: 110px; background: #fff;
+    border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: .5rem .7rem; text-align: center;
+  }
+  .ozet-kutu .sayi { font-size: 1.3rem; font-weight: 700; }
+  .ozet-kutu .etiket { font-size: .7rem; color: #64748b; margin-top: .1rem; }
+  .ozet-kutu.uygun .sayi  { color: #16a34a; }
+  .ozet-kutu.belge .sayi  { color: #2563eb; }
+  .ozet-kutu.sureksiz .sayi { color: #dc2626; }
+
+  .ders-baslik {
+    display: flex; align-items: center; gap: .6rem;
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+    border-radius: 6px 6px 0 0; padding: .4rem .8rem;
+    font-weight: 700; font-size: .85rem; cursor: pointer;
+  }
+  .ders-icerik { border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 6px 6px; margin-bottom: .6rem; }
+  .ogr-satir {
+    display: grid; grid-template-columns: 2rem 5rem 4rem 1fr 7rem 7rem 5rem;
+    align-items: center; gap: .5rem;
+    padding: .25rem .8rem; font-size: .8rem; border-bottom: 1px solid #f8fafc;
+  }
+  .ogr-satir:last-child { border-bottom: none; }
+  .ogr-satir.haric-satir { background: #fef2f2; }
+  .ogr-baslik {
+    display: grid; grid-template-columns: 2rem 5rem 4rem 1fr 7rem 7rem 5rem;
+    gap: .5rem; padding: .25rem .8rem; font-size: .72rem;
+    font-weight: 600; color: #64748b; background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .cb-center { display: flex; justify-content: center; }
+</style>
+
+<script>
+function toggleDers(baslik) {
+  const icerik = baslik.nextElementSibling;
+  icerik.style.display = icerik.style.display === "none" ? "" : "none";
+}
+</script>
+{% endblock %}

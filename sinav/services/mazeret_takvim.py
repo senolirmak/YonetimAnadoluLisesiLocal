@@ -6,13 +6,17 @@ uygun öğrencileri MazeretSinav.salon_config'de tanımlı salonlara yerleştiri
 
 Kurallar:
 - Uygun öğrenci: belge_teslim=True, sureksiz_devamsiz=False, muaf değil
-- Salon kapasiteleri MazeretSinav.efektif_salon_config'den okunur
+- Salon kapasiteleri MazeretSinav.efektif_salon_config'den okunur (herhangi sayıda salon olabilir)
 - Varsayılan: {"Mazeret 1": 36, "Mazeret 2": 36}
-- Sıralama: sinifsube → adi_soyadi (alfabetik)
-- Toplam öğrenci toplam kapasiteyi aşarsa fazlalar son salona eklenir (uyarı)
+- Kelebek dağılım: her ders grubu kendi içinde tüm salonlara round-robin dağıtılır
+  (ana sınavın OturmaPlanService'i ile aynı mantık), böylece bir salonda yan yana
+  oturan öğrenciler farklı derslerden olur.
+- Toplam öğrenci toplam kapasiteyi aşarsa uyarı verilir.
 """
 from __future__ import annotations
 
+import hashlib
+import random
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -113,38 +117,55 @@ def oturma_plani_olustur(mazeret: "MazeretSinav") -> dict:
         if len(tekil) > toplam_kapasite:
             uyari = (
                 f"Bazı oturumlarda salon kapasitesi ({toplam_kapasite}) aşıldı "
-                f"({len(tekil)} öğrenci). Fazla öğrenciler son salona eklendi."
+                f"({len(tekil)} öğrenci)."
             )
 
-        # Öğrencileri salonlara dağıt: her salon dolduktan sonra sıradaki salona geç
-        kapasite_listesi = [salon_config[s] for s in salonlar]
-        salon_idx = 0          # hangi salondayız
-        salon_ici_sira = 0     # bu salonda kaçıncı öğrenciyiz (0-indexed)
+        # Kelebek dağılım: dersi paylaşan öğrenciler karıştırılıp her ders grubu
+        # kendi içinde tüm salonlara round-robin dağıtılır. Böylece bir salonda
+        # yan yana oturan öğrenciler mümkün olduğunca farklı derslerden olur.
+        _seed = int(hashlib.md5(str(oturum_id).encode()).hexdigest(), 16) % (2 ** 31)
+        karisik = list(tekil)
+        random.Random(_seed).shuffle(karisik)
 
-        for okulno, adi_soyadi, sinifsube, ders_adi, sinav_turu in tekil:
-            # Mevcut salon doldu mu?
-            if (salon_idx < len(salonlar) - 1 and
-                    salon_ici_sira >= kapasite_listesi[salon_idx]):
-                salon_idx += 1
-                salon_ici_sira = 0
+        groups_by_ders: dict[str, list] = {}
+        for satir in karisik:
+            groups_by_ders.setdefault(satir[3], []).append(satir)  # satir[3] = ders_adi
 
-            salon = salonlar[min(salon_idx, len(salonlar) - 1)]
-            sira_no = salon_ici_sira + 1
+        salon_map: dict[str, list] = {s: [] for s in salonlar}
+        n_salons = len(salonlar)
+        for students in groups_by_ders.values():
+            for i, satir in enumerate(students):
+                salon_map[salonlar[i % n_salons]].append(satir)
 
-            yeni_kayitlar.append(MazeretOturmaPlani(
-                mazeret_sinav=mazeret,
-                oturum_id=oturum_id,
-                salon=salon,
-                sira_no=sira_no,
-                okulno=okulno,
-                adi_soyadi=adi_soyadi,
-                sinifsube=sinifsube,
-                ders_adi=ders_adi,
-                sinav_turu=sinav_turu,
-            ))
-            salon_sayilari[salon] = salon_sayilari.get(salon, 0) + 1
-            salon_ici_sira += 1
-            toplam += 1
+        # Salon içi sıra numarası da derse göre round-robin harmanlanır: aynı
+        # salonda ard arda oturan (sira_no'su ardışık) öğrenciler farklı ders
+        # gruplarından gelir, tek bir dersin öğrencileri art arda sıralanmaz.
+        for salon, satirlar in salon_map.items():
+            salon_ders_map: dict[str, list] = {}
+            for satir in satirlar:
+                salon_ders_map.setdefault(satir[3], []).append(satir)
+            harmanli = []
+            while any(salon_ders_map.values()):
+                for grup in salon_ders_map.values():
+                    if grup:
+                        harmanli.append(grup.pop(0))
+            salon_map[salon] = harmanli
+
+        for salon, satirlar in salon_map.items():
+            for sira_no, (okulno, adi_soyadi, sinifsube, ders_adi, sinav_turu) in enumerate(satirlar, start=1):
+                yeni_kayitlar.append(MazeretOturmaPlani(
+                    mazeret_sinav=mazeret,
+                    oturum_id=oturum_id,
+                    salon=salon,
+                    sira_no=sira_no,
+                    okulno=okulno,
+                    adi_soyadi=adi_soyadi,
+                    sinifsube=sinifsube,
+                    ders_adi=ders_adi,
+                    sinav_turu=sinav_turu,
+                ))
+                salon_sayilari[salon] = salon_sayilari.get(salon, 0) + 1
+                toplam += 1
 
     MazeretOturmaPlani.objects.bulk_create(yeni_kayitlar, ignore_conflicts=True)
     return {"toplam": toplam, "salonlar": salon_sayilari, "uyari": uyari}

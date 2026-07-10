@@ -412,16 +412,39 @@ class MazeretSinav(models.Model):
         verbose_name="Salon Yapılandırması",
         help_text='{"Mazeret 1": 36, "Mazeret 2": 36} formatında salon adı → kapasite.',
     )
+    max_sinav_per_gun = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        verbose_name="Günde Maks. Oturum Sayısı",
+        help_text="Bir öğrencinin aynı günde girebileceği en fazla oturum sayısı. "
+                  "Boşsa AlgoritmaParametreleri'nden okunur.",
+    )
+    tatil_gunleri = models.TextField(
+        blank=True, default="",
+        verbose_name="Tatil Günleri",
+        help_text="Virgülle veya satırla ayrılmış YYYY-MM-DD listesi. Bu günlere sınav "
+                  "planlanmaz. Sınavın genel tatil günlerine ek olarak uygulanır.",
+    )
     olusturma_tarihi = models.DateTimeField(auto_now_add=True)
     onaylandi = models.BooleanField(default=False, verbose_name="Onaylandı")
     onay_tarihi = models.DateTimeField(null=True, blank=True, verbose_name="Onay Tarihi")
 
     VARSAYILAN_SALON_CONFIG: dict[str, int] = {"Mazeret 1": 36, "Mazeret 2": 36}
+    VARSAYILAN_MAX_SINAV_PER_GUN = 2
 
     @property
     def efektif_salon_config(self) -> dict[str, int]:
         """Salon adı → kapasite; boşsa varsayılanı döner."""
         return self.salon_config if self.salon_config else self.VARSAYILAN_SALON_CONFIG
+
+    @property
+    def efektif_max_sinav_per_gun(self) -> int:
+        """Günde maks. oturum sayısı; boşsa AlgoritmaParametreleri, o da yoksa varsayılanı döner."""
+        if self.max_sinav_per_gun:
+            return self.max_sinav_per_gun
+        try:
+            return self.sinav.parametreler.max_sinav_per_gun
+        except Exception:
+            return self.VARSAYILAN_MAX_SINAV_PER_GUN
 
     class Meta:
         ordering = ["-olusturma_tarihi"]

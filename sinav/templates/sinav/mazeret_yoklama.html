@@ -1,0 +1,133 @@
+{% extends "sinav/base.html" %}
+{% block sinav_title %}Mazeret — Yoklama{% endblock %}
+
+{% block sinav_content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.6rem; margin-bottom:1.2rem;">
+  <div>
+    <a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary btn-sm">← Mazeret Sınavı</a>
+    <h1 style="font-size:1.2rem; font-weight:700; color:#1a1a2e; margin:.5rem 0 0;">
+      <span class="mazeret-adim-no">1</span> Yoklama Gir/Düzenle
+    </h1>
+  </div>
+  {% if aktif_sinav %}
+  <a href="{% url 'sinav:mazeret_yoklama_simule' %}" class="btn btn-secondary btn-sm"
+     title="Test amaçlı devamsızlık simülasyonu oluştur">
+    🧪 Yoklama Simülasyonu
+  </a>
+  {% endif %}
+</div>
+
+{% if not aktif_sinav %}
+<div class="card">
+  <p style="color:#666;">Aktif sınav seçilmedi. Önce bir sınav aktif yapın.</p>
+</div>
+{% else %}
+<div class="card">
+  <form method="get" style="display:flex; gap:.5rem; margin-bottom:.8rem;">
+    <input type="text" name="q" value="{{ yoklama_q }}" placeholder="Okul No veya Ad Soyad ile ara…"
+           style="flex:1; max-width:320px; padding:.4rem .6rem; border:1px solid #d1d5db; border-radius:6px; font-size:.85rem;">
+    <button type="submit" class="btn btn-primary btn-sm">Ara</button>
+  </form>
+
+  {% if yoklama_adaylar %}
+  <p style="font-size:.85rem; color:#4b5563; margin:0 0 .5rem;">
+    {{ yoklama_adaylar|length }} öğrenci eşleşti, birini seçin:
+  </p>
+  <table style="font-size:.83rem; border-collapse:collapse; width:100%;">
+    <thead>
+      <tr style="background:#f3f4f6;">
+        <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #e5e7eb;">Okul No</th>
+        <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #e5e7eb;">Adı Soyadı</th>
+        <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #e5e7eb;">Sınıf/Şube</th>
+        <th style="padding:.35rem .7rem; border-bottom:1px solid #e5e7eb;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for aday in yoklama_adaylar %}
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:.3rem .7rem;">{{ aday.okulno }}</td>
+        <td style="padding:.3rem .7rem; font-weight:600; color:#1a1a2e;">{{ aday.adi_soyadi }}</td>
+        <td style="padding:.3rem .7rem;">{{ aday.sinifsube }}</td>
+        <td style="padding:.3rem .7rem; text-align:right;">
+          <a href="?q={{ aday.okulno }}" class="btn btn-sm" style="background:#6366f1; color:#fff; font-size:.78rem; padding:.2rem .6rem;">
+            Seç
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif yoklama_q and not yoklama_ogrenci %}
+  <p style="font-size:.85rem; color:#991b1b;">"{{ yoklama_q }}" ile eşleşen öğrenci bulunamadı.</p>
+  {% endif %}
+
+  {% if yoklama_ogrenci %}
+  <div style="margin-top:.5rem; padding-top:.7rem; border-top:1px solid #e5e7eb;">
+    <div style="font-size:.9rem; margin-bottom:.6rem;">
+      <strong>{{ yoklama_ogrenci.adi_soyadi }}</strong>
+      <span style="color:#6b7280;">— Okul No: {{ yoklama_ogrenci.okulno }} · {{ yoklama_ogrenci.sinifsube }}</span>
+    </div>
+
+    {% if yoklama_oturumlar %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="form" value="yoklama_kaydet">
+      <input type="hidden" name="okulno" value="{{ yoklama_ogrenci.okulno }}">
+      <input type="hidden" name="satir_sayisi" value="{{ yoklama_oturumlar|length }}">
+      <table style="font-size:.83rem; border-collapse:collapse; width:100%; margin-bottom:.7rem;">
+        <thead>
+          <tr style="background:#f3f4f6;">
+            <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #e5e7eb;">Tarih</th>
+            <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #e5e7eb;">Saat</th>
+            <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #e5e7eb;">Salon</th>
+            <th style="padding:.35rem .7rem; text-align:left; border-bottom:1px solid #e5e7eb;">Ders</th>
+            <th style="padding:.35rem .7rem; text-align:center; border-bottom:1px solid #e5e7eb;">Durum</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for oturum in yoklama_oturumlar %}
+          <tr style="border-bottom:1px solid #f3f4f6;">
+            <td style="padding:.3rem .7rem;">
+              {{ oturum.tarih|date:"d.m.Y" }}
+              <input type="hidden" name="tarih_{{ forloop.counter0 }}" value="{{ oturum.tarih|date:'Y-m-d' }}">
+            </td>
+            <td style="padding:.3rem .7rem;">
+              {{ oturum.saat }}
+              <input type="hidden" name="saat_{{ forloop.counter0 }}" value="{{ oturum.saat }}">
+            </td>
+            <td style="padding:.3rem .7rem; font-weight:600; color:#1a1a2e;">
+              {{ oturum.salon }}
+              <input type="hidden" name="salon_{{ forloop.counter0 }}" value="{{ oturum.salon }}">
+            </td>
+            <td style="padding:.3rem .7rem;">{{ oturum.ders_adi }}</td>
+            <td style="padding:.3rem .7rem; text-align:center;">
+              <select name="durum_{{ forloop.counter0 }}"
+                      style="padding:.2rem .4rem; border-radius:6px; border:1px solid #d1d5db; font-size:.8rem;">
+                <option value="mevcut" {% if oturum.durum == "mevcut" %}selected{% endif %}>Mevcut</option>
+                <option value="yok"    {% if oturum.durum == "yok"    %}selected{% endif %}>Yok</option>
+                <option value="gec"    {% if oturum.durum == "gec"    %}selected{% endif %}>Geç</option>
+              </select>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="submit" class="btn btn-primary btn-sm">Yoklamayı Kaydet</button>
+    </form>
+    {% else %}
+    <p style="font-size:.85rem; color:#6b7280;">Bu öğrencinin aktif sınavda hiç oturumu bulunamadı.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<style>
+  .mazeret-adim-no {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:1.3rem; height:1.3rem; border-radius:50%;
+    background:#4338ca; color:#fff; font-size:.72rem; font-weight:700;
+    margin-right:.3rem; vertical-align:middle;
+  }
+</style>
+{% endblock %}

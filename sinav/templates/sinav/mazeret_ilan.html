@@ -1,0 +1,85 @@
+{% extends "sinav/base.html" %}
+{% block sinav_title %}Mazeret Sınavı Takvimi{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  @media print {
+    .no-print { display:none !important; }
+    body { font-size:11pt; }
+  }
+  .rapor-baslik { text-align:center; margin-bottom:1.5rem; }
+  .rapor-baslik h1 { font-size:1.25rem; font-weight:700; margin:0 0 .2rem; }
+  .rapor-baslik p  { margin:0; font-size:.9rem; color:#555; }
+  .ilan-tablo { width:100%; border-collapse:collapse; font-size:.9rem; }
+  .ilan-tablo th {
+    background:#1e3a5f; color:#fff; padding:.55rem .8rem;
+    text-align:left; font-size:.82rem; font-weight:600;
+  }
+  .ilan-tablo td { padding:.5rem .8rem; border-bottom:1px solid #e2e8f0; vertical-align:top; }
+  .ilan-tablo tr:nth-child(even) td { background:#f8fafc; }
+  .gun-hucre { font-weight:700; color:#1e3a5f; white-space:nowrap; }
+  .ders-etiket {
+    display:inline-block; background:#dbeafe; color:#1d4ed8;
+    border-radius:3px; padding:.15rem .5rem; font-size:.78rem; margin:.1rem .2rem .1rem 0;
+  }
+  .ders-etiket.uygulama { background:#fef3c7; color:#92400e; }
+</style>
+{% endblock %}
+
+{% block sinav_content %}
+<div class="no-print" style="margin-bottom:1rem; display:flex; gap:.6rem;">
+  <a href="{% url 'sinav:mazeret_detay' mazeret.pk %}" class="btn btn-secondary btn-sm">&#8592; Plana Dön</a>
+  <button onclick="window.print()" class="btn btn-primary btn-sm">Yazdır</button>
+  <a href="{% url 'sinav:mazeret_ilan_pdf' mazeret.pk %}" class="btn btn-success btn-sm">PDF İndir</a>
+</div>
+
+<div class="rapor-baslik">
+  {% if okul %}<h1>{{ okul }}</h1>{% endif %}
+  <p>{{ mazeret.sinav }}</p>
+  {% if mazeret.aciklama %}<p>{{ mazeret.aciklama }}</p>{% endif %}
+</div>
+
+<div class="card" style="overflow-x:auto; padding:0;">
+  <table class="ilan-tablo">
+    <thead>
+      <tr>
+        <th style="width:9rem;">Tarih</th>
+        <th style="width:4.5rem;">Oturum</th>
+        <th style="width:7rem;">Saat</th>
+        <th style="width:6rem;">Tür</th>
+        <th>Dersler</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ot_veri in oturumlar_veri %}
+      <tr>
+        <td class="gun-hucre">
+          {% ifchanged ot_veri.oturum.gun.tarih %}{{ ot_veri.oturum.gun.tarih|date:"l, d F Y" }}{% endifchanged %}
+        </td>
+        <td>{{ ot_veri.oturum.oturum_no }}</td>
+        <td style="white-space:nowrap;">
+          {{ ot_veri.oturum.saat_baslangic|time:"H:i" }}–{{ ot_veri.oturum.saat_bitis|time:"H:i" }}
+        </td>
+        <td>{{ ot_veri.oturum.get_sinav_turu_display }}</td>
+        <td>
+          {% for ders in ot_veri.dersler %}
+          <span class="ders-etiket {% if ders.sinav_turu == 'Uygulama' %}uygulama{% endif %}">
+            {{ ders.ders.ders_adi }}{% if ders.sinav_turu %} ({{ ders.sinav_turu }}){% endif %}
+          </span>
+          {% empty %}
+          <span style="color:#ccc;">—</span>
+          {% endfor %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align:center; color:#aaa; padding:1.5rem;">
+          Henüz takvim oluşturulmamış.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

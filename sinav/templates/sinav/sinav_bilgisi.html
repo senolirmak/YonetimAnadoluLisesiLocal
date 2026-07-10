@@ -80,82 +80,16 @@
   </form>
 </details>
 
-<!-- ===== KAYITLI SINAVLAR ===== -->
+{% if not liste %}
 <div class="card">
-  <h2>Kayıtlı Sınavlar</h2>
-
-  {% if liste_formlar %}
-  <div class="sinav-liste">
-    {% for sinav, duzenle_form in liste_formlar %}
-
-    <div class="sinav-blok {% if sinav.aktif %}sinav-aktif{% endif %}">
-
-      <!-- Özet satır -->
-      <div class="sinav-satir">
-        <div class="sinav-satir-bilgi">
-          {% if sinav.aktif %}<span class="badge badge-done">Aktif</span>{% endif %}
-          <span class="sinav-yil">{{ sinav.egitim_ogretim_yili }}</span>
-          <span class="sinav-sep">|</span>
-          <span class="sinav-donem">{{ sinav.get_donem_display }}</span>
-          <span class="sinav-sep">|</span>
-          <span class="sinav-ad">{{ sinav.get_sinav_adi_display }}</span>
-          <span class="sinav-tarih">Başlangıç: {{ sinav.sinav_baslangic_tarihi|date:"d.m.Y" }}</span>
-          <span class="sinav-tarih">Veri: {{ sinav.eokul_veri_tarihi|date:"d.m.Y" }}</span>
-        </div>
-        <div class="sinav-satir-butonlar">
-          {% if not sinav.aktif %}
-          <form method="post" action="{% url 'sinav:sinav_bilgisi_aktif_yap' sinav.pk %}" style="display:inline">
-            {% csrf_token %}
-            <button class="btn btn-success btn-sm" type="submit">Aktif Yap</button>
-          </form>
-          {% endif %}
-          <button class="btn btn-secondary btn-sm"
-                  onclick="toggleEdit({{ sinav.pk }})" type="button">Düzenle</button>
-          {% if not sinav.aktif %}
-          <form method="post" action="{% url 'sinav:sinav_bilgisi_sil' sinav.pk %}" style="display:inline"
-                onsubmit="return confirm('{{ sinav }} silinsin mi?')">
-            {% csrf_token %}
-            <button class="btn btn-danger btn-sm" type="submit">Sil</button>
-          </form>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- Inline düzenleme paneli -->
-      <div id="edit-panel-{{ sinav.pk }}" class="sinav-edit-panel" style="display:none;">
-        <form method="post" action="{% url 'sinav:sinav_bilgisi_duzenle' sinav.pk %}">
-          {% csrf_token %}
-          <div class="grid-2" style="margin-top:.75rem;">
-            {% for field in duzenle_form %}
-            <div class="form-group">
-              {{ field.label_tag }}
-              {{ field }}
-              {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
-              {% for err in field.errors %}<span class="field-error">{{ err }}</span>{% endfor %}
-            </div>
-            {% endfor %}
-          </div>
-          <div style="display:flex; gap:.5rem; margin-top:.75rem;">
-            <button type="submit" class="btn btn-primary btn-sm">Kaydet</button>
-            <button type="button" class="btn btn-secondary btn-sm"
-                    onclick="toggleEdit({{ sinav.pk }})">İptal</button>
-          </div>
-        </form>
-      </div>
-
-    </div>
-    {% endfor %}
-  </div>
-
-  {% else %}
   <p style="color:#6b7280; font-size:.9rem;">
     Henüz sınav bilgisi eklenmedi.
     <a href="#yeni-sinav-panel" onclick="document.getElementById('yeni-sinav-panel').open=true">
       İlk sınavı ekleyin.
     </a>
   </p>
-  {% endif %}
 </div>
+{% endif %}
 
 {% if aktif_sinav %}
 
@@ -197,6 +131,14 @@
         {% if db_ozeti.takvim > 0 %}✓ {{ db_ozeti.takvim }} ders planlandı{% else %}Yapılmadı{% endif %}
       </span>
     </a>
+    <a href="{% url 'sinav:mazeret_listesi' %}" class="akis-kart">
+      <span class="akis-num">Ek İşlem</span>
+      <span class="akis-baslik">Mazeret Sınavı</span>
+      <span class="akis-aciklama">Sınava giremeyen öğrenciler için mazeret sınavı planı oluştur</span>
+      <span class="akis-durum {% if mazeret_sayisi > 0 %}durum-ok{% else %}durum-bos{% endif %}">
+        {% if mazeret_sayisi > 0 %}✓ {{ mazeret_sayisi }} plan{% else %}Oluşturulmadı{% endif %}
+      </span>
+    </a>
   </div>
 </div>
 
@@ -204,27 +146,6 @@
 
 
 <style>
-.sinav-liste { display:flex; flex-direction:column; gap:.5rem; }
-.sinav-blok {
-  border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;
-  background:#fafafa;
-}
-.sinav-blok.sinav-aktif { border-color:#16a34a; background:#f0fdf4; }
-.sinav-satir {
-  display:flex; align-items:center; justify-content:space-between;
-  flex-wrap:wrap; gap:.5rem; padding:.75rem 1rem;
-}
-.sinav-satir-bilgi { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
-.sinav-sep { color:#d1d5db; }
-.sinav-yil  { font-weight:700; color:#1a1a2e; font-size:.9rem; }
-.sinav-donem, .sinav-ad { font-size:.88rem; color:#374151; }
-.sinav-tarih { font-size:.75rem; color:#6b7280; }
-.sinav-satir-butonlar { display:flex; gap:.4rem; flex-shrink:0; }
-.sinav-edit-panel {
-  border-top:1px solid #e5e7eb; padding:.75rem 1rem 1rem;
-  background:#fff;
-}
-.btn-danger { background:#dc2626; color:#fff; }
 .okul-eksik { border-left:4px solid #dc2626; }
 .badge-warn  { background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:999px; }
 .db-grid {
@@ -255,18 +176,6 @@
 </style>
 
 <script>
-function toggleEdit(pk) {
-  const panel = document.getElementById("edit-panel-" + pk);
-  panel.style.display = panel.style.display === "none" ? "block" : "none";
-}
-
-// Form hatasi varsa ilgili paneli ac
-{% for sinav, duzenle_form in liste_formlar %}
-{% if duzenle_form.errors %}
-document.getElementById("edit-panel-{{ sinav.pk }}").style.display = "block";
-{% endif %}
-{% endfor %}
-
 // URL'de #yeni gelirse yeni ekle panelini ac
 if (window.location.hash === "#yeni-sinav-panel") {
   document.getElementById("yeni-sinav-panel").open = true;

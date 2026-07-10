@@ -155,9 +155,32 @@ class MazeretSinavForm(forms.ModelForm):
         ),
     )
 
+    max_sinav_per_gun = forms.IntegerField(
+        label="Günde Maks. Oturum Sayısı",
+        required=False,
+        min_value=1,
+        help_text=(
+            "Bir öğrencinin aynı günde girebileceği en fazla oturum sayısı. "
+            "Boş bırakılırsa sınavın genel ayarındaki değer kullanılır."
+        ),
+    )
+
+    tatil_gunleri = forms.CharField(
+        label="Tatil Günleri",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "2026-01-01\n2026-04-23"}),
+        help_text=(
+            "Her satıra bir tarih, YYYY-AA-GG formatında. Bu günlere sınav planlanmaz. "
+            "Sınavın genel tatil günlerine ek olarak uygulanır."
+        ),
+    )
+
     class Meta:
         model = MazeretSinav
-        fields = ["aciklama", "baslangic_tarihi", "oturum_saatleri"]
+        fields = [
+            "aciklama", "baslangic_tarihi", "oturum_saatleri",
+            "max_sinav_per_gun", "tatil_gunleri",
+        ]
         labels = {"aciklama": "Açıklama (opsiyonel)"}
 
     def clean_oturum_saatleri(self):
@@ -172,6 +195,20 @@ class MazeretSinavForm(forms.ModelForm):
                 f"Geçersiz saat formatı (HH:MM olmalı): {', '.join(hatali)}"
             )
         return ",".join(saatler)
+
+    def clean_tatil_gunleri(self):
+        raw = self.cleaned_data.get("tatil_gunleri", "")
+        hatali = []
+        for tok in raw.replace(",", " ").split():
+            try:
+                date.fromisoformat(tok.strip())
+            except ValueError:
+                hatali.append(tok.strip())
+        if hatali:
+            raise forms.ValidationError(
+                f"Geçersiz tarih formatı (YYYY-MM-DD olmalı): {', '.join(hatali)}"
+            )
+        return raw
 
     def clean_salon_config_text(self):
         raw = self.cleaned_data.get("salon_config_text", "")

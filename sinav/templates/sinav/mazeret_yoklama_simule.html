@@ -24,12 +24,14 @@
   .badge-var { background: #d1fae5; color: #065f46; border-radius: 4px; padding: 1px 7px; font-size: .75rem; font-weight: 600; }
   .badge-yok-var { background: #fee2e2; color: #991b1b; border-radius: 4px; padding: 1px 7px; font-size: .75rem; font-weight: 600; }
   .badge-eksik { background: #f1f5f9; color: #94a3b8; border-radius: 4px; padding: 1px 7px; font-size: .75rem; font-weight: 600; }
+  .simule-parametre-grid > .form-group { min-width: 0; }
+  .simule-parametre-grid input[type=number] { width: 100%; box-sizing: border-box; }
 </style>
 {% endblock %}
 
 {% block sinav_content %}
 <div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem;">
-  <a href="{% url 'sinav:mazeret_listesi' %}" class="btn btn-secondary btn-sm">&#8592; Mazeret Listesi</a>
+  <a href="{% url 'sinav:mazeret_yoklama' %}" class="btn btn-secondary btn-sm">&#8592; Yoklama</a>
   <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Yoklama Simülasyonu</h1>
 </div>
 
@@ -94,7 +96,7 @@
   <div class="card" style="padding:1rem 1.5rem; margin-bottom:1rem;">
     <h2 style="margin-bottom:1rem;">Simülasyon Parametreleri</h2>
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; margin-bottom:1rem;">
+    <div class="simule-parametre-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; margin-bottom:1rem;">
 
       <div class="form-group">
         <label>Devamsızlık Yüzdesi (%)</label>
