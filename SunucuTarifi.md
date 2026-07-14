@@ -38,7 +38,7 @@ rsync -av \
 
 ```bash
 sudo -u postgres psql <<EOF
-CREATE USER nobet_user WITH PASSWORD '452869Zx.c';
+CREATE USER nobet_user WITH PASSWORD 'GUCLU-BIR-SIFRE-BELIRLEYIN';
 CREATE DATABASE nobet_db OWNER nobet_user;
 GRANT ALL PRIVILEGES ON DATABASE nobet_db TO nobet_user;
 EOF
@@ -67,7 +67,7 @@ DEBUG=False
 
 DB_NAME=nobet_db
 DB_USER=nobet_user
-DB_PASSWORD=452869Zx.c
+DB_PASSWORD=GUCLU-BIR-SIFRE-BELIRLEYIN
 DB_HOST=localhost
 DB_PORT=5432
 
@@ -99,7 +99,7 @@ scp /home/senolirmak/vcodeproject/nobet_proje/backups/nobet_db_20260322_195806.d
 **Sunucuda:**
 
 ```bash
-PGPASSWORD=452869Zx.c pg_restore \
+PGPASSWORD=GUCLU-BIR-SIFRE-BELIRLEYIN pg_restore \
   -U nobet_user -h localhost -p 5432 \
   -d nobet_db --clean --if-exists \
   /opt/nobet_db.dump
@@ -219,7 +219,7 @@ sudo systemctl stop gunicorn
 ### B2. Veritabanı Yedeği Al (sunucuda, güvenlik için)
 
 ```bash
-PGPASSWORD=452869Zx.c pg_dump -Fc \
+PGPASSWORD=GUCLU-BIR-SIFRE-BELIRLEYIN pg_dump -Fc \
   -U nobet_user -h localhost -p 5432 nobet_db \
   > /opt/yedek_guncelleme_oncesi_$(date +%Y%m%d_%H%M%S).dump
 ```
