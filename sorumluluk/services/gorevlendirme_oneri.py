@@ -1,0 +1,286 @@
+"""Sorumluluk sınavı komisyon/gözetmen görevlendirmesi için otomatik dağıtım önerisi.
+
+Üretilen öneri veritabanına YAZILMAZ. `gorevlendirme` view'ı bu modülü çağırıp
+sonucu normal görevlendirme formunun (select2 dropdown'lar) ön-dolu hâli olarak
+render eder; kullanıcı inceleyip mevcut "Görevlendirmeleri Kaydet" akışıyla
+onaylar, dilerse dropdown'ları elle değiştirir ya da sayfayı yenileyip vazgeçer.
+
+Kurallar:
+  - Komisyon üyeleri (her iki üye de), dersin Ders Kataloğu'ndaki branş(lar)ı
+    ile eşleşen personel arasından, geçmiş KOMİSYON görev sayısı en düşük
+    olanlar öncelikli seçilerek adaletli dağıtılır. Branşta (Görev
+    Muafiyeti hariç tutulduktan sonra) 2'den az uygun aday kalırsa —
+    örn. FİZİK gibi az öğretmenli bir branşta çoğu kişi muaf olduğunda —
+    eksik kalan koltuk(lar) için uyarı üretilir; branş dışından otomatik
+    tamamlama YAPILMAZ, kullanıcı elle tamamlar.
+  - Gözetmen ataması branştan bağımsız bir havuzdan yapılır; geçmiş TOPLAM
+    (komisyon + gözetmen) görev sayısı en düşük olan personel öncelikli
+    seçilir. Bu karşılaştırma branşa göre normalize EDİLMEZ (aç gözlü,
+    tek-döneme özel bir branş dengelemesi yapılmaz): bir eğitim-öğretim
+    yılında sırasıyla Eylül, Şubat ve Haziran dönemleri sorumluluk sınavları
+    olacağından, "toplam görev sayısı" zaten bu sınav HARİÇ tüm geçmiş
+    sınavları (önceki dönemler + önceki yıllar) kapsıyor; adalet tek bir
+    dönemde değil, yıl genelinde birikimli olarak sağlanır.
+  - Bir personele aynı gün (tarih) yalnızca bir görev (komisyon veya gözetmen)
+    verilebilir. Yazılı/Uygulama ikilisi gibi birden çok tarihe yayılan
+    komisyon görevleri, her iki tarihte de bu kısıtı kilitler.
+  - Aynı slotta (tarih + oturum_no) bir ders farklı sınıf seviyelerinde
+    bulunuyorsa (örn. "Matematik (9. Sınıf)" ve "Matematik (10. Sınıf)" aynı
+    oturumda), bu derslerin hepsine AYNI komisyon üyeleri atanır.
+  - Ders Kataloğu'nda birden fazla branşa bağlı bir ders varsa (örn. "GÖRSEL
+    SANATLAR/MÜZİK"), komisyonun iki üyesi FARKLI branşlardan seçilir (örn.
+    biri Müzik, diğeri Görsel Sanatlar) — ikisi de aynı branştan olamaz.
+  - Görev Muafiyeti listesindeki personel hiçbir göreve (komisyon/gözetmen)
+    aday olarak dahil edilmez.
+  - "Geçmiş" görev yükü hesaplanırken bu sınavın kendi (varsa) kayıtlı
+    atamaları hariç tutulur — öneri, bu sınav için sıfırdan üretilir.
+"""
+import re
+from collections import defaultdict
+
+from okul.models import Personel
+from sorumluluk.models import (
+    OncekiDonemGorev,
+    SorumluDersKatalogu,
+    SorumluGorevMuafPersonel,
+    SorumluGozetmen,
+    SorumluKomisyonUyesi,
+)
+
+_SINIF_SUFFIX_RE = re.compile(r" \(\d+\. Sınıf\)$")
+
+
+def gercek_ders_adi(ders_adi: str) -> str:
+    """Ders Kataloğu ile eşleştirme için sınıf/Grup/Yazılı-Uygulama eklerini temizler."""
+    base = ders_adi.split(" (Grup ")[0] if " (Grup " in ders_adi else ders_adi
+    base = base.replace(" (Uygulama)", "").replace(" (Yazılı)", "")
+    m = _SINIF_SUFFIX_RE.search(base)
+    return (base[: m.start()] if m else base).strip()
+
+
+def pair_base(ders_adi: str) -> str:
+    """Yazılı/Uygulama eşleşmesi için taban ad (Grup ve Sınıf bilgisi korunur)."""
+    if ders_adi.endswith(" (Yazılı)"):
+        return ders_adi[: -len(" (Yazılı)")]
+    if ders_adi.endswith(" (Uygulama)"):
+        return ders_adi[: -len(" (Uygulama)")]
+    return ders_adi
+
+
+def komisyon_birimleri(takvim_rows):
+    """Aynı komisyon üyelerini paylaşması GEREKEN takvim satırlarını gruplar (union-find).
+
+    İki kural aynı birime (=aynı komisyon üyeleri) zorlar:
+      (a) Yazılı/Uygulama eşleşmesi: aynı ders+sınıf, farklı tarihte olabilir.
+      (b) Aynı slot (tarih+oturum_no) + aynı gerçek ders adı: farklı sınıf
+          seviyeleri aynı oturumdaysa (örn. Matematik 9 ve Matematik 10).
+    Her iki bağıntı da aynı gerçek ders adını koruduğu için, oluşan her
+    bileşendeki tüm satırlar aynı gerçek ders adına (dolayısıyla aynı branş
+    kümesine) sahiptir.
+
+    `gorevlendirme_oneri.oner_gorevlendirme()` bu gruplamayı öneri üretirken,
+    `sorumluluk.views.gorevlendirme()` ise kaydetme sırasında (kullanıcı bir
+    satırı doldurup diğerini boş bırakırsa kardeş satırlara senkronize etmek
+    için) kullanır — iki yer AYNI fonksiyonu çağırmalı, aksi halde öneri ile
+    kayıt davranışı birbirinden sapar.
+
+    Returns: list[list[SorumluTakvim]] — her alt liste bir birimin satırları.
+    """
+    n = len(takvim_rows)
+    parent = list(range(n))
+
+    def _find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def _union(a, b):
+        ra, rb = _find(a), _find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    pair_index = defaultdict(list)
+    slot_index = defaultdict(list)
+    for i, row in enumerate(takvim_rows):
+        pair_index[pair_base(row.ders_adi)].append(i)
+        slot_index[(row.tarih, row.oturum_no, gercek_ders_adi(row.ders_adi))].append(i)
+    for idxs in pair_index.values():
+        for i in idxs[1:]:
+            _union(idxs[0], i)
+    for idxs in slot_index.values():
+        for i in idxs[1:]:
+            _union(idxs[0], i)
+
+    bilesenler = defaultdict(list)
+    for i, row in enumerate(takvim_rows):
+        bilesenler[_find(i)].append(row)
+    return list(bilesenler.values())
+
+
+def _kumulatif_komisyon_baseline(sinav):
+    """Bu sınav HARİÇ tüm sınavlardaki komisyon görev sayıları (aynı ders_adi veya
+    aynı slotta birleşen atamalar tek görev sayılır — mevcut gorevlendirme() view'ı
+    ile aynı union-find mantığı)."""
+    kayitlar_by_pid = defaultdict(list)
+    for ku in SorumluKomisyonUyesi.objects.exclude(sinav=sinav):
+        for pid in (ku.uye1_id, ku.uye2_id):
+            if pid:
+                kayitlar_by_pid[pid].append((ku.sinav_id, ku.ders_adi, ku.tarih, ku.oturum_no))
+
+    baseline = defaultdict(int)
+    for pid, kayitlar in kayitlar_by_pid.items():
+        n = len(kayitlar)
+        parent = list(range(n))
+
+        def find(x):
+            while parent[x] != x:
+                x = parent[x]
+            return x
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                s_i, d_i, t_i, o_i = kayitlar[i]
+                s_j, d_j, t_j, o_j = kayitlar[j]
+                if s_i == s_j and ((t_i == t_j and o_i == o_j) or d_i == d_j):
+                    ri, rj = find(i), find(j)
+                    if ri != rj:
+                        parent[ri] = rj
+        baseline[pid] = len({find(i) for i in range(n)})
+    return baseline
+
+
+def oner_gorevlendirme(sinav, takvim_rows, active_salons):
+    """Verilen takvim satırları ve aktif salon bilgisine göre öneri üretir.
+
+    Args:
+        sinav: SorumluSinav
+        takvim_rows: SorumluTakvim listesi (tarih, oturum_no, ders_adi sıralı)
+        active_salons: {(tarih, oturum_no): {salon, ...}}
+
+    Returns:
+        {
+          "komisyon": {(tarih, oturum_no, ders_adi): SorumluKomisyonUyesi(kaydedilmemiş)},
+          "gozetmen": {(tarih, oturum_no, salon): SorumluGozetmen(kaydedilmemiş)},
+          "uyarilar": [str, ...],
+        }
+    """
+    uyarilar = []
+
+    muaf_ids = set(SorumluGorevMuafPersonel.objects.values_list("personel_id", flat=True))
+    personel_listesi = list(Personel.objects.select_related("brans").exclude(pk__in=muaf_ids))
+
+    katalog_brans = {
+        k.ders_adi: set(k.branslar.values_list("pk", flat=True))
+        for k in SorumluDersKatalogu.objects.filter(sinav=sinav).prefetch_related("branslar")
+    }
+
+    running_komisyon = defaultdict(int, _kumulatif_komisyon_baseline(sinav))
+    running_gozetmen = defaultdict(int)
+    for gz in SorumluGozetmen.objects.exclude(sinav=sinav).filter(gozetmen__isnull=False):
+        running_gozetmen[gz.gozetmen_id] += 1
+    for og in OncekiDonemGorev.objects.all():
+        running_komisyon[og.personel_id] += og.komisyon
+        running_gozetmen[og.personel_id] += og.gozetmen
+
+    def running_total(pid):
+        return running_komisyon[pid] + running_gozetmen[pid]
+
+    used_on_date = defaultdict(set)  # tarih -> {personel_id}
+
+    units = []
+    for rows in komisyon_birimleri(takvim_rows):
+        dates = {r.tarih for r in rows}
+        gercek = gercek_ders_adi(rows[0].ders_adi)
+        brans_ids = katalog_brans.get(gercek) or None
+        units.append({"rows": rows, "dates": dates, "brans_ids": brans_ids, "gercek": gercek})
+
+    def komisyon_pool(brans_ids, dates):
+        pool = []
+        for p in personel_listesi:
+            if brans_ids and p.brans_id not in brans_ids:
+                continue
+            if any(p.pk in used_on_date[d] for d in dates):
+                continue
+            pool.append(p)
+        return pool
+
+    # En kısıtlı (aday havuzu küçük / gün sayısı fazla) birimler önce işlenir
+    units.sort(key=lambda u: (len(komisyon_pool(u["brans_ids"], u["dates"])), -len(u["dates"])))
+
+    komisyon_sonuc = {}
+    for u in units:
+        if not u["brans_ids"]:
+            uyarilar.append(
+                f"\"{u['gercek']}\" dersi için Ders Kataloğu'nda branş bilgisi bulunamadı; "
+                f"komisyon üyeleri tüm personel arasından seçildi, lütfen kontrol edin."
+            )
+        pool = komisyon_pool(u["brans_ids"], u["dates"])
+        secilenler = []
+        karma_gerekli = bool(u["brans_ids"]) and len(u["brans_ids"]) >= 2
+
+        if karma_gerekli:
+            # Ders birden fazla branşa bağlı (örn. Görsel Sanatlar/Müzik): komisyonun
+            # iki üyesi FARKLI branşlardan olmalı — her branştan en az yüklü aday seçilir.
+            brans_havuzu = defaultdict(list)
+            for p in pool:
+                brans_havuzu[p.brans_id].append(p)
+            for adaylar in brans_havuzu.values():
+                adaylar.sort(key=lambda p: (running_komisyon[p.pk], running_total(p.pk), p.adi_soyadi))
+            mevcut_branslar = sorted(
+                brans_havuzu.keys(),
+                key=lambda bid: (running_komisyon[brans_havuzu[bid][0].pk], running_total(brans_havuzu[bid][0].pk)),
+            )
+            if len(mevcut_branslar) >= 2:
+                secilenler = [brans_havuzu[bid][0] for bid in mevcut_branslar[:2]]
+            else:
+                uyarilar.append(
+                    f"\"{u['gercek']}\" farklı branşlardan birer komisyon üyesi gerektiriyor, "
+                    f"ancak yalnızca bir branştan uygun aday bulunabildi — lütfen elle kontrol edin."
+                )
+
+        if not secilenler:
+            pool.sort(key=lambda p: (running_komisyon[p.pk], running_total(p.pk), p.adi_soyadi))
+            secilenler = pool[:2]
+
+        if len(secilenler) < 2:
+            uyarilar.append(
+                f"\"{u['gercek']}\" için yeterli komisyon üyesi bulunamadı "
+                f"({len(secilenler)}/2 kişi atanabildi) — lütfen elle tamamlayın."
+            )
+        uye1 = secilenler[0] if len(secilenler) > 0 else None
+        uye2 = secilenler[1] if len(secilenler) > 1 else None
+        for p in secilenler:
+            running_komisyon[p.pk] += 1
+            for d in u["dates"]:
+                used_on_date[d].add(p.pk)
+        for row in u["rows"]:
+            komisyon_sonuc[(row.tarih, row.oturum_no, row.ders_adi)] = SorumluKomisyonUyesi(
+                sinav=sinav, tarih=row.tarih, oturum_no=row.oturum_no, ders_adi=row.ders_adi,
+                uye1=uye1, uye2=uye2,
+            )
+
+    # --- Gözetmen birimleri: her (tarih, oturum_no, salon) bağımsız ---
+    gozetmen_sonuc = {}
+    gozetmen_units = sorted(
+        ((t, o, s) for (t, o), salons in active_salons.items() for s in salons),
+        key=lambda x: (x[0], x[1], x[2]),
+    )
+    for tarih, oturum_no, salon in gozetmen_units:
+        pool = [p for p in personel_listesi if p.pk not in used_on_date[tarih]]
+        secilen = None
+        if not pool:
+            uyarilar.append(
+                f"{tarih:%d.%m.%Y} Oturum {oturum_no} – {salon} için uygun gözetmen bulunamadı "
+                f"(herkes o gün başka bir görevde) — lütfen elle tamamlayın."
+            )
+        else:
+            pool.sort(key=lambda p: (running_total(p.pk), running_gozetmen[p.pk], p.adi_soyadi))
+            secilen = pool[0]
+            running_gozetmen[secilen.pk] += 1
+            used_on_date[tarih].add(secilen.pk)
+        gozetmen_sonuc[(tarih, oturum_no, salon)] = SorumluGozetmen(
+            sinav=sinav, tarih=tarih, oturum_no=oturum_no, salon=salon, gozetmen=secilen,
+        )
+
+    return {"komisyon": komisyon_sonuc, "gozetmen": gozetmen_sonuc, "uyarilar": uyarilar}

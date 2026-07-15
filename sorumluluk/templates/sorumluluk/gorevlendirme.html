@@ -70,6 +70,14 @@
      style="background:#6d28d9; color:#fff; border:none; font-size:.82rem; padding:.35rem .8rem;">
     &#128438; Görev &amp; İmza Formu
   </a>
+  <form method="post" action="{% url 'sorumluluk:gorevlendirme_oner' sinav.pk %}" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm"
+            style="background:#ea580c; color:#fff; border:none; font-size:.82rem; padding:.35rem .8rem;"
+            onclick="return confirm('Mevcut atamaların yerine, geçmiş görev yüküne göre adil bir dağıtım ÖNERİSİ üretilecek. Bu öneri kaydedilmeden önce inceleyebilir ve düzenleyebilirsiniz. Devam edilsin mi?');">
+      &#9889; Otomatik Öner
+    </button>
+  </form>
 </div>
 
 <div style="display:flex; gap:1.5rem; align-items:flex-start;">
@@ -77,12 +85,27 @@
 <!-- Sol: form (%70) -->
 <div style="flex:7; min-width:0;">
 
+{% if oneri_modu %}
+<div style="background:#fff7ed; border:1px solid #fdba74; border-radius:6px; padding:.8rem 1rem; margin-bottom:1.2rem; font-size:.85rem; color:#9a3412; display:flex; align-items:center; gap:.8rem; flex-wrap:wrap;">
+  <span style="flex:1; min-width:220px;">
+    <strong>&#9889; Bu bir ÖNERİdir, henüz kaydedilmedi.</strong>
+    Geçmiş görev yüküne ve gün/branş kısıtlarına göre otomatik oluşturuldu. Aşağıdan inceleyip
+    gerekirse dropdown'ları elle <strong>düzenleyin</strong>, uygunsa <strong>Onayla ve Kaydet</strong>'e basın,
+    ya da vazgeçmek için sayfayı <strong>yenileyin</strong>.
+  </span>
+  <a href="{% url 'sorumluluk:gorevlendirme' sinav.pk %}" class="btn btn-sm"
+     style="background:#fff; color:#9a3412; border:1px solid #fdba74; font-size:.8rem; padding:.3rem .7rem;">
+    &#10005; İptal / Vazgeç
+  </a>
+</div>
+{% else %}
 <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:.7rem 1rem; margin-bottom:1.2rem; font-size:.85rem; color:#1e40af;">
   <strong>Komisyon Üyesi:</strong> Her ders için 2 kişi &nbsp;|&nbsp;
   <strong>Gözetmen:</strong> Her aktif salon için 1 kişi
 </div>
+{% endif %}
 
-<form method="post">
+<form method="post" action="{% url 'sorumluluk:gorevlendirme' sinav.pk %}">
   {% csrf_token %}
 
   {% for ot in oturumlar %}
@@ -189,9 +212,14 @@
   {% endfor %}
 
   {% if oturumlar %}
-  <div style="display:flex; justify-content:flex-end; margin-top:1.5rem;">
+  <div style="display:flex; justify-content:flex-end; gap:.8rem; margin-top:1.5rem;">
+    {% if oneri_modu %}
+    <a href="{% url 'sorumluluk:gorevlendirme' sinav.pk %}" class="btn btn-secondary" style="padding:.65rem 1.5rem; font-size:.95rem;">
+      Vazgeç
+    </a>
+    {% endif %}
     <button type="submit" class="btn btn-success" style="padding:.65rem 2rem; font-size:.95rem;">
-      &#10003; Görevlendirmeleri Kaydet
+      {% if oneri_modu %}&#10003; Öneriyi Onayla ve Kaydet{% else %}&#10003; Görevlendirmeleri Kaydet{% endif %}
     </button>
   </div>
   {% endif %}

@@ -1,0 +1,120 @@
+{% extends "sorumluluk/base.html" %}
+{% block sor_title %}Ders Havuzu{% endblock %}
+
+{% block sor_content %}
+<div style="display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem; flex-wrap:wrap;">
+  <a href="{% url 'sorumluluk:sinav_liste' %}" class="btn btn-secondary btn-sm">&#8592; Başlangıç Paneline Dön</a>
+  <h1 style="font-size:1.3rem; font-weight:700; margin:0; color:#1a1a2e;">Ders Havuzu — {{ sinav.sinav_adi }}</h1>
+  <span class="badge badge-secondary" style="font-size:.85rem;">{{ havuz|length }} ders</span>
+</div>
+<p style="color:#64748b; font-size:.85rem; margin-top:-.5rem; margin-bottom:1.25rem;">
+  Bu liste, "Dış Veri Al (e-Okul)" adımında öğrenci verisi aktarıldığında sorumlu derslerden faydalanılarak
+  otomatik doldurulur (sınıf seviyesi ayrımı yapılmadan, sadece eksik olan dersler eklenir).
+  Sadece bilgilendirme amaçlıdır; buradan ekleme/düzenleme/silme yapmak sınav takvimini <strong>etkilemez</strong>.
+</p>
+
+<div class="card" style="padding:1.25rem; margin-bottom:1.25rem;">
+  <form method="post" style="display:flex; align-items:flex-start; gap:.75rem; flex-wrap:wrap;">
+    {% csrf_token %}
+    <div style="flex:1; min-width:220px;">
+      {{ form.ders_adi }}
+      {% if form.ders_adi.errors %}<div style="color:#dc2626; font-size:.78rem;">{{ form.ders_adi.errors|join:", " }}</div>{% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">+ Ekle</button>
+  </form>
+</div>
+
+{% if bekleyen_oneri_var %}
+<div class="card" style="padding:1rem 1.25rem; margin-bottom:1.25rem; border-left:4px solid #f59e0b; background:#fffbeb;">
+  <h3 style="font-size:.95rem; font-weight:700; color:#92400e; margin:0 0 .75rem;"><i class="fas fa-lightbulb"></i> Onay Bekleyen Branş Önerileri</h3>
+  {% for hd in havuz %}
+    {% for oneri in hd.brans_onerileri.all %}
+    <div style="display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; padding:.35rem 0;">
+      <span style="font-size:.85rem;"><strong>{{ hd.ders_adi }}</strong> → <strong>{{ oneri.brans.ad }}</strong> eklensin mi?</span>
+      <form method="post" action="{% url 'sorumluluk:havuz_brans_onerisi_onayla' oneri.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;">Onayla</button>
+      </form>
+      <form method="post" action="{% url 'sorumluluk:havuz_brans_onerisi_reddet' oneri.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">Reddet</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if bekleyen_okul_dersi_onerisi_var %}
+<div class="card" style="padding:1rem 1.25rem; margin-bottom:1.25rem; border-left:4px solid #3b82f6; background:#eff6ff;">
+  <h3 style="font-size:.95rem; font-weight:700; color:#1d4ed8; margin:0 0 .75rem;"><i class="fas fa-school"></i> Onay Bekleyen Okul Ders Havuzu Önerileri</h3>
+  <p style="font-size:.8rem; color:#475569; margin:0 0 .6rem;">
+    Bu dersler Okul Ders Havuzu'nda bulunamadı (örn. nakil öğrenci nedeniyle). Onaylarsanız Okul Ders Havuzu'na yeni kayıt olarak eklenir.
+  </p>
+  {% for hd in havuz %}
+    {% if hd.okul_dersi_onerisi %}
+    <div style="display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; padding:.35rem 0;">
+      <span style="font-size:.85rem;"><strong>{{ hd.ders_adi }}</strong> Okul Ders Havuzu'na eklensin mi?</span>
+      <form method="post" action="{% url 'sorumluluk:havuz_okul_dersi_onerisi_onayla' hd.okul_dersi_onerisi.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;">Onayla</button>
+      </form>
+      <form method="post" action="{% url 'sorumluluk:havuz_okul_dersi_onerisi_reddet' hd.okul_dersi_onerisi.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">Reddet</button>
+      </form>
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if not havuz %}
+<div class="card">
+  <p style="color:#888; text-align:center;">Henüz havuzda ders yok. "Dış Veri Al (e-Okul)" adımıyla veri aktarın veya yukarıdan elle ekleyin.</p>
+</div>
+{% else %}
+<div class="card" style="overflow-x:auto; padding:0;">
+  <table style="width:100%; border-collapse:collapse; font-size:.85rem;">
+    <thead style="background:#f1f5f9;">
+      <tr>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Ders Adı</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Okul Ders Havuzu</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Branş</th>
+        <th style="padding:.6rem .9rem; text-align:right; border-bottom:2px solid #e2e8f0;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for hd in havuz %}
+      <tr style="border-bottom:1px solid #f0f0f0;">
+        <td style="padding:.45rem .9rem; font-weight:600;">{{ hd.ders_adi }}</td>
+        <td style="padding:.45rem .9rem;">
+          {% if hd.okul_dersi %}
+            <span style="color:#15803d;"><i class="fas fa-check-circle"></i> Bağlı</span>
+          {% elif hd.okul_dersi_onerisi %}
+            <span style="color:#1d4ed8;"><i class="fas fa-hourglass-half"></i> Onay bekliyor</span>
+          {% else %}
+            <span style="color:#94a3b8;"><i class="fas fa-user-friends"></i> Nakil / harici</span>
+          {% endif %}
+        </td>
+        <td style="padding:.45rem .9rem; color:#475569;">
+          {% for b in hd.branslar.all %}
+            <span style="display:inline-block; background:#fef3c7; color:#92400e; border-radius:3px; padding:.1rem .4rem; font-size:.75rem; margin:.1rem;">{{ b.ad }}</span>
+          {% empty %}
+            <span style="color:#cbd5e1;">—</span>
+          {% endfor %}
+        </td>
+        <td style="padding:.45rem .9rem; text-align:right; white-space:nowrap;">
+          <a href="{% url 'sorumluluk:havuz_duzenle' hd.pk %}" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">Düzenle</a>
+          <form method="post" action="{% url 'sorumluluk:havuz_sil' hd.pk %}" style="display:inline;" onsubmit="return confirm('{{ hd.ders_adi }} katalogdan silinsin mi?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">Sil</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

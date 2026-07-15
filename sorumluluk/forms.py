@@ -1,10 +1,12 @@
 from django import forms
 
-from okul.models import EgitimOgretimYili, DersSaatleri
+from okul.models import Brans, EgitimOgretimYili, DersSaatleri, Personel
 from sorumluluk.models import (
     DONEM_TURU_CHOICES,
     SorumluDers,
     SorumluDersHavuzu,
+    SorumluDersKatalogu,
+    SorumluGorevMuafPersonel,
     SorumluOgrenci,
     SorumluSinav,
 )
@@ -65,6 +67,40 @@ class SorumluDersForm(forms.ModelForm):
         if ogr:
             self.fields["havuz_dersi"].queryset = SorumluDersHavuzu.objects.filter(sinav=ogr.sinav)
             self.fields["havuz_dersi"].empty_label = "— Ders Seçin —"
+
+
+class SorumluDersKatalogForm(forms.ModelForm):
+    class Meta:
+        model = SorumluDersKatalogu
+        fields = ["ders_adi", "branslar"]
+        widgets = {
+            "ders_adi": forms.TextInput(attrs={"class": _INPUT}),
+            "branslar": forms.SelectMultiple(attrs={"class": _SELECT, "size": "8"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["branslar"].queryset = Brans.objects.order_by("ad")
+        self.fields["branslar"].required = False
+
+
+class SorumluGorevMuafForm(forms.ModelForm):
+    class Meta:
+        model = SorumluGorevMuafPersonel
+        fields = ["personel", "aciklama"]
+        widgets = {
+            "personel": forms.Select(attrs={"class": _SELECT}),
+            "aciklama": forms.TextInput(attrs={
+                "class": _INPUT,
+                "placeholder": "İsteğe bağlı not (örn: idareci, raporlu vb.)",
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        muaf_ids = SorumluGorevMuafPersonel.objects.values_list("personel_id", flat=True)
+        self.fields["personel"].queryset = Personel.objects.exclude(pk__in=muaf_ids).order_by("adi_soyadi")
+        self.fields["personel"].empty_label = "— Personel Seçin —"
 
 
 class TakvimAyarForm(forms.Form):

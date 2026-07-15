@@ -1,9 +1,14 @@
 import re
+from collections import Counter, defaultdict
+
 import pandas as pd
 
 from sorumluluk.models import (
     SorumluDers,
     SorumluDersHavuzu,
+    SorumluDersKatalogBransOneri,
+    SorumluDersKatalogOkulDersOnerisi,
+    SorumluDersKatalogu,
     SorumluOgrenci,
     SorumluSinav,
 )
@@ -13,6 +18,160 @@ _BASLIK_RE = re.compile(r"(\d+)\.\s*S[ıi]n[ıi]f\s*/\s*([A-Z])\s*Şubesi", re.I
 
 def _normalize(text) -> str:
     return " ".join(str(text).split())
+
+
+def ders_brans_haritasi(ders_adlari: set[str]) -> dict[str, int]:
+    """Haftalık Ders Programı'ndaki (aktif dönem) öğretmen atamalarından
+    faydalanarak her ders adı için en sık görülen branşın id'sini bulur."""
+    from dersprogrami.models import DersProgrami
+
+    if not ders_adlari:
+        return {}
+
+    kayitlar = (
+        DersProgrami.objects.aktif()
+        .filter(ders__ders_adi__in=ders_adlari)
+        .exclude(ogretmen__brans__isnull=True)
+        .values_list("ders__ders_adi", "ogretmen__brans_id")
+    )
+    gruplu: dict = defaultdict(list)
+    for ders_adi, brans_id in kayitlar:
+        gruplu[ders_adi].append(brans_id)
+
+    return {
+        ders_adi: Counter(brans_idler).most_common(1)[0][0]
+        for ders_adi, brans_idler in gruplu.items()
+    }
+
+
+def ders_brans_adi_haritasi(ders_adlari: set[str]) -> dict[str, str]:
+    """ders_brans_haritasi ile aynı sonucu, id yerine branş adı olarak döner
+    (salt-okunur görüntüleme amaçlı — örn. Ders Havuzu ekranları)."""
+    from okul.models import Brans
+
+    id_haritasi = ders_brans_haritasi(ders_adlari)
+    if not id_haritasi:
+        return {}
+
+    brans_adlari = dict(Brans.objects.filter(pk__in=set(id_haritasi.values())).values_list("pk", "ad"))
+    return {
+        ders_adi: brans_adlari[brans_id]
+        for ders_adi, brans_id in id_haritasi.items()
+        if brans_id in brans_adlari
+    }
+
+
+def ders_brans_coklu_haritasi(ders_adlari: set[str]) -> dict[str, set[int]]:
+    """Her ders adı için, Haftalık Ders Programı'nda o dersi okutan tüm öğretmenlerin
+    branşlarını (tekrarsız) döner. Bir ders birden fazla branştan öğretmen tarafından
+    okutulabilir (örn. GÖRSEL SANATLAR/MÜZİK → Görsel Sanatlar + Müzik)."""
+    from dersprogrami.models import DersProgrami
+
+    if not ders_adlari:
+        return {}
+
+    kayitlar = (
+        DersProgrami.objects.aktif()
+        .filter(ders__ders_adi__in=ders_adlari)
+        .exclude(ogretmen__brans__isnull=True)
+        .values_list("ders__ders_adi", "ogretmen__brans_id")
+        .distinct()
+    )
+    sonuc: dict = defaultdict(set)
+    for ders_adi, brans_id in kayitlar:
+        sonuc[ders_adi].add(brans_id)
+    return dict(sonuc)
+
+
+def sorumluluk_katalog_branslarini_oner(sinav: SorumluSinav) -> int:
+    """Katalogdaki derslere, Haftalık Ders Programı'ndan tespit edilen ve henüz
+    atanmamış/önerilmemiş branşlar için onay bekleyen SorumluDersKatalogBransOneri
+    kaydı oluşturur. Branş, kullanıcı onaylamadan doğrudan derse eklenmez.
+    Oluşturulan yeni öneri sayısını döner."""
+    katalog = list(
+        SorumluDersKatalogu.objects.filter(sinav=sinav)
+        .prefetch_related("branslar", "brans_onerileri")
+    )
+    harita = ders_brans_coklu_haritasi({k.ders_adi for k in katalog})
+
+    yeni_oneriler = []
+    for k in katalog:
+        onerilen = harita.get(k.ders_adi)
+        if not onerilen:
+            continue
+        mevcut_brans_id = {b.pk for b in k.branslar.all()}
+        mevcut_oneri_id = {o.brans_id for o in k.brans_onerileri.all()}
+        eksik = onerilen - mevcut_brans_id - mevcut_oneri_id
+        for brans_id in eksik:
+            yeni_oneriler.append(SorumluDersKatalogBransOneri(katalog=k, brans_id=brans_id))
+
+    if yeni_oneriler:
+        SorumluDersKatalogBransOneri.objects.bulk_create(yeni_oneriler, ignore_conflicts=True)
+    return len(yeni_oneriler)
+
+
+def okul_dersi_haritasi(ders_adlari: set[str]) -> dict[str, int]:
+    """Ders adına göre Okul Ders Havuzu'ndaki (okul.DersHavuzu) kaydın id'sini bulur."""
+    from okul.models import DersHavuzu
+
+    if not ders_adlari:
+        return {}
+    return dict(DersHavuzu.objects.filter(ders_adi__in=ders_adlari).values_list("ders_adi", "pk"))
+
+
+def sorumluluk_katalog_okul_dersini_esle(sinav: SorumluSinav) -> int:
+    """Ders Kataloğu'ndaki, henüz Okul Ders Havuzu'na bağlanmamış derslerden adı
+    Okul Ders Havuzu'nda birebir bulunanları doğrudan bağlar (isim eşleşmesi net
+    olduğu için onay gerektirmez). Bağlanan ders sayısını döner."""
+    bagsiz = list(SorumluDersKatalogu.objects.filter(sinav=sinav, okul_dersi__isnull=True))
+    if not bagsiz:
+        return 0
+
+    harita = okul_dersi_haritasi({k.ders_adi for k in bagsiz})
+    guncellenecek = []
+    for k in bagsiz:
+        okul_dersi_id = harita.get(k.ders_adi)
+        if okul_dersi_id:
+            k.okul_dersi_id = okul_dersi_id
+            guncellenecek.append(k)
+
+    if guncellenecek:
+        SorumluDersKatalogu.objects.bulk_update(guncellenecek, ["okul_dersi_id"])
+    return len(guncellenecek)
+
+
+def sorumluluk_katalog_okul_dersi_onerilerini_olustur(sinav: SorumluSinav) -> int:
+    """Ders Kataloğu'ndaki, Okul Ders Havuzu'nda karşılığı bulunamayan (örn. nakil
+    öğrenci) dersler için, Okul Ders Havuzu'na yeni kayıt açılması amacıyla onay
+    bekleyen SorumluDersKatalogOkulDersOnerisi kaydı oluşturur. Okul Ders Havuzu'na
+    doğrudan ekleme yapılmaz. Oluşturulan yeni öneri sayısını döner."""
+    adaylar = (
+        SorumluDersKatalogu.objects.filter(sinav=sinav, okul_dersi__isnull=True)
+        .exclude(okul_dersi_onerisi__isnull=False)
+    )
+    yeni_oneriler = [SorumluDersKatalogOkulDersOnerisi(katalog=k) for k in adaylar]
+    if yeni_oneriler:
+        SorumluDersKatalogOkulDersOnerisi.objects.bulk_create(yeni_oneriler, ignore_conflicts=True)
+    return len(yeni_oneriler)
+
+
+def sorumluluk_brans_bilgisi_guncelle(sinav: SorumluSinav) -> int:
+    """Var olan SorumluDersHavuzu kayıtları için branş bilgisini Haftalık Ders
+    Programı'ndan yeniden hesaplar (ders programı güncellendiğinde tekrar
+    çalıştırılabilir). Güncellenen kayıt sayısını döner."""
+    havuzlar = list(SorumluDersHavuzu.objects.filter(sinav=sinav))
+    harita = ders_brans_haritasi({h.ders_adi for h in havuzlar})
+
+    guncellenecek = []
+    for h in havuzlar:
+        yeni_brans_id = harita.get(h.ders_adi)
+        if h.brans_id != yeni_brans_id:
+            h.brans_id = yeni_brans_id
+            guncellenecek.append(h)
+
+    if guncellenecek:
+        SorumluDersHavuzu.objects.bulk_update(guncellenecek, ["brans_id"])
+    return len(guncellenecek)
 
 
 def sorumluluk_excel_aktar(dosya_yolu: str, sinav: SorumluSinav) -> dict:
@@ -104,11 +263,36 @@ def sorumluluk_excel_aktar(dosya_yolu: str, sinav: SorumluSinav) -> dict:
         for d in veri["dersler"]:
             ders_havuzu_set.add(d)
 
+    brans_harita = ders_brans_haritasi({d_adi for d_adi, _ in ders_havuzu_set})
     havuz_kayitlari = [
-        SorumluDersHavuzu(sinav=sinav, ders_adi=d_adi, onceki_sinif=d_sinif)
+        SorumluDersHavuzu(
+            sinav=sinav, ders_adi=d_adi, onceki_sinif=d_sinif,
+            brans_id=brans_harita.get(d_adi),
+        )
         for d_adi, d_sinif in ders_havuzu_set
     ]
     SorumluDersHavuzu.objects.bulk_create(havuz_kayitlari, ignore_conflicts=True)
+
+    # Bilgilendirme amaçlı ders kataloğu: sınıf seviyesinden bağımsız, sadece
+    # ekleme yapılır (mevcut/elle silinmiş kayıtlar korunur; takvim algoritmasını etkilemez).
+    katalog_ders_adlari = {d_adi for d_adi, _ in ders_havuzu_set}
+    mevcut_katalog_adlari = set(
+        SorumluDersKatalogu.objects.filter(sinav=sinav).values_list("ders_adi", flat=True)
+    )
+    eksik_katalog_adlari = katalog_ders_adlari - mevcut_katalog_adlari
+    okul_dersi_harita = okul_dersi_haritasi(eksik_katalog_adlari)
+    yeni_katalog_kayitlari = [
+        SorumluDersKatalogu(sinav=sinav, ders_adi=d_adi, okul_dersi_id=okul_dersi_harita.get(d_adi))
+        for d_adi in eksik_katalog_adlari
+    ]
+    if yeni_katalog_kayitlari:
+        SorumluDersKatalogu.objects.bulk_create(yeni_katalog_kayitlari, ignore_conflicts=True)
+
+    # Ders adı Okul Ders Havuzu'nda birebir varsa doğrudan bağla (net eşleşme, onay gerekmez);
+    # bulunamayan (örn. nakil öğrenci) dersler için Okul Ders Havuzu'na ekleme önerisi oluştur.
+    sorumluluk_katalog_okul_dersini_esle(sinav)
+    sorumluluk_katalog_okul_dersi_onerilerini_olustur(sinav)
+    sorumluluk_katalog_branslarini_oner(sinav)
 
     # 2. Eklenen havuz derslerini daha sonra ForeignKey olarak atamak için DB'den çekelim
     havuz_dict = {

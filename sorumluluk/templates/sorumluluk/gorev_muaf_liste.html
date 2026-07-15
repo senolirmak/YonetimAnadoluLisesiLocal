@@ -1,0 +1,61 @@
+{% extends "sorumluluk/base.html" %}
+{% block sor_title %}Görev Muafiyeti{% endblock %}
+
+{% block sor_content %}
+<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+  <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Görev Muafiyeti</h1>
+  <span class="badge badge-secondary" style="font-size:.85rem;">{{ muaf_liste|length }} personel</span>
+</div>
+<p style="color:#64748b; font-size:.85rem; margin-top:-.5rem; margin-bottom:1.25rem;">
+  Bu listeye eklenen personel, sorumluluk sınavlarının Görevlendirme sayfasında komisyon üyesi
+  veya gözetmen olarak seçilemez.
+</p>
+
+<div class="card" style="padding:1.25rem; margin-bottom:1.25rem;">
+  <form method="post" style="display:flex; align-items:flex-start; gap:.75rem; flex-wrap:wrap;">
+    {% csrf_token %}
+    <div>
+      {{ form.personel }}
+      {% if form.personel.errors %}<div style="color:#dc2626; font-size:.78rem;">{{ form.personel.errors|join:", " }}</div>{% endif %}
+    </div>
+    <div style="flex:1; min-width:220px;">
+      {{ form.aciklama }}
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">+ Ekle</button>
+  </form>
+</div>
+
+{% if not muaf_liste %}
+<div class="card">
+  <p style="color:#888; text-align:center;">Henüz görev muafiyeti tanımlanmamış.</p>
+</div>
+{% else %}
+<div class="card" style="overflow-x:auto; padding:0;">
+  <table style="width:100%; border-collapse:collapse; font-size:.85rem;">
+    <thead style="background:#f1f5f9;">
+      <tr>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Adı Soyadı</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Branş</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Açıklama</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in muaf_liste %}
+      <tr style="border-bottom:1px solid #f0f0f0;">
+        <td style="padding:.45rem .9rem; font-weight:600;">{{ m.personel.adi_soyadi }}</td>
+        <td style="padding:.45rem .9rem; color:#475569;">{{ m.personel.brans.ad|default:"" }}</td>
+        <td style="padding:.45rem .9rem; color:#475569;">{{ m.aciklama|default:"—" }}</td>
+        <td style="padding:.45rem .9rem; text-align:right;">
+          <form method="post" action="{% url 'sorumluluk:gorev_muaf_sil' m.pk %}" onsubmit="return confirm('{{ m.personel.adi_soyadi }} için görev muafiyeti kaldırılsın mı?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">Kaldır</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

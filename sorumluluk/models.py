@@ -38,6 +38,8 @@ class SorumluSinav(models.Model):
     olusturma_tarihi = models.DateTimeField(auto_now_add=True)
     onaylandi        = models.BooleanField(default=False, verbose_name="Onaylandı")
     onay_tarihi      = models.DateTimeField(null=True, blank=True, verbose_name="Onay Tarihi")
+    arsivlendi       = models.BooleanField(default=False, verbose_name="Arşivlendi")
+    arsivlenme_tarihi = models.DateTimeField(null=True, blank=True, verbose_name="Arşivlenme Tarihi")
 
     class Meta:
         ordering = ["-olusturma_tarihi"]
@@ -48,6 +50,24 @@ class SorumluSinav(models.Model):
         egitim = str(self.egitim_yili) if self.egitim_yili_id else ""
         donem  = self.get_donem_turu_display()
         return f"{self.sinav_adi} ({egitim} {donem})".strip()
+
+    def gorevlendirme_yapilmis_mi(self) -> bool:
+        """Sınava ait en az bir komisyon üyesi veya gözetmen görevlendirmesi yapılmış mı?"""
+        from django.db.models import Q
+        return (
+            self.komisyon_uyeler.filter(Q(uye1__isnull=False) | Q(uye2__isnull=False)).exists()
+            or self.gozetmenler.filter(gozetmen__isnull=False).exists()
+        )
+
+    def arsivlenebilir_mi(self) -> bool:
+        """'Arşivle' işlemi için uygun mu: onaylanmış ve görevlendirmesi yapılmış,
+        henüz arşivlenmemiş olmalı."""
+        return self.onaylandi and not self.arsivlendi and self.gorevlendirme_yapilmis_mi()
+
+    def silinebilir_mi(self) -> bool:
+        """Arşivlenmiş sınavlar silinemez; arşivlenmemiş sınavlar (taslak, onaylı
+        ama henüz arşivlenmemiş vb.) silinebilir."""
+        return not self.arsivlendi
 
 
 class SorumluSinavParametre(models.Model):
@@ -118,6 +138,12 @@ class SorumluDersHavuzu(models.Model):
     onceki_sinif = models.PositiveSmallIntegerField(
         null=True, blank=True, verbose_name="Sınıf Seviyesi",
     )
+    brans        = models.ForeignKey(
+        "okul.Brans", on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="sorumluluk_ders_havuzu", verbose_name="Branş",
+        help_text="Haftalık Ders Programı'ndaki öğretmen atamalarından otomatik belirlenir.",
+    )
 
     class Meta:
         ordering = ["onceki_sinif", "ders_adi"]
@@ -127,6 +153,101 @@ class SorumluDersHavuzu(models.Model):
 
     def __str__(self):
         return f"{self.ders_adi} ({self.onceki_sinif}. Sınıf)"
+
+
+class SorumluDersKatalogu(models.Model):
+    """Sınava ait, sınıf seviyesinden bağımsız bilgilendirme amaçlı ders adı listesi.
+
+    e-Okul verisi çekildiğinde öğrencilerin sorumlu derslerinden faydalanılarak
+    otomatik doldurulur (sadece ekleme yapılır, mevcut kayıt silinmez).
+    SorumluDersHavuzu / SorumluDers ile hiçbir FK ilişkisi yoktur; bu nedenle
+    buradan bir dersin silinmesi sınav planlamasını (takvim algoritmasını) etkilemez.
+    """
+    sinav      = models.ForeignKey(
+        SorumluSinav, on_delete=models.CASCADE,
+        related_name="ders_katalogu", verbose_name="Sınav",
+    )
+    okul_dersi = models.ForeignKey(
+        "okul.DersHavuzu", on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="sorumluluk_ders_katalogu", verbose_name="Okul Ders Havuzu Kaydı",
+        help_text=(
+            "Ders adı, Okul Ders Havuzu'ndaki bir kayıtla eşleşiyorsa otomatik bağlanır. "
+            "Nakil öğrenci nedeniyle Okul Ders Havuzu'nda karşılığı olmayan dersler boş "
+            "kalabilir (bkz. Okul Ders Havuzu Önerileri)."
+        ),
+    )
+    ders_adi   = models.CharField(max_length=200, verbose_name="Ders Adı")
+    branslar   = models.ManyToManyField(
+        "okul.Brans", blank=True,
+        related_name="sorumluluk_ders_katalogu", verbose_name="Branşlar",
+        help_text=(
+            "Haftalık Ders Programı'ndaki öğretmen atamalarından tespit edilen yeni "
+            "branş eşleşmeleri, doğrudan eklenmeden önce onayınıza sunulur (bkz. Branş "
+            "Önerileri). Buradan elle de ekleyip çıkarabilirsiniz. Bazı dersler (örn. "
+            "GÖRSEL SANATLAR/MÜZİK) birden fazla branştan öğretmen tarafından okutulabilir."
+        ),
+    )
+
+    class Meta:
+        ordering = ["ders_adi"]
+        unique_together = [("sinav", "ders_adi")]
+        verbose_name = "Ders Kataloğu"
+        verbose_name_plural = "Ders Kataloğu"
+
+    def __str__(self):
+        return self.ders_adi
+
+
+class SorumluDersKatalogBransOneri(models.Model):
+    """Ders Kataloğu'ndaki bir derse, Haftalık Ders Programı'ndan tespit edilen ancak
+    henüz kullanıcı tarafından onaylanmamış branş önerisi.
+
+    Onaylanınca ilgili branş SorumluDersKatalogu.branslar'a eklenir ve bu kayıt silinir.
+    Reddedilirse sadece bu kayıt silinir (branş eklenmez); sonraki bir e-Okul
+    aktarımında ders programı hâlâ aynı eşleşmeyi gösteriyorsa öneri yeniden oluşabilir.
+    """
+    katalog = models.ForeignKey(
+        SorumluDersKatalogu, on_delete=models.CASCADE,
+        related_name="brans_onerileri", verbose_name="Ders",
+    )
+    brans = models.ForeignKey(
+        "okul.Brans", on_delete=models.CASCADE,
+        related_name="+", verbose_name="Önerilen Branş",
+    )
+    olusturma_tarihi = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("katalog", "brans")]
+        ordering = ["katalog__ders_adi"]
+        verbose_name = "Branş Önerisi"
+        verbose_name_plural = "Branş Önerileri"
+
+    def __str__(self):
+        return f"{self.katalog.ders_adi} → {self.brans.ad} (onay bekliyor)"
+
+
+class SorumluDersKatalogOkulDersOnerisi(models.Model):
+    """Ders Kataloğu'ndaki, Okul Ders Havuzu'nda karşılığı bulunamayan (örn. nakil
+    öğrenci nedeniyle) bir dersin Okul Ders Havuzu'na eklenmesi için onay bekleyen öneri.
+
+    Onaylanınca okul.DersHavuzu'na yeni kayıt açılır ve SorumluDersKatalogu.okul_dersi
+    bu kayda bağlanır; reddedilirse sadece bu öneri kaydı silinir (ders katalogda
+    serbest metin ders_adi ile, Okul Ders Havuzu'na bağlanmadan kalmaya devam eder).
+    """
+    katalog = models.OneToOneField(
+        SorumluDersKatalogu, on_delete=models.CASCADE,
+        related_name="okul_dersi_onerisi", verbose_name="Ders",
+    )
+    olusturma_tarihi = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["katalog__ders_adi"]
+        verbose_name = "Okul Ders Havuzu Önerisi"
+        verbose_name_plural = "Okul Ders Havuzu Önerileri"
+
+    def __str__(self):
+        return f"{self.katalog.ders_adi} → Okul Ders Havuzu'na eklensin (onay bekliyor)"
 
 
 class SorumluDers(models.Model):
@@ -334,3 +455,24 @@ class OncekiDonemGorev(models.Model):
 
     def __str__(self):
         return f"{self.donem} — {self.personel}: K={self.komisyon} G={self.gozetmen}"
+
+
+class SorumluGorevMuafPersonel(models.Model):
+    """Sorumluluk sınavlarında komisyon/gözetmen görevi verilmeyecek personel listesi.
+
+    Tüm sorumluluk sınavları için geçerlidir (sınava özgü değildir).
+    """
+    personel = models.OneToOneField(
+        "okul.Personel", on_delete=models.CASCADE,
+        related_name="sorumluluk_gorev_muafiyeti", verbose_name="Personel",
+    )
+    aciklama = models.CharField(max_length=300, blank=True, verbose_name="Açıklama")
+    eklenme_tarihi = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["personel__adi_soyadi"]
+        verbose_name = "Görev Muafiyeti"
+        verbose_name_plural = "Görev Muafiyetleri"
+
+    def __str__(self):
+        return f"{self.personel} — Görev Muaf"

@@ -11,6 +11,7 @@ urlpatterns = [
     path("<int:pk>/",     views.sinav_detay,   name="sinav_detay"),
     path("<int:pk>/duzenle/", views.sinav_duzenle, name="sinav_duzenle"),
     path("<int:pk>/sil/", views.sinav_sil,     name="sinav_sil"),
+    path("<int:pk>/arsivle/", views.sinav_arsivle, name="sinav_arsivle"),
 
     # Öğrenci yönetimi (sınava özgü)
     path("<int:sinav_pk>/ogrenciler/",        views.ogr_liste,  name="ogr_liste"),
@@ -24,8 +25,21 @@ urlpatterns = [
     path("ders/<int:pk>/duzenle/",            views.ogr_ders_duzenle,  name="ogr_ders_duzenle"),
     path("ders/<int:pk>/sil/",               views.ogr_ders_sil,      name="ogr_ders_sil"),
 
+    # Ders Havuzu (sınava özgü)
+    path("<int:sinav_pk>/havuz/",           views.havuz_liste,   name="havuz_liste"),
+    path("havuz/<int:pk>/duzenle/",         views.havuz_duzenle, name="havuz_duzenle"),
+    path("havuz/<int:pk>/sil/",             views.havuz_sil,     name="havuz_sil"),
+    path("havuz/brans-onerisi/<int:pk>/onayla/", views.havuz_brans_onerisi_onayla, name="havuz_brans_onerisi_onayla"),
+    path("havuz/brans-onerisi/<int:pk>/reddet/", views.havuz_brans_onerisi_reddet, name="havuz_brans_onerisi_reddet"),
+    path("havuz/okul-dersi-onerisi/<int:pk>/onayla/", views.havuz_okul_dersi_onerisi_onayla, name="havuz_okul_dersi_onerisi_onayla"),
+    path("havuz/okul-dersi-onerisi/<int:pk>/reddet/", views.havuz_okul_dersi_onerisi_reddet, name="havuz_okul_dersi_onerisi_reddet"),
+
     # Öğretmen Görev Özeti
     path("ogretmen-raporu/", views.ogretmen_gorev_ozeti, name="ogretmen_gorev_ozeti"),
+
+    # Görev Muafiyeti (komisyon/gözetmen görevi verilmeyecek personel)
+    path("gorev-muafiyeti/",              views.gorev_muaf_liste, name="gorev_muaf_liste"),
+    path("gorev-muafiyeti/<int:pk>/sil/", views.gorev_muaf_sil,   name="gorev_muaf_sil"),
 
 
     # Takvim tarih güncelleme
@@ -33,6 +47,7 @@ urlpatterns = [
 
     # Görevlendirme
     path("<int:sinav_pk>/gorevlendirme/",                    views.gorevlendirme,               name="gorevlendirme"),
+    path("<int:sinav_pk>/gorevlendirme/oner/",                views.gorevlendirme_oner,          name="gorevlendirme_oner"),
     path("<int:sinav_pk>/gorevlendirme/pdf/",                views.gorevlendirme_pdf,          name="gorevlendirme_pdf"),
     path("<int:sinav_pk>/gorevlendirme/ogretmen-gorev-pdf/", views.ogretmen_gorev_raporu_pdf, name="ogretmen_gorev_raporu_pdf"),
     path("<int:sinav_pk>/gorevlendirme/ogretmen-imza-pdf/",  views.ogretmen_gorev_imza_pdf,   name="ogretmen_gorev_imza_pdf"),

@@ -14,6 +14,8 @@ from django.views.decorators.http import require_POST
 from okul.models import OkulBilgi
 from sorumluluk.forms import (
     SorumluDersForm,
+    SorumluDersKatalogForm,
+    SorumluGorevMuafForm,
     SorumluOgrenciForm,
     SorumluSinavForm,
     TakvimAyarForm,
@@ -24,6 +26,10 @@ from sorumluluk.models import (
     SALON_SAYISI,
     SorumluDers,
     SorumluDersHavuzu,
+    SorumluDersKatalogBransOneri,
+    SorumluDersKatalogOkulDersOnerisi,
+    SorumluDersKatalogu,
+    SorumluGorevMuafPersonel,
     SorumluGozetmen,
     SorumluKomisyonUyesi,
     SorumluOgrenci,
@@ -32,8 +38,9 @@ from sorumluluk.models import (
     SorumluSinavParametre,
     SorumluTakvim,
 )
+from sorumluluk.services.gorevlendirme_oneri import komisyon_birimleri, oner_gorevlendirme
 from sorumluluk.services.import_service import sorumluluk_excel_aktar
-from sorumluluk.services.takvim_motoru import DjangoSinavTakvimiMotoru
+from sorumluluk.services.takvim_motoru_ga import DjangoSinavTakvimiMotoruGA as DjangoSinavTakvimiMotoru
 from sorumluluk.services.takvim_service import oturma_plani_olustur
 
 
@@ -42,7 +49,16 @@ from sorumluluk.services.takvim_service import oturma_plani_olustur
 @ust_yonetici_required
 def sinav_liste(request):
     sinavlar = SorumluSinav.objects.select_related("egitim_yili").all()
-    aktif_sinav = sinavlar.first()
+    onaylanan_sinavlar = sinavlar.filter(onaylandi=True)
+
+    secili_pk = request.GET.get("sinav")
+    aktif_sinav = None
+    secili_mi = False
+    if secili_pk:
+        aktif_sinav = onaylanan_sinavlar.filter(pk=secili_pk).first()
+        secili_mi = aktif_sinav is not None
+    if aktif_sinav is None:
+        aktif_sinav = sinavlar.first()
 
     stats = {}
     if aktif_sinav:
@@ -53,13 +69,12 @@ def sinav_liste(request):
                            .values_list("tarih", "oturum_no").distinct().count(),
         }
 
-    onaylanan_sinavlar = sinavlar.filter(onaylandi=True)
-
     return render(request, "sorumluluk/sinav_liste.html", {
         "sinavlar": sinavlar,
         "aktif_sinav": aktif_sinav,
         "stats": stats,
         "onaylanan_sinavlar": onaylanan_sinavlar,
+        "secili_mi": secili_mi,
     })
 
 
@@ -114,8 +129,29 @@ def sinav_detay(request, pk):
 @require_POST
 def sinav_sil(request, pk):
     sinav = get_object_or_404(SorumluSinav, pk=pk)
+    if not sinav.silinebilir_mi():
+        messages.error(request, f"\"{sinav.sinav_adi}\" arşivlenmiş olduğu için silinemez.")
+        return redirect("sorumluluk:sinav_liste")
     sinav.delete()
     messages.success(request, "Sınav silindi.")
+    return redirect("sorumluluk:sinav_liste")
+
+
+@ust_yonetici_required
+@require_POST
+def sinav_arsivle(request, pk):
+    sinav = get_object_or_404(SorumluSinav, pk=pk)
+    if not sinav.arsivlenebilir_mi():
+        messages.error(
+            request,
+            f"\"{sinav.sinav_adi}\" arşivlenemedi: sınav onaylanmış ve en az bir "
+            "komisyon/gözetmen görevlendirmesi yapılmış olmalı.",
+        )
+        return redirect("sorumluluk:sinav_liste")
+    sinav.arsivlendi = True
+    sinav.arsivlenme_tarihi = timezone.now()
+    sinav.save(update_fields=["arsivlendi", "arsivlenme_tarihi"])
+    messages.success(request, f"\"{sinav.sinav_adi}\" arşivlendi.")
     return redirect("sorumluluk:sinav_liste")
 
 
@@ -243,6 +279,112 @@ def ogr_ders_sil(request, pk):
     ders.delete()
     messages.success(request, "Ders silindi.")
     return redirect("sorumluluk:ogr_liste", sinav_pk=sinav_pk)
+
+
+# ─── Ders Havuzu (bilgilendirme amaçlı katalog — sınav planlamasını etkilemez) ──
+
+@ust_yonetici_required
+def havuz_liste(request, sinav_pk):
+    sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
+    havuz = (
+        SorumluDersKatalogu.objects.filter(sinav=sinav)
+        .select_related("okul_dersi", "okul_dersi_onerisi")
+        .prefetch_related("branslar", "brans_onerileri__brans")
+        .order_by("ders_adi")
+    )
+    form = SorumluDersKatalogForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        hd = form.save(commit=False)
+        hd.sinav = sinav
+        try:
+            hd.save()
+            form.save_m2m()
+            messages.success(request, "Ders katalog listesine eklendi.")
+            return redirect("sorumluluk:havuz_liste", sinav_pk=sinav_pk)
+        except IntegrityError:
+            form.add_error("ders_adi", "Bu ders katalogda zaten kayıtlı.")
+
+    bekleyen_brans_onerisi_var = any(hd.brans_onerileri.all() for hd in havuz)
+    bekleyen_okul_dersi_onerisi_var = any(
+        getattr(hd, "okul_dersi_onerisi", None) for hd in havuz
+    )
+    return render(request, "sorumluluk/havuz_liste.html", {
+        "sinav": sinav, "havuz": havuz, "form": form,
+        "bekleyen_oneri_var": bekleyen_brans_onerisi_var,
+        "bekleyen_okul_dersi_onerisi_var": bekleyen_okul_dersi_onerisi_var,
+    })
+
+
+@ust_yonetici_required
+def havuz_duzenle(request, pk):
+    hd = get_object_or_404(SorumluDersKatalogu, pk=pk)
+    form = SorumluDersKatalogForm(request.POST or None, instance=hd)
+    if request.method == "POST" and form.is_valid():
+        try:
+            form.save()
+            messages.success(request, "Ders güncellendi.")
+            return redirect("sorumluluk:havuz_liste", sinav_pk=hd.sinav_id)
+        except IntegrityError:
+            form.add_error("ders_adi", "Bu ders katalogda zaten kayıtlı.")
+    return render(request, "sorumluluk/havuz_form.html", {
+        "form": form, "sinav": hd.sinav, "baslik": "Katalog Dersini Düzenle", "hd": hd,
+    })
+
+
+@ust_yonetici_required
+@require_POST
+def havuz_sil(request, pk):
+    hd = get_object_or_404(SorumluDersKatalogu, pk=pk)
+    sinav_pk = hd.sinav_id
+    hd.delete()
+    messages.success(request, "Ders katalogdan silindi. Sınav planlaması bundan etkilenmez.")
+    return redirect("sorumluluk:havuz_liste", sinav_pk=sinav_pk)
+
+
+@ust_yonetici_required
+@require_POST
+def havuz_brans_onerisi_onayla(request, pk):
+    oneri = get_object_or_404(SorumluDersKatalogBransOneri, pk=pk)
+    katalog, brans, sinav_pk = oneri.katalog, oneri.brans, oneri.katalog.sinav_id
+    katalog.branslar.add(brans)
+    oneri.delete()
+    messages.success(request, f"\"{katalog.ders_adi}\" dersine \"{brans.ad}\" branşı eklendi.")
+    return redirect("sorumluluk:havuz_liste", sinav_pk=sinav_pk)
+
+
+@ust_yonetici_required
+@require_POST
+def havuz_brans_onerisi_reddet(request, pk):
+    oneri = get_object_or_404(SorumluDersKatalogBransOneri, pk=pk)
+    sinav_pk = oneri.katalog.sinav_id
+    oneri.delete()
+    messages.success(request, "Branş önerisi reddedildi.")
+    return redirect("sorumluluk:havuz_liste", sinav_pk=sinav_pk)
+
+
+@ust_yonetici_required
+@require_POST
+def havuz_okul_dersi_onerisi_onayla(request, pk):
+    from okul.models import DersHavuzu
+
+    oneri = get_object_or_404(SorumluDersKatalogOkulDersOnerisi, pk=pk)
+    katalog, sinav_pk = oneri.katalog, oneri.katalog.sinav_id
+    yeni_ders, _ = DersHavuzu.objects.get_or_create(ders_adi=katalog.ders_adi)
+    katalog.okul_dersi = yeni_ders
+    katalog.save(update_fields=["okul_dersi"])
+    oneri.delete()
+    messages.success(request, f"\"{katalog.ders_adi}\" Okul Ders Havuzu'na eklendi.")
+    return redirect("sorumluluk:havuz_liste", sinav_pk=sinav_pk)
+
+
+@ust_yonetici_required
+@require_POST
+def havuz_okul_dersi_onerisi_reddet(request, pk):
+    oneri = get_object_or_404(SorumluDersKatalogOkulDersOnerisi, pk=pk)
+    sinav_pk = oneri.katalog.sinav_id
+    oneri.delete()
+    messages.success(request, "Okul Ders Havuzu önerisi reddedildi.")
+    return redirect("sorumluluk:havuz_liste", sinav_pk=sinav_pk)
 
 
 # ─── Takvim ────────────────────────────────────────────────────────────────────
@@ -707,6 +849,34 @@ def takvim_oturum_tarihi_guncelle(request, sinav_pk):
     return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
 
 
+# ─── Görev Muafiyeti ───────────────────────────────────────────────────────────
+
+@ust_yonetici_required
+def gorev_muaf_liste(request):
+    muaf_liste = (
+        SorumluGorevMuafPersonel.objects
+        .select_related("personel", "personel__brans")
+        .order_by("personel__adi_soyadi")
+    )
+    form = SorumluGorevMuafForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Personel görev muafiyeti listesine eklendi.")
+        return redirect("sorumluluk:gorev_muaf_liste")
+    return render(request, "sorumluluk/gorev_muaf_liste.html", {
+        "muaf_liste": muaf_liste, "form": form,
+    })
+
+
+@ust_yonetici_required
+@require_POST
+def gorev_muaf_sil(request, pk):
+    kayit = get_object_or_404(SorumluGorevMuafPersonel, pk=pk)
+    kayit.delete()
+    messages.success(request, "Muafiyet kaldırıldı.")
+    return redirect("sorumluluk:gorev_muaf_liste")
+
+
 @ust_yonetici_required
 def gorevlendirme(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
@@ -745,13 +915,25 @@ def gorevlendirme(request, sinav_pk):
     if request.method == "POST":
         from okul.models import Personel
 
+        muaf_ids = set(SorumluGorevMuafPersonel.objects.values_list("personel_id", flat=True))
+        muaf_secim_sayisi = 0
+
         def get_personel(field_name):
+            nonlocal muaf_secim_sayisi
             val = request.POST.get(field_name, "").strip()
             if val:
                 try:
-                    return Personel.objects.get(pk=int(val))
+                    personel = Personel.objects.get(pk=int(val))
                 except (Personel.DoesNotExist, ValueError):
-                    pass
+                    return None
+                if personel.pk in muaf_ids:
+                    # Görev Muafiyeti listesindeki personele hiçbir görev (komisyon/gözetmen)
+                    # verilemez — dropdown seçenekleri arasında görünmez, ama form tampering'e
+                    # veya seçim yapıldıktan sonra muafiyet eklenmesine karşı sunucu tarafında
+                    # da reddedilir.
+                    muaf_secim_sayisi += 1
+                    return None
+                return personel
             return None
 
         for row in takvim_rows:
@@ -763,38 +945,32 @@ def gorevlendirme(request, sinav_pk):
                 },
             )
 
-        # Çift oturumlu sınav komisyon senkronizasyonu:
-        # Yazılı veya Uygulama kısmına atama yapılmışsa, diğer kısım(lar) otomatik doldurulur.
+        # Komisyon senkronizasyonu: aynı birime (Yazılı/Uygulama ikilisi VEYA aynı
+        # slotta farklı sınıf seviyesindeki aynı ders — bkz. komisyon_birimleri())
+        # ait satırlar AYNI komisyon üyelerini paylaşmalı. Kullanıcı bu satırlardan
+        # birini (tam) doldurup diğerini boş/eksik bırakabilir; en TAM doldurulmuş
+        # satır o birim için "doğru" kabul edilip diğer satırlara kopyalanır.
         komisyon_map_fresh = {
             (ku.tarih, ku.oturum_no, ku.ders_adi): ku
             for ku in SorumluKomisyonUyesi.objects.filter(sinav=sinav).select_related("uye1", "uye2")
         }
-        from collections import defaultdict as _dd
-        cift_gruplar = _dd(list)
-        for row in takvim_rows:
-            ders = row.ders_adi
-            if ders.endswith(" (Yazılı)"):
-                base = ders[:-9]
-            elif ders.endswith(" (Uygulama)"):
-                base = ders[:-11]
-            else:
+        for rows in komisyon_birimleri(takvim_rows):
+            if len(rows) < 2:
                 continue
-            cift_gruplar[base].append(row)
-        for base, rows in cift_gruplar.items():
-            source_ku = None
+            en_dolu_ku, en_dolu_puan = None, -1
             for row in rows:
                 ku = komisyon_map_fresh.get((row.tarih, row.oturum_no, row.ders_adi))
-                if ku and (ku.uye1_id or ku.uye2_id):
-                    source_ku = ku
-                    break
-            if source_ku is None:
+                puan = (1 if ku and ku.uye1_id else 0) + (1 if ku and ku.uye2_id else 0)
+                if puan > en_dolu_puan:
+                    en_dolu_ku, en_dolu_puan = ku, puan
+            if en_dolu_puan <= 0:
                 continue
             for row in rows:
                 ku = komisyon_map_fresh.get((row.tarih, row.oturum_no, row.ders_adi))
-                if ku is None or (not ku.uye1_id and not ku.uye2_id):
+                if ku is None or ku.uye1_id != en_dolu_ku.uye1_id or ku.uye2_id != en_dolu_ku.uye2_id:
                     SorumluKomisyonUyesi.objects.update_or_create(
                         sinav=sinav, tarih=row.tarih, oturum_no=row.oturum_no, ders_adi=row.ders_adi,
-                        defaults={"uye1": source_ku.uye1, "uye2": source_ku.uye2},
+                        defaults={"uye1": en_dolu_ku.uye1, "uye2": en_dolu_ku.uye2},
                     )
 
         for (tarih, oturum_no), salons in active_salons.items():
@@ -804,11 +980,27 @@ def gorevlendirme(request, sinav_pk):
                     defaults={"gozetmen": get_personel(f"gozetmen_{tarih}_{oturum_no}_{salon}")},
                 )
 
+        if muaf_secim_sayisi:
+            messages.warning(
+                request,
+                f"{muaf_secim_sayisi} görev alanı, seçilen personel Görev Muafiyeti "
+                f"listesinde olduğu için boş bırakıldı.",
+            )
         messages.success(request, "Görevlendirmeler kaydedildi.")
         return redirect("sorumluluk:gorevlendirme", sinav_pk=sinav_pk)
 
+    context = _gorevlendirme_baglam(sinav, takvim_rows, active_salons, komisyon_dict, gozetmen_dict)
+    return render(request, "sorumluluk/gorevlendirme.html", context)
+
+
+def _gorevlendirme_baglam(sinav, takvim_rows, active_salons, komisyon_dict, gozetmen_dict):
+    """`gorevlendirme` (DB'den yüklü) ve `gorevlendirme_oner` (öneri, kaydedilmemiş)
+    view'larının ortak render bağlamını üretir."""
     from okul.models import Personel as OkulPersonel
-    personel_listesi = list(OkulPersonel.objects.select_related("brans").order_by("adi_soyadi"))
+    muaf_ids = SorumluGorevMuafPersonel.objects.values_list("personel_id", flat=True)
+    personel_listesi = list(
+        OkulPersonel.objects.select_related("brans").exclude(pk__in=muaf_ids).order_by("adi_soyadi")
+    )
 
     oturumlar = []
     for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
@@ -931,7 +1123,7 @@ def gorevlendirme(request, sinav_pk):
         for p in personel_listesi
     })
 
-    return render(request, "sorumluluk/gorevlendirme.html", {
+    return {
         "sinav": sinav,
         "oturumlar": oturumlar,
         "personel_listesi": personel_listesi,
@@ -940,7 +1132,49 @@ def gorevlendirme(request, sinav_pk):
         "sinav_toplam_gozetmen": sinav_toplam_gozetmen,
         "sinav_toplam_gorev":    sinav_toplam_gorev,
         "sinav_kbs_saat":        sinav_kbs_saat,
-    })
+    }
+
+
+@ust_yonetici_required
+@require_POST
+def gorevlendirme_oner(request, sinav_pk):
+    """Komisyon/gözetmen görevlerini geçmiş görev yüküne ve branş/gün kısıtlarına göre
+    otomatik olarak ÖNERİR. Veritabanına yazmaz — kullanıcı öneriyi inceleyip
+    "Görevlendirmeleri Kaydet" ile onaylar, dropdown'ları elle düzenler ya da
+    sayfayı yenileyip vazgeçebilir."""
+    sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
+
+    takvim_rows = list(
+        SorumluTakvim.objects.filter(sinav=sinav).order_by("tarih", "oturum_no", "ders_adi")
+    )
+    if not takvim_rows:
+        messages.error(request, "Önce sınav takvimini oluşturun.")
+        return redirect("sorumluluk:takvim_detay", sinav_pk=sinav_pk)
+
+    active_salons: dict = {}
+    for op in (
+        SorumluOturmaPlani.objects
+        .filter(sinav=sinav)
+        .values("tarih", "oturum_no", "salon")
+        .distinct()
+    ):
+        key = (op["tarih"], op["oturum_no"])
+        active_salons.setdefault(key, set()).add(op["salon"])
+
+    sonuc = oner_gorevlendirme(sinav, takvim_rows, active_salons)
+
+    messages.info(
+        request,
+        "Öneri oluşturuldu ve HENÜZ KAYDEDİLMEDİ. Aşağıdaki dağılımı inceleyin; "
+        "uygunsa \"Görevlendirmeleri Kaydet\" ile onaylayın, gerekirse dropdown'ları "
+        "elle düzenleyin ya da sayfayı yenileyerek vazgeçin.",
+    )
+    for uyari in sonuc["uyarilar"]:
+        messages.warning(request, uyari)
+
+    context = _gorevlendirme_baglam(sinav, takvim_rows, active_salons, sonuc["komisyon"], sonuc["gozetmen"])
+    context["oneri_modu"] = True
+    return render(request, "sorumluluk/gorevlendirme.html", context)
 
 
 @ust_yonetici_required

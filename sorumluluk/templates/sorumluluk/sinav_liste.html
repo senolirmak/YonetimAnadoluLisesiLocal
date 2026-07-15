@@ -20,21 +20,62 @@
   <a href="{% url 'sorumluluk:ogretmen_gorev_ozeti' %}" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; margin-left:auto;">
     <i class="fas fa-chalkboard-teacher"></i> Öğretmen Görev Özeti
   </a>
+  <a href="{% url 'sorumluluk:gorev_muaf_liste' %}" class="btn btn-sm" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+    <i class="fas fa-user-slash"></i> Görev Muafiyeti
+  </a>
   <a href="{% url 'sorumluluk:sinav_olustur' %}" class="btn btn-primary btn-sm">+ Yeni Sınav Dönemi Aç</a>
 </div>
+
+{% if onaylanan_sinavlar %}
+<div style="display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; margin-bottom:1rem;">
+  <label style="font-size:.85rem; font-weight:600; color:#475569;">Onaylı sınavlardan görüntüle:</label>
+  <select onchange="if(this.value){window.location.href='?sinav='+this.value;}else{window.location.href=window.location.pathname;}" style="padding:.35rem .6rem; border:1px solid #cbd5e1; border-radius:5px; font-size:.85rem; min-width:220px;">
+    <option value="">— Aktif (varsayılan) dönem —</option>
+    {% for s in onaylanan_sinavlar %}
+    <option value="{{ s.pk }}" {% if secili_mi and aktif_sinav.pk == s.pk %}selected{% endif %}>{{ s.sinav_adi }}</option>
+    {% endfor %}
+  </select>
+  {% if secili_mi %}
+  <a href="{% url 'sorumluluk:sinav_liste' %}" class="btn btn-sm" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">Varsayılana Dön</a>
+  {% endif %}
+</div>
+{% endif %}
 
 {% if aktif_sinav %}
 <div class="card" style="border-left:4px solid #3b82f6; padding:1.5rem;">
   <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
     <div>
       <h2 style="margin:0 0 .3rem; color:#1e3a8a; font-size:1.25rem;">Aktif Dönem: {{ aktif_sinav.sinav_adi }}</h2>
+      {% if secili_mi %}
+      <p style="margin:0; font-size:.85rem; color:#64748b;">Onaylı sınavlardan seçtiğiniz dönemi görüntülüyorsunuz.</p>
+      {% else %}
       <p style="margin:0; font-size:.85rem; color:#64748b;">En son oluşturulan sınav dönemi üzerinde işlem yapıyorsunuz.</p>
+      {% endif %}
     </div>
-    {% if aktif_sinav.onaylandi %}
-    <span class="badge badge-success" style="font-size:.85rem; padding:.4rem .8rem;">✓ Takvim Onaylandı</span>
-    {% else %}
-    <span class="badge badge-warning" style="font-size:.85rem; padding:.4rem .8rem; background:#fef3c7; color:#92400e;">⚠ Planlama Aşamasında</span>
-    {% endif %}
+    <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+      {% if aktif_sinav.onaylandi %}
+      <span class="badge badge-success" style="font-size:.85rem; padding:.4rem .8rem;">✓ Takvim Onaylandı</span>
+      {% else %}
+      <span class="badge badge-warning" style="font-size:.85rem; padding:.4rem .8rem; background:#fef3c7; color:#92400e;">⚠ Planlama Aşamasında</span>
+      {% endif %}
+      <a href="{% url 'sorumluluk:sinav_duzenle' aktif_sinav.pk %}" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">Düzenle</a>
+      {% if aktif_sinav.arsivlendi %}
+      <span class="btn btn-sm" style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; cursor:not-allowed;" title="Arşivlenmiş sınavlar silinemez.">
+        <i class="fas fa-lock"></i> Arşivlendi
+      </span>
+      {% else %}
+        {% if aktif_sinav.arsivlenebilir_mi %}
+        <form method="post" action="{% url 'sorumluluk:sinav_arsivle' aktif_sinav.pk %}" style="display:inline;" onsubmit="return confirm('\'{{ aktif_sinav.sinav_adi }}\' arşivlensin mi?\n\nArşivlenen sınavlar artık silinemez.');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm" style="background:#e2e8f0; color:#334155; border:1px solid #cbd5e1;"><i class="fas fa-archive"></i> Arşivle</button>
+        </form>
+        {% endif %}
+      <form method="post" action="{% url 'sorumluluk:sinav_sil' aktif_sinav.pk %}" style="display:inline;" onsubmit="return confirm('\'{{ aktif_sinav.sinav_adi }}\' sınavı tamamen silinsin mi?\n\nBu işlem geri alınamaz: sınava ait tüm öğrenciler, ders havuzu, takvim, oturma planı ve görevlendirmeler de silinecektir.');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">Sil</button>
+      </form>
+      {% endif %}
+    </div>
   </div>
 
   <div class="dash-grid">
@@ -42,10 +83,10 @@
       <div class="sayi">{{ stats.ogrenci }}</div>
       <div class="etiket">Sorumlu Öğrenci</div>
     </div>
-    <div class="dash-card">
+    <a href="{% url 'sorumluluk:havuz_liste' aktif_sinav.pk %}" class="dash-card" style="text-decoration:none; cursor:pointer;">
       <div class="sayi">{{ stats.ders }}</div>
-      <div class="etiket">Farklı Ders</div>
-    </div>
+      <div class="etiket">Farklı Ders <i class="fas fa-external-link-alt" style="font-size:.7rem;"></i></div>
+    </a>
     <div class="dash-card">
       <div class="sayi">{{ stats.oturum }}</div>
       <div class="etiket">Planlanan Oturum</div>
@@ -87,6 +128,22 @@
         <a href="{% url 'sorumluluk:rapor_imza_pdf' s.pk %}" target="_blank" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:.78rem;"><i class="fas fa-file-pdf"></i> İmza Listesi</a>
         <a href="{% url 'sorumluluk:rapor_genel_takvim_pdf' s.pk %}" target="_blank" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:.78rem;"><i class="fas fa-file-pdf"></i> İlan Takvimi</a>
         <a href="{% url 'sorumluluk:ogrenci_takvim_pdf' s.pk %}" target="_blank" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:.78rem;"><i class="fas fa-file-pdf"></i> Öğrenci Takvimi</a>
+        {% if s.arsivlendi %}
+        <span class="btn btn-sm" style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; font-size:.78rem; cursor:not-allowed;" title="Arşivlenmiş sınavlar silinemez.">
+          <i class="fas fa-lock"></i> Arşivlendi
+        </span>
+        {% else %}
+          {% if s.arsivlenebilir_mi %}
+          <form method="post" action="{% url 'sorumluluk:sinav_arsivle' s.pk %}" style="display:inline;" onsubmit="return confirm('\'{{ s.sinav_adi }}\' arşivlensin mi?\n\nArşivlenen sınavlar artık silinemez.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm" style="background:#e2e8f0; color:#334155; border:1px solid #cbd5e1; font-size:.78rem;"><i class="fas fa-archive"></i> Arşivle</button>
+          </form>
+          {% endif %}
+        <form method="post" action="{% url 'sorumluluk:sinav_sil' s.pk %}" style="display:inline;" onsubmit="return confirm('\'{{ s.sinav_adi }}\' sınavı tamamen silinsin mi?\n\nBu işlem geri alınamaz: sınava ait tüm öğrenciler, ders havuzu, takvim, oturma planı ve görevlendirmeler de silinecektir.');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-size:.78rem;"><i class="fas fa-trash"></i> Sil</button>
+        </form>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -104,6 +161,7 @@
         <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Açıklama</th>
         <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Durum</th>
         <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Oluşturma</th>
+        <th style="padding:.6rem .9rem; text-align:right; border-bottom:2px solid #e2e8f0;"></th>
       </tr>
     </thead>
     <tbody>
@@ -115,13 +173,34 @@
         </td>
         <td style="padding:.45rem .9rem; color:#475569;">{{ s.aciklama|default:"—" }}</td>
         <td style="padding:.45rem .9rem;">
-          {% if s.onaylandi %}
+          {% if s.arsivlendi %}
+          <span class="badge" style="background:#1e293b; color:#fff;"><i class="fas fa-lock"></i> Arşivlendi</span>
+          {% elif s.onaylandi %}
           <span class="badge badge-success">Onaylı</span>
           {% else %}
           <span class="badge badge-secondary">Taslak</span>
           {% endif %}
         </td>
         <td style="padding:.45rem .9rem; color:#475569; white-space:nowrap;">{{ s.olusturma_tarihi|date:"d.m.Y" }}</td>
+        <td style="padding:.45rem .9rem; text-align:right; white-space:nowrap;">
+          <a href="{% url 'sorumluluk:sinav_duzenle' s.pk %}" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">Düzenle</a>
+          {% if s.arsivlendi %}
+          <span class="btn btn-sm" style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; cursor:not-allowed;" title="Arşivlenmiş sınavlar silinemez.">
+            <i class="fas fa-lock"></i> Kilitli
+          </span>
+          {% else %}
+            {% if s.arsivlenebilir_mi %}
+            <form method="post" action="{% url 'sorumluluk:sinav_arsivle' s.pk %}" style="display:inline;" onsubmit="return confirm('\'{{ s.sinav_adi }}\' arşivlensin mi?\n\nArşivlenen sınavlar artık silinemez.');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm" style="background:#e2e8f0; color:#334155; border:1px solid #cbd5e1;"><i class="fas fa-archive"></i> Arşivle</button>
+            </form>
+            {% endif %}
+          <form method="post" action="{% url 'sorumluluk:sinav_sil' s.pk %}" style="display:inline;" onsubmit="return confirm('\'{{ s.sinav_adi }}\' sınavı tamamen silinsin mi?\n\nBu işlem geri alınamaz: sınava ait tüm öğrenciler, ders havuzu, takvim, oturma planı ve görevlendirmeler de silinecektir.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">Sil</button>
+          </form>
+          {% endif %}
+        </td>
       </tr>
       {% endif %}
       {% endfor %}
