@@ -39,7 +39,7 @@ from sorumluluk.models import (
     SorumluTakvim,
 )
 from sorumluluk.services.gorevlendirme_oneri import komisyon_birimleri, oner_gorevlendirme
-from sorumluluk.services.import_service import sorumluluk_excel_aktar
+from sorumluluk.services.import_service import katalog_baglantidan_brans_uygula, sorumluluk_excel_aktar
 from sorumluluk.services.takvim_motoru_ga import DjangoSinavTakvimiMotoruGA as DjangoSinavTakvimiMotoru
 from sorumluluk.services.takvim_service import oturma_plani_olustur
 
@@ -288,7 +288,7 @@ def havuz_liste(request, sinav_pk):
     sinav = get_object_or_404(SorumluSinav, pk=sinav_pk)
     havuz = (
         SorumluDersKatalogu.objects.filter(sinav=sinav)
-        .select_related("okul_dersi", "okul_dersi_onerisi")
+        .select_related("okul_dersi", "okul_dersi_onerisi", "ortak_ders", "secmeli_ders")
         .prefetch_related("branslar", "brans_onerileri__brans")
         .order_by("ders_adi")
     )
@@ -299,6 +299,7 @@ def havuz_liste(request, sinav_pk):
         try:
             hd.save()
             form.save_m2m()
+            katalog_baglantidan_brans_uygula(hd)
             messages.success(request, "Ders katalog listesine eklendi.")
             return redirect("sorumluluk:havuz_liste", sinav_pk=sinav_pk)
         except IntegrityError:
@@ -322,6 +323,7 @@ def havuz_duzenle(request, pk):
     if request.method == "POST" and form.is_valid():
         try:
             form.save()
+            katalog_baglantidan_brans_uygula(hd)
             messages.success(request, "Ders güncellendi.")
             return redirect("sorumluluk:havuz_liste", sinav_pk=hd.sinav_id)
         except IntegrityError:

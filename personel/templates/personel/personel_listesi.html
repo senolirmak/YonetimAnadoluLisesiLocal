@@ -54,6 +54,7 @@
                 <tr>
                     <th>Adı Soyadı</th>
                     <th>Branş</th>
+                    <th>Mezun Okul</th>
                     <th>Görev Tipi</th>
                     <th class="center">Cinsiyet</th>
                     <th class="center">Nöbet</th>
@@ -67,6 +68,7 @@
                 <tr>
                     <td>{{ p.adi_soyadi }}</td>
                     <td>{{ p.brans }}</td>
+                    <td>{{ p.mezunokul|default:"—" }}</td>
                     <td>{{ p.gorev_tipi|default:"—" }}</td>
                     <td class="center">{{ p.get_cinsiyet_display }}</td>
                     <td class="center">
@@ -96,7 +98,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8" class="text-center text-muted">Personel kaydı bulunamadı.</td></tr>
+                <tr><td colspan="9" class="text-center text-muted">Personel kaydı bulunamadı.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

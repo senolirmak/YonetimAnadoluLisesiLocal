@@ -72,16 +72,44 @@ class SorumluDersForm(forms.ModelForm):
 class SorumluDersKatalogForm(forms.ModelForm):
     class Meta:
         model = SorumluDersKatalogu
-        fields = ["ders_adi", "branslar"]
+        fields = ["ders_adi", "branslar", "ortak_ders", "secmeli_ders"]
         widgets = {
             "ders_adi": forms.TextInput(attrs={"class": _INPUT}),
             "branslar": forms.SelectMultiple(attrs={"class": _SELECT, "size": "8"}),
+            "ortak_ders": forms.Select(attrs={"class": _SELECT}),
+            "secmeli_ders": forms.Select(attrs={"class": _SELECT}),
+        }
+        labels = {
+            "ortak_ders": "Eşleşen Ortak Ders Havuzu Kaydı (otomatik bulunamadıysa elle seçin)",
+            "secmeli_ders": "Eşleşen Seçmeli Ders Havuzu Kaydı (otomatik bulunamadıysa elle seçin)",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from secmelidersler.models import OrtakDersHavuzu, SecmeliDersHavuzu
+
         self.fields["branslar"].queryset = Brans.objects.order_by("ad")
         self.fields["branslar"].required = False
+        self.fields["ortak_ders"].queryset = OrtakDersHavuzu.objects.order_by("ders_adi")
+        self.fields["ortak_ders"].required = False
+        self.fields["ortak_ders"].empty_label = "— seçilmedi —"
+        self.fields["ortak_ders"].label_from_instance = (
+            lambda d: f"{d.ders_adi} [ID {d.pk}]"
+        )
+        self.fields["secmeli_ders"].queryset = SecmeliDersHavuzu.objects.order_by("ders_adi")
+        self.fields["secmeli_ders"].required = False
+        self.fields["secmeli_ders"].empty_label = "— seçilmedi —"
+        self.fields["secmeli_ders"].label_from_instance = (
+            lambda d: f"{d.ders_adi} [ID {d.pk}]"
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("ortak_ders") and cleaned.get("secmeli_ders"):
+            raise forms.ValidationError(
+                "Ortak Ders ve Seçmeli Ders aynı anda seçilemez — sadece birini seçin."
+            )
+        return cleaned
 
 
 class SorumluGorevMuafForm(forms.ModelForm):

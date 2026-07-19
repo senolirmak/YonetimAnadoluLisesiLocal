@@ -21,6 +21,15 @@ Kurallar:
     olacağından, "toplam görev sayısı" zaten bu sınav HARİÇ tüm geçmiş
     sınavları (önceki dönemler + önceki yıllar) kapsıyor; adalet tek bir
     dönemde değil, yıl genelinde birikimli olarak sağlanır.
+  - Bununla birlikte, kümülatif sayısı düşük bir kişinin (ör. yeni göreve
+    başlayan ya da branşının bu dönem hiç komisyon ihtiyacı doğurmadığı bir
+    öğretmen) "açığını kapatmak" için TEK bir dönemde aşırı sayıda gözetmen
+    görevi almasını önlemek amacıyla dönem-içi bir GÖZETMEN TAVANI uygulanır:
+    `ceil(bu dönemdeki toplam gözetmen slotu / uygun personel sayısı) + 1`.
+    Kümülatif açık, birkaç sonraki döneme yayılarak kapanır. Havuzdaki
+    herkes tavana ulaşırsa (aksi halde slot boş kalır) tavan o slot için
+    geçici olarak yok sayılır ve uyarı üretilir — hiçbir slot önerisiz
+    bırakılmaz.
   - Bir personele aynı gün (tarih) yalnızca bir görev (komisyon veya gözetmen)
     verilebilir. Yazılı/Uygulama ikilisi gibi birden çok tarihe yayılan
     komisyon görevleri, her iki tarihte de bu kısıtı kilitler.
@@ -35,6 +44,7 @@ Kurallar:
   - "Geçmiş" görev yükü hesaplanırken bu sınavın kendi (varsa) kayıtlı
     atamaları hariç tutulur — öneri, bu sınav için sıfırdan üretilir.
 """
+import math
 import re
 from collections import defaultdict
 
@@ -266,6 +276,16 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
         ((t, o, s) for (t, o), salons in active_salons.items() for s in salons),
         key=lambda x: (x[0], x[1], x[2]),
     )
+
+    # Dönem-içi gözetmen tavanı: kümülatif sayısı düşük biri (ör. branşı bu
+    # dönem hiç komisyon ihtiyacı doğurmayan bir öğretmen), sadece "en ucuz
+    # aday" olduğu için TEK dönemde orantısız çok gözetmen görevi almasın —
+    # açığı birkaç sonraki döneme yayılarak kapansın (bkz. modül docstring'i).
+    bu_donem_gozetmen = defaultdict(int)
+    gozetmen_tavani = (
+        math.ceil(len(gozetmen_units) / len(personel_listesi)) + 1 if personel_listesi else 0
+    )
+
     for tarih, oturum_no, salon in gozetmen_units:
         pool = [p for p in personel_listesi if p.pk not in used_on_date[tarih]]
         secilen = None
@@ -275,9 +295,18 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
                 f"(herkes o gün başka bir görevde) — lütfen elle tamamlayın."
             )
         else:
-            pool.sort(key=lambda p: (running_total(p.pk), running_gozetmen[p.pk], p.adi_soyadi))
-            secilen = pool[0]
+            tavan_alti = [p for p in pool if bu_donem_gozetmen[p.pk] < gozetmen_tavani]
+            secim_havuzu = tavan_alti or pool
+            if not tavan_alti:
+                uyarilar.append(
+                    f"{tarih:%d.%m.%Y} Oturum {oturum_no} – {salon}: uygun personelin tamamı bu "
+                    f"dönem için gözetmen tavanına (kişi başı {gozetmen_tavani}) ulaştığından "
+                    f"tavan bu slot için geçici olarak uygulanmadı — lütfen kontrol edin."
+                )
+            secim_havuzu.sort(key=lambda p: (running_total(p.pk), running_gozetmen[p.pk], p.adi_soyadi))
+            secilen = secim_havuzu[0]
             running_gozetmen[secilen.pk] += 1
+            bu_donem_gozetmen[secilen.pk] += 1
             used_on_date[tarih].add(secilen.pk)
         gozetmen_sonuc[(tarih, oturum_no, salon)] = SorumluGozetmen(
             sinav=sinav, tarih=tarih, oturum_no=oturum_no, salon=salon, gozetmen=secilen,

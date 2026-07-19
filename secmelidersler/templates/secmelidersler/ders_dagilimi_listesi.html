@@ -1,0 +1,164 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+  .dd-sayfa { max-width: 1000px; margin: 0 auto; padding: 20px 16px; }
+  .dd-ust { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .dd-wrap { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 1.6rem; overflow: hidden; }
+  .dd-baslik {
+    display: flex; align-items: center; gap: .6rem;
+    padding: .6rem 1rem; font-size: .95rem; font-weight: 700; color: #fff;
+    background: #1e3a5f;
+  }
+  .dd-tablo { width: 100%; border-collapse: collapse; font-size: .87rem; }
+  .dd-tablo th {
+    background: #f8fafc; color: #64748b; text-align: left;
+    padding: .45rem .9rem; font-size: .76rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .03em; border-bottom: 1px solid #e2e8f0;
+  }
+  .dd-tablo td { padding: .5rem .9rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  .dd-tablo tr:hover td { background: #f8fbff; }
+  .badge-birim {
+    font-size: .78rem; font-weight: 800; padding: .15rem .6rem;
+    border-radius: 4px; background: #dbeafe; color: #1e40af;
+  }
+  .rozet {
+    display: inline-block; font-size: .78rem; font-weight: 700;
+    padding: .12rem .55rem; border-radius: 10px;
+  }
+  .rozet-tam { background: #dcfce7; color: #166534; }
+  .rozet-eksik { background: #fef3c7; color: #92400e; }
+  .rozet-bos { background: #fee2e2; color: #991b1b; }
+  .btn-git {
+    display: inline-block; color: #fff; background: #417690;
+    padding: .3rem 1rem; border-radius: 5px; font-size: .82rem;
+    font-weight: 600; text-decoration: none;
+  }
+  .btn-git:hover { background: #2d5469; color: #fff; text-decoration: none; }
+  .bos-durum { text-align: center; padding: 2rem 1rem; color: #94a3b8; font-size: .9rem; }
+</style>
+
+<div class="dd-sayfa">
+
+  <div class="dd-ust">
+    <a href="{% url 'secmeli_index' %}"
+       style="display:inline-flex;align-items:center;gap:.5rem;background:#6c757d;color:#fff;
+              padding:.4rem 1rem;border-radius:6px;text-decoration:none;font-size:.85rem;font-weight:600;">
+      ← Seçmeli Dersler
+    </a>
+    <a href="{% url 'secmeli_ogretmen_yuku_raporu' %}"
+       style="display:inline-flex;align-items:center;gap:.5rem;background:#0f766e;color:#fff;
+              padding:.4rem 1rem;border-radius:6px;text-decoration:none;font-size:.85rem;font-weight:600;">
+      <i class="fas fa-chalkboard-teacher"></i> Öğretmen Yükü Raporu
+    </a>
+  </div>
+
+  <h5 style="font-size:1.08rem;font-weight:700;color:#1e3a5f;margin-bottom:.6rem;">
+    <i class="fas fa-people-arrows"></i> Ders Dağılımı — Öğretmen Ataması
+  </h5>
+  <p style="font-size:.85rem;color:#64748b;margin-bottom:1.4rem;">
+    Gelecek yıl her şube/alan biriminde okutulacak dersleri, aynı branştaki öğretmenlere atayın.
+  </p>
+
+  <div class="dd-wrap">
+    <div class="dd-baslik"><i class="fas fa-graduation-cap"></i> 11-12. Sınıf — Alan Bazlı Birimler</div>
+    {% if not birimler_11_12 %}
+    <div class="bos-durum">
+      <i class="fas fa-inbox" style="font-size:1.6rem;display:block;margin-bottom:.4rem;opacity:.3;"></i>
+      Henüz alan/şube birimi oluşmamış. Önce <a href="{% url 'secmeli_sinif_dagilimi' %}">Sınıf Dağılımı Planı</a>'nda öğrenci eşleşmesi olmalı.
+    </div>
+    {% else %}
+    <table class="dd-tablo">
+      <thead>
+        <tr>
+          <th>Gelecek Sınıf</th>
+          <th>Alan</th>
+          <th>Şube</th>
+          <th>Ders Sayısı</th>
+          <th>Atama Durumu</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for birim in birimler_11_12 %}
+        <tr>
+          <td>{{ birim.gelecek_sinif }}. Sınıf</td>
+          <td><span class="badge-birim">{{ birim.alan.adi }}</span></td>
+          <td>Şube {{ birim.sube_no }}</td>
+          <td>{{ birim.ders_sayisi }}</td>
+          <td>
+            {% if birim.ders_sayisi == 0 %}
+            <span class="rozet rozet-bos">Ders paketi boş</span>
+            {% elif birim.atanan == birim.ders_sayisi %}
+            <span class="rozet rozet-tam">{{ birim.atanan }}/{{ birim.ders_sayisi }} atandı</span>
+            {% elif birim.atanan == 0 %}
+            <span class="rozet rozet-bos">0/{{ birim.ders_sayisi }} atandı</span>
+            {% else %}
+            <span class="rozet rozet-eksik">{{ birim.atanan }}/{{ birim.ders_sayisi }} atandı</span>
+            {% endif %}
+          </td>
+          <td>
+            <a class="btn-git" href="{% url 'secmeli_ders_dagilimi_alan_detay' gelecek_sinif=birim.gelecek_sinif alan_pk=birim.alan.pk sube_no=birim.sube_no %}">
+              Ata →
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+  <div class="dd-wrap">
+    <div class="dd-baslik" style="background:#065f46;"><i class="fas fa-arrow-up"></i> 9 → 10. Sınıf — Şube Bazlı Birimler</div>
+    {% if not birimler_9_10 %}
+    <div class="bos-durum">
+      <i class="fas fa-inbox" style="font-size:1.6rem;display:block;margin-bottom:.4rem;opacity:.3;"></i>
+      9. sınıfta kayıtlı şube bulunamadı.
+    </div>
+    {% else %}
+    <table class="dd-tablo">
+      <thead>
+        <tr>
+          <th>Mevcut Şube</th>
+          <th>Gelecek Şube</th>
+          <th>Ders Sayısı</th>
+          <th>Atama Durumu</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for birim in birimler_9_10 %}
+        <tr>
+          <td>9/{{ birim.sube }}</td>
+          <td>10/{{ birim.sube }}</td>
+          <td>{{ birim.ders_sayisi }}</td>
+          <td>
+            {% if birim.ders_sayisi == 0 %}
+            <span class="rozet rozet-bos">Ders paketi boş</span>
+            {% elif birim.atanan == birim.ders_sayisi %}
+            <span class="rozet rozet-tam">{{ birim.atanan }}/{{ birim.ders_sayisi }} atandı</span>
+            {% elif birim.atanan == 0 %}
+            <span class="rozet rozet-bos">0/{{ birim.ders_sayisi }} atandı</span>
+            {% else %}
+            <span class="rozet rozet-eksik">{{ birim.atanan }}/{{ birim.ders_sayisi }} atandı</span>
+            {% endif %}
+          </td>
+          <td>
+            <a class="btn-git" href="{% url 'secmeli_ders_dagilimi_sube_detay' mevcut_sinif=9 sube=birim.sube %}">
+              Ata →
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

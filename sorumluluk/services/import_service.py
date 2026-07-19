@@ -83,16 +83,44 @@ def ders_brans_coklu_haritasi(ders_adlari: set[str]) -> dict[str, set[int]]:
     return dict(sonuc)
 
 
+def secmeli_dersler_brans_haritasi(ders_adlari: set[str]) -> dict[str, set[int]]:
+    """Her ders adı için, secmelidersler.OrtakDersHavuzu/SecmeliDersHavuzu'ndaki
+    (sınıf seviyesinden bağımsız, kanonik) aynı adlı kaydın branslar'ını döner.
+    Bu havuz modelleri SorumluDersKatalogu ile aynı şekilde sınıf seviyesi
+    taşımadığından (`OrtakDers`/`SecmeliDers`'in aksine) ders adı ek/saat
+    normalizasyonu gerekmeden birebir eşleşir."""
+    from secmelidersler.models import OrtakDersHavuzu, SecmeliDersHavuzu
+
+    if not ders_adlari:
+        return {}
+
+    sonuc: dict = defaultdict(set)
+
+    for Model in (OrtakDersHavuzu, SecmeliDersHavuzu):
+        for ders_adi, brans_id in (
+            Model.objects.filter(ders_adi__in=ders_adlari)
+            .exclude(branslar__isnull=True)
+            .values_list("ders_adi", "branslar")
+            .distinct()
+        ):
+            sonuc[ders_adi].add(brans_id)
+
+    return dict(sonuc)
+
+
 def sorumluluk_katalog_branslarini_oner(sinav: SorumluSinav) -> int:
-    """Katalogdaki derslere, Haftalık Ders Programı'ndan tespit edilen ve henüz
-    atanmamış/önerilmemiş branşlar için onay bekleyen SorumluDersKatalogBransOneri
-    kaydı oluşturur. Branş, kullanıcı onaylamadan doğrudan derse eklenmez.
-    Oluşturulan yeni öneri sayısını döner."""
+    """Katalogdaki (elle bir Ortak/Seçmeli Ders Havuzu kaydına bağlanmamış)
+    derslere, secmelidersler.OrtakDersHavuzu/SecmeliDersHavuzu'ndan ders adı
+    eşleşmesiyle tespit edilen ve henüz atanmamış/önerilmemiş branşlar için
+    onay bekleyen SorumluDersKatalogBransOneri kaydı oluşturur. Elle bağlanmış
+    kataloglar bu fonksiyonu atlar — onların branşı `katalog_baglantidan_brans_uygula`
+    ile onay gerekmeden doğrudan uygulanır (kullanıcı zaten bağlantıyı elle
+    seçerek onaylamış sayılır). Oluşturulan yeni öneri sayısını döner."""
     katalog = list(
-        SorumluDersKatalogu.objects.filter(sinav=sinav)
+        SorumluDersKatalogu.objects.filter(sinav=sinav, ortak_ders__isnull=True, secmeli_ders__isnull=True)
         .prefetch_related("branslar", "brans_onerileri")
     )
-    harita = ders_brans_coklu_haritasi({k.ders_adi for k in katalog})
+    harita = secmeli_dersler_brans_haritasi({k.ders_adi for k in katalog})
 
     yeni_oneriler = []
     for k in katalog:
@@ -108,6 +136,22 @@ def sorumluluk_katalog_branslarini_oner(sinav: SorumluSinav) -> int:
     if yeni_oneriler:
         SorumluDersKatalogBransOneri.objects.bulk_create(yeni_oneriler, ignore_conflicts=True)
     return len(yeni_oneriler)
+
+
+def katalog_baglantidan_brans_uygula(katalog: SorumluDersKatalogu) -> int:
+    """Katalog satırı elle bir Ortak/Seçmeli Ders'e bağlıysa (`ortak_ders`/
+    `secmeli_ders`), o kaydın branşlarını onay gerekmeden doğrudan
+    `katalog.branslar`'a ekler (kullanıcı bağlantıyı elle seçerek zaten
+    onaylamış sayılır). Eklenen yeni branş sayısını döner."""
+    ders = katalog.ortak_ders or katalog.secmeli_ders
+    if ders is None:
+        return 0
+    yeni_brans_id = set(ders.branslar.values_list("pk", flat=True)) - {
+        b.pk for b in katalog.branslar.all()
+    }
+    if yeni_brans_id:
+        katalog.branslar.add(*yeni_brans_id)
+    return len(yeni_brans_id)
 
 
 def okul_dersi_haritasi(ders_adlari: set[str]) -> dict[str, int]:
@@ -137,6 +181,43 @@ def sorumluluk_katalog_okul_dersini_esle(sinav: SorumluSinav) -> int:
 
     if guncellenecek:
         SorumluDersKatalogu.objects.bulk_update(guncellenecek, ["okul_dersi_id"])
+    return len(guncellenecek)
+
+
+def sorumluluk_katalog_secmeli_dersini_esle(sinav: SorumluSinav) -> int:
+    """Ders Kataloğu'ndaki, henüz bir Ortak/Seçmeli Ders Havuzu kaydına
+    bağlanmamış derslerden adı OrtakDersHavuzu/SecmeliDersHavuzu'nda birebir
+    bulunanları doğrudan bağlar (isim eşleşmesi net olduğu için onay
+    gerektirmez — `sorumluluk_katalog_okul_dersini_esle` ile aynı mantık).
+    Aynı ad hem Ortak hem Seçmeli Ders Havuzu'nda birden varsa (belirsiz durum)
+    atlanır, kullanıcı `havuz_duzenle`'den elle seçer. Bağlanan ders sayısını döner."""
+    from secmelidersler.models import OrtakDersHavuzu, SecmeliDersHavuzu
+
+    bagsiz = list(
+        SorumluDersKatalogu.objects.filter(sinav=sinav, ortak_ders__isnull=True, secmeli_ders__isnull=True)
+    )
+    if not bagsiz:
+        return 0
+
+    ders_adlari = {k.ders_adi for k in bagsiz}
+    ortak_harita = dict(OrtakDersHavuzu.objects.filter(ders_adi__in=ders_adlari).values_list("ders_adi", "pk"))
+    secmeli_harita = dict(SecmeliDersHavuzu.objects.filter(ders_adi__in=ders_adlari).values_list("ders_adi", "pk"))
+
+    guncellenecek = []
+    for k in bagsiz:
+        ortak_id = ortak_harita.get(k.ders_adi)
+        secmeli_id = secmeli_harita.get(k.ders_adi)
+        if ortak_id and secmeli_id:
+            continue
+        if ortak_id:
+            k.ortak_ders_id = ortak_id
+            guncellenecek.append(k)
+        elif secmeli_id:
+            k.secmeli_ders_id = secmeli_id
+            guncellenecek.append(k)
+
+    if guncellenecek:
+        SorumluDersKatalogu.objects.bulk_update(guncellenecek, ["ortak_ders_id", "secmeli_ders_id"])
     return len(guncellenecek)
 
 
@@ -292,6 +373,8 @@ def sorumluluk_excel_aktar(dosya_yolu: str, sinav: SorumluSinav) -> dict:
     # bulunamayan (örn. nakil öğrenci) dersler için Okul Ders Havuzu'na ekleme önerisi oluştur.
     sorumluluk_katalog_okul_dersini_esle(sinav)
     sorumluluk_katalog_okul_dersi_onerilerini_olustur(sinav)
+    # Aynı şekilde Ortak/Seçmeli Ders Havuzu'nda birebir ad eşleşmesi varsa doğrudan bağla.
+    sorumluluk_katalog_secmeli_dersini_esle(sinav)
     sorumluluk_katalog_branslarini_oner(sinav)
 
     # 2. Eklenen havuz derslerini daha sonra ForeignKey olarak atamak için DB'den çekelim

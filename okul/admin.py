@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AktifVeriKonfigurasyonu, OkulYonetici, VeriAktarimGecmisi
+from .models import AktifVeriKonfigurasyonu, OgretmenlikAlanCizelgesi, OkulYonetici, VeriAktarimGecmisi
 
 
 @admin.register(OkulYonetici)
@@ -32,3 +32,13 @@ class VeriAktarimGecmisiAdmin(admin.ModelAdmin):
 class AktifVeriKonfigurasyonuAdmin(admin.ModelAdmin):
     list_display = ("veri_turu", "uygulama_tarihi", "guncelleme_tarihi")
     readonly_fields = ("guncelleme_tarihi",)
+
+
+@admin.register(OgretmenlikAlanCizelgesi)
+class OgretmenlikAlanCizelgesiAdmin(admin.ModelAdmin):
+    """TTKB çizelgesi elle düzenlenmez — `ttkb_cizelge_yukle` komutuyla içe aktarılır.
+    Bu ekran sadece görüntüleme/arama içindir."""
+    list_display = ("sira_no", "brans", "mezunokul")
+    list_filter = ("brans",)
+    search_fields = ("brans", "mezunokul", "dersler")
+    ordering = ("sira_no", "brans", "mezunokul")

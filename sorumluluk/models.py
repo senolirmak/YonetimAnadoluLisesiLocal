@@ -182,16 +182,42 @@ class SorumluDersKatalogu(models.Model):
         "okul.Brans", blank=True,
         related_name="sorumluluk_ders_katalogu", verbose_name="Branşlar",
         help_text=(
-            "Haftalık Ders Programı'ndaki öğretmen atamalarından tespit edilen yeni "
-            "branş eşleşmeleri, doğrudan eklenmeden önce onayınıza sunulur (bkz. Branş "
-            "Önerileri). Buradan elle de ekleyip çıkarabilirsiniz. Bazı dersler (örn. "
-            "GÖRSEL SANATLAR/MÜZİK) birden fazla branştan öğretmen tarafından okutulabilir."
+            "secmelidersler'deki (Ortak/Seçmeli Ders Havuzu) aynı adlı kayıtların "
+            "branşlarından tespit edilen yeni eşleşmeler, doğrudan eklenmeden önce onayınıza sunulur "
+            "(bkz. Branş Önerileri). Buradan elle de ekleyip çıkarabilirsiniz. Bazı dersler "
+            "(örn. GÖRSEL SANATLAR/MÜZİK) birden fazla branştan öğretmen tarafından okutulabilir."
+        ),
+    )
+    ortak_ders = models.ForeignKey(
+        "secmelidersler.OrtakDersHavuzu", on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="+", verbose_name="Eşleşen Ortak Ders (Havuz)",
+        help_text=(
+            "Ders adı otomatik eşleşmediğinde elle bağlanabilir; branşlar buradan "
+            "senkronize edilir. Seçmeli Ders ile birlikte seçilemez."
+        ),
+    )
+    secmeli_ders = models.ForeignKey(
+        "secmelidersler.SecmeliDersHavuzu", on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="+", verbose_name="Eşleşen Seçmeli Ders (Havuz)",
+        help_text=(
+            "Ders adı otomatik eşleşmediğinde elle bağlanabilir; branşlar buradan "
+            "senkronize edilir. Ortak Ders ile birlikte seçilemez."
         ),
     )
 
     class Meta:
         ordering = ["ders_adi"]
         unique_together = [("sinav", "ders_adi")]
+        constraints = [
+            models.CheckConstraint(
+                condition=~(
+                    models.Q(ortak_ders__isnull=False) & models.Q(secmeli_ders__isnull=False)
+                ),
+                name="sorumluderskatalogu_tek_secmeli_ders_turu",
+            ),
+        ]
         verbose_name = "Ders Kataloğu"
         verbose_name_plural = "Ders Kataloğu"
 

@@ -26,7 +26,8 @@
         margin-bottom: 4px;
     }
     .form-grup input[type=text],
-    .form-grup input[type=number] {
+    .form-grup input[type=number],
+    .form-grup select {
         width: 100%;
         padding: 7px 10px;
         border: 1px solid #ced4da;
@@ -34,6 +35,7 @@
         font-size: 0.95em;
         color: #212529;
         box-sizing: border-box;
+        background: #fff;
     }
     .form-grup input:focus {
         outline: none;
@@ -104,6 +106,30 @@
         font-size: 0.95em;
         color: #c7254e;
     }
+    .brans-rozet-alani {
+        display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; min-height: 26px;
+    }
+    .brans-rozet {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: #dbeafe; color: #1e40af; border-radius: 12px;
+        padding: .2rem .4rem .2rem .7rem; font-size: .85em; font-weight: 600;
+    }
+    .brans-rozet-sil {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 16px; height: 16px; border-radius: 50%; border: none;
+        background: rgba(30,64,175,.15); color: #1e40af; font-size: .8em; line-height: 1;
+        cursor: pointer; padding: 0;
+    }
+    .brans-rozet-sil:hover { background: #1e40af; color: #fff; }
+    .brans-bos-not { font-size: .82em; color: #94a3b8; }
+    .brans-ekle-satir { display: flex; gap: 8px; }
+    .brans-ekle-satir select { flex: 1; }
+    .btn-brans-ekle {
+        background: #2d5469; color: #fff; border: none; border-radius: 4px;
+        padding: 0 16px; font-size: .88em; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .btn-brans-ekle:hover { background: #1e3a4a; }
+    .btn-brans-ekle:disabled { background: #93a9b8; cursor: not-allowed; }
 </style>
 
 <div class="form-sayfa">
@@ -154,6 +180,24 @@
                     {% if form.aktif.errors %}<div class="field-hata">{{ form.aktif.errors.0 }}</div>{% endif %}
                 </div>
 
+                <div class="form-grup">
+                    <label>{{ form.branslar.label }}</label>
+
+                    <div id="brans-rozet-alani" class="brans-rozet-alani"></div>
+
+                    <div class="brans-ekle-satir">
+                        <select id="brans-ekle-secici"></select>
+                        <button type="button" id="brans-ekle-buton" class="btn-brans-ekle">+ Ekle</button>
+                    </div>
+
+                    <div style="display:none;">{{ form.branslar }}</div>
+
+                    <div class="yardim-metni">
+                        Öğretmen ders yükü dağıtımında bu branşlardaki öğretmenler önerilir.
+                    </div>
+                    {% if form.branslar.errors %}<div class="field-hata">{{ form.branslar.errors.0 }}</div>{% endif %}
+                </div>
+
                 <div class="eylem-cubugu">
                     <button type="submit" class="btn-kaydet">Kaydet</button>
                     <a href="{% url 'ortak_havuz_listesi' %}" class="btn-geri">← İptal</a>
@@ -162,4 +206,77 @@
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var hiddenSelect = document.getElementById("{{ form.branslar.id_for_label }}");
+    var rozetAlani = document.getElementById("brans-rozet-alani");
+    var eklemeSecici = document.getElementById("brans-ekle-secici");
+    var eklemeButonu = document.getElementById("brans-ekle-buton");
+    if (!hiddenSelect || !rozetAlani || !eklemeSecici || !eklemeButonu) return;
+
+    function ciz() {
+        var secenekler = Array.from(hiddenSelect.options);
+
+        rozetAlani.innerHTML = "";
+        var secili = secenekler.filter(function (o) { return o.selected; });
+        if (secili.length === 0) {
+            var bosNot = document.createElement("span");
+            bosNot.className = "brans-bos-not";
+            bosNot.textContent = "Henüz branş atanmadı.";
+            rozetAlani.appendChild(bosNot);
+        } else {
+            secili.forEach(function (opt) {
+                var rozet = document.createElement("span");
+                rozet.className = "brans-rozet";
+                var etiket = document.createElement("span");
+                etiket.textContent = opt.text;
+                rozet.appendChild(etiket);
+                var silBtn = document.createElement("button");
+                silBtn.type = "button";
+                silBtn.className = "brans-rozet-sil";
+                silBtn.textContent = "×";
+                silBtn.setAttribute("aria-label", opt.text + " branşını kaldır");
+                silBtn.addEventListener("click", function () {
+                    opt.selected = false;
+                    ciz();
+                });
+                rozet.appendChild(silBtn);
+                rozetAlani.appendChild(rozet);
+            });
+        }
+
+        eklemeSecici.innerHTML = "";
+        var eklenebilecekler = secenekler.filter(function (o) { return !o.selected; });
+        if (eklenebilecekler.length === 0) {
+            var bosOpt = document.createElement("option");
+            bosOpt.textContent = "— eklenecek branş kalmadı —";
+            eklemeSecici.appendChild(bosOpt);
+            eklemeSecici.disabled = true;
+            eklemeButonu.disabled = true;
+        } else {
+            eklenebilecekler.forEach(function (opt) {
+                var yeniOpt = document.createElement("option");
+                yeniOpt.value = opt.value;
+                yeniOpt.textContent = opt.text;
+                eklemeSecici.appendChild(yeniOpt);
+            });
+            eklemeSecici.disabled = false;
+            eklemeButonu.disabled = false;
+        }
+    }
+
+    eklemeButonu.addEventListener("click", function () {
+        var deger = eklemeSecici.value;
+        if (!deger) return;
+        var opt = Array.from(hiddenSelect.options).find(function (o) { return o.value === deger; });
+        if (opt) {
+            opt.selected = true;
+            ciz();
+        }
+    });
+
+    ciz();
+})();
+</script>
 {% endblock %}

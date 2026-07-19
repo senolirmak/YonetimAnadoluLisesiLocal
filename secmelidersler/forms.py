@@ -43,18 +43,24 @@ class SecmeliDersGrubuForm(forms.ModelForm):
 class SecmeliDersForm(forms.ModelForm):
     class Meta:
         model = SecmeliDers
-        fields = ["ders_adi", "saat_secenekleri", "sira", "aktif"]
+        fields = ["ders_adi", "saat_secenekleri", "sira", "aktif", "branslar"]
         widgets = {
             "ders_adi": forms.TextInput(attrs={"placeholder": "Örn: Web Tasarımı ve Kodlama"}),
             "saat_secenekleri": forms.TextInput(attrs={"placeholder": "Örn: 4  veya  2,4"}),
             "sira": forms.NumberInput(attrs={"min": 0}),
+            "branslar": forms.SelectMultiple(attrs={"size": 6}),
         }
         labels = {
             "ders_adi": "Ders Adı",
             "saat_secenekleri": "Saat Seçenekleri",
             "sira": "Sıra",
             "aktif": "Aktif",
+            "branslar": "Branş(lar)",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["branslar"].required = False
 
     def clean_saat_secenekleri(self):
         deger = self.cleaned_data.get("saat_secenekleri", "").strip()
@@ -73,18 +79,24 @@ class SecmeliDersForm(forms.ModelForm):
 class OrtakDersHavuzuForm(forms.ModelForm):
     class Meta:
         model = OrtakDersHavuzu
-        fields = ["ders_adi", "derssaati", "sira", "aktif"]
+        fields = ["ders_adi", "derssaati", "sira", "aktif", "branslar"]
         widgets = {
             "ders_adi": forms.TextInput(attrs={"placeholder": "Örn: Türk Dili ve Edebiyatı"}),
             "derssaati": forms.TextInput(attrs={"placeholder": "Örn: 4  veya  2,4"}),
             "sira": forms.NumberInput(attrs={"min": 0}),
+            "branslar": forms.SelectMultiple(attrs={"size": 6}),
         }
         labels = {
             "ders_adi": "Ders Adı",
             "derssaati": "Ders Saati",
             "sira": "Sıra",
             "aktif": "Aktif",
+            "branslar": "Branş(lar)",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["branslar"].required = False
 
     def clean_derssaati(self):
         deger = self.cleaned_data.get("derssaati", "").strip()
@@ -102,12 +114,13 @@ class OrtakDersHavuzuForm(forms.ModelForm):
 class SecmeliDersHavuzuForm(forms.ModelForm):
     class Meta:
         model = SecmeliDersHavuzu
-        fields = ["ders_adi", "derssaati", "secimsayisi", "sira", "aktif"]
+        fields = ["ders_adi", "derssaati", "secimsayisi", "sira", "aktif", "branslar"]
         widgets = {
             "ders_adi": forms.TextInput(attrs={"placeholder": "Örn: Web Tasarımı ve Kodlama"}),
             "derssaati": forms.TextInput(attrs={"placeholder": "Örn: 4  veya  2,4"}),
             "secimsayisi": forms.NumberInput(attrs={"min": 1}),
             "sira": forms.NumberInput(attrs={"min": 0}),
+            "branslar": forms.SelectMultiple(attrs={"size": 6}),
         }
         labels = {
             "ders_adi": "Ders Adı",
@@ -115,7 +128,12 @@ class SecmeliDersHavuzuForm(forms.ModelForm):
             "secimsayisi": "Seçim Sayısı",
             "sira": "Sıra",
             "aktif": "Aktif",
+            "branslar": "Branş(lar)",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["branslar"].required = False
 
     def clean_derssaati(self):
         deger = self.cleaned_data.get("derssaati", "").strip()

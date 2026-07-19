@@ -160,6 +160,7 @@ class PersonelDuzenleForm(forms.ModelForm):
             "adi_soyadi",
             "kimlikno",
             "brans",
+            "mezunokul",
             "cinsiyet",
             "nobeti_var",
             "gorev_tipi",
@@ -171,11 +172,13 @@ class PersonelDuzenleForm(forms.ModelForm):
             "kimlikno": forms.TextInput(
                 attrs={"class": "vTextField", "maxlength": "11", "inputmode": "numeric"}
             ),
+            "mezunokul": forms.TextInput(attrs={"class": "vTextField"}),
         }
         labels = {
             "adi_soyadi": "Adı Soyadı",
             "kimlikno": "TC Kimlik No",
             "brans": "Branş",
+            "mezunokul": "Mezun Olduğu Yükseköğretim Programı/Fakülte",
             "cinsiyet": "Cinsiyet",
             "nobeti_var": "Nöbeti Var",
             "gorev_tipi": "Görevi",

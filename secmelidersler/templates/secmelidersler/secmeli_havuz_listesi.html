@@ -105,6 +105,17 @@
         line-height: 1.5;
     }
     .btn-sil:hover { background: #dc3545; color: #fff; }
+    .brans-chip {
+        display: inline-block;
+        background: #ede9fe;
+        color: #5b21b6;
+        border-radius: 10px;
+        padding: 1px 9px;
+        font-size: 0.78em;
+        font-weight: 600;
+        margin: 1px 3px 1px 0;
+    }
+    .brans-yok { color: #adb5bd; font-size: 0.85em; }
     .bos-durum {
         text-align: center;
         padding: 48px 24px;
@@ -157,6 +168,7 @@
             <tr>
                 <th class="col-sira">Sıra</th>
                 <th>Ders Adı</th>
+                <th>Branş(lar)</th>
                 <th class="col-aktif">Aktif</th>
                 <th class="col-aksiyon">İşlem</th>
             </tr>
@@ -166,6 +178,13 @@
             <tr class="{% if not ders.aktif %}pasif-satir{% endif %}">
                 <td class="col-sira"><span class="sira-chip">{{ ders.sira }}</span></td>
                 <td>{{ ders.ders_adi }}</td>
+                <td>
+                    {% for brans in ders.branslar.all %}
+                    <span class="brans-chip">{{ brans.ad }}</span>
+                    {% empty %}
+                    <span class="brans-yok">—</span>
+                    {% endfor %}
+                </td>
                 <td class="col-aktif">
                     {% if ders.aktif %}
                     <span class="aktif-badge" title="Aktif">✓</span>

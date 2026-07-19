@@ -5,15 +5,17 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 
 from okul.auth import mudur_yardimcisi_required
+from okul.models import Personel
 
 from .forms import AlanForm, OrtakDersHavuzuForm, SecmeliDersForm, SecmeliDersGrubuForm, SecmeliDersHavuzuForm, SinifSeviyeToplamSaatForm
 from .models import (
-    Alan, AlanDers, OgrenciOrtalama, OgrenciSinifTekrari, OgrenciTasdikname,
+    Alan, DersOgretmenAtama, OgrenciOrtalama, OgrenciSinifTekrari, OgrenciTasdikname,
     OrtakDers, OrtakDersHavuzu,
     SecmeliDers, SecmeliDersGrubu, SecmeliDersHavuzu,
     SinifSeviyeToplamSaat,
     get_aktif_egitim_yili, get_toplam_saat,
 )
+from .services.ders_dagilimi import alan_ders_paketi, plan_sinif_dagilimi, sube_ders_paketi
 
 _SINIFLAR = [9, 10, 11, 12]
 
@@ -400,7 +402,7 @@ def ortak_ders_havuzdan_ekle(request):
 
 @mudur_yardimcisi_required
 def secmeli_havuz_listesi(request):
-    dersler = SecmeliDersHavuzu.objects.all()
+    dersler = SecmeliDersHavuzu.objects.prefetch_related("branslar")
     return render(request, "secmelidersler/secmeli_havuz_listesi.html", {
         "title": "Seçmeli Ders Havuzu",
         "dersler": dersler,
@@ -445,7 +447,7 @@ def secmeli_havuz_sil(request, pk):
 
 @mudur_yardimcisi_required
 def ortak_havuz_listesi(request):
-    dersler = OrtakDersHavuzu.objects.all()
+    dersler = OrtakDersHavuzu.objects.prefetch_related("branslar")
     return render(request, "secmelidersler/ortak_havuz_listesi.html", {
         "title": "Ortak (Zorunlu) Ders Havuzu",
         "dersler": dersler,
@@ -532,137 +534,204 @@ def sinif_toplam_saat_listesi(request):
 
 @mudur_yardimcisi_required
 def sinif_dagilimi(request):
-    import math
-    from collections import defaultdict
-    from ogrenci.models import Ogrenci
-    from ogrencidersleri.models import OgrenciSecmeliDers
-
-    MAKS = 34
-    HARFLER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     aktif_yil = get_aktif_egitim_yili()
 
-    def _sube_dagit(ogrs, gelecek_sinif, harf_idx):
-        """Öğrencileri kız/erkek dengesi korunarak şubelere dağıtır."""
-        kizlar  = sorted([o for o in ogrs if o.cinsiyet == "K"], key=lambda x: x.okulno or 0)
-        erkekler = sorted([o for o in ogrs if o.cinsiyet == "E"], key=lambda x: x.okulno or 0)
-        toplam = len(kizlar) + len(erkekler)
-        if toplam == 0:
-            return [], harf_idx
-
-        n_sube = math.ceil(toplam / MAKS)
-        G, B = len(kizlar), len(erkekler)
-        kiz_base, kiz_rem   = divmod(G, n_sube)
-        erk_base, erk_rem   = divmod(B, n_sube)
-
-        subeler = []
-        kiz_idx = erk_idx = 0
-        for i in range(n_sube):
-            kiz_al = kiz_base + (1 if i < kiz_rem else 0)
-            erk_al = erk_base + (1 if i < erk_rem else 0)
-            sube_ogrs = kizlar[kiz_idx:kiz_idx + kiz_al] + erkekler[erk_idx:erk_idx + erk_al]
-            sube_ogrs.sort(key=lambda x: x.okulno or 0)
-            kiz_idx += kiz_al
-            erk_idx += erk_al
-            harf = HARFLER[harf_idx] if harf_idx < 26 else str(harf_idx + 1)
-            subeler.append({
-                "sube": harf,
-                "label": f"{gelecek_sinif}/{harf}",
-                "ogrenciler": sube_ogrs,
-                "kiz_sayi": kiz_al,
-                "erkek_sayi": erk_al,
-            })
-            harf_idx += 1
-        return subeler, harf_idx
-
-    def _plan(sinif_no, gelecek_sinif):
-        alanlar = list(
-            _yf(Alan.objects.filter(sinif_seviyesi=gelecek_sinif), aktif_yil)
-            .order_by("sira", "adi")
-        )
-        alan_ders_map = {
-            a.pk: set(AlanDers.objects.filter(alan=a).values_list("ders_id", flat=True))
-            for a in alanlar
-        }
-
-        ogrenciler = list(Ogrenci.objects.filter(sinif=sinif_no).order_by("okulno"))
-        ogr_ids = [o.pk for o in ogrenciler]
-
-        # Sınıf tekrarı: modelden oku
-        sinif_tekrari_ids = set(
-            OgrenciSinifTekrari.objects.filter(
-                ogrenci_id__in=ogr_ids,
-            ).values_list("ogrenci_id", flat=True)
-        )
-        # Tasdikname: okuma hakkı biten
-        tasdikname_ids = set(
-            OgrenciTasdikname.objects.filter(
-                ogrenci_id__in=ogr_ids,
-            ).values_list("ogrenci_id", flat=True)
-        )
-
-        ogr_secim: dict = defaultdict(set)
-        for ogr_id, ders_id in OgrenciSecmeliDers.objects.filter(
-            ogrenci_id__in=ogr_ids
-        ).values_list("ogrenci_id", "ders_id"):
-            ogr_secim[ogr_id].add(ders_id)
-
-        alan_ogr: dict = defaultdict(list)
-        alan_yok = []
-        sinif_tekrari_liste = []
-        tasdikname_liste = []
-        for ogr in ogrenciler:
-            if ogr.pk in tasdikname_ids:
-                tasdikname_liste.append(ogr)
-                continue
-            if ogr.pk in sinif_tekrari_ids:
-                sinif_tekrari_liste.append(ogr)
-                continue
-            secimler = ogr_secim.get(ogr.pk, set())
-            if not secimler:
-                alan_yok.append(ogr)
-                continue
-            en_iyi_pk, en_iyi_skor = None, 0
-            for a_pk, d_ids in alan_ders_map.items():
-                skor = len(secimler & d_ids)
-                if skor > en_iyi_skor:
-                    en_iyi_skor, en_iyi_pk = skor, a_pk
-            (alan_ogr[en_iyi_pk] if en_iyi_pk else alan_yok).append(ogr)
-
-        harf_idx = 0
-        alan_gruplari = []
-        for a in alanlar:
-            ogrs = alan_ogr.get(a.pk, [])
-            subeler, harf_idx = _sube_dagit(ogrs, gelecek_sinif, harf_idx)
-            toplam_kiz    = sum(1 for o in ogrs if o.cinsiyet == "K")
-            toplam_erkek  = sum(1 for o in ogrs if o.cinsiyet == "E")
-            alan_gruplari.append({
-                "alan": a,
-                "ogrenci_sayisi": len(ogrs),
-                "toplam_kiz": toplam_kiz,
-                "toplam_erkek": toplam_erkek,
-                "sube_sayisi": len(subeler),
-                "subeler": subeler,
-            })
-
-        return {
-            "sinif": sinif_no,
-            "gelecek_sinif": gelecek_sinif,
-            "alan_gruplari": alan_gruplari,
-            "alan_yok": alan_yok,
-            "sinif_tekrari": sinif_tekrari_liste,
-            "tasdikname": tasdikname_liste,
-            "toplam_ogr": sum(g["ogrenci_sayisi"] for g in alan_gruplari),
-            "toplam_sube": sum(g["sube_sayisi"] for g in alan_gruplari),
-        }
-
-    plan_11 = _plan(10, 11)
-    plan_12 = _plan(11, 12)
+    plan_11 = plan_sinif_dagilimi(10, 11, aktif_yil)
+    plan_12 = plan_sinif_dagilimi(11, 12, aktif_yil)
 
     return render(request, "secmelidersler/sinif_dagilimi.html", {
         "title": "Sınıf Dağılımı",
         "aktif_yil": aktif_yil,
         "plan_11": plan_11,
         "plan_12": plan_12,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Ders — Öğretmen Ataması (gelecek yıl şube/alan ders dağılımı)
+# ---------------------------------------------------------------------------
+
+def _atama_field_adi(satir):
+    return f"ogretmen_{satir['tur']}_{satir['ders'].pk}"
+
+
+def _atama_satirlari(paket, mevcut_atamalar):
+    """Ders paketini, mevcut atamalarla eşleştirip template'e hazır hale getirir."""
+    satirlar = []
+    for satir in paket:
+        ders = satir["ders"]
+        anahtar = (ders.pk, None) if satir["tur"] == "ortak" else (None, ders.pk)
+        atama = mevcut_atamalar.get(anahtar)
+        brans_id_listesi = list(ders.branslar.values_list("pk", flat=True))
+        ogretmen_secenekleri = (
+            Personel.objects.filter(brans_id__in=brans_id_listesi).order_by("brans__ad", "adi_soyadi")
+            if brans_id_listesi
+            else Personel.objects.none()
+        )
+        satirlar.append({
+            **satir,
+            "field_adi": _atama_field_adi(satir),
+            "secili_ogretmen_id": atama.ogretmen_id if atama else None,
+            "ogretmen_secenekleri": list(ogretmen_secenekleri),
+            "brans_yok": not brans_id_listesi,
+        })
+    return satirlar
+
+
+def _atama_kaydet(paket, ortak_kwargs, request):
+    for satir in paket:
+        ders = satir["ders"]
+        field_adi = _atama_field_adi(satir)
+        ogretmen_id_str = request.POST.get(field_adi, "").strip()
+        ogretmen_id = int(ogretmen_id_str) if ogretmen_id_str.isdigit() else None
+        DersOgretmenAtama.objects.update_or_create(
+            **ortak_kwargs,
+            ortak_ders=ders if satir["tur"] == "ortak" else None,
+            secmeli_ders=ders if satir["tur"] == "secmeli" else None,
+            defaults={"haftalik_saat": satir["haftalik_saat"], "ogretmen_id": ogretmen_id},
+        )
+
+
+@mudur_yardimcisi_required
+def ders_dagilimi_listesi(request):
+    aktif_yil = get_aktif_egitim_yili()
+
+    birimler_11_12 = []
+    for mevcut_sinif, gelecek_sinif in ((10, 11), (11, 12)):
+        plan = plan_sinif_dagilimi(mevcut_sinif, gelecek_sinif, aktif_yil)
+        for grup in plan["alan_gruplari"]:
+            if grup["sube_sayisi"] == 0:
+                continue
+            paket = alan_ders_paketi(grup["alan"], aktif_yil)
+            for sube_no in range(1, grup["sube_sayisi"] + 1):
+                atanan = DersOgretmenAtama.objects.filter(
+                    alan=grup["alan"], sube_no=sube_no, ogretmen__isnull=False
+                ).count()
+                birimler_11_12.append({
+                    "gelecek_sinif": gelecek_sinif,
+                    "alan": grup["alan"],
+                    "sube_no": sube_no,
+                    "ders_sayisi": len(paket),
+                    "atanan": atanan,
+                })
+
+    from ogrenci.models import Ogrenci
+
+    birimler_9_10 = []
+    sube_listesi = (
+        Ogrenci.objects.filter(sinif=9).values_list("sube", flat=True).distinct().order_by("sube")
+    )
+    for sube in sube_listesi:
+        if not sube:
+            continue
+        paket = sube_ders_paketi(9, sube, 10, aktif_yil)
+        atanan = DersOgretmenAtama.objects.filter(
+            gelecek_sinif=10, alan__isnull=True, sube=sube, ogretmen__isnull=False
+        ).count()
+        birimler_9_10.append({
+            "gelecek_sinif": 10,
+            "sube": sube,
+            "ders_sayisi": len(paket),
+            "atanan": atanan,
+        })
+
+    return render(request, "secmelidersler/ders_dagilimi_listesi.html", {
+        "title": "Ders Dağılımı — Öğretmen Ataması",
+        "aktif_yil": aktif_yil,
+        "birimler_11_12": birimler_11_12,
+        "birimler_9_10": birimler_9_10,
+    })
+
+
+@mudur_yardimcisi_required
+def ders_dagilimi_alan_detay(request, gelecek_sinif, alan_pk, sube_no):
+    aktif_yil = get_aktif_egitim_yili()
+    alan = get_object_or_404(Alan, pk=alan_pk, sinif_seviyesi=gelecek_sinif)
+    paket = alan_ders_paketi(alan, aktif_yil)
+
+    ortak_kwargs = {
+        "egitim_yili": aktif_yil,
+        "gelecek_sinif": gelecek_sinif,
+        "alan": alan,
+        "sube_no": sube_no,
+    }
+
+    if request.method == "POST":
+        _atama_kaydet(paket, ortak_kwargs, request)
+        messages.success(request, f"{alan.adi} — Şube {sube_no} ders/öğretmen ataması kaydedildi.")
+        return redirect("secmeli_ders_dagilimi_alan_detay", gelecek_sinif=gelecek_sinif, alan_pk=alan_pk, sube_no=sube_no)
+
+    mevcut_atamalar = {
+        (a.ortak_ders_id, a.secmeli_ders_id): a
+        for a in DersOgretmenAtama.objects.filter(alan=alan, sube_no=sube_no).select_related("ogretmen")
+    }
+    satirlar = _atama_satirlari(paket, mevcut_atamalar)
+
+    return render(request, "secmelidersler/ders_dagilimi_detay.html", {
+        "title": f"{alan.adi} — Şube {sube_no} Ders Dağılımı",
+        "aktif_yil": aktif_yil,
+        "birim_etiketi": f"{alan.adi} — Şube {sube_no}",
+        "satirlar": satirlar,
+        "toplam_saat": sum(s["haftalik_saat"] for s in paket),
+        "geri_url_adi": "secmeli_ders_dagilimi_listesi",
+    })
+
+
+@mudur_yardimcisi_required
+def ders_dagilimi_sube_detay(request, mevcut_sinif, sube):
+    aktif_yil = get_aktif_egitim_yili()
+    gelecek_sinif = mevcut_sinif + 1
+    paket = sube_ders_paketi(mevcut_sinif, sube, gelecek_sinif, aktif_yil)
+
+    ortak_kwargs = {
+        "egitim_yili": aktif_yil,
+        "gelecek_sinif": gelecek_sinif,
+        "alan": None,
+        "sube": sube,
+    }
+
+    if request.method == "POST":
+        _atama_kaydet(paket, ortak_kwargs, request)
+        messages.success(request, f"{gelecek_sinif}/{sube} ders/öğretmen ataması kaydedildi.")
+        return redirect("secmeli_ders_dagilimi_sube_detay", mevcut_sinif=mevcut_sinif, sube=sube)
+
+    mevcut_atamalar = {
+        (a.ortak_ders_id, a.secmeli_ders_id): a
+        for a in DersOgretmenAtama.objects.filter(
+            alan__isnull=True, gelecek_sinif=gelecek_sinif, sube=sube
+        ).select_related("ogretmen")
+    }
+    satirlar = _atama_satirlari(paket, mevcut_atamalar)
+
+    return render(request, "secmelidersler/ders_dagilimi_detay.html", {
+        "title": f"{gelecek_sinif}/{sube} Ders Dağılımı",
+        "aktif_yil": aktif_yil,
+        "birim_etiketi": f"{mevcut_sinif}/{sube} → {gelecek_sinif}/{sube}",
+        "satirlar": satirlar,
+        "toplam_saat": sum(s["haftalik_saat"] for s in paket),
+        "geri_url_adi": "secmeli_ders_dagilimi_listesi",
+    })
+
+
+@mudur_yardimcisi_required
+def ogretmen_yuku_raporu(request):
+    aktif_yil = get_aktif_egitim_yili()
+    qs = _yf(DersOgretmenAtama.objects, aktif_yil)
+
+    atanmamis_sayisi = qs.filter(ogretmen__isnull=True).count()
+
+    yukler = (
+        qs.filter(ogretmen__isnull=False)
+        .values("ogretmen_id", "ogretmen__adi_soyadi", "ogretmen__brans__ad")
+        .annotate(toplam_saat=Sum("haftalik_saat"), ders_sayisi=Count("pk"))
+        .order_by("ogretmen__brans__ad", "ogretmen__adi_soyadi")
+    )
+
+    return render(request, "secmelidersler/ogretmen_yuku_raporu.html", {
+        "title": "Öğretmen Ders Yükü Raporu",
+        "aktif_yil": aktif_yil,
+        "yukler": yukler,
+        "atanmamis_sayisi": atanmamis_sayisi,
     })
 
 

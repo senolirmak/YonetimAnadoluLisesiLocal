@@ -226,6 +226,11 @@ class Personel(models.Model):
         related_name="personeller",
         verbose_name="Branş",
     )
+    mezunokul = models.CharField(
+        max_length=300,
+        blank=True,
+        verbose_name="Mezun Olduğu Yükseköğretim Programı/Fakülte",
+    )
     CINSIYET_CHOICES = (
         (True, "Erkek"),
         (False, "Kadın"),
@@ -250,9 +255,13 @@ class Personel(models.Model):
         ("Dış Görevde", "Dış Görevde"),
         ("Aylıksız İzinli", "Aylıksız İzinli"),
         ("Analık İzinli", "Analık İzinli"),
+        ("Görevlendirme Sona Erdi", "Görevlendirme Sona Erdi"),
+        ("Emekli", "Emekli"),
+        ("Ayrıldı-Tayin", "Ayrıldı-Tayin"),
+        ("Açığa Alındı", "Açığa Alındı"),
     )
     durum = models.CharField(
-        max_length=20, choices=DURUM_CHOICES, default="Görevde", verbose_name="Durum",
+        max_length=30, choices=DURUM_CHOICES, default="Görevde", verbose_name="Durum",
     )
     sabit_nobet = models.BooleanField(default=False)
 
@@ -447,3 +456,45 @@ class AktifVeriKonfigurasyonu(models.Model):
     def __str__(self):
         turu = dict(self.VERI_TURU_CHOICES).get(self.veri_turu, self.veri_turu)
         return f"{turu} → {self.uygulama_tarihi}"
+
+
+# ---------------------------------------------------------------------------
+# TTKB Öğretmenlik Alanları, Atama ve Ders Okutma Esasları (resmi çizelge)
+# ---------------------------------------------------------------------------
+
+class OgretmenlikAlanCizelgesi(models.Model):
+    """
+    MEB Talim ve Terbiye Kurulu Başkanlığı'nın "Öğretmenlik Alanları, Atama ve
+    Ders Okutma Esasları" çizelgesinden içe aktarılan resmi referans tablosu.
+    Her satır bir (branş, mezuniyet programı) çiftini ve o çiftin okutabileceği
+    dersleri temsil eder — aynı branşın farklı mezuniyet programları farklı
+    ders yetkisine sahip olabildiğinden (örn. Din Kültürü ve Ahlâk Bilgisi'nde
+    İlahiyat mezunları ilköğretim mezunlarından daha geniş bir ders listesi
+    okutabilir), granülerlik branş değil bu çift bazındadır.
+    Elle düzenlenmez — `ttkb_cizelge_yukle` komutuyla TTKB PDF'inden içe aktarılır.
+    """
+
+    sira_no = models.PositiveSmallIntegerField(
+        verbose_name="Sıra No",
+        help_text="Çizelgedeki SIRA NO sütunu (aynı sıra no birden fazla branşı kapsayabilir).",
+    )
+    brans = models.CharField(max_length=200, verbose_name="Atamaya Esas Olan Alan (Branş)")
+    mezunokul = models.CharField(
+        max_length=300,
+        blank=True,
+        verbose_name="Mezun Olduğu Yükseköğretim Programı/Fakülte",
+    )
+    dersler = models.TextField(verbose_name="Okutacağı Dersler")
+    kaynak_sayfa = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name="Kaynak PDF Sayfası",
+    )
+
+    class Meta:
+        db_table = "okul_ttkb_ogretmenlik_alan_cizelgesi"
+        unique_together = [("sira_no", "brans", "mezunokul")]
+        ordering = ["sira_no", "brans", "mezunokul"]
+        verbose_name = "Öğretmenlik Alanı Çizelgesi (TTKB)"
+        verbose_name_plural = "Öğretmenlik Alanları Çizelgesi (TTKB)"
+
+    def __str__(self):
+        return f"{self.brans} — {self.mezunokul}"

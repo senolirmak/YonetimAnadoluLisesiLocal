@@ -48,7 +48,8 @@
         margin-bottom: 4px;
     }
     .form-grup input[type=text],
-    .form-grup input[type=number] {
+    .form-grup input[type=number],
+    .form-grup select {
         width: 100%;
         padding: 7px 10px;
         border: 1px solid #ced4da;
@@ -56,6 +57,7 @@
         font-size: 0.95em;
         color: #212529;
         box-sizing: border-box;
+        background: #fff;
     }
     .form-grup input:focus {
         outline: none;
@@ -195,6 +197,16 @@
                     </div>
                     <div class="yardim-metni">Pasif dersler öğrenci seçim formunda görünmez.</div>
                     {% if form.aktif.errors %}<div class="field-hata">{{ form.aktif.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="form-grup">
+                    <label for="{{ form.branslar.id_for_label }}">{{ form.branslar.label }}</label>
+                    {{ form.branslar }}
+                    <div class="yardim-metni">
+                        Ctrl/Cmd tuşuyla birden fazla branş seçebilirsiniz. Ders-öğretmen atamasında
+                        bu branşlardaki öğretmenler önerilir.
+                    </div>
+                    {% if form.branslar.errors %}<div class="field-hata">{{ form.branslar.errors.0 }}</div>{% endif %}
                 </div>
 
                 <div class="eylem-cubugu">

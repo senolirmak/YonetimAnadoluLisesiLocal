@@ -59,13 +59,14 @@ class PersonelForm(forms.ModelForm):
     class Meta:
         model = Personel
         fields = [
-            "kimlikno", "adi_soyadi", "brans", "cinsiyet",
+            "kimlikno", "adi_soyadi", "brans", "mezunokul", "cinsiyet",
             "nobeti_var", "gorev_tipi", "durum", "sabit_nobet", "user",
         ]
         labels = {
             "kimlikno": "TC Kimlik No",
             "adi_soyadi": "Adı Soyadı",
             "brans": "Branş",
+            "mezunokul": "Mezun Olduğu Yükseköğretim Programı/Fakülte",
             "cinsiyet": "Cinsiyet",
             "nobeti_var": "Nöbeti Var",
             "gorev_tipi": "Görevi",
