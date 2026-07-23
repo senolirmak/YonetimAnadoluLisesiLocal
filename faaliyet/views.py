@@ -29,7 +29,8 @@ from okul.utils import get_aktif_dp_tarihi
 
 def _ogrenci_verileri():
     sinifsube_listesi = (
-        Ogrenci.objects.values_list("sinif", "sube").distinct().order_by("sinif", "sube")
+        Ogrenci.objects.filter(aktif=True)
+        .values_list("sinif", "sube").distinct().order_by("sinif", "sube")
     )
     aktif_tarih = get_aktif_dp_tarihi()
     dp_filter = {"sinif_sube__isnull": False}
@@ -42,7 +43,7 @@ def _ogrenci_verileri():
         .order_by("sinif_sube__sinif", "sinif_sube__sube")
     )
     return {
-        "ogrenciler": Ogrenci.objects.all().order_by("sinif", "sube", "soyadi", "adi"),
+        "ogrenciler": Ogrenci.objects.filter(aktif=True).order_by("sinif", "sube", "soyadi", "adi"),
         "sinifsube_secenekleri": [f"{s}/{sb}" for s, sb in sinifsube_listesi],
         "dp_sinifsube": [{"sinif": s, "sube": sb, "label": f"{s}/{sb}"} for s, sb in dp_sinifsube],
     }

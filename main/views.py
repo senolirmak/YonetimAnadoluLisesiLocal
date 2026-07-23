@@ -53,6 +53,7 @@ def index(request):
     from ogrenci.models import Ogrenci as _Ogrenci
     _sube_qs = (
         _Ogrenci.objects
+        .filter(aktif=True)
         .values("sinif", "sube", "cinsiyet")
         .annotate(sayi=Count("id"))
         .order_by("sinif", "sube", "cinsiyet")

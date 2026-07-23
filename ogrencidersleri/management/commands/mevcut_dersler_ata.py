@@ -56,7 +56,7 @@ class Command(BaseCommand):
         # Sınıf/şube → ders saatleri önbelleği (aynı şubeyi birden fazla öğrenciye tekrar sorgulamayalım)
         dp_cache = {}
 
-        ogrenciler = Ogrenci.objects.order_by("sinif", "sube", "okulno")
+        ogrenciler = Ogrenci.objects.filter(aktif=True).order_by("sinif", "sube", "okulno")
         if sinif_filtre:
             ogrenciler = ogrenciler.filter(sinif=sinif_filtre)
         if sube_filtre:

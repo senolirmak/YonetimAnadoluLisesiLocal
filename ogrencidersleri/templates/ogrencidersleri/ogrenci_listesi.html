@@ -170,6 +170,27 @@
         background: #fff;
     }
     .btn-detay:hover { background: #e8f4fd; border-color: #417690; text-decoration: none; }
+
+    .alan-btn-grup { display: inline-flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+    .btn-alan {
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 2px 9px;
+        font-size: 0.78em;
+        font-weight: 700;
+        cursor: pointer;
+        background: #e9ecef;
+        color: #495057;
+    }
+    .btn-alan:hover { background: #dee2e6; }
+    .btn-alan.secili {
+        background: #28a745;
+        color: #fff;
+        border-color: #28a745;
+    }
+    .btn-alan.secili:hover { background: #218838; }
+
+    .ogr-tablo tbody tr.row-highlight { background: #fff3cd; transition: background 1.8s ease; }
     .kapat-btn {
         margin-left: auto;
         font-size: 0.78em;
@@ -361,7 +382,7 @@
                 </form>
             </div>
 
-            <div class="islem-kart islem-kart-toggle" onclick="toggleOgrTablo()" style="cursor:pointer;">
+            <div class="islem-kart islem-kart-toggle" onclick="toggleOgrTablo()" style="cursor:pointer;border-color:#6f42c1;">
                 <div class="islem-kart-ust">
                     <span class="islem-kart-ikon">👥</span>
                     <div class="islem-kart-baslik-metin">Öğrenci Ders Ayrıntıları</div>
@@ -371,12 +392,30 @@
                     <strong>{{ sube.toplam }} öğrencinin</strong>
                     ders atama durumunu listele. Her öğrenci için detay sayfasına erişin.
                 </div>
-                <span class="btn-toplu-ata" id="tablo-toggle-btn" style="background:#6f42c1;display:inline-block;padding:4px 14px;">Göster</span>
+                <span class="btn-toplu-ata" id="tablo-toggle-btn" style="background:#6f42c1;display:inline-block;padding:4px 14px;">Gizle</span>
             </div>
+
+            {% if seviye.sinif_no|add:1 <= 12 %}
+            <div class="islem-kart">
+                <div class="islem-kart-ust">
+                    <span class="islem-kart-ikon">🧩</span>
+                    <div class="islem-kart-baslik-metin">{{ seviye.sinif_no|add:1 }}. Sınıf Seçmeli Derslerini Ata</div>
+                </div>
+                <div class="islem-kart-aciklama">
+                    <strong>{{ seviye.sinif_no|add:1 }}. sınıfta</strong> okutulacak seçmeli ders
+                    paketini düzenleyin ve tek seferde <strong>{{ sube.toplam }} öğrencinin</strong>
+                    tamamına atayın.
+                </div>
+                <a href="{% url 'ogrdrs_sube_secmeli_form' seviye.sinif_no sube.sube %}"
+                   class="btn-toplu-ata" style="background:#8e44ad;display:inline-block;text-decoration:none;text-align:center;">
+                    Düzenle ve Ata →
+                </a>
+            </div>
+            {% endif %}
 
         </div>
 
-        <div class="ogr-tablo-blok" id="ogr-detay-tablo" style="display:none;margin-top:10px;">
+        <div class="ogr-tablo-blok" id="ogr-detay-tablo" style="display:block;margin-top:10px;">
             <div class="ogr-tablo-baslik">
                 <span>{{ sube.sinif_sube }} — Öğrenci Ders Ayrıntıları</span>
                 <button onclick="toggleOgrTablo()" class="kapat-btn" style="border:none;cursor:pointer;">✕ Gizle</button>
@@ -390,12 +429,13 @@
                         <th class="col-c">Zorunlu</th>
                         <th class="col-c">Seçmeli</th>
                         <th class="col-c">Durum</th>
+                        <th class="col-c">Alan</th>
                         <th class="col-c">İşlem</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for ogr in sube.ogrenciler %}
-                    <tr>
+                    <tr data-ogr-pk="{{ ogr.ogrenci.pk }}">
                         <td>{{ ogr.ogrenci.okulno }}</td>
                         <td>{{ ogr.ogrenci.adi }} {{ ogr.ogrenci.soyadi }}</td>
                         <td class="col-c">
@@ -421,6 +461,25 @@
                             {% else %}
                             <span class="bos-chip">Boş</span>
                             {% endif %}
+                        </td>
+                        <td class="col-c">
+                            {% if ogr.alan_secenekleri %}
+                            <div class="alan-btn-grup">
+                                {% for alan in ogr.alan_secenekleri %}
+                                <form method="post"
+                                      action="{% url 'ogrdrs_alan_ata' ogr.ogrenci.pk alan.pk %}"
+                                      onsubmit="return confirm('{{ ogr.ogrenci.adi }} {{ ogr.ogrenci.soyadi }} — seçmeli ders seçimi {{ alan.adi }} alanına göre tamamlansın mı?\nMevcut seçimler silinip alan dersleriyle değiştirilecek.')">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="sinif" value="{{ secilen_sinif }}">
+                                    <input type="hidden" name="sube" value="{{ secilen_sube }}">
+                                    <button type="submit"
+                                            class="btn-alan{% if alan.pk == ogr.secili_alan_id %} secili{% endif %}">
+                                        {{ alan.adi }}
+                                    </button>
+                                </form>
+                                {% endfor %}
+                            </div>
+                            {% else %}—{% endif %}
                         </td>
                         <td class="col-c">
                             <a href="{% url 'ogrdrs_detay' ogr.ogrenci.pk %}" class="btn-detay">Detay →</a>
@@ -452,8 +511,18 @@ function toggleOgrTablo() {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-    const anchor = document.getElementById("ogr-tablo");
-    if (anchor) anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+    const params = new URLSearchParams(window.location.search);
+    const ogrPk = params.get("ogr");
+    const row = ogrPk ? document.querySelector('tr[data-ogr-pk="' + ogrPk + '"]') : null;
+
+    if (row) {
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        row.classList.add("row-highlight");
+        setTimeout(function () { row.classList.remove("row-highlight"); }, 2000);
+    } else {
+        const anchor = document.getElementById("ogr-tablo");
+        if (anchor) anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
 });
 </script>
 {% endblock %}

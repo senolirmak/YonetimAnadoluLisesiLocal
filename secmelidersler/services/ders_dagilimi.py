@@ -165,7 +165,9 @@ def sube_ders_paketi(mevcut_sinif, sube, gelecek_sinif, aktif_yil):
     for od in _yf(OrtakDers.objects.filter(sinif_seviyesi=gelecek_sinif), aktif_yil).order_by("sira"):
         paket.append({"tur": "ortak", "ders": od, "haftalik_saat": od.haftalik_saat})
 
-    ogr_ids = Ogrenci.objects.filter(sinif=mevcut_sinif, sube=sube).values_list("pk", flat=True)
+    ogr_ids = Ogrenci.objects.filter(
+        sinif=mevcut_sinif, sube=sube, aktif=True
+    ).values_list("pk", flat=True)
     secmeli_satirlar = (
         OgrenciSecmeliDers.objects.filter(
             ogrenci_id__in=ogr_ids, ders__grup__sinif_seviyesi=gelecek_sinif

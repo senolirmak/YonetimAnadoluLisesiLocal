@@ -16,7 +16,7 @@ NOBET_DERS_SAATI = None  # tüm gün için özel sabit (FK null)
 def _sinifsube_secenekleri():
     return [
         f"{s}/{sb}"
-        for s, sb in Ogrenci.objects.values_list("sinif", "sube")
+        for s, sb in Ogrenci.objects.filter(aktif=True).values_list("sinif", "sube")
         .distinct()
         .order_by("sinif", "sube")
     ]
@@ -43,9 +43,9 @@ def nobetci_form(request):
             secili_sinif = int(sinif_str.strip())
             secili_sube = sube_str.strip()
             ogrenciler = list(
-                Ogrenci.objects.filter(sinif=secili_sinif, sube__iexact=secili_sube).order_by(
-                    "okulno"
-                )
+                Ogrenci.objects.filter(
+                    sinif=secili_sinif, sube__iexact=secili_sube, aktif=True
+                ).order_by("okulno")
             )
         except (ValueError, TypeError):
             pass

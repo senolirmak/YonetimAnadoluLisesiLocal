@@ -878,7 +878,7 @@ def sinif_oturma_plani(request):
             raise PermissionDenied
 
     ogrenciler = list(
-        Ogrenci.objects.filter(sinif=sinif_sube.sinif, sube=sinif_sube.sube)
+        Ogrenci.objects.filter(sinif=sinif_sube.sinif, sube=sinif_sube.sube, aktif=True)
         .order_by("soyadi", "adi")
     )
 

@@ -20,12 +20,6 @@
   }
   .btn-ara { background: #417690; color: #fff; border: none; border-radius: 5px;
              padding: .38rem 1rem; font-size: .84rem; font-weight: 600; cursor: pointer; }
-  .btn-otomatik {
-    background: #b45309; color: #fff; border: none; border-radius: 5px;
-    padding: .38rem 1rem; font-size: .84rem; font-weight: 600; cursor: pointer;
-    display: inline-flex; align-items: center; gap: .4rem;
-  }
-  .btn-otomatik:hover { background: #92400e; }
   .sonuc-tablo { width: 100%; border-collapse: collapse; font-size: .84rem; margin-top: .8rem; }
   .sonuc-tablo th {
     background: #f1f5f9; color: #475569; padding: .32rem .75rem;
@@ -82,25 +76,6 @@
     {{ m }}
   </div>
   {% endfor %}
-
-  {# ---- Otomatik Yükleme Bildirimi ---- #}
-  {% if oneri_sayisi > 0 %}
-  <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;
-              padding:.65rem 1rem;margin-bottom:1.2rem;font-size:.84rem;
-              display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-    <span style="color:#9a3412;">
-      <i class="fas fa-lightbulb"></i>
-      Ağırlıklı ortalaması &lt;50 olan <strong>{{ oneri_sayisi }}</strong> öğrenci henüz listede değil.
-    </span>
-    <form method="post" action="{% url 'sinif_tekrari_otomatik_ekle' %}"
-          onsubmit="return confirm('Ortalama verilerinden {{ oneri_sayisi }} öğrenci otomatik eklenecek. Devam?')">
-      {% csrf_token %}
-      <button type="submit" class="btn-otomatik">
-        <i class="fas fa-magic"></i> Otomatik Ekle ({{ oneri_sayisi }})
-      </button>
-    </form>
-  </div>
-  {% endif %}
 
   {# ---- Öğrenci Arama & Manuel Ekleme ---- #}
   <div class="arama-kart">

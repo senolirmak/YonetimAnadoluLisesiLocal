@@ -1,7 +1,7 @@
 from django import forms
 from django.core.validators import RegexValidator
 
-from .models import OgrenciAdres, OgrenciDetay
+from .models import Ogrenci, OgrenciAdres, OgrenciDetay
 
 telefon_validator = RegexValidator(
     regex=r"^\(5\d{2}\) \d{3} \d{2} \d{2}$",
@@ -55,6 +55,23 @@ class OgrenciDetayForm(forms.ModelForm):
 
     def clean_babatelefon(self):
         return self.cleaned_data.get("babatelefon") or None
+
+
+class OgrenciForm(forms.ModelForm):
+    class Meta:
+        model = Ogrenci
+        fields = ["okulno", "sube", "tckimlikno", "adi", "soyadi", "dogumtarihi", "cinsiyet"]
+        widgets = {
+            "okulno": forms.NumberInput(attrs={"class": "vTextField"}),
+            "sube": forms.TextInput(attrs={"class": "vTextField", "maxlength": "2"}),
+            "tckimlikno": forms.TextInput(attrs={"class": "vTextField", "maxlength": "11"}),
+            "adi": forms.TextInput(attrs={"class": "vTextField"}),
+            "soyadi": forms.TextInput(attrs={"class": "vTextField"}),
+            "dogumtarihi": forms.DateInput(attrs={"class": "vTextField", "type": "date"}),
+        }
+
+    def clean_sube(self):
+        return (self.cleaned_data.get("sube") or "").strip().upper()
 
 
 class OgrenciAdresForm(forms.ModelForm):

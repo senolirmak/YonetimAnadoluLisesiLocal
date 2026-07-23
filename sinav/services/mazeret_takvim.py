@@ -34,6 +34,8 @@ def oturma_plani_olustur(mazeret: "MazeretSinav") -> dict:
         "uyari": str,
     }
     """
+    from django.db.models import Q
+
     from ogrenci.models import Ogrenci, OgrenciMuaf
     from okul.utils import get_aktif_egitim_yili
     from sinav.models import (
@@ -51,7 +53,9 @@ def oturma_plani_olustur(mazeret: "MazeretSinav") -> dict:
     # Sürekli devamsız okulno'lar — Ogrenci.okulno int; MazeretOgrenci.okulno CharField → str
     sureksiz_strs = {
         str(x) for x in
-        Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+        Ogrenci.objects.filter(
+            Q(sureksiz_devamsiz=True) | Q(aktif=False)
+        ).values_list("okulno", flat=True)
     }
 
     # Muaf (okulno, ders_adi) çiftleri — subquery yerine Python listesi (int↔varchar tip uyumu)

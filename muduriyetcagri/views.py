@@ -22,7 +22,7 @@ def _mudur_mi(user):
 def _sinifsube_secenekleri():
     return [
         f"{s}/{sb}"
-        for s, sb in Ogrenci.objects.values_list("sinif", "sube")
+        for s, sb in Ogrenci.objects.filter(aktif=True).values_list("sinif", "sube")
         .distinct()
         .order_by("sinif", "sube")
     ]
@@ -97,7 +97,7 @@ def gorusme_olustur(request):
         messages.error(request, "Bu işlem için yetkiniz yok.")
         return redirect("index")
 
-    ogrenciler = Ogrenci.objects.select_related("detay").order_by("sinif", "sube", "okulno")
+    ogrenciler = Ogrenci.objects.filter(aktif=True).select_related("detay").order_by("sinif", "sube", "okulno")
     sinifsube_secenekleri = _sinifsube_secenekleri()
 
     if request.method == "POST":
@@ -219,7 +219,7 @@ def gorusme_duzenle(request, pk):
         messages.error(request, "Yalnızca kendi görüşmelerinizi düzenleyebilirsiniz.")
         return redirect("muduriyetcagri:gorusme_detay", pk=pk)
 
-    ogrenciler = Ogrenci.objects.select_related("detay").order_by("sinif", "sube", "okulno")
+    ogrenciler = Ogrenci.objects.filter(aktif=True).select_related("detay").order_by("sinif", "sube", "okulno")
     sinifsube_secenekleri = _sinifsube_secenekleri()
 
     if request.method == "POST":

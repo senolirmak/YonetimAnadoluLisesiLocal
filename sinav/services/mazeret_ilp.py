@@ -76,6 +76,8 @@ class MazeretILPService(BaseService):
             MazeretGun, MazeretOturum, MazeretOturumDers, MazeretOgrenci,
             TakvimUretim, Takvim,
         )
+        from django.db.models import Q
+
         from ogrenci.models import Ogrenci, OgrenciMuaf
         from okul.utils import get_aktif_egitim_yili
 
@@ -118,7 +120,9 @@ class MazeretILPService(BaseService):
         # Ogrenci.okulno int; MazeretOgrenci.okulno CharField → str dönüşümü
         sureksiz_strs = {
             str(x) for x in
-            Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+            Ogrenci.objects.filter(
+                Q(sureksiz_devamsiz=True) | Q(aktif=False)
+            ).values_list("okulno", flat=True)
         }
 
         # Subquery yerine Python listesi: int↔varchar tip çakışmasını önle

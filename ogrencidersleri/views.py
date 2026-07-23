@@ -80,7 +80,7 @@ def ogrenci_listesi(request):
     sinif_filtre = request.GET.get("sinif", "").strip()
     sube_filtre = request.GET.get("sube", "").strip()
 
-    qs = Ogrenci.objects.order_by("sinif", "sube", "okulno")
+    qs = Ogrenci.objects.filter(aktif=True).order_by("sinif", "sube", "okulno")
     if sinif_filtre:
         try:
             qs = qs.filter(sinif=int(sinif_filtre))
@@ -116,12 +116,39 @@ def ogrenci_listesi(request):
         )
     }
 
-    tum_siniflar = list(Ogrenci.objects.values_list("sinif", flat=True).distinct().order_by("sinif"))
-    tum_subeler = list(Ogrenci.objects.values_list("sube", flat=True).distinct().order_by("sube"))
+    tum_siniflar = list(
+        Ogrenci.objects.filter(aktif=True).values_list("sinif", flat=True).distinct().order_by("sinif")
+    )
+    tum_subeler = list(
+        Ogrenci.objects.filter(aktif=True).values_list("sube", flat=True).distinct().order_by("sube")
+    )
 
     tum_ogr_ids = list(qs.values_list("pk", flat=True))
     _tekrari_ids   = _sinif_tekrari_ids(tum_ogr_ids, _aktif_yil)
     _tasdikname_ids_set = _tasdikname_ids(tum_ogr_ids)
+
+    # Alan (TM/MF/DİL vb.) seçenekleri yalnızca 11-12. sınıf seviyeleri için tanımlanır.
+    alan_map = {}
+    for lvl in (11, 12):
+        alan_map[lvl] = list(
+            _yf(Alan.objects.filter(sinif_seviyesi=lvl), _aktif_yil).order_by("sira")
+        )
+
+    # Her alanın ders id kümesi (öğrencinin mevcut seçimiyle tam eşleşme kontrolü için)
+    alan_ders_set_map = {
+        alan.pk: set(
+            AlanDers.objects.filter(alan=alan).values_list("ders_id", flat=True)
+        )
+        for lvl_alanlar in alan_map.values() for alan in lvl_alanlar
+    }
+
+    # Öğrencinin (gelecek sınıf seviyesindeki) mevcut seçmeli ders id kümesi
+    ogr_ders_set_map = {}
+    for row in OgrenciSecmeliDers.objects.filter(
+        ogrenci_id__in=tum_ogr_ids, ders__grup__sinif_seviyesi__in=(11, 12)
+    ).values_list("ogrenci_id", "ders__grup__sinif_seviyesi", "ders_id"):
+        ogr_id, lvl, ders_id = row
+        ogr_ders_set_map.setdefault((ogr_id, lvl), set()).add(ders_id)
 
     ogr_listesi = []
     for o in qs:
@@ -129,6 +156,17 @@ def ogrenci_listesi(request):
         tasdikname = o.pk in _tasdikname_ids_set
         gelecek = o.sinif if tekrari else _GELECEK(o.sinif)
         secmeli_maks = secmeli_maks_map.get(gelecek, 0)
+
+        alan_secenekleri = alan_map.get(gelecek, [])
+        secili_alan_id = None
+        if alan_secenekleri:
+            ogr_ders_seti = ogr_ders_set_map.get((o.pk, gelecek), set())
+            for alan in alan_secenekleri:
+                alan_ders_seti = alan_ders_set_map.get(alan.pk, set())
+                if alan_ders_seti and ogr_ders_seti == alan_ders_seti:
+                    secili_alan_id = alan.pk
+                    break
+
         ogr_listesi.append({
             "ogrenci": o,
             "gelecek_sinif": gelecek,
@@ -139,6 +177,8 @@ def ogrenci_listesi(request):
             "secmeli_saat": secmeli_map.get((o.pk, gelecek), 0),
             "secmeli_maks": secmeli_maks,
             "zorunlu_sayi": zorunlu_map.get(o.pk, 0),
+            "alan_secenekleri": alan_secenekleri,
+            "secili_alan_id": secili_alan_id,
         })
 
     # Seviye → Şube → Öğrenciler gruplu yapı (yeni template için)
@@ -179,6 +219,39 @@ def ogrenci_listesi(request):
         "secilen_sinif": sinif_filtre,
         "secilen_sube": sube_filtre,
     })
+
+
+@mudur_yardimcisi_required
+def ogrenci_alan_ata(request, ogrenci_pk, alan_pk):
+    """Öğrencinin seçmeli ders seçimini seçilen Alan'ın (TM/MF/DİL vb.) ders paketiyle değiştirir."""
+    if request.method != "POST":
+        return redirect("ogrdrs_listesi")
+
+    ogrenci = get_object_or_404(Ogrenci, pk=ogrenci_pk)
+    alan = get_object_or_404(Alan, pk=alan_pk)
+
+    alan_dersler = list(AlanDers.objects.filter(alan=alan).select_related("ders"))
+    if not alan_dersler:
+        messages.error(request, f"{alan.adi} alanı için tanımlı ders bulunmuyor.")
+    else:
+        OgrenciSecmeliDers.objects.filter(
+            ogrenci=ogrenci, ders__grup__sinif_seviyesi=alan.sinif_seviyesi
+        ).delete()
+        OgrenciSecmeliDers.objects.bulk_create([
+            OgrenciSecmeliDers(ogrenci=ogrenci, ders=ad.ders, secilen_saat=ad.secilen_saat)
+            for ad in alan_dersler
+        ])
+        messages.success(
+            request,
+            f"{ogrenci.adi} {ogrenci.soyadi} — seçmeli ders seçimi {alan.adi} alanına göre tamamlandı.",
+        )
+
+    sinif = request.POST.get("sinif", "").strip()
+    sube = request.POST.get("sube", "").strip()
+    url = reverse("ogrdrs_listesi")
+    if sinif:
+        url += f"?sinif={sinif}&sube={sube}&ogr={ogrenci_pk}#ogr-tablo"
+    return redirect(url)
 
 
 @mudur_yardimcisi_required
@@ -288,7 +361,7 @@ def sinif_toplu_ders_ata(request):
         messages.warning(request, f"{sinif}/{sube} için aktif ders programında kayıt bulunamadı.")
         return redirect(f"{reverse('ogrdrs_listesi')}?sinif={sinif}&sube={sube}#ogr-tablo")
 
-    ogrenciler = list(Ogrenci.objects.filter(sinif=sinif, sube=sube))
+    ogrenciler = list(Ogrenci.objects.filter(sinif=sinif, sube=sube, aktif=True))
     if not ogrenciler:
         messages.warning(request, f"{sinif}/{sube} şubesinde öğrenci bulunamadı.")
         return redirect(f"{reverse('ogrdrs_listesi')}?sinif={sinif}&sube={sube}#ogr-tablo")
@@ -381,21 +454,43 @@ def sinif_toplu_zorunlu_ata(request):
         messages.error(request, "Geçersiz sınıf değeri.")
         return redirect("ogrdrs_listesi")
 
-    gelecek_sinif = _GELECEK(sinif)
-    yonlendir = f"{reverse('ogrdrs_listesi')}?sinif={sinif}&sube={sube}#ogr-tablo"
+    return _toplu_zorunlu_ata_impl(request, sinif, sube, _GELECEK(sinif))
 
-    if gelecek_sinif > 12:
-        messages.warning(request, f"{sinif}/{sube} öğrencileri son sınıf — gelecek yıl zorunlu ders ataması yapılamaz.")
+
+@mudur_yardimcisi_required
+def sube_zorunlu_ata_mevcut(request):
+    """POST: Bir sınıf/şubedeki tüm öğrencilere KENDİ sınıf seviyesindeki zorunlu dersleri toplu atar."""
+    if request.method != "POST":
+        return redirect("ogrdrs_listesi")
+
+    sinif_str = request.POST.get("sinif", "").strip()
+    sube = request.POST.get("sube", "").strip().upper()
+
+    try:
+        sinif = int(sinif_str)
+    except (ValueError, TypeError):
+        messages.error(request, "Geçersiz sınıf değeri.")
+        return redirect("ogrdrs_listesi")
+
+    return _toplu_zorunlu_ata_impl(request, sinif, sube, sinif)
+
+
+def _toplu_zorunlu_ata_impl(request, sinif, sube, hedef_sinif):
+    varsayilan_yonlendir = f"{reverse('ogrdrs_listesi')}?sinif={sinif}&sube={sube}#ogr-tablo"
+    yonlendir = request.POST.get("next") or varsayilan_yonlendir
+
+    if hedef_sinif > 12:
+        messages.warning(request, f"{sinif}/{sube} öğrencileri son sınıf — zorunlu ders ataması yapılamaz.")
         return redirect(yonlendir)
 
     aktif_yil = get_aktif_egitim_yili()
-    zorunlu_dersler = list(_yf(OrtakDers.objects.filter(sinif_seviyesi=gelecek_sinif), aktif_yil))
+    zorunlu_dersler = list(_yf(OrtakDers.objects.filter(sinif_seviyesi=hedef_sinif), aktif_yil))
 
     if not zorunlu_dersler:
-        messages.warning(request, f"{gelecek_sinif}. sınıf için aktif yılda zorunlu ders tanımlanmamış.")
+        messages.warning(request, f"{hedef_sinif}. sınıf için aktif yılda zorunlu ders tanımlanmamış.")
         return redirect(yonlendir)
 
-    ogrenciler = list(Ogrenci.objects.filter(sinif=sinif, sube=sube))
+    ogrenciler = list(Ogrenci.objects.filter(sinif=sinif, sube=sube, aktif=True))
     if not ogrenciler:
         messages.warning(request, f"{sinif}/{sube} şubesinde öğrenci bulunamadı.")
         return redirect(yonlendir)
@@ -409,10 +504,121 @@ def sinif_toplu_zorunlu_ata(request):
 
     messages.success(
         request,
-        f"{sinif}/{sube} — {len(ogrenciler)} öğrenciye {gelecek_sinif}. sınıf "
+        f"{sinif}/{sube} — {len(ogrenciler)} öğrenciye {hedef_sinif}. sınıf "
         f"{len(zorunlu_dersler)} zorunlu ders atandı."
     )
     return redirect(yonlendir)
+
+
+@mudur_yardimcisi_required
+def sube_secmeli_form(request, sinif, sube):
+    """
+    Bir sınıf/şubedeki tüm öğrenciler için gelecek sınıf seviyesinde okutulacak
+    seçmeli ders paketini seçip tek seferde tüm şubeye atamayı sağlar.
+    """
+    return _sube_secmeli_form_impl(request, sinif, sube, _GELECEK(sinif), kendi_seviyesi=False)
+
+
+@mudur_yardimcisi_required
+def sube_secmeli_form_mevcut(request, sinif, sube):
+    """
+    Bir sınıf/şubedeki tüm öğrenciler için KENDİ sınıf seviyesinde okutulacak
+    seçmeli ders paketini seçip tek seferde tüm şubeye atamayı sağlar (örn. yeni
+    kayıt olan öğrencilere kendi sınıf seviyelerinin seçmeli derslerini atamak için).
+    """
+    return _sube_secmeli_form_impl(request, sinif, sube, sinif, kendi_seviyesi=True)
+
+
+def _sube_secmeli_form_impl(request, sinif, sube, hedef_sinif, kendi_seviyesi):
+    sube = sube.upper()
+    varsayilan_yonlendir = f"{reverse('ogrdrs_listesi')}?sinif={sinif}&sube={sube}#ogr-tablo"
+    yonlendir = request.POST.get("next") or varsayilan_yonlendir
+
+    ogrenciler = list(Ogrenci.objects.filter(sinif=sinif, sube=sube, aktif=True))
+    if not ogrenciler:
+        messages.warning(request, f"{sinif}/{sube} şubesinde öğrenci bulunamadı.")
+        return redirect(yonlendir)
+
+    if hedef_sinif > 12:
+        messages.warning(request, f"{sinif}/{sube} öğrencileri son sınıf — seçmeli ders ataması yapılamaz.")
+        return redirect(yonlendir)
+
+    aktif_yil = get_aktif_egitim_yili()
+
+    if not _yf(SecmeliDersGrubu.objects.filter(sinif_seviyesi=hedef_sinif), aktif_yil).exists():
+        messages.warning(request, f"{hedef_sinif}. sınıf için seçmeli ders grubu tanımlanmamış.")
+        return redirect(yonlendir)
+
+    if request.method == "POST":
+        form = OgrenciSecmeliDersForm(hedef_sinif, ogrenci=None, egitim_yili=aktif_yil, data=request.POST)
+        if form.is_valid():
+            secimler = form.get_secimler()
+            OgrenciSecmeliDers.objects.filter(
+                ogrenci__in=ogrenciler, ders__grup__sinif_seviyesi=hedef_sinif
+            ).delete()
+            yeni_atamalar = [
+                OgrenciSecmeliDers(ogrenci=ogr, ders=ders, secilen_saat=saat)
+                for ogr in ogrenciler
+                for ders, saat in secimler
+            ]
+            OgrenciSecmeliDers.objects.bulk_create(yeni_atamalar)
+            messages.success(
+                request,
+                f"{sinif}/{sube} — {len(ogrenciler)} öğrenciye {hedef_sinif}. sınıf "
+                f"seçmeli ders paketi ({len(secimler)} ders) atandı.",
+            )
+            return redirect(yonlendir)
+    else:
+        form = OgrenciSecmeliDersForm(hedef_sinif, ogrenci=None, egitim_yili=aktif_yil)
+
+    ortak_dersler = _yf(
+        OrtakDers.objects.filter(sinif_seviyesi=hedef_sinif), aktif_yil
+    ).order_by("sira")
+    ortak_toplam_saat = ortak_dersler.aggregate(
+        toplam=Coalesce(Sum("haftalik_saat"), Value(0))
+    )["toplam"]
+
+    grup_listesi = [
+        {
+            "grup": grup,
+            "fields": [
+                {
+                    "field": form[fname],
+                    "saat_field": form[fname_saat] if fname_saat else None,
+                    "ders": ders,
+                }
+                for fname, fname_saat, ders in field_items
+            ],
+        }
+        for grup, field_items in form.grup_field_map.values()
+    ]
+
+    alanlar = Alan.objects.filter(sinif_seviyesi=hedef_sinif).order_by("sira")
+    alan_verileri = []
+    for alan in alanlar:
+        ders_saat = {
+            ad.ders_id: ad.secilen_saat
+            for ad in AlanDers.objects.filter(alan=alan)
+        }
+        alan_verileri.append({"id": alan.pk, "adi": alan.adi, "ders_saat": ders_saat})
+
+    return render(request, "ogrencidersleri/sube_secmeli_form.html", {
+        "title": f"{hedef_sinif}. Sınıf Seçmeli Ders — {sinif}/{sube} Şubesi",
+        "sinif": sinif,
+        "sube": sube,
+        "ogrenci_sayisi": len(ogrenciler),
+        "mevcut_sinif": sinif,
+        "gelecek_sinif": hedef_sinif,
+        "kendi_seviyesi": kendi_seviyesi,
+        "next": request.GET.get("next", ""),
+        "form": form,
+        "grup_listesi": grup_listesi,
+        "ortak_dersler": ortak_dersler,
+        "ortak_toplam_saat": ortak_toplam_saat,
+        "maks_saat": form.MAKS_SAAT,
+        "toplam_saat": get_toplam_saat(hedef_sinif),
+        "alan_verileri": alan_verileri,
+    })
 
 
 @mudur_yardimcisi_required

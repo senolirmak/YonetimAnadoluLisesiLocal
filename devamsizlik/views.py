@@ -160,6 +160,7 @@ def ogretmen_devamsizlik(request, ders_saati=None):
     ogrenciler = Ogrenci.objects.filter(
         sinif=sinif_sube.sinif,
         sube=sinif_sube.sube,
+        aktif=True,
     ).order_by("okulno")
 
     kayitli_devamsiz_ids = set(

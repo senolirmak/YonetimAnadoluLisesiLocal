@@ -8,10 +8,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from dersprogrami.models import DersProgrami
-from okul.models import DersHavuzu
+from okul.auth import mudur_yardimcisi_required
+from okul.models import DersHavuzu, SinifSube
 from okul.utils import get_aktif_dp_tarihi, get_aktif_egitim_yili
 
-from .forms import OgrenciAdresForm, OgrenciDetayForm
+from .forms import OgrenciAdresForm, OgrenciDetayForm, OgrenciForm
 from .models import Ogrenci, OgrenciAdres, OgrenciDetay, OgrenciMuaf
 
 
@@ -243,7 +244,7 @@ def sureksiz_devamsiz_listesi(request):
     if request.method == "POST":
         sureksiz_isaretli = set(request.POST.getlist("sureksiz"))
         sinifsube = request.POST.get("sinifsube_filtre", "")
-        qs = Ogrenci.objects.all()
+        qs = Ogrenci.objects.filter(aktif=True)
         if sinifsube:
             try:
                 sinif, sube = sinifsube.split("/")
@@ -267,7 +268,7 @@ def sureksiz_devamsiz_listesi(request):
 
     aktif_yil = get_aktif_egitim_yili()
 
-    ogrenciler = Ogrenci.objects.all()
+    ogrenciler = Ogrenci.objects.filter(aktif=True)
     if sinifsube:
         try:
             sinif, sube = sinifsube.split("/")
@@ -291,7 +292,8 @@ def sureksiz_devamsiz_listesi(request):
 
     sinifsube_secenekleri = [
         f"{s}/{sb}"
-        for s, sb in Ogrenci.objects.values_list("sinif", "sube").distinct().order_by("sinif", "sube")
+        for s, sb in Ogrenci.objects.filter(aktif=True)
+        .values_list("sinif", "sube").distinct().order_by("sinif", "sube")
     ]
 
     ogr_listesi = list(ogrenciler.order_by("sinif", "sube", "okulno"))
@@ -303,7 +305,7 @@ def sureksiz_devamsiz_listesi(request):
         "sinifsube_secenekleri": sinifsube_secenekleri,
         "secili_sinifsube":      sinifsube,
         "filtre":                filtre,
-        "toplam_sureksiz":       Ogrenci.objects.filter(sureksiz_devamsiz=True).count(),
+        "toplam_sureksiz":       Ogrenci.objects.filter(sureksiz_devamsiz=True, aktif=True).count(),
         "toplam_muaf":           OgrenciMuaf.objects.filter(egitim_yili=aktif_yil).values("ogrenci").distinct().count(),
     })
 
@@ -432,3 +434,102 @@ def ogrenci_muaf_duzenle(request, pk):
             "mevcut_ders_ids": mevcut_ders_ids,
         },
     )
+
+
+# ─────────────────────────────────────────────
+# Yeni Kayıt — sınıf/şube bazlı öğrenci CRUD'u
+# ─────────────────────────────────────────────
+
+
+@mudur_yardimcisi_required
+def yeni_kayit_hub(request, sinif):
+    subeler = sorted(
+        set(SinifSube.objects.filter(sinif=sinif).values_list("sube", flat=True))
+        | set(Ogrenci.objects.filter(sinif=sinif).values_list("sube", flat=True).distinct())
+    )
+
+    sube_verileri = [
+        {"sube": sube, "toplam": Ogrenci.objects.filter(sinif=sinif, sube__iexact=sube).count()}
+        for sube in subeler
+    ]
+
+    return render(request, "ogrenci/yeni_kayit_hub.html", {
+        "title": f"{sinif}. Sınıf Yeni Kayıt",
+        "sinif": sinif,
+        "sube_verileri": sube_verileri,
+        "toplam_ogrenci": sum(s["toplam"] for s in sube_verileri),
+    })
+
+
+@mudur_yardimcisi_required
+def yeni_kayit_liste(request, sinif, sube):
+    sube = sube.upper()
+    ogrenciler = Ogrenci.objects.filter(sinif=sinif, sube__iexact=sube).order_by("okulno")
+
+    return render(request, "ogrenci/yeni_kayit_liste.html", {
+        "title": f"{sinif}/{sube} — Öğrenciler",
+        "sinif": sinif,
+        "sube": sube,
+        "ogrenciler": ogrenciler,
+    })
+
+
+@mudur_yardimcisi_required
+def yeni_kayit_ekle(request, sinif, sube):
+    sube = sube.upper()
+
+    if request.method == "POST":
+        form = OgrenciForm(request.POST)
+        if form.is_valid():
+            ogrenci = form.save(commit=False)
+            ogrenci.sinif = sinif
+            ogrenci.sube = sube
+            ogrenci.save()
+            messages.success(request, f"{ogrenci.adi} {ogrenci.soyadi} eklendi.")
+            return redirect("ogrenci:yeni_kayit_liste", sinif=sinif, sube=sube)
+    else:
+        form = OgrenciForm()
+
+    return render(request, "ogrenci/yeni_kayit_form.html", {
+        "title": f"{sinif}/{sube} — Yeni Öğrenci Ekle",
+        "sinif": sinif,
+        "sube": sube,
+        "form": form,
+        "duzenleme": False,
+    })
+
+
+@mudur_yardimcisi_required
+def yeni_kayit_duzenle(request, pk):
+    ogrenci = get_object_or_404(Ogrenci, pk=pk)
+
+    if request.method == "POST":
+        form = OgrenciForm(request.POST, instance=ogrenci)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"{ogrenci.adi} {ogrenci.soyadi} güncellendi.")
+            return redirect("ogrenci:yeni_kayit_liste", sinif=ogrenci.sinif, sube=ogrenci.sube)
+    else:
+        form = OgrenciForm(instance=ogrenci)
+
+    return render(request, "ogrenci/yeni_kayit_form.html", {
+        "title": f"{ogrenci.adi} {ogrenci.soyadi} — Düzenle",
+        "sinif": ogrenci.sinif,
+        "sube": ogrenci.sube,
+        "form": form,
+        "duzenleme": True,
+        "ogrenci": ogrenci,
+    })
+
+
+@mudur_yardimcisi_required
+def yeni_kayit_sil(request, pk):
+    if request.method != "POST":
+        return redirect("ogrenci:ogrenci_liste")
+
+    ogrenci = get_object_or_404(Ogrenci, pk=pk)
+    sinif, sube = ogrenci.sinif, ogrenci.sube
+    ad = f"{ogrenci.adi} {ogrenci.soyadi}"
+    ogrenci.delete()
+    messages.success(request, f"{ad} silindi.")
+    return redirect("ogrenci:yeni_kayit_liste", sinif=sinif, sube=sube)

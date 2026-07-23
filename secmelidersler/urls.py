@@ -44,5 +44,4 @@ path("alanlar/", views.alan_listesi, name="secmeli_alan_listesi"),
     path("sinif-tekrari/", views.sinif_tekrari_listesi, name="sinif_tekrari_listesi"),
     path("sinif-tekrari/ekle/", views.sinif_tekrari_ekle, name="sinif_tekrari_ekle"),
     path("sinif-tekrari/<int:pk>/sil/", views.sinif_tekrari_sil, name="sinif_tekrari_sil"),
-    path("sinif-tekrari/otomatik-ekle/", views.sinif_tekrari_otomatik_ekle, name="sinif_tekrari_otomatik_ekle"),
 ]

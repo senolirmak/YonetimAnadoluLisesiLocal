@@ -1,0 +1,59 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">{{ title }}</h2>
+        <div style="display:flex;gap:.5rem;">
+            <a href="{% url 'ogrenci:yeni_kayit_hub' sinif %}" class="btn btn-dark">← Şubeler</a>
+            <a href="{% url 'ogrenci:yeni_kayit_ekle' sinif sube %}" class="btn btn-success">Yeni Öğrenci Ekle</a>
+        </div>
+    </div>
+
+    {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Okul No</th>
+                    <th>Adı Soyadı</th>
+                    <th>T.C. Kimlik No</th>
+                    <th>Cinsiyet</th>
+                    <th>Doğum Tarihi</th>
+                    <th class="center">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ogr in ogrenciler %}
+                <tr>
+                    <td>{{ ogr.okulno }}</td>
+                    <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                    <td>{{ ogr.tckimlikno }}</td>
+                    <td>{{ ogr.get_cinsiyet_display }}</td>
+                    <td>{{ ogr.dogumtarihi|date:"d.m.Y" }}</td>
+                    <td class="center">
+                        <a href="{% url 'ogrenci:yeni_kayit_duzenle' ogr.pk %}" class="btn btn-info">Düzenle</a>
+                        <form method="post" action="{% url 'ogrenci:yeni_kayit_sil' ogr.pk %}"
+                              style="display:inline;"
+                              onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} silinsin mi? Bu işlem geri alınamaz.')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">Sil</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted">Bu şubede henüz kayıtlı öğrenci yok.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted mt-20">Toplam: {{ ogrenciler.count }} öğrenci</p>
+</div>
+{% endblock %}

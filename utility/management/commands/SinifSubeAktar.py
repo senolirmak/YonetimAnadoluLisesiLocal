@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from veriaktar.services.sinifsube_import_service import sinif_sube_kaydet
 
 sinif_bilgileri = {
-    9: ["A", "B", "C", "D", "E", "F"],
+    9: ["A", "B", "C", "D", "E", "F", "G"],
     10: ["A", "B", "C", "D", "E", "F", "G", "H", "İ"],
     11: ["A", "B", "C", "D", "E", "F", "G", "H"],
     12: ["A", "B", "C", "D", "E", "F", "G"],

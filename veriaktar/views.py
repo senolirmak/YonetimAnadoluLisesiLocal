@@ -48,7 +48,7 @@ def veriaktar_ana(request):
     mevcut_siniflar = defaultdict(list)
     if not SinifSube.objects.exists():
         defaults = {
-            9: ["A", "B", "C", "D", "E", "F"],
+            9: ["A", "B", "C", "D", "E", "F", "G"],
             10: ["A", "B", "C", "D", "E", "F", "G", "H", "İ"],
             11: ["A", "B", "C", "D", "E", "F", "G", "H"],
             12: ["A", "B", "C", "D", "E", "F", "G"],

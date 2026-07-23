@@ -11,4 +11,9 @@ urlpatterns = [
     path("sureksiz-devamsiz/", views.sureksiz_devamsiz_listesi, name="sureksiz_devamsiz_listesi"),
     path("<int:pk>/sureksiz-toggle/", views.sureksiz_devamsiz_toggle, name="sureksiz_devamsiz_toggle"),
     path("<int:pk>/muaf/", views.ogrenci_muaf_duzenle, name="ogrenci_muaf_duzenle"),
+    path("yeni-kayit/<int:sinif>/", views.yeni_kayit_hub, name="yeni_kayit_hub"),
+    path("yeni-kayit/<int:sinif>/<str:sube>/", views.yeni_kayit_liste, name="yeni_kayit_liste"),
+    path("yeni-kayit/<int:sinif>/<str:sube>/ekle/", views.yeni_kayit_ekle, name="yeni_kayit_ekle"),
+    path("yeni-kayit/duzenle/<int:pk>/", views.yeni_kayit_duzenle, name="yeni_kayit_duzenle"),
+    path("yeni-kayit/sil/<int:pk>/", views.yeni_kayit_sil, name="yeni_kayit_sil"),
 ]

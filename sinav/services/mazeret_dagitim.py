@@ -20,7 +20,7 @@ import re
 from datetime import time, timedelta
 from typing import List, Tuple
 
-from django.db.models import Subquery, OuterRef
+from django.db.models import Subquery, OuterRef, Q
 
 from ogrenci.models import Ogrenci, OgrenciMuaf
 from okul.utils import get_aktif_egitim_yili
@@ -171,7 +171,9 @@ def populate_ogrenciler(mazeret_sinav: MazeretSinav) -> tuple[int, int]:
     # Ogrenci.okulno PositiveIntegerField; SinavSalonYoklama.okulno CharField → str dönüşümü
     sureksiz_okulnolari = {
         str(x) for x in
-        Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+        Ogrenci.objects.filter(
+            Q(sureksiz_devamsiz=True) | Q(aktif=False)
+        ).values_list("okulno", flat=True)
     }
 
     # Özel durum 2: Muaf → (okulno, ders_adi) bazında hariç
@@ -315,7 +317,9 @@ def dagit(mazeret_sinav: MazeretSinav) -> Tuple[bool, str]:
     # Ogrenci.okulno int; MazeretOgrenci.okulno CharField → str dönüşümü
     sureksiz_okulnolari = {
         str(x) for x in
-        Ogrenci.objects.filter(sureksiz_devamsiz=True).values_list("okulno", flat=True)
+        Ogrenci.objects.filter(
+            Q(sureksiz_devamsiz=True) | Q(aktif=False)
+        ).values_list("okulno", flat=True)
     }
 
     # Muaf (ders bazında): (okulno, ders_adi) çiftleri → o ders için hariç

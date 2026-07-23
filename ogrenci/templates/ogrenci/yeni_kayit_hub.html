@@ -1,0 +1,50 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">{{ title }}</h2>
+        <span class="text-muted">Toplam: {{ toplam_ogrenci }} öğrenci</span>
+    </div>
+
+    {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
+        {% for sv in sube_verileri %}
+        <div class="card">
+            <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>{{ sinif }}/{{ sv.sube }}</span>
+                <span style="font-weight:400;font-size:.85em;">{{ sv.toplam }} öğrenci</span>
+            </div>
+            <div class="form-box" style="display:flex;flex-direction:column;gap:8px;">
+                <a href="{% url 'ogrenci:yeni_kayit_liste' sinif sv.sube %}" class="btn btn-info" style="text-align:center;">
+                    Öğrenciler →
+                </a>
+
+                <form method="post" action="{% url 'ogrdrs_toplu_zorunlu_ata_mevcut' %}"
+                      onsubmit="return confirm('{{ sinif }}/{{ sv.sube }} — {{ sv.toplam }} öğrenciye {{ sinif }}. sınıf zorunlu dersleri atanacak. Devam edilsin mi?')">
+                    {% csrf_token %}
+                    <input type="hidden" name="sinif" value="{{ sinif }}">
+                    <input type="hidden" name="sube" value="{{ sv.sube }}">
+                    <input type="hidden" name="next" value="{% url 'ogrenci:yeni_kayit_hub' sinif %}">
+                    <button type="submit" class="btn btn-warning" style="width:100%;">Zorunlu Dersleri Ata</button>
+                </form>
+
+                <a href="{% url 'ogrdrs_sube_secmeli_form_mevcut' sinif sv.sube %}?next={% url 'ogrenci:yeni_kayit_hub' sinif %}"
+                   class="btn btn-success" style="text-align:center;">
+                    Seçmeli Dersleri Düzenle ve Ata
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-muted">Bu sınıf seviyesi için tanımlı şube bulunmuyor.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

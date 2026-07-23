@@ -21,6 +21,12 @@ class Ogrenci(models.Model):
         verbose_name="Sürekli Devamsız",
         help_text="İşaretlenirse mazeret sınavına çağrılmaz.",
     )
+    aktif = models.BooleanField(
+        default=True,
+        verbose_name="Aktif",
+        help_text="Tasdikname alan (öğrenim hakkını kullanmış) öğrenciler için otomatik olarak "
+        "pasife alınır ve aktif öğrenci listelerinden çıkarılır.",
+    )
     class Meta:
         db_table = "ogrenci"
         verbose_name = "Öğrenci"

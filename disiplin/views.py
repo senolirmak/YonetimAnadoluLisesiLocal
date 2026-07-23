@@ -36,7 +36,10 @@ def _personel(request):
 
 
 def _sinifsube_secenekleri():
-    rows = Ogrenci.objects.values_list("sinif", "sube").distinct().order_by("sinif", "sube")
+    rows = (
+        Ogrenci.objects.filter(aktif=True)
+        .values_list("sinif", "sube").distinct().order_by("sinif", "sube")
+    )
     return [f"{s}/{sb}" for s, sb in rows]
 
 
@@ -146,7 +149,7 @@ def gorusme_olustur(request):
         messages.error(request, "Bu kullanıcıya bağlı personel kaydı bulunamadı.")
         return redirect("index")
 
-    ogrenciler = Ogrenci.objects.select_related("detay").order_by("sinif", "sube", "okulno")
+    ogrenciler = Ogrenci.objects.filter(aktif=True).select_related("detay").order_by("sinif", "sube", "okulno")
     sinifsube_secenekleri = _sinifsube_secenekleri()
 
     if request.method == "POST":
@@ -275,7 +278,7 @@ def gorusme_duzenle(request, pk):
         messages.error(request, "Yalnızca kendi görüşmelerinizi düzenleyebilirsiniz.")
         return redirect("disiplin:gorusme_detay", pk=pk)
 
-    ogrenciler = Ogrenci.objects.select_related("detay").order_by("sinif", "sube", "okulno")
+    ogrenciler = Ogrenci.objects.filter(aktif=True).select_related("detay").order_by("sinif", "sube", "okulno")
     sinifsube_secenekleri = _sinifsube_secenekleri()
 
     if request.method == "POST":

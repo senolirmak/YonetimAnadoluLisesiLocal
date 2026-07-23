@@ -619,7 +619,8 @@ def ders_dagilimi_listesi(request):
 
     birimler_9_10 = []
     sube_listesi = (
-        Ogrenci.objects.filter(sinif=9).values_list("sube", flat=True).distinct().order_by("sube")
+        Ogrenci.objects.filter(sinif=9, aktif=True)
+        .values_list("sube", flat=True).distinct().order_by("sube")
     )
     for sube in sube_listesi:
         if not sube:
@@ -937,7 +938,8 @@ def tasdikname_listesi(request):
             Ogrenci.objects.filter(
                 Q(okulno__icontains=arama)
                 | Q(adi__icontains=arama)
-                | Q(soyadi__icontains=arama)
+                | Q(soyadi__icontains=arama),
+                aktif=True,
             ).exclude(pk__in=mevcut_ids).order_by("sinif", "sube", "okulno")[:20]
         )
 
@@ -972,7 +974,14 @@ def tasdikname_ekle(request):
         defaults={"egitim_yili": aktif_yil, "tarih": tarih, "aciklama": aciklama},
     )
     if created:
-        messages.success(request, f"{ogr.adi} {ogr.soyadi} tasdikname listesine eklendi.")
+        if ogr.aktif:
+            ogr.aktif = False
+            ogr.save(update_fields=["aktif"])
+        messages.success(
+            request,
+            f"{ogr.adi} {ogr.soyadi} tasdikname listesine eklendi ve aktif öğrenci "
+            "listelerinden çıkarıldı.",
+        )
     else:
         messages.warning(request, f"{ogr.adi} {ogr.soyadi} zaten tasdikname listesinde.")
 
@@ -986,9 +995,15 @@ def tasdikname_sil(request, pk):
     if request.method == "POST":
         kayit = OgrenciTasdikname.objects.filter(pk=pk).select_related("ogrenci").first()
         if kayit:
-            ad = f"{kayit.ogrenci.adi} {kayit.ogrenci.soyadi}"
+            ogr = kayit.ogrenci
+            ad = f"{ogr.adi} {ogr.soyadi}"
             kayit.delete()
-            messages.success(request, f"{ad} tasdikname listesinden çıkarıldı.")
+            if not ogr.aktif:
+                ogr.aktif = True
+                ogr.save(update_fields=["aktif"])
+            messages.success(
+                request, f"{ad} tasdikname listesinden çıkarıldı ve tekrar aktif hale getirildi."
+            )
     return redirect("tasdikname_listesi")
 
 
@@ -1016,18 +1031,10 @@ def sinif_tekrari_listesi(request):
             Ogrenci.objects.filter(
                 Q(okulno__icontains=arama)
                 | Q(adi__icontains=arama)
-                | Q(soyadi__icontains=arama)
+                | Q(soyadi__icontains=arama),
+                aktif=True,
             ).exclude(pk__in=mevcut_ids).order_by("sinif", "sube", "okulno")[:20]
         )
-
-    # a_ortalama < 50 olanların kaçının henüz listede olmadığını göster
-    oneri_sayisi = 0
-    if aktif_yil:
-        mevcut_tekrari_ids = set(kayitlar.values_list("ogrenci_id", flat=True))
-        oneri_sayisi = OgrenciOrtalama.objects.filter(
-            egitim_yili=aktif_yil,
-            a_ortalama__lt=50,
-        ).exclude(ogrenci_id__in=mevcut_tekrari_ids).count()
 
     return render(request, "secmelidersler/sinif_tekrari_listesi.html", {
         "title": "Sınıf Tekrarı Öğrencileri",
@@ -1036,7 +1043,6 @@ def sinif_tekrari_listesi(request):
         "arama": arama,
         "arama_sonuclari": arama_sonuclari,
         "toplam": kayitlar.count(),
-        "oneri_sayisi": oneri_sayisi,
     })
 
 
@@ -1079,35 +1085,4 @@ def sinif_tekrari_sil(request, pk):
             messages.success(request, f"{ad} sınıf tekrarı listesinden çıkarıldı.")
     return redirect("sinif_tekrari_listesi")
 
-
-@mudur_yardimcisi_required
-def sinif_tekrari_otomatik_ekle(request):
-    """a_ortalama < 50 olan öğrencileri sınıf tekrarı listesine otomatik ekler."""
-    if request.method != "POST":
-        return redirect("sinif_tekrari_listesi")
-
-    aktif_yil = get_aktif_egitim_yili()
-    if not aktif_yil:
-        messages.error(request, "Aktif eğitim-öğretim yılı tanımlanmamış.")
-        return redirect("sinif_tekrari_listesi")
-
-    dusuk_ort = OgrenciOrtalama.objects.filter(
-        egitim_yili=aktif_yil,
-        a_ortalama__lt=50,
-    ).select_related("ogrenci")
-
-    eklenen = 0
-    for kayit in dusuk_ort:
-        _, created = OgrenciSinifTekrari.objects.get_or_create(
-            ogrenci=kayit.ogrenci,
-            defaults={"egitim_yili": aktif_yil},
-        )
-        if created:
-            eklenen += 1
-
-    if eklenen:
-        messages.success(request, f"{eklenen} öğrenci sınıf tekrarı listesine eklendi.")
-    else:
-        messages.info(request, "Eklenecek yeni öğrenci bulunamadı (hepsi zaten listede).")
-    return redirect("sinif_tekrari_listesi")
 

@@ -8,6 +8,7 @@
         <h2 class="page-title">Öğrenci Listesi</h2>
         {% if is_mudur_yardimcisi %}
         <div style="display:flex; gap:.5rem;">
+          <a href="{% url 'ogrenci:yeni_kayit_hub' 9 %}" class="btn btn-warning">Yeni Kayıt (9. Sınıf)</a>
           <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" class="btn btn-secondary">Sürekli Devamsız</a>
           <a href="{% url 'ogrenci:excel_yukle' %}" class="btn btn-success">Excel Yükle</a>
         </div>
