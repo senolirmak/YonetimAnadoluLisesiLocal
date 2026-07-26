@@ -8,9 +8,15 @@
         <h2 class="page-title">{{ title }}</h2>
         <div style="display:flex;gap:.5rem;">
             <a href="{% url 'ogrenci:yeni_kayit_hub' sinif %}" class="btn btn-dark">← Şubeler</a>
+            {% if acik %}
             <a href="{% url 'ogrenci:yeni_kayit_ekle' sinif sube %}" class="btn btn-success">Yeni Öğrenci Ekle</a>
+            {% endif %}
         </div>
     </div>
+
+    {% if not acik %}
+    <div class="msg-box msg-error">{{ sinif }}/{{ sube }} şubesi kapalı — yeni öğrenci eklenemez.</div>
+    {% endif %}
 
     {% for message in messages %}
         <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">

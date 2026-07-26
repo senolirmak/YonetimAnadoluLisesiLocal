@@ -51,6 +51,22 @@ class DersProgrami(models.Model):
     ogretmen = models.ForeignKey(
         "okul.Personel", on_delete=models.CASCADE, related_name="dersprogrami"
     )
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ders_programlari",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    donem = models.ForeignKey(
+        "okul.OkulDonem",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ders_programlari",
+        verbose_name="Dönem",
+    )
 
     class Meta:
         db_table = "nobet_dersprogrami"

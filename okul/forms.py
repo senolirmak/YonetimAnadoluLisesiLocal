@@ -36,8 +36,8 @@ class DersHavuzuFullForm(forms.ModelForm):
 class SinifSubeForm(forms.ModelForm):
     class Meta:
         model = SinifSube
-        fields = ["sinif", "sube"]
-        labels = {"sinif": "Sınıf", "sube": "Şube"}
+        fields = ["sinif", "sube", "acik"]
+        labels = {"sinif": "Sınıf", "sube": "Şube", "acik": "Açık"}
 
 
 class DersSaatleriForm(forms.ModelForm):

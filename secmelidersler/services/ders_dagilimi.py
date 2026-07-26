@@ -12,7 +12,7 @@ from collections import defaultdict
 from django.db.models import Max
 
 MAKS_SUBE = 34
-HARFLER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+HARFLER = "ABCDEFGHİJKLMNOPQRSTUVWXYZ"
 
 
 def _yf(qs, aktif_yil):
@@ -130,6 +130,90 @@ def plan_sinif_dagilimi(sinif_no, gelecek_sinif, aktif_yil, maks_sube=MAKS_SUBE)
         "alan_yok": alan_yok,
         "sinif_tekrari": sinif_tekrari_liste,
         "tasdikname": tasdikname_liste,
+        "toplam_ogr": sum(g["ogrenci_sayisi"] for g in alan_gruplari),
+        "toplam_sube": sum(g["sube_sayisi"] for g in alan_gruplari),
+    }
+
+
+def plan_sinif_dagilimi_gecmis(gelecek_sinif, secili_yil):
+    """`plan_sinif_dagilimi` ile aynı çıktı biçimini, zaten uygulanmış bir geçişi
+    denetlemek için üretir: `gelecek_sinif` seviyesinde HÂLEN aktif olan öğrencileri,
+    `secili_yil`in Alan/AlanDers kayıtlarıyla (kendi seviyelerindeki seçimleri üzerinden)
+    eşleştirir ve gerçek (hipotetik değil) mevcut şubelerine göre gruplar. Hiçbir kayıt
+    değiştirmez, salt okunur denetim amaçlıdır — bkz. `secmelidersler.views.sinif_dagilimi`.
+    """
+    from ogrenci.models import Ogrenci
+    from ogrencidersleri.models import OgrenciSecmeliDers
+
+    from ..models import Alan, AlanDers
+
+    alanlar = list(
+        _yf(Alan.objects.filter(sinif_seviyesi=gelecek_sinif), secili_yil)
+        .order_by("sira", "adi")
+    )
+    alan_ders_map = {
+        a.pk: set(AlanDers.objects.filter(alan=a).values_list("ders_id", flat=True))
+        for a in alanlar
+    }
+
+    ogrenciler = list(
+        Ogrenci.objects.filter(sinif=gelecek_sinif, aktif=True).order_by("sube", "okulno")
+    )
+    ogr_ids = [o.pk for o in ogrenciler]
+
+    ogr_secim = defaultdict(set)
+    for ogr_id, ders_id in OgrenciSecmeliDers.objects.filter(
+        ogrenci_id__in=ogr_ids, ders__grup__sinif_seviyesi=gelecek_sinif
+    ).values_list("ogrenci_id", "ders_id"):
+        ogr_secim[ogr_id].add(ders_id)
+
+    alan_ogr = defaultdict(list)
+    alan_yok = []
+    for ogr in ogrenciler:
+        secimler = ogr_secim.get(ogr.pk, set())
+        if not secimler:
+            alan_yok.append(ogr)
+            continue
+        en_iyi_pk, en_iyi_skor = None, 0
+        for a_pk, d_ids in alan_ders_map.items():
+            skor = len(secimler & d_ids)
+            if skor > en_iyi_skor:
+                en_iyi_skor, en_iyi_pk = skor, a_pk
+        (alan_ogr[en_iyi_pk] if en_iyi_pk else alan_yok).append(ogr)
+
+    alan_gruplari = []
+    for a in alanlar:
+        ogrs = alan_ogr.get(a.pk, [])
+        sube_ogr_map = defaultdict(list)
+        for o in ogrs:
+            sube_ogr_map[o.sube].append(o)
+        subeler = []
+        for harf in sorted(sube_ogr_map):
+            grup_ogrenciler = sorted(sube_ogr_map[harf], key=lambda x: x.okulno or 0)
+            subeler.append({
+                "sube": harf,
+                "label": f"{gelecek_sinif}/{harf}",
+                "ogrenciler": grup_ogrenciler,
+                "kiz_sayi": sum(1 for o in grup_ogrenciler if o.cinsiyet == "K"),
+                "erkek_sayi": sum(1 for o in grup_ogrenciler if o.cinsiyet == "E"),
+            })
+        alan_gruplari.append({
+            "alan": a,
+            "ogrenci_sayisi": len(ogrs),
+            "toplam_kiz": sum(1 for o in ogrs if o.cinsiyet == "K"),
+            "toplam_erkek": sum(1 for o in ogrs if o.cinsiyet == "E"),
+            "sube_sayisi": len(subeler),
+            "subeler": subeler,
+        })
+
+    return {
+        "sinif": None,
+        "gelecek_sinif": gelecek_sinif,
+        "alan_gruplari": alan_gruplari,
+        "alan_yok": alan_yok,
+        "tum_alanlar": alanlar,
+        "sinif_tekrari": [],
+        "tasdikname": [],
         "toplam_ogr": sum(g["ogrenci_sayisi"] for g in alan_gruplari),
         "toplam_sube": sum(g["sube_sayisi"] for g in alan_gruplari),
     }

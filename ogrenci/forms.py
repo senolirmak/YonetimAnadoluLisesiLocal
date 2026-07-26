@@ -71,7 +71,16 @@ class OgrenciForm(forms.ModelForm):
         }
 
     def clean_sube(self):
-        return (self.cleaned_data.get("sube") or "").strip().upper()
+        sube = (self.cleaned_data.get("sube") or "").strip().upper()
+        if self.instance.pk and self.instance.sinif and sube != self.instance.sube:
+            from okul.models import SinifSube
+
+            kayit = SinifSube.objects.filter(sinif=self.instance.sinif, sube__iexact=sube).first()
+            if kayit and not kayit.acik:
+                raise forms.ValidationError(
+                    f"{self.instance.sinif}/{sube} şubesi kapalı — öğrenci bu şubeye taşınamaz."
+                )
+        return sube
 
 
 class OgrenciAdresForm(forms.ModelForm):

@@ -53,6 +53,14 @@ def get_aktif_egitim_yili():
     return okul.okul_egtyil if okul else None
 
 
+def get_aktif_donem():
+    """OkulBilgi singleton'dan aktif dönemi (OkulDonem) döner."""
+    from okul.models import OkulBilgi
+
+    okul = OkulBilgi.objects.select_related("okul_donem").first()
+    return okul.okul_donem if okul else None
+
+
 def get_aktif_dp_tarihi() -> datetime.date | None:
     """
     Aktif ders programı uygulama_tarihi'ni döner.

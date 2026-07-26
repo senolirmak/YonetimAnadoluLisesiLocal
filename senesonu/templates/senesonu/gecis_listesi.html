@@ -1,0 +1,80 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<div class="container">
+    <div class="page-header">
+        <h2 class="page-title">{{ title }}</h2>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">Yeni Sene Sonu Geçişi Oluştur</div>
+        <div style="padding:14px 16px;">
+            <p style="margin:0 0 12px; color:#495057; font-size:.9em;">
+                Aktif eğitim-öğretim yılı: <strong>{{ aktif_yil|default:"— tanımlı değil —" }}</strong>
+            </p>
+            {% if hedef_yillar %}
+            <form method="post" action="{% url 'senesonu:gecis_olustur' %}" style="display:flex; gap:10px; align-items:center;">
+                {% csrf_token %}
+                <label>Hedef (yeni) eğitim-öğretim yılı:</label>
+                <select name="yeni_yil" required style="padding:6px 10px; border:1px solid #ced4da; border-radius:4px;">
+                    <option value="">-- seçin --</option>
+                    {% for y in hedef_yillar %}
+                    <option value="{{ y.pk }}">{{ y.egitim_yili }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-filtre">Geçiş Taslağı Oluştur</button>
+            </form>
+            {% else %}
+            <p style="color:#856404; background:#fff3cd; border:1px solid #ffeeba; border-radius:6px; padding:8px 12px; font-size:.88em;">
+                Seçilebilecek başka bir eğitim-öğretim yılı yok. Önce
+                <a href="{% url 'okul_ayarlari' %}">Okul Ayarları</a>'ndan yeni eğitim-öğretim yılını ekleyin.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Geçmiş / Taslak Geçişler</div>
+        <div style="overflow-x: auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Eski Yıl</th>
+                        <th>Yeni Yıl</th>
+                        <th>Durum</th>
+                        <th>Oluşturulma</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for g in gecisler %}
+                    <tr>
+                        <td>{{ g.eski_egitim_yili }}</td>
+                        <td>{{ g.yeni_egitim_yili }}</td>
+                        <td>
+                            {% if g.uygulandi %}
+                            <span class="badge" style="background:#198754; color:#fff; padding:2px 8px; border-radius:10px; font-size:.8em;">Uygulandı</span>
+                            {% else %}
+                            <span class="badge" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:10px; font-size:.8em;">Taslak</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ g.olusturulma_zamani|date:"d.m.Y H:i" }}</td>
+                        <td>
+                            <a href="{% url 'senesonu:gecis_detay' g.pk %}" style="text-decoration:none; padding:5px 12px; border-radius:4px; background:#17a2b8; color:#fff;">Görüntüle</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align:center; padding:24px; color:#999;">Henüz bir sene sonu geçişi oluşturulmadı.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

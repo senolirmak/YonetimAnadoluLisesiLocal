@@ -61,6 +61,15 @@
   .tm-renk  { background: #f0fdf4; border-left-color: #16a34a; color: #065f46; }
   .dil-renk { background: #fff7ed; border-left-color: #ea580c; color: #9a3412; }
   .diger-renk { background: #f5f3ff; border-left-color: #7c3aed; color: #4c1d95; }
+  .alan-btn-grup { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+  .btn-alan {
+    border: 1px solid #ced4da; border-radius: 4px; padding: 2px 9px;
+    font-size: .74rem; font-weight: 700; cursor: pointer;
+    background: #e9ecef; color: #495057;
+  }
+  .btn-alan:hover { background: #dee2e6; }
+  .btn-alan.secili { background: #16a34a; color: #fff; border-color: #16a34a; }
+  .btn-alan.secili:hover { background: #128a3e; }
 </style>
 
 <div class="sd-sayfa">
@@ -76,13 +85,28 @@
               padding:.4rem 1rem;border-radius:6px;text-decoration:none;font-size:.85rem;font-weight:600;">
       <i class="fas fa-home"></i> Ana Sayfa
     </a>
+    <select onchange="if(this.value){window.location.search='?yil='+this.value;}else{window.location.search='';}"
+            style="padding:6px 10px; border:1px solid #dee2e6; border-radius:4px; font-size:0.88em;">
+      {% for y in tum_yillar %}
+      <option value="{{ y.pk }}" {% if secili_yil.pk == y.pk %}selected{% endif %}>{{ y.egitim_yili }}</option>
+      {% endfor %}
+    </select>
   </div>
 
   <h5 style="font-size:1.08rem;font-weight:700;color:#1e3a5f;margin-bottom:1.4rem;">
     <i class="fas fa-layer-group"></i> Sınıf Dağılımı Planı
   </h5>
 
-  {% if aktif_yil %}
+  {% if salt_okunur %}
+  <div style="display:flex;align-items:center;gap:10px;background:#fff3cd;border-left:4px solid #856404;
+              border-radius:4px;padding:8px 14px;font-size:.86em;color:#856404;margin-bottom:1.6rem;">
+    <i class="fas fa-history"></i>
+    <span>{% if gecmis_yil %}Geçmiş yıl denetimi{% else %}Aktif yıl denetimi{% endif %}: <strong>{{ secili_yil.egitim_yili }}</strong> &mdash;
+      Hâlen 11./12. sınıfta olan öğrenciler, {{ secili_yil.egitim_yili }} yılının Alan kayıtlarıyla eşleştirilip
+      GERÇEK (mevcut) şubelerine göre gruplanıyor. Alan Seçimi sütunundaki butonlarla öğrencinin
+      alanı değiştirilebilir/atanabilir — bu değişiklik kalıcıdır.</span>
+  </div>
+  {% elif aktif_yil %}
   <div style="display:flex;align-items:center;gap:10px;background:#e8f5e9;border-left:4px solid #2e7d32;
               border-radius:4px;padding:8px 14px;font-size:.86em;color:#1b5e20;margin-bottom:1.6rem;">
     <i class="fas fa-calendar-alt"></i>
@@ -102,7 +126,7 @@
   <div class="sd-plan-wrap">
     <div class="sd-plan-baslik" style="background:#1e3a5f;">
       <i class="fas fa-arrow-up"></i>
-      10. Sınıf &rarr; 11. Sınıf Planı
+      {% if salt_okunur %}11. Sınıf Denetimi ({{ secili_yil.egitim_yili }}){% else %}10. Sınıf &rarr; 11. Sınıf Planı{% endif %}
     </div>
     <div class="sd-ozet-bar">
       <div>Eşleşen öğrenci: <strong>{{ plan_11.toplam_ogr }}</strong></div>
@@ -151,6 +175,7 @@
                 <th>Ad Soyad</th>
                 <th style="text-align:center;">Cin.</th>
                 <th>Mevcut Sınıf/Şube</th>
+                <th>Alan Seçimi</th>
               </tr>
             </thead>
             <tbody>
@@ -167,6 +192,22 @@
                   {% endif %}
                 </td>
                 <td style="color:#64748b;">{{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}</td>
+                <td style="font-weight:600;">
+                  {% if salt_okunur %}
+                  <div class="alan-btn-grup">
+                    {% for alan in aktif_alanlar_11 %}
+                    <form method="post" action="{% url 'secmeli_sinif_dagilimi_alan_degistir' ogr.pk alan.pk %}"
+                          onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} — seçmeli ders seçimi {{ alan.adi }} alanına göre değiştirilsin mi?\nMevcut seçimler silinip alan dersleriyle değiştirilecek.')">
+                      {% csrf_token %}
+                      <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
+                      <button type="submit" class="btn-alan{% if alan.adi == grup.alan.adi %} secili{% endif %}">{{ alan.adi }}</button>
+                    </form>
+                    {% endfor %}
+                  </div>
+                  {% else %}
+                  {{ grup.alan.adi }}
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -184,7 +225,21 @@
         <br><small>Bu öğrencilerin seçmeli ders seçimleri alan tanımlarıyla örtüşmüyor ya da seçim yapılmamış.</small>
         <ul>
           {% for ogr in plan_11.alan_yok %}
-          <li>{{ ogr.adi }} {{ ogr.soyadi }} – {{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}</li>
+          <li>
+            {{ ogr.adi }} {{ ogr.soyadi }} – {{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}
+            {% if salt_okunur %}
+            <span class="alan-btn-grup" style="margin-left:.5rem;">
+              {% for alan in aktif_alanlar_11 %}
+              <form method="post" action="{% url 'secmeli_sinif_dagilimi_alan_degistir' ogr.pk alan.pk %}" style="display:inline;"
+                    onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} — seçmeli ders seçimi {{ alan.adi }} alanına göre atansın mı?')">
+                {% csrf_token %}
+                <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
+                <button type="submit" class="btn-alan">{{ alan.adi }}</button>
+              </form>
+              {% endfor %}
+            </span>
+            {% endif %}
+          </li>
           {% endfor %}
         </ul>
       </div>
@@ -224,7 +279,7 @@
   <div class="sd-plan-wrap">
     <div class="sd-plan-baslik" style="background:#065f46;">
       <i class="fas fa-arrow-up"></i>
-      11. Sınıf &rarr; 12. Sınıf Planı
+      {% if salt_okunur %}12. Sınıf Denetimi ({{ secili_yil.egitim_yili }}){% else %}11. Sınıf &rarr; 12. Sınıf Planı{% endif %}
     </div>
     <div class="sd-ozet-bar">
       <div>Eşleşen öğrenci: <strong>{{ plan_12.toplam_ogr }}</strong></div>
@@ -271,6 +326,7 @@
                 <th>Ad Soyad</th>
                 <th style="text-align:center;">Cin.</th>
                 <th>Mevcut Sınıf/Şube</th>
+                <th>Alan Seçimi</th>
               </tr>
             </thead>
             <tbody>
@@ -287,6 +343,22 @@
                   {% endif %}
                 </td>
                 <td style="color:#64748b;">{{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}</td>
+                <td style="font-weight:600;">
+                  {% if salt_okunur %}
+                  <div class="alan-btn-grup">
+                    {% for alan in aktif_alanlar_12 %}
+                    <form method="post" action="{% url 'secmeli_sinif_dagilimi_alan_degistir' ogr.pk alan.pk %}"
+                          onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} — seçmeli ders seçimi {{ alan.adi }} alanına göre değiştirilsin mi?\nMevcut seçimler silinip alan dersleriyle değiştirilecek.')">
+                      {% csrf_token %}
+                      <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
+                      <button type="submit" class="btn-alan{% if alan.adi == grup.alan.adi %} secili{% endif %}">{{ alan.adi }}</button>
+                    </form>
+                    {% endfor %}
+                  </div>
+                  {% else %}
+                  {{ grup.alan.adi }}
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -304,7 +376,21 @@
         <br><small>Bu öğrencilerin seçmeli ders seçimleri alan tanımlarıyla örtüşmüyor ya da seçim yapılmamış.</small>
         <ul>
           {% for ogr in plan_12.alan_yok %}
-          <li>{{ ogr.adi }} {{ ogr.soyadi }} – {{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}</li>
+          <li>
+            {{ ogr.adi }} {{ ogr.soyadi }} – {{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}
+            {% if salt_okunur %}
+            <span class="alan-btn-grup" style="margin-left:.5rem;">
+              {% for alan in aktif_alanlar_12 %}
+              <form method="post" action="{% url 'secmeli_sinif_dagilimi_alan_degistir' ogr.pk alan.pk %}" style="display:inline;"
+                    onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} — seçmeli ders seçimi {{ alan.adi }} alanına göre atansın mı?')">
+                {% csrf_token %}
+                <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
+                <button type="submit" class="btn-alan">{{ alan.adi }}</button>
+              </form>
+              {% endfor %}
+            </span>
+            {% endif %}
+          </li>
           {% endfor %}
         </ul>
       </div>

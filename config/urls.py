@@ -55,6 +55,7 @@ urlpatterns = [
     path("ekders/", include("ekders.urls")),
     path("secmeli/", include("secmelidersler.urls")),
     path("ogr-dersler/", include("ogrencidersleri.urls")),
+    path("sene-sonu/", include("senesonu.urls")),
     path("", include("main.urls")),
     path("", include("nobet.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

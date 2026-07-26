@@ -104,8 +104,24 @@
         Her alana ait seçmeli dersler öğrenci seçim formlarında kullanılabilir.
     </p>
 
+    {% if not salt_okunur %}
     <a href="{% url 'secmeli_alan_yeni' %}" class="yeni-btn">+ Yeni Alan</a>
+    <form method="post" action="{% url 'secmeli_alan_onceki_getir' %}" style="display:inline;"
+          onsubmit="return confirm('Önceki eğitim-öğretim yılındaki alan tanımları bu yıla eklenecek. Devam edilsin mi?')">
+        {% csrf_token %}
+        <button type="submit" class="geri-btn" style="background:#e8f4fd;color:#2d5469;border-color:#c5d8e8;cursor:pointer;">↺ Önceki Dönemden Getir</button>
+    </form>
+    {% endif %}
     <a href="{% url 'secmeli_index' %}" class="geri-btn">← Seçmeli Dersler</a>
+
+    <select onchange="if(this.value){window.location.search='?yil='+this.value;}else{window.location.search='';}" style="padding:6px 10px; border:1px solid #dee2e6; border-radius:4px; font-size:0.88em; margin-left:10px;">
+        {% for y in tum_yillar %}
+        <option value="{{ y.pk }}" {% if secili_yil.pk == y.pk %}selected{% endif %}>{{ y.egitim_yili }}</option>
+        {% endfor %}
+    </select>
+    {% if salt_okunur %}
+    <span style="color:#856404; background:#fff3cd; border:1px solid #ffeeba; border-radius:4px; padding:4px 10px; font-size:0.85em; margin-left:8px;">Geçmiş yıl — salt okunur</span>
+    {% endif %}
 
     {% if not alanlar_11 and not alanlar_12 %}
     <p class="bos-mesaj" style="margin-top:24px">Henüz alan tanımlanmamış.</p>
@@ -119,6 +135,7 @@
             <div class="alan-kart">
                 <div class="alan-kart-baslik">
                     <span>{{ alan.adi }}</span>
+                    {% if not salt_okunur %}
                     <span class="aksiyon">
                         <a href="{% url 'secmeli_alan_duzenle' alan.pk %}">Düzenle</a>
                         <form method="post" action="{% url 'secmeli_alan_sil' alan.pk %}" class="sil-form"
@@ -127,6 +144,7 @@
                             <button type="submit" class="sil-link" style="background:none;border:none;cursor:pointer;color:#ffb3b3;font-size:0.82em;padding:0;margin-left:10px;">Sil</button>
                         </form>
                     </span>
+                    {% endif %}
                 </div>
                 <div class="alan-kart-govde">
                     {% with dersler=alan.dersler.all %}
@@ -155,6 +173,7 @@
             <div class="alan-kart">
                 <div class="alan-kart-baslik">
                     <span>{{ alan.adi }}</span>
+                    {% if not salt_okunur %}
                     <span class="aksiyon">
                         <a href="{% url 'secmeli_alan_duzenle' alan.pk %}">Düzenle</a>
                         <form method="post" action="{% url 'secmeli_alan_sil' alan.pk %}" class="sil-form"
@@ -163,6 +182,7 @@
                             <button type="submit" class="sil-link" style="background:none;border:none;cursor:pointer;color:#ffb3b3;font-size:0.82em;padding:0;margin-left:10px;">Sil</button>
                         </form>
                     </span>
+                    {% endif %}
                 </div>
                 <div class="alan-kart-govde">
                     {% with dersler=alan.dersler.all %}

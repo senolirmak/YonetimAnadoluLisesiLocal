@@ -3,6 +3,12 @@
 {% block title %}Öğrenci Listesi{% endblock %}
 
 {% block content %}
+<style>
+  .badge-warning { background-color: #b45309; }
+  .badge-success { background-color: #16a34a; }
+  .badge-light { background-color: #6b7280; }
+  td .badge + .badge { margin-left: .3rem; }
+</style>
 <div class="container">
     <div class="flex-between mb-20">
         <h2 class="page-title">Öğrenci Listesi</h2>
@@ -49,6 +55,7 @@
                     <th>Cinsiyet</th>
                     <th>Veli</th>
                     <th>Veli Telefon</th>
+                    <th>Durum</th>
                     <th class="center">İşlem</th>
                 </tr>
             </thead>
@@ -61,16 +68,23 @@
                     <td>{{ ogr.get_cinsiyet_display }}</td>
                     <td>{{ ogr.detay.veli|default:"-" }}</td>
                     <td>{{ ogr.detay.velitelefon|default:"-" }}</td>
+                    <td>
+                        {% for etiket in ogr.durum_etiketleri %}
+                        <span class="badge {% if etiket == 'Sınıf Tekrarı' %}badge-warning{% else %}badge-light{% endif %}">{{ etiket }}</span>
+                        {% empty %}
+                        <span class="badge badge-success">Aktif</span>
+                        {% endfor %}
+                    </td>
                     <td class="center">
                         <a href="{% url 'ogrenci:ogrenci_detay_duzenle' ogr.pk %}" class="btn btn-info">Düzenle</a>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="text-center text-muted">Kayıt bulunamadı.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted">Kayıt bulunamadı.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    <p class="text-muted mt-20">Toplam: {{ ogrenciler.count }} öğrenci</p>
+    <p class="text-muted mt-20">Toplam: {{ ogrenciler|length }} öğrenci</p>
 </div>
 {% endblock %}

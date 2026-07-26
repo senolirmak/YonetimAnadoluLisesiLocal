@@ -13,6 +13,7 @@ from django.utils import timezone
 from reportlab.lib import colors
 from reportlab.platypus import Paragraph, TableStyle
 
+from okul.utils import get_aktif_donem, get_aktif_egitim_yili
 from personeldevamsizlik.models import Devamsizlik
 
 from ..models import (
@@ -48,6 +49,8 @@ def gunun_nobetcileri(request):
             raise PermissionDenied
         if "kaydet" in request.POST:
             try:
+                egitim_yili = get_aktif_egitim_yili()
+                donem = get_aktif_donem()
                 with transaction.atomic():
                     for key, value in request.POST.items():
                         if key.startswith("place_") and value:
@@ -56,7 +59,11 @@ def gunun_nobetcileri(request):
                             GunlukNobetCizelgesi.objects.update_or_create(
                                 tarih=target_date,
                                 ogretmen=gorev.ogretmen,
-                                defaults={"nobet_yeri": value},
+                                defaults={
+                                    "nobet_yeri": value,
+                                    "egitim_yili": egitim_yili,
+                                    "donem": donem,
+                                },
                             )
 
                 messages.success(

@@ -16,6 +16,17 @@ class OkulBilgiAyarForm(forms.ModelForm):
             "okul_egtyil": "Aktif Eğitim-Öğretim Yılı",
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        egtyil_id = None
+        if self.is_bound:
+            egtyil_id = self.data.get(self.add_prefix("okul_egtyil"))
+        elif self.instance and self.instance.okul_egtyil_id:
+            egtyil_id = self.instance.okul_egtyil_id
+        self.fields["okul_donem"].queryset = OkulDonem.objects.filter(
+            egitim_yili_id=egtyil_id
+        ).order_by("donem")
+
 
 class EgitimOgretimYiliForm(forms.ModelForm):
     class Meta:

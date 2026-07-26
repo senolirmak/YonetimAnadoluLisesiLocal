@@ -25,4 +25,5 @@ urlpatterns = [
         name="download_unassigned_ders_png",
     ),
     path("devamsizlik-sinif-pdf/", views.devamsizlik_sinif_pdf, name="devamsizlik_sinif_pdf"),
+    path("liste/", views.nobet_gorevi_listesi, name="nobet_gorevi_listesi"),
 ]

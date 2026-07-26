@@ -1,0 +1,123 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Nöbet Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<div class="container">
+    <div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 class="page-title">{{ title }}</h2>
+        <a href="{% url 'senesonu:gecis_listesi' %}" style="text-decoration:none; color:#6c757d;">← Geçişler</a>
+    </div>
+
+    {% if gecis.uygulandi %}
+    <p style="margin:0 0 12px; color:#155724; background:#d4edda; border:1px solid #c3e6cb; border-radius:6px; padding:8px 12px; font-size:0.88em;">
+        Bu geçiş {{ gecis.uygulama_zamani|date:"d.m.Y H:i" }} tarihinde uygulandı — salt okunur.
+    </p>
+    {% endif %}
+
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:16px;">
+        <div class="card" style="text-align:center; padding:12px;">
+            <div style="font-size:1.6em; font-weight:700; color:#1d4ed8;">{{ ozet.toplam }}</div>
+            <div style="font-size:.8em; color:#495057; font-weight:600;">TOPLAM</div>
+        </div>
+        <div class="card" style="text-align:center; padding:12px;">
+            <div style="font-size:1.6em; font-weight:700; color:#198754;">{{ ozet.normal }}</div>
+            <div style="font-size:.8em; color:#495057; font-weight:600;">NORMAL</div>
+        </div>
+        <div class="card" style="text-align:center; padding:12px;">
+            <div style="font-size:1.6em; font-weight:700; color:#6c757d;">{{ ozet.sinif_tekrari }}</div>
+            <div style="font-size:.8em; color:#495057; font-weight:600;">SINIF TEKRARI</div>
+        </div>
+        <div class="card" style="text-align:center; padding:12px;">
+            <div style="font-size:1.6em; font-weight:700; color:#6c757d;">{{ ozet.mezun }}</div>
+            <div style="font-size:.8em; color:#495057; font-weight:600;">MEZUN</div>
+        </div>
+        <div class="card" style="text-align:center; padding:12px; {% if ozet.inceleme_gerekli %}border:1.5px solid #dc3545;{% endif %}">
+            <div style="font-size:1.6em; font-weight:700; color:#dc3545;">{{ ozet.inceleme_gerekli }}</div>
+            <div style="font-size:.8em; color:#495057; font-weight:600;">İNCELEME GEREKLİ</div>
+        </div>
+    </div>
+
+    {% if not gecis.uygulandi %}
+    <div class="card" style="margin-bottom:16px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+            {% if ozet.inceleme_gerekli %}
+            <span style="color:#dc3545; font-weight:600; font-size:.9em;">
+                {{ ozet.inceleme_gerekli }} öğrencinin şubesi belirlenmeden uygulanamaz.
+            </span>
+            {% else %}
+            <span style="color:#495057; font-size:.9em;">Tüm satırlar çözüldü, uygulamaya hazır.</span>
+            {% endif %}
+        </div>
+        <div style="display:flex; gap:8px;">
+            <form method="post" action="{% url 'senesonu:gecis_sil' gecis.pk %}" onsubmit="return confirm('Bu taslak silinsin mi?')">
+                {% csrf_token %}
+                <button type="submit" style="padding:7px 16px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">Taslağı Sil</button>
+            </form>
+            <form method="post" action="{% url 'senesonu:gecis_uygula' gecis.pk %}" onsubmit="return confirm('Bu işlem {{ ozet.toplam }} öğrencinin sınıf/şubesini güncelleyecek ve aktif eğitim-öğretim yılını {{ gecis.yeni_egitim_yili }} olarak değiştirecek. Emin misiniz?')">
+                {% csrf_token %}
+                <button type="submit" {% if ozet.inceleme_gerekli %}disabled{% endif %} style="padding:7px 16px; background:#198754; color:#fff; border:none; border-radius:4px; cursor:pointer; {% if ozet.inceleme_gerekli %}opacity:.5; cursor:not-allowed;{% endif %}">Uygula</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="get" style="margin-bottom:12px;">
+        <label style="font-size:.88em; font-weight:600; color:#495057;">Durum filtresi:</label>
+        <select name="durum" onchange="this.form.submit()" style="padding:5px 8px; border:1px solid #ced4da; border-radius:4px;">
+            <option value="">-- Tümü --</option>
+            {% for val, label in durum_choices %}
+            <option value="{{ val }}" {% if durum_filtre == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <div class="card">
+        <div style="overflow-x: auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Okul No</th>
+                        <th>Öğrenci</th>
+                        <th>Eski</th>
+                        <th>Yeni</th>
+                        <th>Durum</th>
+                        {% if not gecis.uygulandi %}<th>Düzenle</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in satirlar %}
+                    <tr {% if s.durum == "inceleme_gerekli" %}style="background:#fff5f5;"{% endif %}>
+                        <td>{{ s.ogrenci.okulno }}</td>
+                        <td>{{ s.ogrenci.adi }} {{ s.ogrenci.soyadi }}</td>
+                        <td>{{ s.eski_sinif }}/{{ s.eski_sube }}</td>
+                        <td>{% if s.yeni_sinif %}{{ s.yeni_sinif }}/{{ s.yeni_sube|default:"?" }}{% else %}—{% endif %}</td>
+                        <td>{{ s.get_durum_display }}</td>
+                        {% if not gecis.uygulandi %}
+                        <td>
+                            {% if s.durum != "mezun" %}
+                            <form method="post" action="{% url 'senesonu:satir_duzenle' s.pk %}" style="display:flex; gap:4px;">
+                                {% csrf_token %}
+                                <input type="text" name="yeni_sinif" value="{{ s.yeni_sinif|default:'' }}" style="width:40px; padding:3px 5px; border:1px solid #ced4da; border-radius:4px;">
+                                <input type="text" name="yeni_sube" value="{{ s.yeni_sube }}" maxlength="2" style="width:40px; padding:3px 5px; border:1px solid #ced4da; border-radius:4px;">
+                                <button type="submit" style="padding:3px 10px; background:#17a2b8; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:.82em;">Kaydet</button>
+                            </form>
+                            {% else %}
+                            <span style="color:#adb5bd; font-size:.85em;">—</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align:center; padding:24px; color:#999;">Kayıt bulunamadı.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

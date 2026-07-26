@@ -1,6 +1,7 @@
 # nobet/views/__init__.py
 # Geriye dönük uyumluluk: tüm public isimler buradan erişilebilir.
 
+from .arsiv import nobet_gorevi_listesi
 from .dagitim import (
     _get_report_header_info,
     _gun_adi_tr,
@@ -41,6 +42,8 @@ from .ogretmen import (
 )
 
 __all__ = [
+    # arsiv
+    "nobet_gorevi_listesi",
     # permissions
     "YONETICI_GRUPLAR",
     "TARIH_DEGISTIREBILIR_GRUPLAR",

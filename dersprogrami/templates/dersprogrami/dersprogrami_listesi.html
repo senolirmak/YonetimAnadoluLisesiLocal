@@ -64,6 +64,26 @@
 
     <form method="get" class="filtre-form">
         <div>
+            <label>Eğitim-Öğretim Yılı / Dönem:</label>
+            <select onchange="
+                var v = this.value;
+                if (v) {
+                    var parts = v.split('|');
+                    window.location.search = '?yil=' + parts[0] + '&donem=' + parts[1];
+                } else {
+                    window.location.search = '';
+                }
+            ">
+                <option value="">-- Aktif (güncel) --</option>
+                {% for d in donemler %}
+                <option value="{{ d.egitim_yili_id }}|{{ d.donem_id }}"
+                    {% if secili_yil_id == d.egitim_yili_id|stringformat:"s" and secili_donem_id == d.donem_id|stringformat:"s" %}selected{% endif %}>
+                    {{ d.egitim_yili__egitim_yili }} — {% if d.donem__donem == 1 %}1. Dönem{% elif d.donem__donem == 2 %}2. Dönem{% else %}—{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
             <label>Öğretmen:</label>
             <select name="ogretmen">
                 <option value="">-- Tümü --</option>
@@ -95,8 +115,13 @@
             </select>
         </div>
         <button type="submit" class="btn-filtre">Filtrele</button>
-        <a href="{% url 'dersprogrami_listesi' %}" class="btn-sifirla">Sıfırla</a>
+        <a href="{{ request.path }}" class="btn-sifirla">Sıfırla</a>
     </form>
+    {% if gecmis_donem_secili %}
+    <p style="margin:0 0 12px; color:#856404; background:#fff3cd; border:1px solid #ffeeba; border-radius:6px; padding:8px 12px; font-size:0.88em;">
+        Geçmiş bir eğitim-öğretim yılı/dönem verisini görüntülüyorsunuz — salt okunur.
+    </p>
+    {% endif %}
 
     <div class="card">
         <div class="card-header">

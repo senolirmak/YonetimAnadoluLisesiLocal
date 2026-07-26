@@ -16,6 +16,39 @@ from .forms import OgrenciAdresForm, OgrenciDetayForm, OgrenciForm
 from .models import Ogrenci, OgrenciAdres, OgrenciDetay, OgrenciMuaf
 
 
+def _gorunur_ogrenciler_ve_durum(ogrenciler):
+    """Mezun/Tasdikname öğrencileri listeden çıkarır, kalanlara `.durum_etiketleri` atar."""
+    from secmelidersler.models import OgrenciSinifTekrari, OgrenciTasdikname
+    from senesonu.models import SeneSonuOgrenciGecisi
+
+    tasdikname_ids = set(OgrenciTasdikname.objects.values_list("ogrenci_id", flat=True))
+    mezun_ids = set(
+        SeneSonuOgrenciGecisi.objects.filter(
+            durum="mezun", gecis__uygulandi=True
+        ).values_list("ogrenci_id", flat=True)
+    )
+
+    ogr_listesi = [
+        o for o in ogrenciler if o.pk not in tasdikname_ids and o.pk not in mezun_ids
+    ]
+
+    sinif_tekrari_ids = set(
+        OgrenciSinifTekrari.objects.filter(
+            ogrenci_id__in=[o.pk for o in ogr_listesi]
+        ).values_list("ogrenci_id", flat=True)
+    )
+
+    for ogr in ogr_listesi:
+        etiketler = []
+        if ogr.pk in sinif_tekrari_ids:
+            etiketler.append("Sınıf Tekrarı")
+        if not ogr.aktif:
+            etiketler.append("Pasif")
+        ogr.durum_etiketleri = etiketler
+
+    return ogr_listesi
+
+
 def _rehberlik_sinif_sube(user):
     """Öğretmenin 'REHBERLİK VE YÖNLENDİRME' dersine ait SinifSube nesnesini döner; yoksa None."""
     try:
@@ -198,7 +231,7 @@ def ogrenci_liste(request):
             request,
             "ogrenci/ogrenci_liste.html",
             {
-                "ogrenciler": ogrenciler,
+                "ogrenciler": _gorunur_ogrenciler_ve_durum(ogrenciler),
                 "sinifsube_secenekleri": [],
                 "secili_sinifsube": str(ss),
                 "sinif_filtre_gizli": True,
@@ -224,7 +257,7 @@ def ogrenci_liste(request):
         request,
         "ogrenci/ogrenci_liste.html",
         {
-            "ogrenciler": ogrenciler,
+            "ogrenciler": _gorunur_ogrenciler_ve_durum(ogrenciler),
             "sinifsube_secenekleri": sinifsube_secenekleri,
             "secili_sinifsube": sinifsube,
             "sinif_filtre_gizli": False,
@@ -447,9 +480,14 @@ def yeni_kayit_hub(request, sinif):
         set(SinifSube.objects.filter(sinif=sinif).values_list("sube", flat=True))
         | set(Ogrenci.objects.filter(sinif=sinif).values_list("sube", flat=True).distinct())
     )
+    acik_map = dict(SinifSube.objects.filter(sinif=sinif).values_list("sube", "acik"))
 
     sube_verileri = [
-        {"sube": sube, "toplam": Ogrenci.objects.filter(sinif=sinif, sube__iexact=sube).count()}
+        {
+            "sube": sube,
+            "toplam": Ogrenci.objects.filter(sinif=sinif, sube__iexact=sube).count(),
+            "acik": acik_map.get(sube, True),
+        }
         for sube in subeler
     ]
 
@@ -459,6 +497,12 @@ def yeni_kayit_hub(request, sinif):
         "sube_verileri": sube_verileri,
         "toplam_ogrenci": sum(s["toplam"] for s in sube_verileri),
     })
+
+
+def _sube_acik_mi(sinif, sube):
+    """SinifSube kaydı yoksa (henüz tanımlanmamış şube) açık kabul edilir."""
+    kayit = SinifSube.objects.filter(sinif=sinif, sube__iexact=sube).first()
+    return kayit.acik if kayit else True
 
 
 @mudur_yardimcisi_required
@@ -471,12 +515,17 @@ def yeni_kayit_liste(request, sinif, sube):
         "sinif": sinif,
         "sube": sube,
         "ogrenciler": ogrenciler,
+        "acik": _sube_acik_mi(sinif, sube),
     })
 
 
 @mudur_yardimcisi_required
 def yeni_kayit_ekle(request, sinif, sube):
     sube = sube.upper()
+
+    if not _sube_acik_mi(sinif, sube):
+        messages.error(request, f"{sinif}/{sube} şubesi kapalı — yeni öğrenci eklenemez.")
+        return redirect("ogrenci:yeni_kayit_liste", sinif=sinif, sube=sube)
 
     if request.method == "POST":
         form = OgrenciForm(request.POST)

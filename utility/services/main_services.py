@@ -216,6 +216,10 @@ class EOkulVeriAktar:
             status["message"] = "İşlenecek veri yok."
             return status
 
+        from okul.utils import get_aktif_donem, get_aktif_egitim_yili
+        egitim_yili = get_aktif_egitim_yili()
+        donem = get_aktif_donem()
+
         try:
             with transaction.atomic():
                 # 1. Silinecek tarihleri belirle
@@ -268,6 +272,8 @@ class EOkulVeriAktar:
                                 uygulama_tarihi=uygulama_tarihi,
                                 nobet_gun=row["nobet_gun"],
                                 nobet_yeri=yer_map[yer_adi],
+                                egitim_yili=egitim_yili,
+                                donem=donem,
                             )
                         )
                     except Exception as row_error:
@@ -316,6 +322,10 @@ class EOkulVeriAktar:
         if program_df.empty:
             status["message"] = "İşlenecek veri yok."
             return status
+
+        from okul.utils import get_aktif_donem, get_aktif_egitim_yili
+        egitim_yili = get_aktif_egitim_yili()
+        donem = get_aktif_donem()
 
         try:
             with transaction.atomic():
@@ -380,6 +390,8 @@ class EOkulVeriAktar:
                                 uygulama_tarihi=uygulama_tarihi,
                                 ders=ders_obj,
                                 sinif_sube=sinif_sube,
+                                egitim_yili=egitim_yili,
+                                donem=donem,
                             )
                         )
                     except Exception as row_err:

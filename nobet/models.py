@@ -79,6 +79,22 @@ class NobetGorevi(models.Model):
     )
     uygulama_tarihi = models.DateField(default=timezone.now)
     ogretmen = models.ForeignKey(NobetOgretmen, on_delete=models.CASCADE, related_name="nobetler")
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="nobet_gorevleri",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    donem = models.ForeignKey(
+        "okul.OkulDonem",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="nobet_gorevleri",
+        verbose_name="Dönem",
+    )
 
     class Meta:
         db_table = "nobet_gorevi"
@@ -141,6 +157,22 @@ class GunlukNobetCizelgesi(models.Model):
         NobetOgretmen, on_delete=models.CASCADE, related_name="gunluk_nobetler"
     )
     nobet_yeri = models.CharField(max_length=100)
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="gunluk_nobet_cizelgeleri",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    donem = models.ForeignKey(
+        "okul.OkulDonem",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="gunluk_nobet_cizelgeleri",
+        verbose_name="Dönem",
+    )
 
     class Meta:
         db_table = "gunluk_nobet_cizelgesi"
@@ -179,6 +211,22 @@ class MazeretSalonGorevi(models.Model):
         verbose_name="Görevli Nöbetçi",
     )
     kayit_zamani = models.DateTimeField(auto_now=True)
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="mazeret_salon_gorevleri",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    donem = models.ForeignKey(
+        "okul.OkulDonem",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="mazeret_salon_gorevleri",
+        verbose_name="Dönem",
+    )
 
     class Meta:
         db_table = "nobet_mazeret_salon_gorevi"

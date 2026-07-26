@@ -13,6 +13,7 @@ from django.db.models import Q
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from okul.utils import get_aktif_donem, get_aktif_egitim_yili
 from personeldevamsizlik.models import Devamsizlik
 from utility.services.main_services import IstatistikService
 from utility.services.nobet_dagitimi_service import AdvancedNobetDagitim
@@ -158,6 +159,8 @@ def _handle_mazeret_kaydet(request):
     except (ValueError, TypeError):
         target_date = timezone.localdate()
 
+    egitim_yili = get_aktif_egitim_yili()
+    donem = get_aktif_donem()
     for salon_ad in ("Mazeret1", "Mazeret2"):
         if request.POST.get(f"mazeret_acik_{salon_ad}") != "1":
             MazeretSalonGorevi.objects.filter(tarih=target_date, salon=salon_ad).delete()
@@ -169,7 +172,11 @@ def _handle_mazeret_kaydet(request):
                     ogretmen = NobetOgretmen.objects.get(pk=int(ogr_pk))
                     MazeretSalonGorevi.objects.update_or_create(
                         tarih=target_date, salon=salon_ad, saat=saat,
-                        defaults={"ogretmen": ogretmen},
+                        defaults={
+                            "ogretmen": ogretmen,
+                            "egitim_yili": egitim_yili,
+                            "donem": donem,
+                        },
                     )
                 except (NobetOgretmen.DoesNotExist, ValueError):
                     pass

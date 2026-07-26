@@ -136,6 +136,11 @@
 
     <div class="ust-bar">
         <a href="{% url 'secmeli_index' %}" class="geri-btn">← Seçmeli Dersler</a>
+        <form method="post" action="{% url 'secmeli_sinif_toplam_saat_onceki_getir' %}"
+              onsubmit="return confirm('Önceki eğitim-öğretim yılındaki değerler bu yılınkilerin üzerine yazılacak. Devam edilsin mi?')">
+            {% csrf_token %}
+            <button type="submit" class="geri-btn" style="background:#e8f4fd;color:#2d5469;border-color:#c5d8e8;cursor:pointer;">↺ Önceki Dönemden Getir</button>
+        </form>
     </div>
 
     {% if messages %}

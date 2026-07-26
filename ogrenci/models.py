@@ -27,6 +27,15 @@ class Ogrenci(models.Model):
         help_text="Tasdikname alan (öğrenim hakkını kullanmış) öğrenciler için otomatik olarak "
         "pasife alınır ve aktif öğrenci listelerinden çıkarılır.",
     )
+    sectigi_alan = models.CharField(
+        max_length=20,
+        default="YOK",
+        blank=True,
+        verbose_name="Seçtiği Alan",
+        help_text="11-12. sınıfta MF/TM/DİL gibi seçilen alan adı; 9-10. sınıf ve alan "
+        "seçimi yapılmamış öğrenciler için 'YOK'.",
+    )
+
     class Meta:
         db_table = "ogrenci"
         verbose_name = "Öğrenci"

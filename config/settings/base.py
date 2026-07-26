@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "ekders",
     "secmelidersler",
     "ogrencidersleri",
+    "senesonu",
 ]
 
 MIDDLEWARE = [

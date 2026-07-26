@@ -19,7 +19,12 @@
         {% for sv in sube_verileri %}
         <div class="card">
             <div class="card-header bg-primary" style="display:flex;justify-content:space-between;align-items:center;">
-                <span>{{ sinif }}/{{ sv.sube }}</span>
+                <span>
+                    {{ sinif }}/{{ sv.sube }}
+                    {% if not sv.acik %}
+                    <span style="background:#dc3545;color:#fff;border-radius:8px;padding:1px 7px;font-size:.75em;font-weight:600;margin-left:6px;">Kapalı</span>
+                    {% endif %}
+                </span>
                 <span style="font-weight:400;font-size:.85em;">{{ sv.toplam }} öğrenci</span>
             </div>
             <div class="form-box" style="display:flex;flex-direction:column;gap:8px;">

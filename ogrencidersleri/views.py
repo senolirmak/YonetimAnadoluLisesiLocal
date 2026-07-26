@@ -241,6 +241,9 @@ def ogrenci_alan_ata(request, ogrenci_pk, alan_pk):
             OgrenciSecmeliDers(ogrenci=ogrenci, ders=ad.ders, secilen_saat=ad.secilen_saat)
             for ad in alan_dersler
         ])
+        if ogrenci.sinif == alan.sinif_seviyesi:
+            ogrenci.sectigi_alan = alan.adi
+            ogrenci.save(update_fields=["sectigi_alan"])
         messages.success(
             request,
             f"{ogrenci.adi} {ogrenci.soyadi} — seçmeli ders seçimi {alan.adi} alanına göre tamamlandı.",

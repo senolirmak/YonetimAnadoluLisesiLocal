@@ -110,6 +110,11 @@ class OkulBilgi(models.Model):
 class SinifSube(models.Model):
     sinif = models.IntegerField()
     sube = models.CharField(max_length=2)
+    acik = models.BooleanField(
+        default=True,
+        verbose_name="Açık",
+        help_text="Kapalı şubelere yeni öğrenci atanamaz.",
+    )
 
     class Meta:
         db_table = "nobet_sinifsube"

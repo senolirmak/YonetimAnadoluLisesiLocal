@@ -569,14 +569,26 @@ def sinif_ogretmenleri(request):
 
 @login_required
 def dersprogrami_listesi(request):
-    from okul.models import SinifSube
+    from okul.models import EgitimOgretimYili, OkulDonem, SinifSube
 
     # Filtre parametreleri
     ogretmen_id = request.GET.get("ogretmen", "").strip()
     sinif_id = request.GET.get("sinif_sube", "").strip()
     gun = request.GET.get("gun", "").strip()
+    yil_id = request.GET.get("yil", "").strip()
+    donem_id = request.GET.get("donem", "").strip()
 
-    qs = DersProgrami.objects.aktif().select_related("ogretmen", "sinif_sube", "ders_saati", "ders").order_by(
+    secili_yil = EgitimOgretimYili.objects.filter(pk=yil_id).first() if yil_id else None
+    secili_donem = OkulDonem.objects.filter(pk=donem_id).first() if donem_id else None
+
+    if secili_yil and secili_donem:
+        qs = DersProgrami.objects.filter(egitim_yili=secili_yil, donem=secili_donem)
+        gecmis_donem_secili = True
+    else:
+        qs = DersProgrami.objects.aktif()
+        gecmis_donem_secili = False
+
+    qs = qs.select_related("ogretmen", "sinif_sube", "ders_saati", "ders").order_by(
         "ogretmen__adi_soyadi", "gun", "ders_saati__derssaati_no"
     )
 
@@ -604,6 +616,13 @@ def dersprogrami_listesi(request):
         ("Friday", "Cuma"),
     ]
 
+    donemler = (
+        DersProgrami.objects.exclude(egitim_yili__isnull=True)
+        .values("egitim_yili_id", "egitim_yili__egitim_yili", "donem_id", "donem__donem")
+        .distinct()
+        .order_by("-egitim_yili__egitim_yili", "donem__donem")
+    )
+
     context = {
         "title": "Ders Programı Listesi",
         "kayitlar": qs,
@@ -613,6 +632,10 @@ def dersprogrami_listesi(request):
         "secilen_ogretmen": ogretmen_id,
         "secilen_sinif": sinif_id,
         "secilen_gun": gun,
+        "donemler": donemler,
+        "secili_yil_id": yil_id,
+        "secili_donem_id": donem_id,
+        "gecmis_donem_secili": gecmis_donem_secili,
     }
     return render(request, "dersprogrami/dersprogrami_listesi.html", context)
 

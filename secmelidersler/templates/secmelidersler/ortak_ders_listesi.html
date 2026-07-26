@@ -303,9 +303,24 @@
         Toplam ortak ders saati, öğrenci seçim formundaki seçmeli ders saat limitini belirler.
     </p>
 
+    <select onchange="if(this.value){window.location.href='{% url 'secmeli_ortak_ders_listesi' %}?yil='+this.value{% if secili_sinif %}+'&sinif={{ secili_sinif }}'{% endif %};}else{window.location.href='{% url 'secmeli_ortak_ders_listesi' %}{% if secili_sinif %}?sinif={{ secili_sinif }}{% endif %}';}" style="padding:6px 10px; border:1px solid #dee2e6; border-radius:4px; font-size:0.88em; margin-bottom:16px;">
+        {% for y in tum_yillar %}
+        <option value="{{ y.pk }}" {% if secili_yil.pk == y.pk %}selected{% endif %}>{{ y.egitim_yili }}</option>
+        {% endfor %}
+    </select>
+    {% if salt_okunur %}
+    <span style="color:#856404; background:#fff3cd; border:1px solid #ffeeba; border-radius:4px; padding:4px 10px; font-size:0.85em; margin-left:8px;">Geçmiş yıl — salt okunur</span>
+    {% else %}
+    <form method="post" action="{% url 'secmeli_ortak_ders_onceki_getir' %}" style="display:inline;margin-left:8px;"
+          onsubmit="return confirm('Önceki eğitim-öğretim yılındaki zorunlu dersler bu yıla eklenecek. Devam edilsin mi?')">
+        {% csrf_token %}
+        <button type="submit" class="geri-btn" style="background:#e8f4fd;color:#2d5469;border-color:#c5d8e8;cursor:pointer;">↺ Önceki Dönemden Getir</button>
+    </form>
+    {% endif %}
+
     {% if secili_sinif %}
     {# ── İki kartlı seviye görünümü ── #}
-    <a href="{% url 'secmeli_ortak_ders_listesi' %}" class="geri-btn" style="margin-left:0;margin-bottom:16px;">← Tüm Tablo</a>
+    <a href="{% url 'secmeli_ortak_ders_listesi' %}{% if salt_okunur %}?yil={{ secili_yil.pk }}{% endif %}" class="geri-btn" style="margin-left:0;margin-bottom:16px;">← Tüm Tablo</a>
 
     <div class="iki-kart-layout">
 
@@ -380,14 +395,16 @@
                                 {% if item.atanmis %}
                                 <div class="atanmis-aksiyon">
                                     <span class="atanmis-chip">{{ item.ders_obj.haftalik_saat }}s</span>
+                                    {% if not salt_okunur %}
                                     <form method="post" action="{% url 'secmeli_ortak_ders_sil' item.ders_obj.pk %}" class="sil-form"
                                           onsubmit="return confirm('{{ item.ders_adi }} dersini {{ secili_sinif }}. sınıftan çıkarmak istediğinizden emin misiniz?')">
                                         {% csrf_token %}
                                         <input type="hidden" name="ref_sinif" value="{{ secili_sinif }}">
                                         <button type="submit" class="btn-cikar">Çıkar</button>
                                     </form>
+                                    {% endif %}
                                 </div>
-                                {% elif item.aktif %}
+                                {% elif item.aktif and not salt_okunur %}
                                 <form method="post" action="{% url 'secmeli_ortak_ders_ekle' %}" class="sil-form">
                                     {% csrf_token %}
                                     <input type="hidden" name="sinif_seviyesi" value="{{ secili_sinif }}">
@@ -425,7 +442,7 @@
                 <th class="col-ders">Ders Adı</th>
                 {% for sinif in siniflar %}
                 <th>
-                    <a href="{% url 'secmeli_ortak_ders_listesi' %}?sinif={{ sinif }}" class="baslik-btn">
+                    <a href="{% url 'secmeli_ortak_ders_listesi' %}?sinif={{ sinif }}{{ yil_qs }}" class="baslik-btn">
                         {{ sinif }}. Sınıf
                     </a>
                 </th>

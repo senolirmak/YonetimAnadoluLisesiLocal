@@ -55,6 +55,7 @@ REGISTRY = {
         "list_fields": [
             ("sinif", "Sınıf"),
             ("sube", "Şube"),
+            ("acik", "Açık mı?"),
         ],
         "group_by": "sinif",
         "group_order": ["sube"],

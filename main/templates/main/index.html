@@ -102,6 +102,9 @@
                         <a href="/admin/" class="btn btn-primary btn-lg">Yönetici Paneline Git</a>
                         <a href="{% url 'okul_ayarlari' %}" class="btn btn-lg" style="background-color: #495057; color: white;">Okul Yapılandırması</a>
                         <a href="{% url 'okul:yonetim_index' %}" class="btn btn-lg" style="background-color: #417690; color: white;">Okul Yönetimi (CRUD)</a>
+                        {% if is_tarih_degistirebilir %}
+                        <a href="{% url 'senesonu:gecis_listesi' %}" class="btn btn-lg" style="background-color: #b45309; color: white;">Sene Sonu Geçişleri</a>
+                        {% endif %}
                         <a href="{% url 'personel_listesi' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Personel Listesi</a>
                         <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" class="btn btn-lg"
                            style="background-color:#fd7e14;color:#fff;position:relative;">

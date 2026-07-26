@@ -58,7 +58,9 @@
       {% else %}
       <span class="badge badge-warning" style="font-size:.85rem; padding:.4rem .8rem; background:#fef3c7; color:#92400e;">⚠ Planlama Aşamasında</span>
       {% endif %}
+      {% if not aktif_sinav.arsivlendi %}
       <a href="{% url 'sorumluluk:sinav_duzenle' aktif_sinav.pk %}" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">Düzenle</a>
+      {% endif %}
       {% if aktif_sinav.arsivlendi %}
       <span class="btn btn-sm" style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; cursor:not-allowed;" title="Arşivlenmiş sınavlar silinemez.">
         <i class="fas fa-lock"></i> Arşivlendi
@@ -183,7 +185,9 @@
         </td>
         <td style="padding:.45rem .9rem; color:#475569; white-space:nowrap;">{{ s.olusturma_tarihi|date:"d.m.Y" }}</td>
         <td style="padding:.45rem .9rem; text-align:right; white-space:nowrap;">
+          {% if not s.arsivlendi %}
           <a href="{% url 'sorumluluk:sinav_duzenle' s.pk %}" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">Düzenle</a>
+          {% endif %}
           {% if s.arsivlendi %}
           <span class="btn btn-sm" style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; cursor:not-allowed;" title="Arşivlenmiş sınavlar silinemez.">
             <i class="fas fa-lock"></i> Kilitli
