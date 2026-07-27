@@ -161,6 +161,22 @@ def plan_sinif_dagilimi_gecmis(gelecek_sinif, secili_yil):
     )
     ogr_ids = [o.pk for o in ogrenciler]
 
+    from senesonu.models import SeneSonuOgrenciGecisi
+
+    # Öğrencinin şu an bulunduğu `gelecek_sinif` seviyesine hangi geçişte ulaştığına bakılır;
+    # bu, hangi katalog yılı (`secili_yil`) görüntülendiğinden bağımsızdır. Sınıf tekrarı gibi
+    # birden fazla geçiş kaydı varsa en güncel (en büyük gecis id) olan esas alınır.
+    onceki_map = {
+        ogr_id: (eski_sinif, eski_sube)
+        for ogr_id, eski_sinif, eski_sube in SeneSonuOgrenciGecisi.objects.filter(
+            yeni_sinif=gelecek_sinif, ogrenci_id__in=ogr_ids
+        ).order_by("gecis_id").values_list("ogrenci_id", "eski_sinif", "eski_sube")
+    }
+    for ogr in ogrenciler:
+        eski = onceki_map.get(ogr.pk)
+        ogr.onceki_sinif = eski[0] if eski else None
+        ogr.onceki_sube = eski[1] if eski else None
+
     ogr_secim = defaultdict(set)
     for ogr_id, ders_id in OgrenciSecmeliDers.objects.filter(
         ogrenci_id__in=ogr_ids, ders__grup__sinif_seviyesi=gelecek_sinif

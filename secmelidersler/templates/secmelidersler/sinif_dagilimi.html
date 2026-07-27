@@ -175,6 +175,7 @@
                 <th>Ad Soyad</th>
                 <th style="text-align:center;">Cin.</th>
                 <th>Mevcut Sınıf/Şube</th>
+                {% if salt_okunur %}<th>Önceki Sınıf/Şube</th>{% endif %}
                 <th>Alan Seçimi</th>
               </tr>
             </thead>
@@ -192,6 +193,11 @@
                   {% endif %}
                 </td>
                 <td style="color:#64748b;">{{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}</td>
+                {% if salt_okunur %}
+                <td style="color:#94a3b8;">
+                  {% if ogr.onceki_sinif %}{{ ogr.onceki_sinif }}{% if ogr.onceki_sube %}/{{ ogr.onceki_sube }}{% endif %}{% else %}—{% endif %}
+                </td>
+                {% endif %}
                 <td style="font-weight:600;">
                   {% if salt_okunur %}
                   <div class="alan-btn-grup">
@@ -326,6 +332,7 @@
                 <th>Ad Soyad</th>
                 <th style="text-align:center;">Cin.</th>
                 <th>Mevcut Sınıf/Şube</th>
+                {% if salt_okunur %}<th>Önceki Sınıf/Şube</th>{% endif %}
                 <th>Alan Seçimi</th>
               </tr>
             </thead>
@@ -343,6 +350,11 @@
                   {% endif %}
                 </td>
                 <td style="color:#64748b;">{{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}</td>
+                {% if salt_okunur %}
+                <td style="color:#94a3b8;">
+                  {% if ogr.onceki_sinif %}{{ ogr.onceki_sinif }}{% if ogr.onceki_sube %}/{{ ogr.onceki_sube }}{% endif %}{% else %}—{% endif %}
+                </td>
+                {% endif %}
                 <td style="font-weight:600;">
                   {% if salt_okunur %}
                   <div class="alan-btn-grup">
