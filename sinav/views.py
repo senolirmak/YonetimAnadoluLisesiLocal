@@ -1,39 +1,52 @@
-import os
-import uuid
 import threading
 import traceback
-from datetime import datetime, date
-
-from django.contrib.auth.decorators import login_required
-from django.db.models import Subquery, OuterRef, Min, Max
-from okul.auth import ust_yonetici_required
-from .utils import gozetmen_bul, onceki_ders_saati
+import uuid
+from datetime import date
 
 from django.contrib import messages
-from django.http import HttpResponse, JsonResponse, Http404
-from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .forms import AlgoritmaForm, SinavBilgisiForm, MazeretSinavForm
-from .models import (
-    SinavBilgisi,
-    DersAyarlariJSON,
-    DisVeri, AlgoritmaParametreleri,
-    TakvimUretim, Takvim, OturmaPlani, SinavSalonYoklama,
-    MazeretSinav, MazeretGun, MazeretOturum, MazeretOturumDers, MazeretOgrenci,
-    MazeretBelgeTeslim, MazeretOturmaPlani,
-)
-from okul.models import OkulBilgi
-from ogrenci.models import Ogrenci as OgrenciModel
 from dersprogrami.models import DersProgrami
+from ogrenci.models import Ogrenci as OgrenciModel
+from okul.auth import ust_yonetici_required
+from okul.models import OkulBilgi
 from ortaksinav_engine import (
     CONFIG,
-    temel_verileri_olustur,
-    verileri_aktar,
+    oturma_planlarini_olustur,
     subeders_guncelle,
     takvim_olustur,
-    oturma_planlarini_olustur,
+    temel_verileri_olustur,
+    verileri_aktar,
+)
+from sinav.services.config_builder import config_uygula
+from sinav.services.sinav_ozet import db_ozeti, gozetmen_ozeti_hesapla, sinav_takvim_araliklari
+from sinav.services.takvim_duzenleme import (
+    onizleme_oturumlarini_yeniden_numarala,
+    takvim_oturumlarini_yeniden_numarala,
+    takvimi_onayla,
+)
+from sinav.services.takvim_slot import slot_temizle
+
+from .forms import AlgoritmaForm, MazeretSinavForm, SinavBilgisiForm
+from .models import (
+    AlgoritmaParametreleri,
+    DersAyarlariJSON,
+    DisVeri,
+    MazeretBelgeTeslim,
+    MazeretOgrenci,
+    MazeretOturmaPlani,
+    MazeretOturum,
+    MazeretOturumDers,
+    MazeretSinav,
+    OturmaPlani,
+    SinavBilgisi,
+    SinavSalonYoklama,
+    Takvim,
+    TakvimUretim,
 )
 
 # ---------------------------------------------------------------
@@ -59,100 +72,6 @@ def _finish(task_id: str, error: bool = False):
     with _TASKS_LOCK:
         _TASKS[task_id]["done"] = True
         _TASKS[task_id]["error"] = error
-
-
-# ---------------------------------------------------------------
-# Session'dan CONFIG'e uygula
-# ---------------------------------------------------------------
-def _apply_config(session_cfg: dict):
-    if session_cfg.get("eokul_ogrenci_dosya"):
-        CONFIG["eokul_ogrenci_dosya"] = session_cfg["eokul_ogrenci_dosya"]
-    if session_cfg.get("eokul_haftalik_program_dosya"):
-        CONFIG["eokul_haftalik_program_dosya"] = session_cfg["eokul_haftalik_program_dosya"]
-    if session_cfg.get("uygulama_tarihi"):
-        CONFIG["uygulama_tarihi"] = session_cfg["uygulama_tarihi"]
-
-    # Algoritma parametreleri: DB birincil kaynak, yoksa session'a bak
-    aktif_sinav_cfg = SinavBilgisi.objects.filter(aktif=True).first()
-    prm = AlgoritmaParametreleri.objects.filter(sinav=aktif_sinav_cfg).first() if aktif_sinav_cfg else None
-    alg = prm.to_session_dict() if prm else session_cfg
-
-    if alg.get("baslangic_tarih"):
-        CONFIG["BASLANGIC_TARIH"] = datetime.fromisoformat(str(alg["baslangic_tarih"]))
-
-    if alg.get("oturum_saatleri"):
-        saatler = [s.strip() for s in alg["oturum_saatleri"].split(",") if s.strip()]
-        CONFIG["OTURUM_SAATLERI"] = saatler
-        CONFIG["OTURUM_SAYISI_GUN"] = len(saatler)
-
-    if "time_limit_phase1" in alg:
-        CONFIG["TIME_LIMIT_PHASE1"] = int(alg["time_limit_phase1"])
-    if "time_limit_phase2" in alg:
-        CONFIG["TIME_LIMIT_PHASE2"] = int(alg["time_limit_phase2"])
-    if "max_extra_days" in alg:
-        CONFIG["MAX_EXTRA_DAYS"] = int(alg["max_extra_days"])
-
-    if alg.get("tatil_gunleri"):
-        holidays = set()
-        for line in alg["tatil_gunleri"].splitlines():
-            line = line.strip()
-            if line:
-                try:
-                    holidays.add(datetime.fromisoformat(line).date())
-                except ValueError:
-                    pass
-        CONFIG["HOLIDAYS"] = holidays
-
-    # Ders ayarlarini aktif sinava gore JSON'dan yukle
-    aktif_sinav = aktif_sinav_cfg
-    try:
-        _daj = DersAyarlariJSON.objects.get(sinav=aktif_sinav)
-        _veri = _daj.veri or {}
-    except DersAyarlariJSON.DoesNotExist:
-        _veri = {}
-
-    yapilmayacak = _veri.get("yapilmayacak", [])
-    if yapilmayacak:
-        CONFIG["SINAV_YAPILMAYACAK_DERSLER"] = yapilmayacak
-    cift_oturumlu = _veri.get("cift_oturumlu", [])
-    if cift_oturumlu:
-        CONFIG["CIFT_OTURUMLU_DERSLER"] = cift_oturumlu
-    CONFIG["SABIT_SINAVLAR"] = [
-        {
-            "ders":      s["ders_adi"],
-            "tarih":     s["tarih"],
-            "saat":      s["saat"],
-            "seviyeler": [int(v) for v in (s.get("seviyeler") or []) if str(v).isdigit()],
-        }
-        for s in _veri.get("sabit_sinavlar", [])
-    ]
-    CONFIG["SEVIYE_CATISMA_GRUPLARI"] = [
-        g["dersler"] if isinstance(g.get("dersler"), list)
-        else [d.strip() for d in g.get("dersler", "").split(",") if d.strip()]
-        for g in _veri.get("catisma_gruplari", [])
-    ]
-    CONFIG["AYNI_SLOT_ESLEME"] = [
-        [e["ders1"], e["ders2"]]
-        for e in _veri.get("ayni_slot_esleme", [])
-    ]
-    ortak_seviyeleri = _veri.get("ortak_sinav_seviyeleri", [])
-    CONFIG["ORTAK_SINAV_SEVIYELERI"] = [int(s) for s in ortak_seviyeleri] if ortak_seviyeleri else []
-
-    # Kelebek dağılımı ayarı DB'den gelir; yoksa True (mevcut davranış)
-    kelebek = True
-    if prm is not None:
-        kelebek = bool(prm.kelebek_dagitim)
-    elif alg.get("kelebek_dagitim") is not None:
-        kelebek = bool(alg["kelebek_dagitim"])
-    CONFIG["KELEBEK_DAGITIM"] = kelebek
-
-    # Günde maks. sınav sayısı
-    if prm is not None:
-        CONFIG["MAX_SINAV_PER_GUN"] = int(prm.max_sinav_per_gun)
-    elif alg.get("max_sinav_per_gun") is not None:
-        CONFIG["MAX_SINAV_PER_GUN"] = int(alg["max_sinav_per_gun"])
-    else:
-        CONFIG["MAX_SINAV_PER_GUN"] = 2
 
 
 # ---------------------------------------------------------------
@@ -186,51 +105,6 @@ def _kurulum_durumu():
         "okul_tamam":    okul_tamam,
         "veri_tamam":    veri_tamam,
         "kurulum_tamam": okul_tamam and veri_tamam,
-    }
-
-
-def _db_ozeti():
-    from sinav.models import SubeDers, Takvim, OturmaPlani
-    aktif = _aktif_sinav()
-    return {
-        "ogrenci":      OgrenciModel.objects.count(),
-        "ders_program": DersProgrami.objects.aktif().count(),
-        "sube_ders":    SubeDers.objects.count(),
-        "takvim":       Takvim.objects.filter(sinav=aktif).count(),
-        "oturma_plani": OturmaPlani.objects.filter(sinav=aktif).count(),
-    }
-
-
-
-def _sinav_takvim_araliklari(sinavlar) -> dict:
-    """
-    Her sınav için aktif TakvimUretim'in kapsadığı gerçek (üretilmiş) takvimin
-    ilk ve son gününü döner: { sinav_id: (baslangic_tarihi, bitis_tarihi) }.
-
-    sinav_baslangic_tarihi alanı elle girilir ve ILP'ye başlangıç noktası olarak
-    verilir; üretilen takvim tatil/çakışma yüzünden daha ileri bir tarihte
-    başlayabilir veya beklenenden uzun sürebilir. Bu yüzden gerçek aralık,
-    manuel alanla karıştırılmadan, üretilen Takvim kayıtlarından hesaplanır.
-    """
-    uretimler = {
-        u.sinav_id: u
-        for u in TakvimUretim.objects.filter(sinav__in=sinavlar, aktif=True)
-    }
-    if not uretimler:
-        return {}
-
-    araliklar = (
-        Takvim.objects
-        .filter(uretim__in=uretimler.values())
-        .values("uretim")
-        .annotate(baslangic=Min("tarih"), bitis=Max("tarih"))
-    )
-    aralik_by_uretim = {a["uretim"]: (a["baslangic"], a["bitis"]) for a in araliklar}
-
-    return {
-        sinav_id: aralik_by_uretim[u.pk]
-        for sinav_id, u in uretimler.items()
-        if u.pk in aralik_by_uretim
     }
 
 
@@ -282,10 +156,10 @@ def index(request):
             aktif = yeni
 
     kurulum = _kurulum_durumu()
-    db = _db_ozeti()
+    db = db_ozeti()
     dosya = _dosya_durumu(request)
     liste = SinavBilgisi.objects.all()
-    takvim_araliklari = _sinav_takvim_araliklari(liste)
+    takvim_araliklari = sinav_takvim_araliklari(liste)
     for s in liste:
         s.otomatik_baslangic, s.otomatik_bitis = takvim_araliklari.get(s.pk, (None, None))
     liste_formlar = [(s, SinavBilgisiForm(instance=s)) for s in liste]
@@ -328,7 +202,7 @@ def _veri_yukle_calistir(request):
     from ortaksinav_engine.services.veri_import import VeriImportService
 
     aktif_sinav = _aktif_sinav()
-    _apply_config(request.session.get("ortaksinav_config", {}))
+    config_uygula(request.session.get("ortaksinav_config", {}))
     svc = VeriImportService(CONFIG)
     svc.temel_verileri_olustur()
     if aktif_sinav:
@@ -411,7 +285,6 @@ def admin_force_aktif_toggle(request):
 @login_required
 def slot_serbest_birak(request):
     """Staff/Superuser: belirtilen slot için OturmaUretim + OturmaPlani + SinavSalonYoklama kayıtlarını sil."""
-    from sinav.models import OturmaUretim, SinavSalonYoklama
     if not (request.user.is_staff or request.user.is_superuser):
         return JsonResponse({"error": "Yetkisiz işlem."}, status=403)
 
@@ -424,28 +297,11 @@ def slot_serbest_birak(request):
         return JsonResponse({"error": "Eksik parametre."}, status=400)
 
     uretim = get_object_or_404(TakvimUretim, pk=uretim_pk)
-
-    op_sayisi = OturmaPlani.objects.filter(
-        uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
-    ).count()
-    OturmaPlani.objects.filter(
-        uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
-    ).delete()
-    OturmaUretim.objects.filter(
-        takvim_uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
-    ).delete()
-    # Bu (tarih, saat) için başka oturum kalmadıysa yoklama kayıtlarını da sil
-    baska_oturum_var = OturmaPlani.objects.filter(
-        uretim=uretim, tarih=tarih, saat=saat
-    ).exists()
-    if not baska_oturum_var:
-        SinavSalonYoklama.objects.filter(
-            uretim=uretim, tarih=tarih, saat=saat
-        ).delete()
+    sonuc = slot_temizle(uretim, tarih, saat, oturum, takvim_de_sil=False)
 
     messages.success(
         request,
-        f"Slot serbest bırakıldı ({tarih} {saat} Ot.{oturum}) — {op_sayisi} oturma planı silindi."
+        f"Slot serbest bırakıldı ({tarih} {saat} Ot.{oturum}) — {sonuc['op_sayisi']} oturma planı silindi."
     )
     return redirect(f"{reverse('sinav:pdf_rapor')}?uretim_pk={uretim_pk}")
 
@@ -455,7 +311,6 @@ def slot_serbest_birak(request):
 def takvim_slot_sil(request):
     """Staff/Superuser: belirtilen slotu takvimden tamamen sil
     (OturmaPlani + OturmaUretim + Takvim + SinavSalonYoklama)."""
-    from sinav.models import OturmaUretim, Takvim, SinavSalonYoklama
     if not (request.user.is_staff or request.user.is_superuser):
         return JsonResponse({"error": "Yetkisiz işlem."}, status=403)
 
@@ -468,30 +323,11 @@ def takvim_slot_sil(request):
         return JsonResponse({"error": "Eksik parametre."}, status=400)
 
     uretim = get_object_or_404(TakvimUretim, pk=uretim_pk)
-
-    OturmaPlani.objects.filter(
-        uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
-    ).delete()
-    OturmaUretim.objects.filter(
-        takvim_uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
-    ).delete()
-    takvim_sayisi, _ = Takvim.objects.filter(
-        uretim=uretim, tarih=tarih, saat=saat, oturum=oturum
-    ).delete()
-    # Takvim.CASCADE ile SinavMedia otomatik silindi.
-    # SinavSalonYoklama'da oturum alanı yoktur; bu (tarih, saat) için başka
-    # oturum kalmadıysa yoklama kayıtlarını da temizle.
-    baska_oturum_var = Takvim.objects.filter(
-        uretim=uretim, tarih=tarih, saat=saat
-    ).exists()
-    if not baska_oturum_var:
-        SinavSalonYoklama.objects.filter(
-            uretim=uretim, tarih=tarih, saat=saat
-        ).delete()
+    sonuc = slot_temizle(uretim, tarih, saat, oturum, takvim_de_sil=True)
 
     messages.success(
         request,
-        f"Slot takvimden silindi ({tarih} {saat} Ot.{oturum}) — {takvim_sayisi} takvim kaydı kaldırıldı."
+        f"Slot takvimden silindi ({tarih} {saat} Ot.{oturum}) — {sonuc['takvim_sayisi']} takvim kaydı kaldırıldı."
     )
     return redirect(f"{reverse('sinav:pdf_rapor')}?uretim_pk={uretim_pk}")
 
@@ -499,55 +335,13 @@ def takvim_slot_sil(request):
 @login_required
 def gozetmen_ozet(request):
     """Aktif TakvimUretim'deki tüm gözetmenler + Sınıf Listesi PDF öğretmenlerini listeler."""
-    from sinav.services.ders_sinav_eslestir import tum_siniflistesi_eslestir
-
     aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
     aktif_uretim = (
         TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
         if aktif_sinav else None
     )
 
-    gozetmenler = []
-    siniflistesi_map: dict = {}
-
-    if aktif_uretim:
-        from okul.models import Personel
-
-        # Gözetmen listesi + slot sayıları (FK üzerinden, ID bazlı)
-        personel_rows = (
-            OturmaPlani.objects
-            .filter(uretim=aktif_uretim, gozetmen_fk__isnull=False)
-            .values("gozetmen_fk_id")
-            .distinct()
-        )
-        gozetmen_slot_sayisi = {}  # pk → slot_sayisi
-        for row in personel_rows:
-            pk = row["gozetmen_fk_id"]
-            gozetmen_slot_sayisi[pk] = (
-                OturmaPlani.objects
-                .filter(uretim=aktif_uretim, gozetmen_fk_id=pk)
-                .values("tarih", "saat", "oturum")
-                .distinct()
-                .count()
-            )
-
-        # Sınıf Listesi PDF: sınav öncesi son dersin öğretmeni (bitis bazlı eşleşme, ID bazlı)
-        siniflistesi_map = tum_siniflistesi_eslestir(aktif_uretim)
-
-        # Tüm personel ID'lerini birleştir (gozetmen_fk + siniflistesi sahibi) ve
-        # isimleri tek sorguda çek (isim yalnızca gösterim için, eşleştirme ID ile yapılır)
-        tum_pkler = set(gozetmen_slot_sayisi) | set(siniflistesi_map)
-        ad_map = dict(
-            Personel.objects.filter(pk__in=tum_pkler).values_list("pk", "adi_soyadi")
-        )
-        for pk in tum_pkler:
-            gozetmenler.append({
-                "ad":               ad_map.get(pk, "—"),
-                "pk":               pk,
-                "slot_sayisi":      gozetmen_slot_sayisi.get(pk, 0),
-                "siniflistesi_adet": len(siniflistesi_map.get(pk, [])),
-            })
-        gozetmenler.sort(key=lambda g: g["ad"])
+    gozetmenler, siniflistesi_map = gozetmen_ozeti_hesapla(aktif_uretim)
 
     return render(request, "sinav/gozetmen_ozet.html", {
         "aktif_sinav":      aktif_sinav,
@@ -587,6 +381,7 @@ def takvim_sayfasi(request):
 @login_required
 def takvim_onizleme(request):
     from collections import defaultdict
+
     from sinav.models import Takvim, TakvimUretim
     aktif = _aktif_sinav()
     son_uretim = TakvimUretim.objects.filter(sinav=aktif).first() if aktif else None
@@ -645,60 +440,15 @@ def takvim_onizleme(request):
 
 @require_POST
 def takvim_onayla(request):
-    from datetime import datetime as dt
-    from okul.models import DersHavuzu
-    from sinav.models import Takvim as TakvimModel, TakvimUretim
+    from sinav.models import TakvimUretim
     aktif_sinav = _aktif_sinav()
     uretim = TakvimUretim.objects.filter(sinav=aktif_sinav).order_by("-uretim_tarihi").first()
     if not uretim or uretim.onizleme_verisi is None:
         messages.error(request, "Önizleme verisi bulunamadı.")
         return redirect("sinav:takvim_sayfasi")
-    kayitlar = uretim.onizleme_verisi
-    # Takvim.ders FK için ders adı → DersHavuzu eşlemesi
-    # Çift oturumlu dersler " (Yazili)"/" (Uygulama)" ekiyle gelir; base adı dene.
-    ders_map = {d.ders_adi: d for d in DersHavuzu.objects.all()}
 
-    def _ders_fk(ders_adi_str):
-        obj = ders_map.get(ders_adi_str)
-        if obj is None:
-            base = ders_adi_str.rsplit(" (", 1)[0].strip()
-            obj = ders_map.get(base)
-        return obj
-
-    def _sinav_turu(ders_adi_str):
-        if ders_adi_str.endswith(" (Uygulama)"):
-            return "Uygulama"
-        if ders_adi_str.endswith(" (Yazili)"):
-            return "Yazili"
-        return ""
-
-    # Takvim.ders_saati FK için saat string → DersSaatleri eşlemesi
-    from okul.models import DersSaatleri as _DS
-    saatler_map = {
-        str(ds.derssaati_baslangic)[:5]: ds
-        for ds in _DS.objects.all()
-    }
-
-    # Yalnızca bu uretim'e ait eski Takvim kayıtlarını temizle (yeniden onaylama durumu)
-    TakvimModel.objects.filter(uretim=uretim).delete()
-    TakvimModel.objects.bulk_create([
-        TakvimModel(
-            sinav      = aktif_sinav,
-            uretim     = uretim,
-            tarih      = dt.strptime(r["Tarih"], "%Y-%m-%d").date(),
-            saat       = r["Saat"],
-            ders_saati = saatler_map.get(r["Saat"]),
-            oturum     = int(r["Oturum"]),
-            ders       = _ders_fk(r["Ders"]),
-            sinav_turu = _sinav_turu(r["Ders"]),
-            subeler    = r["Subeler"],
-        )
-        for r in kayitlar
-    ])
-    # Önizleme verisini temizle
-    uretim.onizleme_verisi = None
-    uretim.save(update_fields=["onizleme_verisi"])
-    messages.success(request, f"Takvim onaylandı: {len(kayitlar)} kayıt DB'ye kaydedildi.")
+    kayit_sayisi = takvimi_onayla(aktif_sinav, uretim)
+    messages.success(request, f"Takvim onaylandı: {kayit_sayisi} kayıt DB'ye kaydedildi.")
     from_param = request.POST.get("from", "")
     from django.urls import reverse
     url = reverse("sinav:takvim_onizleme") + (f"?from={from_param}" if from_param else "")
@@ -709,6 +459,7 @@ def takvim_onayla(request):
 def takvim_onizleme_guncelle(request):
     """Onaylanmamış önizleme JSON'undaki tarih/saat değişikliklerini uygular."""
     from datetime import datetime as dt
+
     from sinav.models import TakvimUretim
     aktif_sinav = _aktif_sinav()
     uretim = TakvimUretim.objects.filter(sinav=aktif_sinav).order_by("-uretim_tarihi").first()
@@ -737,19 +488,7 @@ def takvim_onizleme_guncelle(request):
             guncellenen += 1
 
     # Oturum numaralarını Tarih+Saat sıralamasına göre yeniden hesapla
-    from collections import defaultdict
-    gun_map = defaultdict(list)
-    for r in kayitlar:
-        gun_map[r["Tarih"]].append(r)
-    for gun_kayitlari in gun_map.values():
-        gun_kayitlari.sort(key=lambda x: x.get("Saat", ""))
-        slot_to_oturum: dict = {}
-        oturum_no = 1
-        for r in gun_kayitlari:
-            if r["Saat"] not in slot_to_oturum:
-                slot_to_oturum[r["Saat"]] = oturum_no
-                oturum_no += 1
-            r["Oturum"] = slot_to_oturum[r["Saat"]]
+    onizleme_oturumlarini_yeniden_numarala(kayitlar)
 
     uretim.onizleme_verisi = kayitlar
     uretim.save(update_fields=["onizleme_verisi"])
@@ -841,6 +580,7 @@ def takvim_guncelle(request):
     """Takvim Formu'ndan gelen tarih/saat düzenlemelerini DB'ye yazar.
     Kayıt sonrası oturum numaraları gün bazında otomatik yeniden hesaplanır."""
     from datetime import datetime as dt
+
     from sinav.models import Takvim as TakvimModel
     aktif_sinav = _aktif_sinav()
     if not aktif_sinav:
@@ -871,20 +611,7 @@ def takvim_guncelle(request):
             guncellenen += 1
 
     # Oturum numaralarini gun bazinda yeniden hesapla
-    from collections import defaultdict
-    gun_map = defaultdict(list)
-    for t in TakvimModel.objects.filter(uretim=aktif_uretim).order_by("tarih", "saat"):
-        gun_map[t.tarih].append(t)
-
-    for gun_kayitlari in gun_map.values():
-        slot_to_oturum: dict = {}
-        oturum_no = 1
-        for t in gun_kayitlari:
-            if t.saat not in slot_to_oturum:
-                slot_to_oturum[t.saat] = oturum_no
-                oturum_no += 1
-            t.oturum = slot_to_oturum[t.saat]
-            t.save(update_fields=["oturum"])
+    takvim_oturumlarini_yeniden_numarala(aktif_uretim)
 
     messages.success(request, f"{guncellenen} kayıt güncellendi, oturum numaraları yenilendi.")
     from_param = request.POST.get("from", "")
@@ -941,8 +668,9 @@ def parametre_kaydet(request):
 @login_required
 def takvim_gecmisi(request):
     """Üretilen takvimlerin listesi: aktif sınava ait üretimler."""
-    from sinav.models import TakvimUretim
     from django.db.models import Count
+
+    from sinav.models import TakvimUretim
     aktif = _aktif_sinav()
     kayitlar = (
         TakvimUretim.objects
@@ -965,8 +693,9 @@ def takvim_gecmisi(request):
 @login_required
 def pdf_rapor(request):
     """PDF rapor üretim sayfası: seçili TakvimUretim'e bağlı takvim verilerini gösterir."""
-    from sinav.models import TakvimUretim, Takvim, OturmaUretim
     from collections import defaultdict
+
+    from sinav.models import OturmaUretim, Takvim, TakvimUretim
 
     # Belirli üretim seçilmişse onu kullan; yoksa aktif üretimi bul
     uretim_pk = request.GET.get("uretim_pk")
@@ -1081,7 +810,7 @@ def calistir_oturma_secili(request):
 
 def _run_oturma_secili(task_id: str, session_cfg: dict, sessions: list):
     try:
-        _apply_config(session_cfg)
+        config_uygula(session_cfg)
         from ortaksinav_engine.services.oturma import OturmaPlanService
         OturmaPlanService(CONFIG, log_fn=lambda m: _log(task_id, m)).generate_selected(sessions)
         if _TASKS.get(task_id, {}).get("cancel"):
@@ -1098,10 +827,12 @@ def _run_oturma_secili(task_id: str, session_cfg: dict, sessions: list):
 @login_required
 def oturma_plani_pdf_view(request):
     """OturmaPlani DB'den Oturma Planı PDF'ini anlık üretip döner."""
-    import io, re as _re
+    import io
+    import re as _re
     from datetime import datetime as _dt
-    from sinav.models import OturmaPlani, OturmaUretim
+
     from ortaksinav_engine.services.pdf_rapor import oturum_plani_pdf
+    from sinav.models import OturmaPlani, OturmaUretim
 
     tarih_str  = request.GET.get("tarih", "")
     saat       = request.GET.get("saat", "")
@@ -1177,8 +908,9 @@ def sinav_takvimi_pdf_view(request):
     ?subeler=0  →  Şubeler sütunu olmadan üretir (varsayılan: şubeli).
     """
     import io
-    from sinav.models import TakvimUretim
+
     from ortaksinav_engine.services.pdf_rapor import sinav_takvimi_pdf
+    from sinav.models import TakvimUretim
 
     aktif = _aktif_sinav()
     if not aktif:
@@ -1208,8 +940,9 @@ def sinav_takvimi_pdf_view(request):
 def sinav_takvimi_subesiz_pdf_view(request):
     """Şubeler sütunu olmadan sınav takvimi PDF'i döner."""
     import io
-    from sinav.models import TakvimUretim
+
     from ortaksinav_engine.services.pdf_rapor import sinav_takvimi_pdf
+    from sinav.models import TakvimUretim
 
     aktif = _aktif_sinav()
     if not aktif:
@@ -1238,8 +971,9 @@ def sinif_listesi_pdf_view(request):
     """OturmaPlani DB'den Sınıf Listesi PDF'ini anlık üretip döner."""
     import io
     from datetime import datetime as _dt
-    from sinav.models import OturmaPlani, OturmaUretim
+
     from ortaksinav_engine.services.pdf_rapor import sinif_raporu_pdf
+    from sinav.models import OturmaPlani, OturmaUretim
 
     tarih_str      = request.GET.get("tarih", "")
     saat           = request.GET.get("saat", "")
@@ -1285,8 +1019,10 @@ def sinif_listesi_pdf_view(request):
 @login_required
 def takvim_uretim_aciklama_guncelle(request, pk):
     import json
-    from sinav.models import TakvimUretim
+
     from django.http import JsonResponse
+
+    from sinav.models import TakvimUretim
     uretim = TakvimUretim.objects.filter(pk=pk).first()
     if not uretim:
         return JsonResponse({"ok": False}, status=404)
@@ -1337,7 +1073,7 @@ ADIM_FUNCLARI = {
 def _run_step(task_id: str, session_cfg: dict, func_name: str):
     _, label = ADIM_FUNCLARI[func_name]
     try:
-        _apply_config(session_cfg)
+        config_uygula(session_cfg)
         _log(task_id, f"> {label} baslatildi...")
 
         if func_name == "takvim":
@@ -1365,7 +1101,8 @@ def _run_step(task_id: str, session_cfg: dict, func_name: str):
 
     if func_name == "takvim":
         try:
-            from sinav.models import TakvimUretim, SinavBilgisi as _SB
+            from sinav.models import SinavBilgisi as _SB
+            from sinav.models import TakvimUretim
             aktif = _SB.objects.filter(aktif=True).first()
             if aktif:
                 log_text = "\n".join(_TASKS.get(task_id, {}).get("logs", []))
@@ -1477,7 +1214,7 @@ def sinav_bilgisi_listesi(request):
         "aktif_sinav":    aktif_sinav,
         "okul":           okul,
         "okul_tamam":     okul_tamam,
-        "db_ozeti":       _db_ozeti(),
+        "db_ozeti":       db_ozeti(),
         "mazeret_sayisi": mazeret_sayisi,
         **kurulum,
         **dosya,
@@ -1660,7 +1397,7 @@ def ders_ayarlari_kaydet(request):
 
     # Otomatik: SubeDers yenile
     session_cfg = dict(request.session.get("ortaksinav_config", {}))
-    _apply_config(session_cfg)
+    config_uygula(session_cfg)
     try:
         from ortaksinav_engine.services.ders_analiz import DersAnalizService
         DersAnalizService(CONFIG).subeders_guncelle(aktif)
@@ -1936,14 +1673,16 @@ def ogrenci_sinav_yeri(request):
 @login_required
 def sinav_yoklama_raporu(request):
     """Seviye ve Ders filtreli sınav yoklama listesi — yöneticiler için."""
-    from okul.auth import is_ust_yonetici
     from django.core.exceptions import PermissionDenied
+
+    from okul.auth import is_ust_yonetici
 
     if not is_ust_yonetici(request.user):
         raise PermissionDenied
 
-    from django.db.models import Count, Q
-    from sinav.models import Takvim, TakvimUretim, OturmaPlani, SinavSalonYoklama
+    from django.db.models import Q
+
+    from sinav.models import OturmaPlani, SinavSalonYoklama, Takvim, TakvimUretim
 
     aktif_sinav  = _aktif_sinav()
     aktif_uretim = (
@@ -2089,14 +1828,16 @@ def sinav_yoklama_raporu(request):
 
 def sinav_yoklama_yok_detay(request):
     """Belirli (seviye, ders_adi, tarih) için 'yok' durumundaki öğrencilerin listesi."""
-    from okul.auth import is_ust_yonetici
-    from django.core.exceptions import PermissionDenied
     from collections import defaultdict
+
+    from django.core.exceptions import PermissionDenied
+
+    from okul.auth import is_ust_yonetici
 
     if not is_ust_yonetici(request.user):
         raise PermissionDenied
 
-    from sinav.models import TakvimUretim, OturmaPlani, SinavSalonYoklama
+    from sinav.models import OturmaPlani, SinavSalonYoklama, TakvimUretim
 
     seviye   = request.GET.get("seviye", "").strip()
     ders_adi = request.GET.get("ders_adi", "").strip()
@@ -2192,12 +1933,15 @@ def mazeret_yoklama_simule(request):
     - Sürekli Devamsız (Ogrenci.sureksiz_devamsiz=True) → simülasyonda devamsız seçilmez
     - Muaf (OgrenciMuaf) → o ders için devamsız seçilmez
     """
-    from okul.auth import is_ust_yonetici
-    from django.core.exceptions import PermissionDenied
     import random
     import re
     from collections import defaultdict
-    from ogrenci.models import Ogrenci as _Ogrenci, OgrenciMuaf as _OgrenciMuaf
+
+    from django.core.exceptions import PermissionDenied
+
+    from ogrenci.models import Ogrenci as _Ogrenci
+    from ogrenci.models import OgrenciMuaf as _OgrenciMuaf
+    from okul.auth import is_ust_yonetici
     from okul.utils import get_aktif_egitim_yili
 
     if not is_ust_yonetici(request.user):
@@ -2821,7 +2565,9 @@ def _mazeret_belge_ctx(mazeret: MazeretSinav, q: str = "") -> dict:
     bayrakları ve özet sayılarla) hazırlar. q verilirse okulno/adı-soyadı ile filtreler.
     """
     from django.db.models import Q
-    from ogrenci.models import Ogrenci as OgrenciModel, OgrenciMuaf
+
+    from ogrenci.models import Ogrenci as OgrenciModel
+    from ogrenci.models import OgrenciMuaf
     from okul.utils import get_aktif_egitim_yili
 
     # Sürekli devamsız okulnoları — int → str (MazeretOgrenci.okulno CharField)
@@ -3159,7 +2905,9 @@ def mazeret_rapor(request, pk):
 def mazeret_rapor_pdf_view(request, pk):
     """Mazeret oturma planını PDF olarak indirir (ReportLab)."""
     import io
+
     from django.http import HttpResponse
+
     from ortaksinav_engine.services.pdf_rapor import mazeret_rapor_pdf
 
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
@@ -3232,7 +2980,9 @@ def mazeret_ilan_takvimi(request, pk):
 def mazeret_ilan_takvimi_pdf(request, pk):
     """Mazeret sınavı ilan takvimini PDF olarak indirir (ReportLab)."""
     import io
+
     from django.http import HttpResponse
+
     from ortaksinav_engine.services.pdf_rapor import mazeret_ilan_pdf
 
     mazeret = get_object_or_404(MazeretSinav, pk=pk)
@@ -3253,8 +3003,12 @@ def mazeret_ilan_takvimi_pdf(request, pk):
 @login_required
 def sorumluluk_gorevlerim(request):
     from django.db.models import Q
+
     from sorumluluk.models import (
-        SorumluKomisyonUyesi, SorumluGozetmen, SorumluTakvim, SALON_CHOICES,
+        SALON_CHOICES,
+        SorumluGozetmen,
+        SorumluKomisyonUyesi,
+        SorumluTakvim,
     )
 
     try:
