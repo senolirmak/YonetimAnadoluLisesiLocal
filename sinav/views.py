@@ -23,6 +23,17 @@ from ortaksinav_engine import (
     verileri_aktar,
 )
 from sinav.services.config_builder import config_uygula
+from sinav.services.ders_ayarlari import (
+    _VARSAYILAN_CATISMA_GRUBU,
+    _VARSAYILAN_CIFT_OTURUMLU,
+    _VARSAYILAN_SINAV_YAPILMAYACAK,
+    get_ayarlar,
+    mutate_ayar_listesi,
+    parse_ders_ayarlari_post,
+    save_ayarlar,
+)
+from sinav.services.ogrenci_sorgu import en_yakin_sinav_sonucu
+from sinav.services.oturma_pdf import build_salon_grids, resolve_aktif_uretim
 from sinav.services.sinav_ozet import db_ozeti, gozetmen_ozeti_hesapla, sinav_takvim_araliklari
 from sinav.services.takvim_duzenleme import (
     onizleme_oturumlarini_yeniden_numarala,
@@ -34,7 +45,6 @@ from sinav.services.takvim_slot import slot_temizle
 from .forms import AlgoritmaForm, MazeretSinavForm, SinavBilgisiForm
 from .models import (
     AlgoritmaParametreleri,
-    DersAyarlariJSON,
     DisVeri,
     MazeretBelgeTeslim,
     MazeretOgrenci,
@@ -79,21 +89,6 @@ def _finish(task_id: str, error: bool = False):
 # ---------------------------------------------------------------
 def _aktif_sinav():
     return SinavBilgisi.objects.filter(aktif=True).first()
-
-
-def _get_ayarlar(sinav) -> dict:
-    """Aktif sinava ait ders ayarlari JSON verisini döndürür."""
-    if sinav is None:
-        return {}
-    obj, _ = DersAyarlariJSON.objects.get_or_create(sinav=sinav)
-    return dict(obj.veri) if obj.veri else {}
-
-
-def _save_ayarlar(sinav, veri: dict):
-    """Ders ayarlari JSON verisini kaydeder."""
-    obj, _ = DersAyarlariJSON.objects.get_or_create(sinav=sinav)
-    obj.veri = veri
-    obj.save()
 
 
 def _kurulum_durumu():
@@ -828,11 +823,10 @@ def _run_oturma_secili(task_id: str, session_cfg: dict, sessions: list):
 def oturma_plani_pdf_view(request):
     """OturmaPlani DB'den Oturma Planı PDF'ini anlık üretip döner."""
     import io
-    import re as _re
     from datetime import datetime as _dt
 
     from ortaksinav_engine.services.pdf_rapor import oturum_plani_pdf
-    from sinav.models import OturmaPlani, OturmaUretim
+    from sinav.models import OturmaPlani
 
     tarih_str  = request.GET.get("tarih", "")
     saat       = request.GET.get("saat", "")
@@ -843,22 +837,9 @@ def oturma_plani_pdf_view(request):
     except ValueError:
         raise Http404
 
-    # OturmaUretim üzerinden doğru TakvimUretim'i bul
-    if uretim_pk:
-        ou = OturmaUretim.objects.filter(
-            takvim_uretim_id=int(uretim_pk), tarih=tarih_date, saat=saat, oturum=oturum
-        ).select_related("takvim_uretim").first()
-        if not ou:
-            # Aktif TakvimUretim değişmiş olabilir; planı üreten gerçek kaydı bul
-            ou = OturmaUretim.objects.filter(
-                tarih=tarih_date, saat=saat, oturum=oturum
-            ).select_related("takvim_uretim").first()
-        if not ou:
-            raise Http404
-        aktif_uretim = ou.takvim_uretim
-    else:
-        from sinav.models import TakvimUretim as _TU
-        aktif_uretim = _TU.objects.filter(sinav=_aktif_sinav(), aktif=True).first()
+    aktif_uretim = resolve_aktif_uretim(uretim_pk, tarih_date, saat, oturum, _aktif_sinav())
+    if uretim_pk and aktif_uretim is None:
+        raise Http404
 
     salon_filter = request.GET.get("salon", "")
     qs = OturmaPlani.objects.filter(
@@ -870,27 +851,7 @@ def oturma_plani_pdf_view(request):
     if not qs.exists():
         raise Http404
 
-    salon_grids = {}
-    for op in qs:
-        if op.salon not in salon_grids:
-            salon_grids[op.salon] = [[[None] * 2 for _ in range(6)] for _ in range(3)]
-        sira  = op.sira_no - 1
-        block = sira // 12
-        rem   = sira % 12
-        row   = rem // 2
-        col   = rem % 2
-        if block < 3 and row < 6 and col < 2:
-            sinifsube = str(op.sinifsube or "")
-            m = _re.search(r"(\d+)", sinifsube)
-            parts = (op.adi_soyadi or "").split(" ", 1)
-            salon_grids[op.salon][block][row][col] = {
-                "okulno":    op.okulno,
-                "sinifsube": sinifsube,
-                "adi":       parts[0] if parts else "",
-                "soyadi":    parts[1] if len(parts) > 1 else "",
-                "ders":      op.ders_adi or "",
-                "sinif":     m.group(1) if m else "",
-            }
+    salon_grids = build_salon_grids(qs)
 
     baslik = f"{tarih_str} {saat} (Oturum {oturum})"
     okul   = OkulBilgi.get()
@@ -902,14 +863,11 @@ def oturma_plani_pdf_view(request):
                         headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 
-@login_required
-def sinav_takvimi_pdf_view(request):
-    """Aktif TakvimUretim'e bağlı tek sayfalık öğrenci Sınav Takvimi PDF'i döner.
-    ?subeler=0  →  Şubeler sütunu olmadan üretir (varsayılan: şubeli).
-    """
+def _sinav_takvimi_pdf_response(request, goster_subeler: bool):
     import io
 
     from ortaksinav_engine.services.pdf_rapor import sinav_takvimi_pdf
+    from sinav.models import Takvim as TakvimModel
     from sinav.models import TakvimUretim
 
     aktif = _aktif_sinav()
@@ -920,10 +878,8 @@ def sinav_takvimi_pdf_view(request):
     if not aktif_uretim:
         raise Http404
 
-    from sinav.models import Takvim as TakvimModel
     TakvimModel.objects.filter(sinav=aktif, uretim__isnull=True).update(uretim=aktif_uretim)
 
-    goster_subeler = request.GET.get("subeler", "1") != "0"
     okul = OkulBilgi.get()
     buf  = io.BytesIO()
     sinav_takvimi_pdf(buf, okul, aktif_uretim,
@@ -937,33 +893,18 @@ def sinav_takvimi_pdf_view(request):
 
 
 @login_required
+def sinav_takvimi_pdf_view(request):
+    """Aktif TakvimUretim'e bağlı tek sayfalık öğrenci Sınav Takvimi PDF'i döner.
+    ?subeler=0  →  Şubeler sütunu olmadan üretir (varsayılan: şubeli).
+    """
+    goster_subeler = request.GET.get("subeler", "1") != "0"
+    return _sinav_takvimi_pdf_response(request, goster_subeler)
+
+
+@login_required
 def sinav_takvimi_subesiz_pdf_view(request):
     """Şubeler sütunu olmadan sınav takvimi PDF'i döner."""
-    import io
-
-    from ortaksinav_engine.services.pdf_rapor import sinav_takvimi_pdf
-    from sinav.models import TakvimUretim
-
-    aktif = _aktif_sinav()
-    if not aktif:
-        raise Http404
-
-    aktif_uretim = TakvimUretim.objects.filter(sinav=aktif, aktif=True).first()
-    if not aktif_uretim:
-        raise Http404
-
-    from sinav.models import Takvim as TakvimModel
-    TakvimModel.objects.filter(sinav=aktif, uretim__isnull=True).update(uretim=aktif_uretim)
-
-    okul = OkulBilgi.get()
-    buf  = io.BytesIO()
-    sinav_takvimi_pdf(buf, okul, aktif_uretim,
-                      hazirlayan_user=request.user,
-                      goster_subeler=False)
-    buf.seek(0)
-    fname = f"Sinav_Takvimi_subesiz_{aktif.egitim_ogretim_yili}.pdf"
-    return HttpResponse(buf.read(), content_type="application/pdf",
-                        headers={"Content-Disposition": f'inline; filename="{fname}"'})
+    return _sinav_takvimi_pdf_response(request, goster_subeler=False)
 
 
 @login_required
@@ -973,7 +914,7 @@ def sinif_listesi_pdf_view(request):
     from datetime import datetime as _dt
 
     from ortaksinav_engine.services.pdf_rapor import sinif_raporu_pdf
-    from sinav.models import OturmaPlani, OturmaUretim
+    from sinav.models import OturmaPlani
 
     tarih_str      = request.GET.get("tarih", "")
     saat           = request.GET.get("saat", "")
@@ -985,26 +926,14 @@ def sinif_listesi_pdf_view(request):
     except ValueError:
         raise Http404
 
-    # OturmaUretim üzerinden doğru TakvimUretim'i bul
+    aktif_uretim = resolve_aktif_uretim(uretim_pk, tarih_date, saat, oturum, _aktif_sinav())
     if uretim_pk:
-        ou = OturmaUretim.objects.filter(
-            takvim_uretim_id=int(uretim_pk), tarih=tarih_date, saat=saat, oturum=oturum
-        ).select_related("takvim_uretim").first()
-        if not ou:
-            # Aktif TakvimUretim değişmiş olabilir; planı üreten gerçek kaydı bul
-            ou = OturmaUretim.objects.filter(
-                tarih=tarih_date, saat=saat, oturum=oturum
-            ).select_related("takvim_uretim").first()
-        if not ou:
+        if aktif_uretim is None:
             raise Http404
-        aktif_uretim = ou.takvim_uretim
-    else:
-        from sinav.models import TakvimUretim as _TU2
-        aktif_uretim = _TU2.objects.filter(sinav=_aktif_sinav(), aktif=True).first()
-        if not OturmaPlani.objects.filter(
-            tarih=tarih_date, saat=saat, oturum=oturum, uretim=aktif_uretim
-        ).exists():
-            raise Http404
+    elif not OturmaPlani.objects.filter(
+        tarih=tarih_date, saat=saat, oturum=oturum, uretim=aktif_uretim
+    ).exists():
+        raise Http404
 
     okul  = OkulBilgi.get()
     buf   = io.BytesIO()
@@ -1298,37 +1227,11 @@ def ogrenci_sil(request, pk: int):
 # ---------------------------------------------------------------
 # Ders Ayarlari
 # ---------------------------------------------------------------
-_VARSAYILAN_SINAV_YAPILMAYACAK = [
-    "GÖRSEL SANATLAR/MÜZİK",
-    "BEDEN EĞİTİMİ VE SPOR/GÖRSEL SANATLAR/MÜZİK",
-    "BEDEN EĞİTİMİ VE SPOR",
-    "SEÇMELİ SANAT EĞİTİMİ",
-    "REHBERLİK VE YÖNLENDİRME",
-    "SEÇMELİ SPOR EĞİTİMİ",
-    "SEÇMELİ HEDEF TEMELLİ DESTEK EĞİTİMİ",
-    "SEÇMELİ YABANCI DİL",
-]
-
-_VARSAYILAN_CIFT_OTURUMLU = [
-    "SEÇMELİ İKİNCİ YABANCI DİL",
-    "SEÇMELİ TÜRK DİLİ VE EDEBİYATI",
-    "TÜRK DİLİ VE EDEBİYATI",
-    "YABANCI DİL",
-]
-
-
-def _bolumle(tum_dersler: list, efektif: set) -> tuple[list, list]:
-    """Dersleri iki gruba ayirir: efektif secili (uste) ve diger (alta)."""
-    secili = sorted(d for d in tum_dersler if d in efektif)
-    diger  = sorted(d for d in tum_dersler if d not in efektif)
-    return secili, diger
-
-
 @login_required
 def ders_ayarlari(request):
     from okul.models import DersHavuzu
     aktif = _aktif_sinav()
-    veri = _get_ayarlar(aktif)
+    veri = get_ayarlar(aktif)
 
     dp_dersler = list(DersHavuzu.objects.order_by("ders_adi"))
     tum_dersler = sorted(DersHavuzu.objects.values_list("ders_adi", flat=True))
@@ -1370,30 +1273,9 @@ def ders_ayarlari_kaydet(request):
         messages.error(request, "Önce aktif bir sınav seçin.")
         return redirect("sinav:ders_ayarlari")
 
-    import json as _json
-    veri = _get_ayarlar(aktif)
-
-    for key, field in [("sabit_sinavlar", "sabit_json"),
-                        ("catisma_gruplari", "catisma_json"),
-                        ("ayni_slot_esleme", "esleme_json")]:
-        raw = request.POST.get(field, "").strip()
-        if raw:
-            try:
-                veri[key] = _json.loads(raw)
-            except Exception:
-                pass
-
-    raw_seviyeler = request.POST.get("ortak_seviyeler_json", "").strip()
-    if raw_seviyeler:
-        try:
-            parsed = _json.loads(raw_seviyeler)
-            seviyelar = sorted({int(s) for s in parsed if str(s).isdigit() or isinstance(s, int)})
-            if seviyelar:
-                veri["ortak_sinav_seviyeleri"] = seviyelar
-        except Exception:
-            pass
-
-    _save_ayarlar(aktif, veri)
+    veri = get_ayarlar(aktif)
+    veri.update(parse_ders_ayarlari_post(request.POST))
+    save_ayarlar(aktif, veri)
 
     # Otomatik: SubeDers yenile
     session_cfg = dict(request.session.get("ortaksinav_config", {}))
@@ -1423,16 +1305,17 @@ def ders_ayarlari_varsayilan_yukle(request):
         messages.error(request, "Önce aktif bir sınav seçin.")
         return redirect("sinav:ders_ayarlari")
     tip = request.POST.get("tip", "")
-    veri = _get_ayarlar(aktif)
     if tip == "yapilmayacak":
-        mevcut = set(veri.get("yapilmayacak", []))
-        veri["yapilmayacak"] = sorted(mevcut | set(_VARSAYILAN_SINAV_YAPILMAYACAK))
-        _save_ayarlar(aktif, veri)
+        def _mutate(liste):
+            liste[:] = sorted(set(liste) | set(_VARSAYILAN_SINAV_YAPILMAYACAK))
+            return True
+        mutate_ayar_listesi(aktif, "yapilmayacak", _mutate)
         messages.success(request, "Varsayılan 'sınav yapılmayacak' listesi yüklendi.")
     elif tip == "cift":
-        mevcut = set(veri.get("cift_oturumlu", []))
-        veri["cift_oturumlu"] = sorted(mevcut | set(_VARSAYILAN_CIFT_OTURUMLU))
-        _save_ayarlar(aktif, veri)
+        def _mutate(liste):
+            liste[:] = sorted(set(liste) | set(_VARSAYILAN_CIFT_OTURUMLU))
+            return True
+        mutate_ayar_listesi(aktif, "cift_oturumlu", _mutate)
         messages.success(request, "Varsayılan 'iki oturumlu' listesi yüklendi.")
     return redirect("sinav:ders_ayarlari")
 
@@ -1453,19 +1336,17 @@ def sabit_sinav_ekle(request):
     if not ders_adi or not tarih or not saat:
         messages.error(request, "Ders adı, tarih ve saat zorunludur.")
         return redirect("sinav:ders_ayarlari")
-    veri = _get_ayarlar(aktif)
-    liste = veri.get("sabit_sinavlar", [])
-    yeni = {"ders_adi": ders_adi, "tarih": tarih, "saat": saat, "seviyeler": seviyeler}
-    guncellendi = False
-    for i, ss in enumerate(liste):
-        if ss["ders_adi"] == ders_adi:
-            liste[i] = yeni
-            guncellendi = True
-            break
-    if not guncellendi:
+
+    def _mutate(liste):
+        yeni = {"ders_adi": ders_adi, "tarih": tarih, "saat": saat, "seviyeler": seviyeler}
+        for i, ss in enumerate(liste):
+            if ss["ders_adi"] == ders_adi:
+                liste[i] = yeni
+                return True
         liste.append(yeni)
-    veri["sabit_sinavlar"] = liste
-    _save_ayarlar(aktif, veri)
+        return False
+
+    guncellendi = mutate_ayar_listesi(aktif, "sabit_sinavlar", _mutate)
     if guncellendi:
         messages.success(request, f'"{ders_adi}" sabit sınav güncellendi.')
     else:
@@ -1476,14 +1357,17 @@ def sabit_sinav_ekle(request):
 @require_POST
 def sabit_sinav_sil(request, idx: int):
     aktif = _aktif_sinav()
-    veri = _get_ayarlar(aktif)
-    liste = veri.get("sabit_sinavlar", [])
-    if 0 <= idx < len(liste):
-        ad = liste[idx]["ders_adi"]
-        liste.pop(idx)
-        veri["sabit_sinavlar"] = liste
-        _save_ayarlar(aktif, veri)
-        messages.success(request, f'"{ad}" sabit sınavdan çıkarıldı.')
+
+    def _mutate(liste):
+        if 0 <= idx < len(liste):
+            ad = liste[idx]["ders_adi"]
+            liste.pop(idx)
+            return ad
+        return None
+
+    sonuc = mutate_ayar_listesi(aktif, "sabit_sinavlar", _mutate)
+    if sonuc:
+        messages.success(request, f'"{sonuc}" sabit sınavdan çıkarıldı.')
     else:
         messages.error(request, "Kayıt bulunamadı.")
     return redirect("sinav:ders_ayarlari")
@@ -1492,13 +1376,6 @@ def sabit_sinav_sil(request, idx: int):
 # ---------------------------------------------------------------
 # Seviye Çakışma Grupları
 # ---------------------------------------------------------------
-_VARSAYILAN_CATISMA_GRUBU = {
-    "grup_adi": "Fen-Matematik Grubu",
-    "dersler":  "BİYOLOJİ,FİZİK,KİMYA,MATEMATİK,"
-                "SEÇMELİ BİYOLOJİ,SEÇMELİ FİZİK,SEÇMELİ KİMYA,SEÇMELİ MATEMATİK",
-}
-
-
 @require_POST
 def catisma_grubu_ekle(request):
     aktif = _aktif_sinav()
@@ -1511,11 +1388,12 @@ def catisma_grubu_ekle(request):
         messages.error(request, "Grup adı ve en az bir ders zorunludur.")
         return redirect("sinav:ders_ayarlari")
     ders_listesi = [d.strip() for d in dersler.replace("\n", ",").split(",") if d.strip()]
-    veri = _get_ayarlar(aktif)
-    liste = veri.get("catisma_gruplari", [])
-    liste.append({"grup_adi": grup_adi, "dersler": ders_listesi})
-    veri["catisma_gruplari"] = liste
-    _save_ayarlar(aktif, veri)
+
+    def _mutate(liste):
+        liste.append({"grup_adi": grup_adi, "dersler": ders_listesi})
+        return True
+
+    mutate_ayar_listesi(aktif, "catisma_gruplari", _mutate)
     messages.success(request, f'"{grup_adi}" çakışma grubu eklendi ({len(ders_listesi)} ders).')
     return redirect("sinav:ders_ayarlari")
 
@@ -1523,14 +1401,17 @@ def catisma_grubu_ekle(request):
 @require_POST
 def catisma_grubu_sil(request, idx: int):
     aktif = _aktif_sinav()
-    veri = _get_ayarlar(aktif)
-    liste = veri.get("catisma_gruplari", [])
-    if 0 <= idx < len(liste):
-        ad = liste[idx]["grup_adi"]
-        liste.pop(idx)
-        veri["catisma_gruplari"] = liste
-        _save_ayarlar(aktif, veri)
-        messages.success(request, f'"{ad}" çakışma grubu silindi.')
+
+    def _mutate(liste):
+        if 0 <= idx < len(liste):
+            ad = liste[idx]["grup_adi"]
+            liste.pop(idx)
+            return ad
+        return None
+
+    sonuc = mutate_ayar_listesi(aktif, "catisma_gruplari", _mutate)
+    if sonuc:
+        messages.success(request, f'"{sonuc}" çakışma grubu silindi.')
     else:
         messages.error(request, "Kayıt bulunamadı.")
     return redirect("sinav:ders_ayarlari")
@@ -1543,11 +1424,12 @@ def catisma_grubu_varsayilan(request):
         messages.error(request, "Önce aktif bir sınav seçin.")
         return redirect("sinav:ders_ayarlari")
     ders_listesi = [d.strip() for d in _VARSAYILAN_CATISMA_GRUBU["dersler"].split(",") if d.strip()]
-    veri = _get_ayarlar(aktif)
-    liste = veri.get("catisma_gruplari", [])
-    liste.append({"grup_adi": _VARSAYILAN_CATISMA_GRUBU["grup_adi"], "dersler": ders_listesi})
-    veri["catisma_gruplari"] = liste
-    _save_ayarlar(aktif, veri)
+
+    def _mutate(liste):
+        liste.append({"grup_adi": _VARSAYILAN_CATISMA_GRUBU["grup_adi"], "dersler": ders_listesi})
+        return True
+
+    mutate_ayar_listesi(aktif, "catisma_gruplari", _mutate)
     messages.success(request, "Varsayılan çakışma grubu eklendi.")
     return redirect("sinav:ders_ayarlari")
 
@@ -1566,27 +1448,33 @@ def esleme_ekle(request):
     if ders1 == ders2:
         messages.error(request, "İki ders farklı olmalıdır.")
         return redirect("sinav:ders_ayarlari")
-    veri = _get_ayarlar(aktif)
-    liste = veri.get("ayni_slot_esleme", [])
-    if any(e["ders1"] == ders1 and e["ders2"] == ders2 for e in liste):
-        messages.info(request, "Bu eşleme zaten kayıtlı.")
-    else:
+
+    def _mutate(liste):
+        if any(e["ders1"] == ders1 and e["ders2"] == ders2 for e in liste):
+            return None
         liste.append({"ders1": ders1, "ders2": ders2})
-        veri["ayni_slot_esleme"] = liste
-        _save_ayarlar(aktif, veri)
+        return True
+
+    sonuc = mutate_ayar_listesi(aktif, "ayni_slot_esleme", _mutate)
+    if sonuc:
         messages.success(request, f'"{ders1}" ↔ "{ders2}" eşlemesi eklendi.')
+    else:
+        messages.info(request, "Bu eşleme zaten kayıtlı.")
     return redirect("sinav:ders_ayarlari")
 
 
 @require_POST
 def esleme_sil(request, idx: int):
     aktif = _aktif_sinav()
-    veri = _get_ayarlar(aktif)
-    liste = veri.get("ayni_slot_esleme", [])
-    if 0 <= idx < len(liste):
-        liste.pop(idx)
-        veri["ayni_slot_esleme"] = liste
-        _save_ayarlar(aktif, veri)
+
+    def _mutate(liste):
+        if 0 <= idx < len(liste):
+            liste.pop(idx)
+            return True
+        return None
+
+    sonuc = mutate_ayar_listesi(aktif, "ayni_slot_esleme", _mutate)
+    if sonuc:
         messages.success(request, "Eşleme silindi.")
     else:
         messages.error(request, "Kayıt bulunamadı.")
@@ -1630,30 +1518,7 @@ def ogrenci_sinav_yeri(request):
         if not aktif_uretim:
             hata = "Aktif sınav takvimi bulunamadı."
         else:
-            tum_sonuclar = list(
-                OturmaPlani.objects
-                .filter(uretim=aktif_uretim, okulno=okulno)
-                .order_by("tarih", "saat", "oturum")
-                .values("tarih", "saat", "salon", "sira_no", "ders_adi", "sinifsube", "adi_soyadi")
-            )
-            if not tum_sonuclar:
-                hata = f"'{okulno}' okul numarasına ait kayıt bulunamadı."
-            else:
-                # Bugünkü oturumlar varsa onları, yoksa en yakın gelecek tarihi göster
-                bugun_sonuclar = [s for s in tum_sonuclar if s["tarih"] == bugun]
-                if bugun_sonuclar:
-                    sonuclar        = bugun_sonuclar
-                    gosterim_tarihi = bugun
-                else:
-                    yakin_tarih = next(
-                        (s["tarih"] for s in tum_sonuclar if s["tarih"] > bugun), None
-                    )
-                    if yakin_tarih:
-                        sonuclar        = [s for s in tum_sonuclar if s["tarih"] == yakin_tarih]
-                        gosterim_tarihi = yakin_tarih
-                    else:
-                        # Tüm sınavlar geçmiş
-                        hata = "Yaklaşan sınav oturumu bulunmuyor (tüm oturumlar geçmiş)."
+            sonuclar, gosterim_tarihi, hata = en_yakin_sinav_sonucu(aktif_uretim, okulno, bugun)
 
     return render(request, "sinav/ogrenci_sinav_yeri.html", {
         "aktif_sinav":      aktif_sinav,
