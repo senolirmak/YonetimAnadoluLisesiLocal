@@ -1,9 +1,15 @@
 import re
+from datetime import time as _time
 from itertools import groupby
+
+from django.db import transaction
+from django.db.models import Max
 
 from sorumluluk.models import (
     SALON_KAPASITESI,
     SALON_SAYISI,
+    SorumluGozetmen,
+    SorumluKomisyonUyesi,
     SorumluOgrenci,
     SorumluOturmaPlani,
     SorumluSinav,
@@ -166,3 +172,205 @@ def oturma_plani_olustur(sinav: SorumluSinav) -> None:
             ))
 
     SorumluOturmaPlani.objects.bulk_create(yeni_kayitlar, ignore_conflicts=True)
+
+
+def oturumlar_verisini_hazirla(sinav: SorumluSinav) -> list[dict]:
+    """Sınava ait takvim ve oturma planı kayıtlarını birleştirerek görünümler için
+    ortak veri yapısı üretir."""
+    takvim_rows = list(
+        SorumluTakvim.objects
+        .filter(sinav=sinav)
+        .order_by("tarih", "oturum_no", "ders_adi")
+    )
+
+    oturma_dict = {}
+    for op in SorumluOturmaPlani.objects.filter(sinav=sinav).order_by("salon", "sira_no"):
+        oturma_dict.setdefault((op.tarih, op.oturum_no), []).append(op)
+
+    oturumlar_veri = []
+    for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
+        rows = list(rows)
+        kayitlar = oturma_dict.get((tarih, oturum_no), [])
+        oturumlar_veri.append({
+            "tarih":          tarih,
+            "oturum_no":      oturum_no,
+            "saat_baslangic": rows[0].saat_baslangic,
+            "saat_bitis":     rows[0].saat_bitis,
+            "dersler":        [r.ders_adi for r in rows],
+            "ders_sayisi":    len(rows),
+            "salon1":         [k for k in kayitlar if k.salon == "Sorumluluk1"],
+            "salon2":         [k for k in kayitlar if k.salon == "Sorumluluk2"],
+            "salon3":         [k for k in kayitlar if k.salon == "Sorumluluk3"],
+        })
+    return oturumlar_veri
+
+
+def ayni_dersin_ogrencilerini_grupla(sinav: SorumluSinav) -> None:
+    """Oturma planı oluşturulduktan sonra aynı dersin öğrencilerini aynı salonda
+    toplamak için salon/sıra numaralarını yeniden düzenler."""
+    planlar = list(
+        SorumluOturmaPlani.objects.filter(sinav=sinav)
+        .order_by("tarih", "oturum_no", "ders_adi", "sinifsube", "adi_soyadi")
+    )
+    salon_isimleri = [f"Sorumluluk{i+1}" for i in range(SALON_SAYISI)]
+
+    for (tarih, oturum_no), group in groupby(planlar, key=lambda x: (x.tarih, x.oturum_no)):
+        oturum_planlari = list(group)
+
+        is_uygulama_session = any("(Uygulama)" in op.ders_adi for op in oturum_planlari)
+
+        if is_uygulama_session:
+            def get_gercek_ders_adi(d_adi):
+                base = d_adi.split(" (Grup ")[0] if " (Grup " in d_adi else d_adi
+                base = base.replace(" (Uygulama)", "").replace(" (Yazılı)", "")
+                m = re.search(r" \(\d+\. Sınıf\)$", base)
+                if m:
+                    return base[:m.start()].strip()
+                return base.strip()
+
+            oturum_planlari.sort(key=lambda op: get_gercek_ders_adi(op.ders_adi))
+            courses = [list(c_group) for _, c_group in groupby(oturum_planlari, key=lambda op: get_gercek_ders_adi(op.ders_adi))]
+        else:
+            courses = [list(c_group) for _, c_group in groupby(oturum_planlari, key=lambda x: x.ders_adi)]
+
+        salon_counts = {s: 0 for s in salon_isimleri}
+        current_salon_idx = 0
+
+        for c_students in courses:
+            c_len = len(c_students)
+
+            # Uygulama sınavlarında her farklı ders yeni bir salonda başlamalı
+            if is_uygulama_session and salon_counts[salon_isimleri[current_salon_idx]] > 0:
+                if current_salon_idx + 1 < len(salon_isimleri):
+                    current_salon_idx += 1
+
+            current_salon = salon_isimleri[current_salon_idx]
+
+            if salon_counts[current_salon] + c_len <= SALON_KAPASITESI:
+                # Dersi tamamen mevcut salona sığdır
+                for op in c_students:
+                    op.salon = current_salon
+                    salon_counts[current_salon] += 1
+                    op.sira_no = salon_counts[current_salon]
+            else:
+                # Mevcut salona sığmıyorsa, bir sonraki salona geçmeyi dene
+                next_salon_idx = current_salon_idx + 1
+                if next_salon_idx < len(salon_isimleri) and c_len <= SALON_KAPASITESI:
+                    current_salon_idx = next_salon_idx
+                    current_salon = salon_isimleri[current_salon_idx]
+                    for op in c_students:
+                        op.salon = current_salon
+                        salon_counts[current_salon] += 1
+                        op.sira_no = salon_counts[current_salon]
+                else:
+                    # Diğer salona da sığmıyorsa veya tek salondan büyükse, mecburen bölerek doldur
+                    for op in c_students:
+                        if salon_counts[current_salon] >= SALON_KAPASITESI and current_salon_idx + 1 < len(salon_isimleri):
+                            current_salon_idx += 1
+                            current_salon = salon_isimleri[current_salon_idx]
+                        op.salon = current_salon
+                        salon_counts[current_salon] += 1
+                        op.sira_no = salon_counts[current_salon]
+
+    if planlar:
+        # Güncelleme sırasında oluşan "unique constraint" (tekil kısıtlama) hatasını
+        # önlemek için mevcut kayıtları silip yeniden toplu olarak ekliyoruz.
+        SorumluOturmaPlani.objects.filter(sinav=sinav).delete()
+        for op in planlar:
+            op.pk = None
+        SorumluOturmaPlani.objects.bulk_create(planlar)
+
+
+def oturumu_tasi(
+    sinav: SorumluSinav,
+    eski_tarih,
+    yeni_tarih,
+    oturum_no: int,
+    yeni_bas: _time | None = None,
+    yeni_bit: _time | None = None,
+) -> bool:
+    """Bir sınav oturumunu (takvim + komisyon + gözetmen + oturma planı) başka bir
+    tarihe/saate taşır. Çakışma kontrolü çağıran tarafından yapılmış olmalıdır.
+
+    Döndürülen bool, hedef slotta zaten kayıt olup olmadığını (birleştirme modu)
+    belirtir.
+    """
+    hedef_dersler = set(
+        SorumluTakvim.objects
+        .filter(sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no)
+        .values_list("ders_adi", flat=True)
+    )
+    hedef_var = bool(hedef_dersler)
+
+    with transaction.atomic():
+        SorumluTakvim.objects.filter(
+            sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+        ).update(tarih=yeni_tarih)
+        SorumluKomisyonUyesi.objects.filter(
+            sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+        ).update(tarih=yeni_tarih)
+
+        if hedef_var:
+            # Gozetmen: hedefte zaten atanmış salonları atla
+            hedef_salonlar = set(
+                SorumluGozetmen.objects
+                .filter(sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no)
+                .values_list("salon", flat=True)
+            )
+            SorumluGozetmen.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no,
+                salon__in=hedef_salonlar,
+            ).delete()
+            SorumluGozetmen.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+            ).update(tarih=yeni_tarih)
+
+            # OturmaPlani: hedef salon max sira_no'dan devam et
+            salon_max = dict(
+                SorumluOturmaPlani.objects
+                .filter(sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no)
+                .values("salon")
+                .annotate(m=Max("sira_no"))
+                .values_list("salon", "m")
+            )
+            to_move = list(
+                SorumluOturmaPlani.objects
+                .filter(sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no)
+                .order_by("salon", "sira_no")
+            )
+            SorumluOturmaPlani.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+            ).delete()
+            counters: dict = dict(salon_max)
+            for op in to_move:
+                counters[op.salon] = counters.get(op.salon, 0) + 1
+                op.pk      = None
+                op.tarih   = yeni_tarih
+                op.sira_no = counters[op.salon]
+            if to_move:
+                SorumluOturmaPlani.objects.bulk_create(to_move)
+        else:
+            SorumluGozetmen.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+            ).update(tarih=yeni_tarih)
+            SorumluOturmaPlani.objects.filter(
+                sinav=sinav, tarih=eski_tarih, oturum_no=oturum_no
+            ).update(tarih=yeni_tarih)
+
+    # Saat güncelleme — tarih işlemlerinden bağımsız, yeni_tarih üzerinden uygula
+    saat_guncelleme = {}
+    if yeni_bas is not None:
+        saat_guncelleme["saat_baslangic"] = yeni_bas
+    if yeni_bit is not None:
+        saat_guncelleme["saat_bitis"] = yeni_bit
+
+    if saat_guncelleme:
+        with transaction.atomic():
+            SorumluTakvim.objects.filter(
+                sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no
+            ).update(**saat_guncelleme)
+            SorumluOturmaPlani.objects.filter(
+                sinav=sinav, tarih=yeni_tarih, oturum_no=oturum_no
+            ).update(**saat_guncelleme)
+
+    return hedef_var

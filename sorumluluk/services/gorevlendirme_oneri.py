@@ -44,9 +44,11 @@ Kurallar:
   - "Geçmiş" görev yükü hesaplanırken bu sınavın kendi (varsa) kayıtlı
     atamaları hariç tutulur — öneri, bu sınav için sıfırdan üretilir.
 """
+import json
 import math
 import re
 from collections import defaultdict
+from itertools import groupby
 
 from okul.models import Personel
 from sorumluluk.models import (
@@ -128,6 +130,39 @@ def komisyon_birimleri(takvim_rows):
     return list(bilesenler.values())
 
 
+def komisyon_gorev_sayisi(kayitlar: list[tuple]) -> int:
+    """Union-find: bir personelin komisyon kayıtları arasında aynı slotta
+    (tarih + oturum_no eşit) VEYA aynı ders_adi'na sahip olanlar tek görev sayılır
+    (Yazılı/Uygulama ikilisi ya da çok günlü sınav gibi durumlarda tekrar saymayı
+    önler). Sonuç, oluşan bağlı bileşen sayısıdır.
+
+    `kayitlar` elemanları `(ders_adi, tarih, oturum_no)` (tek sınav bağlamı) ya da
+    `(sinav_id, ders_adi, tarih, oturum_no)` (sınavlar arası kümülatif bağlam)
+    biçiminde olabilir — sinav_id varsa ayrıca eşitlik şartı aranır.
+    """
+    n = len(kayitlar)
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            *sinav_i, ders_i, tarih_i, oturum_i = kayitlar[i]
+            *sinav_j, ders_j, tarih_j, oturum_j = kayitlar[j]
+            if sinav_i != sinav_j:
+                continue
+            if (tarih_i == tarih_j and oturum_i == oturum_j) or ders_i == ders_j:
+                ri, rj = find(i), find(j)
+                if ri != rj:
+                    parent[ri] = rj
+
+    return len({find(i) for i in range(n)})
+
+
 def _kumulatif_komisyon_baseline(sinav):
     """Bu sınav HARİÇ tüm sınavlardaki komisyon görev sayıları (aynı ders_adi veya
     aynı slotta birleşen atamalar tek görev sayılır — mevcut gorevlendirme() view'ı
@@ -138,26 +173,9 @@ def _kumulatif_komisyon_baseline(sinav):
             if pid:
                 kayitlar_by_pid[pid].append((ku.sinav_id, ku.ders_adi, ku.tarih, ku.oturum_no))
 
-    baseline = defaultdict(int)
-    for pid, kayitlar in kayitlar_by_pid.items():
-        n = len(kayitlar)
-        parent = list(range(n))
-
-        def find(x):
-            while parent[x] != x:
-                x = parent[x]
-            return x
-
-        for i in range(n):
-            for j in range(i + 1, n):
-                s_i, d_i, t_i, o_i = kayitlar[i]
-                s_j, d_j, t_j, o_j = kayitlar[j]
-                if s_i == s_j and ((t_i == t_j and o_i == o_j) or d_i == d_j):
-                    ri, rj = find(i), find(j)
-                    if ri != rj:
-                        parent[ri] = rj
-        baseline[pid] = len({find(i) for i in range(n)})
-    return baseline
+    return defaultdict(int, {
+        pid: komisyon_gorev_sayisi(kayitlar) for pid, kayitlar in kayitlar_by_pid.items()
+    })
 
 
 def oner_gorevlendirme(sinav, takvim_rows, active_salons):
@@ -313,3 +331,108 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
         )
 
     return {"komisyon": komisyon_sonuc, "gozetmen": gozetmen_sonuc, "uyarilar": uyarilar}
+
+
+def gorevlendirme_baglami_olustur(sinav, takvim_rows, active_salons, komisyon_dict, gozetmen_dict):
+    """`sorumluluk.views.gorevlendirme` (DB'den yüklü) ve `gorevlendirme_oner`
+    (öneri, kaydedilmemiş) view'larının ortak render bağlamını üretir."""
+    muaf_ids = SorumluGorevMuafPersonel.objects.values_list("personel_id", flat=True)
+    personel_listesi = list(
+        Personel.objects.select_related("brans").exclude(pk__in=muaf_ids).order_by("adi_soyadi")
+    )
+
+    oturumlar = []
+    for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
+        rows = list(rows)
+        dersler_data = [
+            {"takvim": row, "komisyon": komisyon_dict.get((row.tarih, row.oturum_no, row.ders_adi))}
+            for row in rows
+        ]
+        salons_data = [
+            {
+                "salon": salon,
+                "salon_label": dict(
+                    [("Sorumluluk1", "Mazeret 1"), ("Sorumluluk2", "Mazeret 2"), ("Sorumluluk3", "Mazeret 3")]
+                ).get(salon, salon),
+                "gozetmen": gozetmen_dict.get((tarih, oturum_no, salon)),
+            }
+            for salon in sorted(active_salons.get((tarih, oturum_no), []))
+        ]
+        oturumlar.append({
+            "tarih": tarih,
+            "oturum_no": oturum_no,
+            "saat_baslangic": rows[0].saat_baslangic,
+            "saat_bitis": rows[0].saat_bitis,
+            "dersler_data": dersler_data,
+            "ders_sayisi": len(rows),
+            "salons_data": salons_data,
+        })
+
+    # Görev sayısı özeti — tüm personel dahil, branş bazında gruplu
+    gorev_sayac: dict = {
+        p.pk: {"adi_soyadi": p.adi_soyadi, "brans": p.brans.ad if p.brans else "", "komisyon": 0, "gozetmen": 0}
+        for p in personel_listesi
+    }
+
+    # Komisyon sayımı: aynı slotta farklı dersler ya da farklı slotlarda aynı
+    # ders (çok günlü sınav) → 1 görev (bkz. komisyon_gorev_sayisi).
+    komisyon_kayitlar: dict = {}  # personel_pk → [(ders_adi, tarih, oturum_no), ...]
+    for ku in komisyon_dict.values():
+        for pid in (ku.uye1_id, ku.uye2_id):
+            if pid and pid in gorev_sayac:
+                komisyon_kayitlar.setdefault(pid, []).append(
+                    (ku.ders_adi, ku.tarih, ku.oturum_no)
+                )
+    for pid, kayitlar in komisyon_kayitlar.items():
+        gorev_sayac[pid]["komisyon"] = komisyon_gorev_sayisi(kayitlar)
+
+    for gz in gozetmen_dict.values():
+        if gz.gozetmen_id and gz.gozetmen_id in gorev_sayac:
+            gorev_sayac[gz.gozetmen_id]["gozetmen"] += 1
+
+    # Kümülatif görev sayısı — tüm SorumluSinav kayıtları
+    kumulatif_sayac = {p.pk: {"komisyon": 0, "gozetmen": 0} for p in personel_listesi}
+
+    kum_komisyon_kayitlar: dict = {}  # personel_pk → [(sinav_id, ders_adi, tarih, oturum_no)]
+    for ku in SorumluKomisyonUyesi.objects.all():
+        for pid in (ku.uye1_id, ku.uye2_id):
+            if pid and pid in kumulatif_sayac:
+                kum_komisyon_kayitlar.setdefault(pid, []).append(
+                    (ku.sinav_id, ku.ders_adi, ku.tarih, ku.oturum_no)
+                )
+    for pid, kayitlar in kum_komisyon_kayitlar.items():
+        kumulatif_sayac[pid]["komisyon"] = komisyon_gorev_sayisi(kayitlar)
+
+    for gz in SorumluGozetmen.objects.all():
+        if gz.gozetmen_id and gz.gozetmen_id in kumulatif_sayac:
+            kumulatif_sayac[gz.gozetmen_id]["gozetmen"] += 1
+
+    # Geçmiş dönem (OncekiDonemGorev) kümülatife ekle
+    for og in OncekiDonemGorev.objects.filter(personel_id__in=kumulatif_sayac):
+        kumulatif_sayac[og.personel_id]["komisyon"] += og.komisyon
+        kumulatif_sayac[og.personel_id]["gozetmen"] += og.gozetmen
+
+    sinav_toplam_komisyon = sum(v["komisyon"] for v in gorev_sayac.values())
+    sinav_toplam_gozetmen = sum(v["gozetmen"] for v in gorev_sayac.values())
+    sinav_toplam_gorev    = sinav_toplam_komisyon + sinav_toplam_gozetmen
+    sinav_kbs_saat        = sinav_toplam_gorev * 5
+
+    personel_kum_json = json.dumps({
+        str(p.pk): {
+            "k": kumulatif_sayac[p.pk]["komisyon"],
+            "g": kumulatif_sayac[p.pk]["gozetmen"],
+            "t": kumulatif_sayac[p.pk]["komisyon"] + kumulatif_sayac[p.pk]["gozetmen"],
+        }
+        for p in personel_listesi
+    })
+
+    return {
+        "sinav": sinav,
+        "oturumlar": oturumlar,
+        "personel_listesi": personel_listesi,
+        "personel_kum_json": personel_kum_json,
+        "sinav_toplam_komisyon": sinav_toplam_komisyon,
+        "sinav_toplam_gozetmen": sinav_toplam_gozetmen,
+        "sinav_toplam_gorev":    sinav_toplam_gorev,
+        "sinav_kbs_saat":        sinav_kbs_saat,
+    }
