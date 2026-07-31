@@ -106,8 +106,10 @@ geçmiş rapor/filtre dropdown'ları, Excel import eşleştirmeleri ve `ogrenci`
 
 `/veriaktar/` altında 5 adımlı bir sihirbaz personel, sınıf/şube, ders programı ve nöbet verilerini
 Excel'den içe aktarır. Her veri türü için ayrı bir `*_import_service.py` vardır
-(`veriaktar/services/`); `utility/services/` altında aynı isimli dosyalar da bulunur — ikisi
-karıştırılmamalı, hangi app'in hangisini import ettiğine dikkat edin.
+(`veriaktar/services/`) — içe aktarma mantığının tek kaynağı burasıdır. `utility/services/` yalnızca
+`main_services.py` (`IstatistikService`, `EOkulVeriAktar`) ve `nobet_dagitimi_service.py` barındırır;
+bunlar `veriaktar/services/*_import_service.py` tarafından da kullanılır ama tersi geçerli değildir —
+`utility/services/` içine `veriaktar`'daki dosyalarla aynı isimde yeni bir dosya eklemeyin.
 
 ### Ortak sınav motoru (Kelebek) — `sinav` + `ortaksinav_engine`
 
