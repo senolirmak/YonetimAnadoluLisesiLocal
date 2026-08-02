@@ -39,7 +39,9 @@ def oturma_plani_olustur(mazeret: "MazeretSinav") -> dict:
     from ogrenci.models import Ogrenci, OgrenciMuaf
     from okul.utils import get_aktif_egitim_yili
     from sinav.models import (
-        MazeretOturumDers, MazeretOgrenci, MazeretOturmaPlani,
+        MazeretOgrenci,
+        MazeretOturmaPlani,
+        MazeretOturumDers,
     )
 
     # Salon adı → kapasite
@@ -173,3 +175,19 @@ def oturma_plani_olustur(mazeret: "MazeretSinav") -> dict:
 
     MazeretOturmaPlani.objects.bulk_create(yeni_kayitlar, ignore_conflicts=True)
     return {"toplam": toplam, "salonlar": salon_sayilari, "uyari": uyari}
+
+
+def mazeret_salon_gruplari(mazeret: "MazeretSinav", kayitlar: list) -> list[dict]:
+    """
+    kayitlar listesini (MazeretOturmaPlani) salon adına göre gruplar.
+    Sıralama önce mazeret.efektif_salon_config'deki salon adlarını, sonra kayıtlarda
+    olup config'de olmayan (elle düzenlenmiş) salon adlarını takip eder.
+    """
+    salon_adlari = list(mazeret.efektif_salon_config.keys())
+    for k in kayitlar:
+        if k.salon not in salon_adlari:
+            salon_adlari.append(k.salon)
+    return [
+        {"ad": ad, "kayitlar": [k for k in kayitlar if k.salon == ad]}
+        for ad in salon_adlari
+    ]
