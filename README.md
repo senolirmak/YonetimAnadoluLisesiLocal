@@ -1,4 +1,4 @@
-# Nöbet Yönetim Sistemi
+# Okul Yönetim Sistemi
 
 Okul personelinin haftalık nöbet görevlerini, ders doldurma listelerini, devamsızlık kayıtlarını, öğrenci takip süreçlerini ve ortak sınav oturma düzenini yöneten Django tabanlı web uygulaması.
 

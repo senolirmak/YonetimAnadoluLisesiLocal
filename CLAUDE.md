@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Proje Özeti
 
-Django 6.0 / Python 3.12 tabanlı okul yönetim uygulaması ("Nöbet Yönetim Sistemi"). Nöbet dağıtımı,
+Django 6.0 / Python 3.12 tabanlı okul yönetim uygulaması ("Okul Yönetim Sistemi"). Nöbet dağıtımı,
 ders doldurma, devamsızlık, ders programı, ortak/mazeret/sorumluluk sınav yönetimi, öğrenci takibi ve
 dijital pano modüllerini tek bir Django projesinde barındırır. Kod ve arayüz metinleri Türkçe'dir
 (model/fonksiyon isimleri de dahil) — yeni kod eklerken bu dile uyun.
