@@ -125,8 +125,8 @@
     </a>
     <a href="{% url 'sinav:takvim_sayfasi' %}" class="akis-kart">
       <span class="akis-num">Adım 4</span>
-      <span class="akis-baslik">Sınav Takvimi (ILP)</span>
-      <span class="akis-aciklama">Çakışmasız sınav takvimini ILP ile oluştur</span>
+      <span class="akis-baslik">Sınav Takvimi (GA)</span>
+      <span class="akis-aciklama">Çakışmasız sınav takvimini genetik algoritma ile oluştur</span>
       <span class="akis-durum {% if db_ozeti.takvim > 0 %}durum-ok{% else %}durum-bos{% endif %}">
         {% if db_ozeti.takvim > 0 %}✓ {{ db_ozeti.takvim }} ders planlandı{% else %}Yapılmadı{% endif %}
       </span>

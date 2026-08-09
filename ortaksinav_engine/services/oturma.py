@@ -7,11 +7,12 @@ Kelebek karisik oturma duzeni olusturur, OturmaPlani tablosuna kaydeder
 ve Excel ciktisi uretir.
 
 Ozel metodlar:
-  _build_layout   – 6x6 matris icin backtracking + greedy yerlesim
-  _place_matrix   – 6x6 matrisi 3 blok x 6 sira x 2 koltuk yapisina donusturur
-  _write_excel    – oturma plani Excel dosyasini olusturur
-  generate_oturum – tek oturum icin plani uretir
-  generate_all    – takvimdeki tum oturumlar icin calistirir
+  _build_layout       – 6x6 matris icin stride bosluk + GA tabanli yerlesim
+  _ga_seat_assignment – komsu-cakisma sayisini minimize eden permutasyon GA'si
+  _place_matrix       – 6x6 matrisi 3 blok x 6 sira x 2 koltuk yapisina donusturur
+  _write_excel        – oturma plani Excel dosyasini olusturur
+  generate_oturum     – tek oturum icin plani uretir
+  generate_all        – takvimdeki tum oturumlar icin calistirir
 """
 
 import hashlib
@@ -395,18 +396,15 @@ class OturmaPlanService(BaseService):
     @staticmethod
     def _build_layout(exam_counts, rows=6, cols=6):
         """
-        Üç fazlı yerleşim algoritması.
+        İki fazlı yerleşim.
 
         Faz 1 (Stride deseni):
             Boş koltuklar grid'e düzenli aralıklarla yayılır; tampon görevi görür.
 
-        Faz 2 (MRV greedy):
-            En kısıtlı konuma önce ata (Minimum Remaining Values).
-            exam_key = (ders, seviye) → aynı ders+seviye komşu olamaz.
-            Çakışmasız seçenek yoksa en az çakışan grup atanır.
-
-        Faz 3 (Takas onarımı):
-            Kalan komşu çakışmalarını yerel ikili takasla gider.
+        Faz 2 (Genetik algoritma):
+            Dolu konumlara exam_key = (ders, seviye) atamasını, komşu-çakışma
+            sayısını (aynı ders+seviye komşu olamaz) minimize edecek şekilde
+            permütasyon tabanlı bir GA ile bulur (bkz. _ga_seat_assignment).
         """
         EMPTY_KEY = ("__EMPTY__", None)
         total_students = sum(exam_counts.values())
@@ -442,81 +440,85 @@ class OturmaPlanService(BaseService):
 
         adj = {pos: occ_neighbors(*pos) for pos in occupied_set}
 
-        # ── Faz 2: MRV greedy ───────────────────────────────────────────────
-        layout     = [[EMPTY_KEY] * cols for _ in range(rows)]
-        assignment: dict = {}
-        remaining  = dict(exam_counts)
-        keys_desc  = sorted(exam_counts, key=lambda k: -exam_counts[k])
+        # ── Faz 2: GA ile komşu-çakışmasını minimize eden atama ─────────────
+        assignment = OturmaPlanService._ga_seat_assignment(occupied_list, adj, exam_counts)
 
-        def valid_keys(pos):
-            forbidden = {assignment.get(n) for n in adj[pos]} - {None}
-            return [k for k in keys_desc if remaining.get(k, 0) > 0 and k not in forbidden]
+        layout = [[EMPTY_KEY] * cols for _ in range(rows)]
+        for (r, c), key in assignment.items():
+            layout[r][c] = key
+        return layout
 
-        unassigned = set(occupied_set)
+    @staticmethod
+    def _ga_seat_assignment(occupied_list, adj, exam_counts,
+                             population_size=60, generations=150, max_stagnation=30):
+        """
+        Dolu konum → exam_key atamasını, komşu (aynı ders+seviye) çakışma
+        sayısını minimize eden permütasyon tabanlı bir GA ile bulur.
 
-        while unassigned:
-            # En kısıtlı konum: geçerli seçenek sayısı az, komşu sayısı fazla
-            best = min(unassigned, key=lambda p: (len(valid_keys(p)), -len(adj[p]), p))
-            vk = valid_keys(best)
-            if vk:
-                chosen = vk[0]              # geçerliler içinde en büyük grup
+        Birey: occupied_list ile ayni uzunlukta bir exam_key permutasyonu.
+        Fitness: komsu ciftler arasindaki ayni-key cakisma sayisi (0 = ideal).
+        Mutasyon: rastgele birkac pozisyon ciftinin key'ini takas eder — bu,
+        Faz 1'deki eski "takas onarımı" adımının GA mutasyonu icindeki karsiligidir.
+        Çaprazlama kullanılmaz (projede AdvancedNobetDagitim/takvim GA'larıyla
+        aynı sade desen: elitizm + mutasyon).
+        """
+        EMPTY_KEY = ("__EMPTY__", None)
+        n = len(occupied_list)
+        if n == 0:
+            return {}
+
+        keys_expanded: list = []
+        for k, cnt in exam_counts.items():
+            keys_expanded.extend([k] * cnt)
+        if len(keys_expanded) < n:
+            keys_expanded += [EMPTY_KEY] * (n - len(keys_expanded))
+        elif len(keys_expanded) > n:
+            keys_expanded = keys_expanded[:n]
+
+        def conflict_count(perm) -> int:
+            pos_key = dict(zip(occupied_list, perm))
+            total = 0
+            for pos, key in pos_key.items():
+                for nb in adj[pos]:
+                    if pos_key.get(nb) == key:
+                        total += 1
+            return total // 2  # her çakışan çift iki kez sayılır
+
+        rng = random.Random()
+
+        def random_individual():
+            perm = list(keys_expanded)
+            rng.shuffle(perm)
+            return perm
+
+        population = [random_individual() for _ in range(population_size)]
+        best_fitness = float("inf")
+        stagnation = 0
+        swaps_per_mutation = max(1, n // 10)
+
+        for _generation in range(generations):
+            population.sort(key=conflict_count)
+            current_best = conflict_count(population[0])
+            if current_best == 0:
+                break
+            if current_best < best_fitness:
+                best_fitness = current_best
+                stagnation = 0
             else:
-                available = [k for k in keys_desc if remaining.get(k, 0) > 0]
-                if not available:
-                    unassigned.discard(best)
-                    continue
-                # Çakışmasız seçenek yok → en az çakışan grubu ata
-                chosen = min(
-                    available,
-                    key=lambda k: sum(1 for n in adj[best] if assignment.get(n) == k),
-                )
-            r, c = best
-            layout[r][c]   = chosen
-            assignment[best] = chosen
-            remaining[chosen] -= 1
-            unassigned.discard(best)
-
-        # ── Faz 3: Takas onarımı ────────────────────────────────────────────
-        # Kalan komşu çakışmalarını yerel ikili takasla azalt (max 5 geçiş)
-        for _ in range(5):
-            improved = False
-            for pos in occupied_set:
-                key_here = assignment.get(pos)
-                if key_here is None:
-                    continue
-                conflict_n = [n for n in adj[pos] if assignment.get(n) == key_here]
-                if not conflict_n:
-                    continue
-                old_here = len(conflict_n)
-
-                for pos2 in occupied_set:
-                    if pos2 == pos:
-                        continue
-                    key2 = assignment.get(pos2)
-                    if key2 is None or key2 == key_here:
-                        continue
-                    # Takas sonrası çakışma sayılarını hesapla
-                    new_here = sum(
-                        1 for n in adj[pos]  if assignment.get(n) == key2 and n != pos2
-                    )
-                    old_p2 = sum(
-                        1 for n in adj[pos2] if assignment.get(n) == key2 and n != pos
-                    )
-                    new_p2 = sum(
-                        1 for n in adj[pos2] if assignment.get(n) == key_here and n != pos
-                    )
-                    if new_here + new_p2 < old_here + old_p2:
-                        # Takas faydalı
-                        r,  c  = pos
-                        r2, c2 = pos2
-                        layout[r][c]   = key2
-                        layout[r2][c2] = key_here
-                        assignment[pos]  = key2
-                        assignment[pos2] = key_here
-                        improved = True
-                        break
-            if not improved:
+                stagnation += 1
+            if stagnation >= max_stagnation:
                 break
 
-        return layout
+            parent_pool = population[: max(3, population_size // 4)]
+            new_population = [population[0]]  # Elitizm: en iyi bireyi koru
+            while len(new_population) < population_size:
+                child = list(rng.choice(parent_pool))
+                for _ in range(swaps_per_mutation):
+                    i, j = rng.randrange(n), rng.randrange(n)
+                    child[i], child[j] = child[j], child[i]
+                new_population.append(child)
+            population = new_population
+
+        best = min(population, key=conflict_count)
+        return dict(zip(occupied_list, best))
 

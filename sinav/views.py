@@ -574,7 +574,7 @@ def takvim_ders_duzenle(request):
 
 @require_POST
 def takvim_onizleme_iptal(request):
-    """Önizleme taslağını temizler ve Takvim (ILP) sayfasına döner."""
+    """Önizleme taslağını temizler ve Takvim (GA) sayfasına döner."""
     aktif_sinav = _aktif_sinav()
     from sinav.models import TakvimUretim
     uretim = TakvimUretim.objects.filter(sinav=aktif_sinav).order_by("-uretim_tarihi").first()
@@ -1008,7 +1008,7 @@ ADIM_FUNCLARI = {
     "temel_veriler":  (temel_verileri_olustur,    "Temel Veriler (DersHavuzu + SinifSube)"),
     "veri_aktar":     (verileri_aktar,            "Veri Aktarimi (DersProgram + Ogrenci)"),
     "subeders":       (subeders_guncelle,          "SubeDers Guncelle"),
-    "takvim":         (takvim_olustur,             "Sinav Takvimi (ILP)"),
+    "takvim":         (takvim_olustur,             "Sinav Takvimi (GA)"),
     "oturma":         (oturma_planlarini_olustur,  "Oturma Planlari"),
 }
 
@@ -1113,7 +1113,7 @@ def gorev_iptal(request, task_id: str):
         if task_id in _TASKS and not _TASKS[task_id]["done"]:
             _TASKS[task_id]["cancel"] = True
             _TASKS[task_id]["logs"].append(
-                "! Durdurma istegi alindi. Mevcut ILP adimlari tamamlaninca durulacak..."
+                "! Durdurma istegi alindi. Mevcut adim tamamlaninca durulacak..."
             )
     return JsonResponse({"ok": True})
 

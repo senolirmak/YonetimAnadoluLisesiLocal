@@ -14,7 +14,7 @@ Okul personelinin haftalık nöbet görevlerini, ders doldurma listelerini, deva
 - **Veri Aktarma** — 5 adımlı Excel import sihirbazı (personel, sınıf/şube, ders programı, nöbet verileri)
 - **Dijital Pano** — Duyuru, etkinlik ve medya içerik yönetimi (kiosk)
 - **Öğrenci Modülü** — Öğrenci bilgileri, rehberlik, disiplin, müdüriyet görüşme kayıtları
-- **Ortak Sınav Yönetimi (Kelebek)** — ILP tabanlı sınav takvimi, oturma planı üretimi, salon ve sıra ataması, PDF raporlama; katılacak sınıf seviyeleri (9–12), kelebek/kendi sınıfı dağılımı ve günde maks. sınav sayısı yapılandırılabilir
+- **Ortak Sınav Yönetimi (Kelebek)** — genetik algoritma tabanlı sınav takvimi, oturma planı üretimi, salon ve sıra ataması, PDF raporlama; katılacak sınıf seviyeleri (9–12), kelebek/kendi sınıfı dağılımı ve günde maks. sınav sayısı yapılandırılabilir
 - **Sınav Gözetim** — Öğretmenlere sınav günü kendi sınıflarının Kelebek yerleşim listesini gösterir
 - **Raporlama** — PDF, PNG ve Excel dışa aktarma
 
@@ -290,7 +290,7 @@ nobet_proje/
 | `sinav_sinav_bilgisi` | SinavBilgisi | Aktif sınav tanımı |
 | `sinav_oturma_plani` | OturmaPlani | Öğrenci salon ve sıra atamaları |
 | `sinav_takvim_uretim` | TakvimUretim | Sınav takvimi üretim kayıtları |
-| `sinav_algoritma_parametreleri` | AlgoritmaParametreleri | ILP parametreleri (kelebek, maks. sınav/gün, tatil günleri vb.) |
+| `sinav_algoritma_parametreleri` | AlgoritmaParametreleri | GA parametreleri (kelebek, maks. sınav/gün, tatil günleri vb.) |
 
 ---
 

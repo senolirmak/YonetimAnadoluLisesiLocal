@@ -6,7 +6,7 @@ CONFIG = {
     "eokul_ogrenci_dosya": "",
     "eokul_haftalik_program_dosya": "",
     "uygulama_tarihi": "2026-02-23",
-    # ILP / takvim parametreleri
+    # GA / takvim parametreleri
     "HOLIDAYS": set(),
     "BASLANGIC_TARIH": datetime(2025, 1, 6),
     "OTURUM_SAYISI_GUN": 5,

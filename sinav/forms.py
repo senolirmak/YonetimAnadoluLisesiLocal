@@ -64,13 +64,13 @@ class AlgoritmaForm(forms.Form):
         label="Faz-1 Süre Limiti (sn)",
         initial=300,
         min_value=30,
-        help_text="ILP minimum slot sayısı aşaması için zaman sınırı.",
+        help_text="GA'nın minimum/kompakt slot sayısını aradığı aşama için zaman sınırı.",
     )
     time_limit_phase2 = forms.IntegerField(
         label="Faz-2 Süre Limiti (sn)",
         initial=120,
         min_value=30,
-        help_text="ILP optimizasyon aşaması için zaman sınırı.",
+        help_text="GA'nın (Kelebek amaç fonksiyonuyla) populasyonu evrimlestirdigi aşama için zaman sınırı.",
     )
     max_extra_days = forms.IntegerField(
         label="Maksimum Ek Gün",
@@ -90,7 +90,7 @@ class AlgoritmaForm(forms.Form):
         initial=2,
         min_value=1,
         max_value=5,
-        help_text="Bir öğrencinin aynı günde girebileceği en fazla sınav sayısı (ILP kısıtı).",
+        help_text="Bir öğrencinin aynı günde girebileceği en fazla sınav sayısı (sert kısıt).",
     )
 
     def clean_oturum_saatleri(self):

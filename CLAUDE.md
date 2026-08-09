@@ -115,9 +115,13 @@ bunlar `veriaktar/services/*_import_service.py` tarafından da kullanılır ama 
 
 `sinav` app'i modelleri/view'ları barındırır (`SinavBilgisi`, `OturmaPlani`, `TakvimUretim`,
 `AlgoritmaParametreleri`); asıl optimizasyon mantığı `ortaksinav_engine/services/` altındadır
-(`takvim.py`, `oturma.py`, `ders_analiz.py`, `veri_import.py`, `pdf_rapor.py`) ve ILP tabanlı takvim +
-oturma planı üretimi için `PuLP`/`networkx` kullanır. Katılacak sınıf seviyeleri, kelebek/kendi sınıfı
-dağılım oranı ve günlük maks. sınav sayısı `AlgoritmaParametreleri` üzerinden yapılandırılır.
+(`takvim.py`, `oturma.py`, `ders_analiz.py`, `veri_import.py`, `pdf_rapor.py`) ve genetik algoritma (GA)
+tabanlı takvim + oturma planı üretimi kullanır: `takvim.py` çakışma grafiğini `networkx` ile kurar (DSATUR
+greedy boyama başlangıç üst sınırı verir), ardından kısıt-duyarlı yapıcı yerleşim + mutasyonla evrimleşen
+GA (`_phase1`/`_phase2`) çakışmasız takvimi üretir; `oturma.py` da salon içi öğrenci yerleşimini benzer
+şekilde permütasyon tabanlı bir GA (`_ga_seat_assignment`) ile bulur. Katılacak sınıf seviyeleri,
+kelebek/kendi sınıfı dağılım oranı ve günlük maks. sınav sayısı `AlgoritmaParametreleri` üzerinden
+yapılandırılır.
 Öğretmenlerin sınav günü kendi sınıflarının yerleşim listesini gördüğü gözetim ekranı
 (`/sinav/gozetim/`) yalnızca o öğretmen gözetmen olarak atanmışsa ve sınav saatinden 50 dakika önce
 itibaren aktif olur — bu zamanlama kısıtını değiştirirken dikkatli olun.
@@ -125,8 +129,9 @@ itibaren aktif olur — bu zamanlama kısıtını değiştirirken dikkatli olun.
 `sinav/services/` ise ayrı bir alt sistemdir: **mazeret sınavı** (makeup exam) ILP dağıtımı ve
 takvimi (`mazeret_ilp.py`, `mazeret_dagitim.py`, `mazeret_takvim.py`) — Kelebek motoruyla karıştırmayın.
 
-`sorumluluk` app'i de kendi ILP/genetik algoritma motorunu taşır (`takvim_motoru.py` vs.
-`takvim_motoru_ga.py`) — sorumluluk sınavı (responsibility exam) için ayrı bir optimizasyon problemidir.
+`sorumluluk` app'i de kendi optimizasyon motorunu taşır — sorumluluk sınavı (responsibility exam) için
+ayrı bir problemdir. İki dosya var: `takvim_motoru_ga.py` (GA, `views.py`'nin kullandığı aktif motor) ve
+`takvim_motoru.py` (ILP, artık hiçbir yerden çağrılmıyor — dead code, silmeden önce onaylayın).
 
 ### Şablonlar ve statik dosyalar
 

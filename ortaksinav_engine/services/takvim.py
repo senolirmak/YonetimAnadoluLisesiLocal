@@ -2,41 +2,53 @@
 """
 TakvimService – Adim 4
 
-ILP (PuLP + NetworkX) ile catismasiz sinav takvimi olusturur.
-SubeDers tablosunu okur; Takvim tablosuna yazar ve takvim.xlsx uretir.
+Genetik algoritma (kisit-duyarli yapici yerlesim + mutasyonla iyilestirme) ile
+catismasiz sinav takvimi olusturur. SubeDers tablosunu okur; Takvim tablosuna
+yazar ve takvim.xlsx uretir.
 
 Ozel metodlar:
-  _nth_business_day  – takvim hesabi icin is gunu bulur
-  _build_graph       – sube bazli catisma grafi
-  _greedy_upper_bound – greedy boyama ile slot ust siniri
-  _day_slots_dict    – gun -> slot listesi eslestirmesi
-  _phase1            – Faz-1 ILP (minimum slot sayisi)
-  _phase2            – Faz-2 ILP (Kelebek amac fonksiyonlu optimizasyon)
+  _nth_business_day   – takvim hesabi icin is gunu bulur
+  _build_graph        – sube bazli catisma grafi
+  _greedy_upper_bound – greedy boyama ile slot ust siniri (GA icin baslangic K'si)
+  _day_slots_dict     – gun -> slot listesi eslestirmesi
+  _phase1             – Faz-1 GA (minimum/kompakt slot sayisini bulan yapici arama)
+  _phase2             – Faz-2 GA (Kelebek amac fonksiyonlu populasyon evrimi)
+  _ga_build_context   – ders bazli kisitlari 'birim' (union-find ile eslesmis
+                        ders gruplari) bazina indirger
+  _ga_construct       – kisit-duyarli DSATUR-benzeri yapici yerlesim
+  _ga_mutate          – sert kisitlari koruyarak bireyi mutasyona ugratir
+  _ga_fitness         – yumusak amaclari (erken slot, yuk dengesi, cesitlilik) puanlar
 """
 
+import copy
 import itertools
+import random
+import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 from math import ceil
 
-import pandas as pd
 import networkx as nx
-from pulp import (
-    LpProblem, LpVariable, LpBinary, lpSum,
-    LpMinimize, PULP_CBC_CMD, value, LpStatusOptimal,
-)
+import pandas as pd
 
 from ortaksinav_engine.config import CIFT_OTURUMLU_DERSLER as _DEFAULT_CIFT_OTURUMLU
 from ortaksinav_engine.services.base import BaseService
 
+# GA parametreleri
+_GA_POPULATION_SIZE = 40
+_GA_GENERATIONS = 120
+_GA_MAX_STAGNATION = 25
+_GA_CONSTRUCT_ATTEMPTS = 50  # bir K icin feasible birey aramak icin deneme sayisi
+
 
 class TakvimService(BaseService):
-    """ILP tabanli sinav takvimi olusturan servis."""
+    """Genetik algoritma tabanli sinav takvimi olusturan servis."""
 
     def takvimolustur(self):
-        self.log("\nILP ile sinav takvimi olusturuluyor...")
-        from sinav.models import SubeDers, SinavBilgisi
-
+        self.log("\nGA ile sinav takvimi olusturuluyor...")
         from django.db.models import F as _F
+
+        from sinav.models import SinavBilgisi, SubeDers
         aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
         # FK alanlar için string değerler: ders__ders_adi, sube__sube (harf)
         records = list(
@@ -118,7 +130,7 @@ class TakvimService(BaseService):
 
         # Uygulama sinavlari exclusive slot: ayni slotta baska hicbir sinav olamaz.
         # Her (Uygulama) dersi ile diger tum dersler arasina G'ye kenar eklenir;
-        # ILP bu kenarlar icin x[d1,t] + x[d2,t] <= 1 kisitini zaten uygular.
+        # GA _ga_slot_valid icinde bu kenarlari komsu-cakisma kisiti olarak okur.
         uygulama_dersler = [d for d in DERSLER if d.endswith(" (Uygulama)")]
         if uygulama_dersler:
             uyg_kenar = 0
@@ -159,8 +171,8 @@ class TakvimService(BaseService):
                 ders_adi  = ss["ders"]
                 seviyeler = ss.get("seviyeler") or []  # [] → tüm seviyeler
 
-                # Çift oturumlu dersler ILP'de "(Yazılı)" ve "(Uygulama)" olarak
-                # ikiye bölündüğünden, sabit atama "(Yazılı)" varyantına yapılır.
+                # Çift oturumlu dersler DERSLER listesinde "(Yazılı)" ve "(Uygulama)"
+                # olarak ikiye bölündüğünden, sabit atama "(Yazılı)" varyantına yapılır.
                 if ders_adi in CIFT_OTURUMLU_DERSLER:
                     ilp_ders_adi = ders_adi + " (Yazili)"
                     self.log(f"  [Sabit] '{ders_adi}' çift oturumlu → Yazili oturumu sabitlenecek.")
@@ -180,8 +192,8 @@ class TakvimService(BaseService):
 
                 # Seviye filtresi: belirtilmişse yalnızca o seviyelerde var olan dersler için uygula.
                 # SUBE_DERS_MAP anahtarları "9/A" biçiminde; ham ders_adi kullanılarak kontrol edilir.
-                # ILP'de SUBE_DERS_MAP değerleri dfE'den gelir: çift oturumlu dersler
-                # orada "(Yazılı)"/"(Uygulama)" olarak genişletilmiştir.
+                # SUBE_DERS_MAP değerleri dfE'den gelir: çift oturumlu dersler orada
+                # "(Yazılı)"/"(Uygulama)" olarak genişletilmiştir.
                 # Bu yüzden varlık/seviye kontrolü ilp_ders_adi ile yapılmalı.
                 if ilp_ders_adi not in DERSLER:
                     self.log(f"  [Sabit] '{ilp_ders_adi}' DERSLER'de yok, atlanıyor.")
@@ -423,205 +435,433 @@ class TakvimService(BaseService):
 
     def _phase1(self, K_upper, G, DERSLER, SUBE_DERS_MAP, DAY_SLOTS,
                 fixed_slots=None, catisma_gun_kisitlari=None, pairs=None, esleme_gercek=None):
-        MAX_SINAV_PER_GUN = int(self.config.get("MAX_SINAV_PER_GUN", 2))
-        DAYS = list(DAY_SLOTS.keys())
-        model = LpProblem("MinSlot_Phase1", LpMinimize)
-        x = {
-            (d, t): LpVariable(f"x_{i}_{t}", cat=LpBinary)
-            for i, d in enumerate(DERSLER)
-            for t in range(K_upper)
-        }
-        y = {t: LpVariable(f"y_{t}", cat=LpBinary) for t in range(K_upper)}
+        """
+        Faz-1 (GA): K_upper slot ust siniri icinde TUM sert kisitlari saglayan
+        kompakt (erken-slot oncelikli) bir yerlesim arar. DAY_SLOTS parametresi
+        cagiran kodla imza uyumu icin tutulur, GA gun sayisini oturum_sayisi_gun
+        uzerinden kendi hesaplar.
+        """
+        max_sinav_per_gun = int(self.config.get("MAX_SINAV_PER_GUN", 2))
+        oturum_sayisi_gun = self.config["OTURUM_SAYISI_GUN"]
+        ctx = self._ga_build_context(
+            G, DERSLER, SUBE_DERS_MAP, fixed_slots, catisma_gun_kisitlari, pairs, esleme_gercek,
+        )
 
-        for d in DERSLER:
-            model += lpSum(x[(d, t)] for t in range(K_upper)) == 1
+        rng = random.Random()
+        deadline = time.monotonic() + self.config.get("TIME_LIMIT_PHASE1", 300)
 
-        # Sabit sınav kısıtları: bu dersler yalnızca belirlenen slota atanabilir
-        for d, t_fixed in (fixed_slots or {}).items():
-            if d in DERSLER and t_fixed < K_upper:
-                model += x[(d, t_fixed)] == 1
+        # Once tamamen ac-gozlu (earliest-fit) deneme: kompakt/az-slot kullanan
+        # cozume en yakin sonucu verir (ILP'nin min-slot amacinin GA karsiligi).
+        placement = self._ga_construct(
+            ctx, K_upper, oturum_sayisi_gun, max_sinav_per_gun, rng, earliest_fit=True,
+        )
+        attempts = 0
+        while placement is None and attempts < _GA_CONSTRUCT_ATTEMPTS:
+            if self.is_cancelled():
+                raise RuntimeError("Adim 4 kullanici tarafindan durduruldu.")
+            if time.monotonic() > deadline:
+                break
+            attempts += 1
+            placement = self._ga_construct(ctx, K_upper, oturum_sayisi_gun, max_sinav_per_gun, rng)
 
-        for d1, d2 in G.edges():
-            for t in range(K_upper):
-                model += x[(d1, t)] + x[(d2, t)] <= 1
-
-        for t in range(K_upper):
-            for d in DERSLER:
-                model += x[(d, t)] <= y[t]
-            if t < K_upper - 1:
-                model += y[t] >= y[t + 1]
-
-        for sube, dlist in SUBE_DERS_MAP.items():
-            dset = set(dlist)
-            for g, slots in DAY_SLOTS.items():
-                model += lpSum(x[(d, t)] for d in dset for t in slots if (d, t) in x) <= MAX_SINAV_PER_GUN
-
-        # Catisma grubundaki dersler: ayni sube icin ayni gunde en fazla 1 sinav
-        for _sube, dset_cg in (catisma_gun_kisitlari or []):
-            for g, slots in DAY_SLOTS.items():
-                model += lpSum(x[(d, t)] for d in dset_cg for t in slots if (d, t) in x) <= 1
-
-        # Cift oturumlu dersler AYNI GUNDE OLMALI – Faz-1'de de hard kisit
-        if pairs:
-            u1 = {
-                (d, g): LpVariable(f"u1_{DERSLER.index(d)}_{g}", cat=LpBinary)
-                for d in DERSLER
-                for g in DAYS
-            }
-            for d in DERSLER:
-                for g, slots in DAY_SLOTS.items():
-                    model += u1[(d, g)] <= lpSum(x[(d, t)] for t in slots if (d, t) in x)
-                model += lpSum(u1[(d, g)] for g in DAYS) == 1
-            for dL, dK in pairs:
-                for g in DAYS:
-                    model += u1[(dL, g)] == u1[(dK, g)]
-
-        # Eş zamanlı eşleme hard kısıtı (Faz-1)
-        for d1, d2 in (esleme_gercek or []):
-            for t in range(K_upper):
-                model += x[(d1, t)] == x[(d2, t)]
-
-        model += lpSum(y[t] for t in range(K_upper))
-        model.solve(PULP_CBC_CMD(msg=False, timeLimit=self.config["TIME_LIMIT_PHASE1"],
-                                 gapRel=0.0, threads=0))
-
-        if model.status not in (LpStatusOptimal, 1):
+        if placement is None:
             return None, None, None
 
-        ders_to_slot = {}
-        for d in DERSLER:
-            for t in range(K_upper):
-                if value(x[(d, t)]) > 0.5:
-                    ders_to_slot[d] = t
-                    break
+        ders_to_slot = self._ga_placement_to_ders(placement, ctx)
         used_slots = sorted(set(ders_to_slot.values()))
-        return len(used_slots), ders_to_slot, used_slots
+        min_slots = (max(used_slots) + 1) if used_slots else 0
+        return min_slots, ders_to_slot, used_slots
 
     def _phase2(self, min_slots, G, DERSLER, SUBE_DERS_MAP, pairs, DERS_WEIGHT,
                 oturum_sayisi_gun, ders_seviye_map=None, fixed_slots=None,
                 catisma_gun_kisitlari=None, esleme_gercek=None):
-        MAX_SINAV_PER_GUN = int(self.config.get("MAX_SINAV_PER_GUN", 2))
         """
-        Faz-2: Exactly min_slots sloti kullanir (K = min_slots).
-        Tum y[t]=1 olacagindan y degiskenleri kaldirilir.
-        Hedef:
-          1. Cift oturumlu dersleri ayni gune koy.
+        Faz-2 (GA): Tam olarak min_slots slotu kullanan bir populasyon insa edip
+        mutasyon + elitizmle yumusak amaclara gore evrimlestirir. Sert kisitlar
+        (cakisma, sabit slot, ayni-slot esleme, cift-oturum ayni-gun, gun/sube
+        kotasi, catisma-grubu gun kisiti) her bireyde YAPICI ASAMADA garanti
+        edilir; mutasyon da yalnizca gecerli tasimalari uygular. Hedef:
+          1. Cift oturumlu dersleri ayni gune koy (yapici asamada garanti).
           2. Her oturumda farkli sinif seviyelerinden ders olsun (Kelebek karisimi).
-          3. Erken slotlari tercih et.
+          3. Erken slotlari ve dengeli yuku tercih et.
         """
+        max_sinav_per_gun = int(self.config.get("MAX_SINAV_PER_GUN", 2))
         K = min_slots
-        DAY_SLOTS = self._day_slots_dict(K, oturum_sayisi_gun)
-        DAYS = list(DAY_SLOTS.keys())
-
-        model = LpProblem("SameDay_Phase2", LpMinimize)
-
-        x = {
-            (d, t): LpVariable(f"x_{i}_{t}", cat=LpBinary)
-            for i, d in enumerate(DERSLER)
-            for t in range(K)
-        }
-
-        # Her ders tam olarak 1 slota atanir
-        for d in DERSLER:
-            model += lpSum(x[(d, t)] for t in range(K)) == 1
-
-        # Sabit sınav kısıtları
-        for d, t_fixed in (fixed_slots or {}).items():
-            if d in DERSLER and t_fixed < K:
-                model += x[(d, t_fixed)] == 1
-
-        # Catisan dersler ayni slotta olamaz
-        for d1, d2 in G.edges():
-            for t in range(K):
-                model += x[(d1, t)] + x[(d2, t)] <= 1
-
-        # Sube/gun <= MAX_SINAV_PER_GUN sinavi
-        for sube, dlist in SUBE_DERS_MAP.items():
-            dset = set(dlist)
-            for g, slots in DAY_SLOTS.items():
-                model += lpSum(x[(d, t)] for d in dset for t in slots if (d, t) in x) <= MAX_SINAV_PER_GUN
-
-        # Catisma grubundaki dersler: ayni sube icin ayni gunde en fazla 1 sinav
-        for _sube, dset_cg in (catisma_gun_kisitlari or []):
-            for g, slots in DAY_SLOTS.items():
-                model += lpSum(x[(d, t)] for d in dset_cg for t in slots if (d, t) in x) <= 1
-
-        # Ders-gun ikili degiskeni (cift oturum icin)
-        u = {
-            (d, g): LpVariable(f"u_{DERSLER.index(d)}_{g}", cat=LpBinary)
-            for d in DERSLER
-            for g in DAYS
-        }
-        for d in DERSLER:
-            for g, slots in DAY_SLOTS.items():
-                model += u[(d, g)] <= lpSum(x[(d, t)] for t in slots if (d, t) in x)
-            model += lpSum(u[(d, g)] for g in DAYS) == 1
-
-        # Cift oturumlu dersler AYNI GUNDE OLMALI – hard kisit
-        # u[(dL,g)] == u[(dK,g)] her g icin: ya ikisi birden o gunde ya da ikisi de degil.
-        for dL, dK in pairs:
-            for g in DAYS:
-                model += u[(dL, g)] == u[(dK, g)]
-
-        # Erken slotlari tercih et (slot numarasi kucuk olsun)
-        slot_usage = lpSum(
-            x[(d, t)] * (t % oturum_sayisi_gun)
-            for d in DERSLER
-            for t in range(K)
-            if (d, t) in x
+        ctx = self._ga_build_context(
+            G, DERSLER, SUBE_DERS_MAP, fixed_slots, catisma_gun_kisitlari, pairs, esleme_gercek,
         )
 
-        # Agir dersleri ayri slotlara dag (max grup buyuklugunu minimize et)
-        M = {t: LpVariable(f"M_{t}", lowBound=0) for t in range(K)}
-        for t in range(K):
-            for d in DERSLER:
-                w_d = DERS_WEIGHT.get(d, 1)
-                model += M[t] >= w_d * x[(d, t)]
-
-        # Eş zamanlı eşleme hard kısıtı (Faz-2): x[d1,t] == x[d2,t] for all t
-        for d1, d2 in (esleme_gercek or []):
-            for t in range(K):
-                model += x[(d1, t)] == x[(d2, t)]
-
-        # Kelebek karisimi: her slotta farkli sinif seviyelerinden ders olsun
-        # lev[s,t] = 1 ise slot t'de seviye s'den en az bir ders var
-        diversity_term = 0
-        if ders_seviye_map:
-            SEVIYELER = sorted({s for sevs in ders_seviye_map.values() for s in sevs})
-            if SEVIYELER:
-                lev = {
-                    (sv, t): LpVariable(f"lev_{sv}_{t}", cat=LpBinary)
-                    for sv in SEVIYELER
-                    for t in range(K)
-                }
-                for sv in SEVIYELER:
-                    dersler_sv = [d for d in DERSLER if sv in ders_seviye_map.get(d, set())]
-                    for t in range(K):
-                        if dersler_sv:
-                            model += lev[(sv, t)] <= lpSum(
-                                x[(d, t)] for d in dersler_sv if (d, t) in x
-                            )
-                        else:
-                            model += lev[(sv, t)] == 0
-                # Maksimize etmek icin minimizasyona negatif eklenir
-                diversity_term = -0.5 * lpSum(lev[(sv, t)] for sv in SEVIYELER for t in range(K))
-
-        model += (
-            0.01 * slot_usage
-            + 0.01 * lpSum(M[t] for t in range(K))
-            + diversity_term
+        rng = random.Random()
+        population = self._ga_build_population(
+            ctx, K, oturum_sayisi_gun, max_sinav_per_gun,
+            pop_size=_GA_POPULATION_SIZE, rng=rng,
+            attempts_budget=_GA_POPULATION_SIZE * 6,
         )
-
-        model.solve(PULP_CBC_CMD(msg=False, timeLimit=self.config["TIME_LIMIT_PHASE2"],
-                                 gapRel=0.05, threads=0))
-
-        if model.status not in (LpStatusOptimal, 1):
+        if not population:
             return None
 
-        ders_to_slot = {}
+        def fit(p):
+            return self._ga_fitness(p, ctx, DERS_WEIGHT, ders_seviye_map, oturum_sayisi_gun)
+
+        best_penalty = float("inf")
+        stagnation = 0
+        mutation_rate = 0.25
+        deadline = time.monotonic() + self.config.get("TIME_LIMIT_PHASE2", 120)
+
+        for _generation in range(_GA_GENERATIONS):
+            if self.is_cancelled():
+                raise RuntimeError("Adim 4 kullanici tarafindan durduruldu.")
+            if time.monotonic() > deadline:
+                break
+
+            population.sort(key=fit)
+            current_best = fit(population[0])
+            if current_best < best_penalty:
+                best_penalty = current_best
+                stagnation = 0
+            else:
+                stagnation += 1
+            if stagnation >= _GA_MAX_STAGNATION:
+                break
+
+            parent_pool = population[: max(3, len(population) // 4)]
+            new_population = [population[0]]  # Elitizm: en iyi bireyi koru
+            while len(new_population) < len(population):
+                parent = copy.deepcopy(rng.choice(parent_pool))
+                child = self._ga_mutate(
+                    ctx, parent, K, oturum_sayisi_gun, max_sinav_per_gun, rng, mutation_rate,
+                )
+                new_population.append(child)
+            population = new_population
+
+        best = min(population, key=fit)
+        return self._ga_placement_to_ders(best, ctx)
+
+    # ------------------------------------------------------------------
+    # GA yardimci metodlari
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _ga_build_context(G, DERSLER, SUBE_DERS_MAP, fixed_slots, catisma_gun_kisitlari,
+                           pairs, esleme_gercek):
+        """
+        Ders bazli kisitlari 'birim' (unit) bazina indirger:
+          - Ayni-slot eslemesi (esleme_gercek) olan ders ciftleri Union-Find ile
+            TEK birim haline getirilir (her zaman ayni slota duserler).
+          - Cift oturumlu ciftler (pairs) 'gun bagi' olarak ayrica saklanir
+            (ayni GUNDE olmalilar, slot cakismasi zaten G kenariyla saglanir).
+        """
+        parent = {d: d for d in DERSLER}
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a, b):
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[rb] = ra
+
+        for d1, d2 in (esleme_gercek or []):
+            if d1 in parent and d2 in parent:
+                union(d1, d2)
+
+        unit_courses: dict[str, list[str]] = defaultdict(list)
+        course_unit: dict[str, str] = {}
         for d in DERSLER:
-            for t in range(K):
-                if value(x[(d, t)]) > 0.5:
-                    ders_to_slot[d] = t
-                    break
+            u = find(d)
+            unit_courses[u].append(d)
+            course_unit[d] = u
+        units = list(unit_courses.keys())
+
+        # Birimler arasi catisma komsulugu (G kenarlarindan projekte edilir)
+        unit_neighbors: dict[str, set[str]] = {u: set() for u in units}
+        for d1, d2 in G.edges():
+            u1, u2 = course_unit.get(d1), course_unit.get(d2)
+            if u1 and u2 and u1 != u2:
+                unit_neighbors[u1].add(u2)
+                unit_neighbors[u2].add(u1)
+
+        # Sabit slotlar birim bazina
+        fixed_unit_slot: dict[str, int] = {}
+        for d, t in (fixed_slots or {}).items():
+            u = course_unit.get(d)
+            if u is None:
+                continue
+            if u in fixed_unit_slot and fixed_unit_slot[u] != t:
+                continue
+            fixed_unit_slot[u] = t
+
+        # Gun bagi ciftleri (cift oturumlu Uygulama/Yazili) birim bazina
+        day_partner: dict[str, str] = {}
+        for dL, dK in (pairs or []):
+            uL, uK = course_unit.get(dL), course_unit.get(dK)
+            if uL and uK and uL != uK:
+                day_partner[uL] = uK
+                day_partner[uK] = uL
+
+        # Birim -> (sube -> o birimdeki, o subeye ait ders sayisi) — gun kotasi icin
+        sube_of_course: dict[str, list[str]] = defaultdict(list)
+        for sube, dlist in SUBE_DERS_MAP.items():
+            for d in dlist:
+                sube_of_course[d].append(sube)
+        unit_sube_weight: dict[str, dict[str, int]] = defaultdict(dict)
+        for u, courses in unit_courses.items():
+            w: dict[str, int] = defaultdict(int)
+            for d in courses:
+                for sube in sube_of_course.get(d, []):
+                    w[sube] += 1
+            unit_sube_weight[u] = dict(w)
+
+        # Catisma grubu kisitlari: (sube, dset) -> o gruba giren birimler
+        unit_catisma_groups: dict[str, list[int]] = defaultdict(list)
+        catisma_groups: list[tuple] = []
+        for idx, (sube, dset_cg) in enumerate(catisma_gun_kisitlari or []):
+            for d in dset_cg:
+                u = course_unit.get(d)
+                if u is not None:
+                    unit_catisma_groups[u].append(idx)
+            catisma_groups.append((sube, dset_cg))
+
+        return {
+            "units": units,
+            "unit_courses": dict(unit_courses),
+            "course_unit": course_unit,
+            "unit_neighbors": unit_neighbors,
+            "fixed_unit_slot": fixed_unit_slot,
+            "day_partner": day_partner,
+            "unit_sube_weight": dict(unit_sube_weight),
+            "unit_catisma_groups": dict(unit_catisma_groups),
+        }
+
+    @staticmethod
+    def _ga_slot_valid(ctx, placement, day_count, catisma_day_count, unit, t,
+                        oturum_sayisi_gun, max_sinav_per_gun):
+        """unit'in t slotuna yerlestirilmesi TUM sert kisitlara uyuyor mu?"""
+        day = t // oturum_sayisi_gun
+
+        # 1) Cakisma komsulugu: komsu birimlerden biri ayni slotta mi?
+        for n in ctx["unit_neighbors"].get(unit, ()):
+            if placement.get(n) == t:
+                return False
+
+        # 2) Gun bagi: eslesigi (cift oturum) varsa ayni gunde olmali
+        partner = ctx["day_partner"].get(unit)
+        if partner is not None and partner in placement:
+            if placement[partner] // oturum_sayisi_gun != day:
+                return False
+
+        # 3) Sube/gun kotasi (MAX_SINAV_PER_GUN)
+        for sube, adet in ctx["unit_sube_weight"].get(unit, {}).items():
+            if day_count.get((sube, day), 0) + adet > max_sinav_per_gun:
+                return False
+
+        # 4) Catisma grubu gun kisiti: (sube, grup) basina gunde <= 1 birim.
+        #    (Birim >1 ders icerse bile pratikte esleme nadir oldugundan birim
+        #    granularitesinde kontrol yeterlidir.)
+        for grup_idx in ctx["unit_catisma_groups"].get(unit, ()):
+            if catisma_day_count.get((grup_idx, day), 0) >= 1:
+                return False
+
+        return True
+
+    @staticmethod
+    def _ga_place(ctx, placement, day_count, catisma_day_count, unit, t, oturum_sayisi_gun):
+        placement[unit] = t
+        day = t // oturum_sayisi_gun
+        for sube, adet in ctx["unit_sube_weight"].get(unit, {}).items():
+            day_count[(sube, day)] = day_count.get((sube, day), 0) + adet
+        for grup_idx in ctx["unit_catisma_groups"].get(unit, ()):
+            catisma_day_count[(grup_idx, day)] = catisma_day_count.get((grup_idx, day), 0) + 1
+
+    @staticmethod
+    def _ga_unplace(ctx, placement, day_count, catisma_day_count, unit, oturum_sayisi_gun):
+        t = placement.pop(unit, None)
+        if t is None:
+            return
+        day = t // oturum_sayisi_gun
+        for sube, adet in ctx["unit_sube_weight"].get(unit, {}).items():
+            day_count[(sube, day)] -= adet
+        for grup_idx in ctx["unit_catisma_groups"].get(unit, ()):
+            catisma_day_count[(grup_idx, day)] -= 1
+
+    @staticmethod
+    def _ga_recompute_counts(ctx, placement, oturum_sayisi_gun):
+        day_count: dict[tuple, int] = {}
+        catisma_day_count: dict[tuple, int] = {}
+        for unit, t in placement.items():
+            day = t // oturum_sayisi_gun
+            for sube, adet in ctx["unit_sube_weight"].get(unit, {}).items():
+                day_count[(sube, day)] = day_count.get((sube, day), 0) + adet
+            for grup_idx in ctx["unit_catisma_groups"].get(unit, ()):
+                catisma_day_count[(grup_idx, day)] = catisma_day_count.get((grup_idx, day), 0) + 1
+        return day_count, catisma_day_count
+
+    def _ga_construct(self, ctx, K, oturum_sayisi_gun, max_sinav_per_gun, rng, earliest_fit=False):
+        """Kisit-duyarli yapici yerlesim. Basarili olursa {unit: slot} doner, olmazsa None.
+
+        Sira: once sabit-slotlu birimler (hep aynen atanir), sonra en cok komsusu
+        olan birimler once (DSATUR benzeri). earliest_fit=True ise her birim icin
+        gecerli en kucuk slot secilir (kompakt/az-slot cozum — Faz-1 icin); aksi
+        halde gecerli adaylar arasindan erken-slot egilimli rastgele secim yapilir
+        (populasyon cesitliligi icin — Faz-2 icin).
+        """
+        units = ctx["units"]
+        unit_neighbors = ctx["unit_neighbors"]
+        fixed_unit_slot = ctx["fixed_unit_slot"]
+
+        fixed_first = [u for u in units if u in fixed_unit_slot]
+        rest = [u for u in units if u not in fixed_unit_slot]
+        rng.shuffle(rest)
+        rest.sort(key=lambda u: -len(unit_neighbors.get(u, ())))
+        order = fixed_first + rest
+
+        placement: dict[str, int] = {}
+        day_count: dict[tuple, int] = {}
+        catisma_day_count: dict[tuple, int] = {}
+
+        for unit in order:
+            if unit in fixed_unit_slot:
+                t = fixed_unit_slot[unit]
+                if t >= K or not self._ga_slot_valid(
+                    ctx, placement, day_count, catisma_day_count, unit, t,
+                    oturum_sayisi_gun, max_sinav_per_gun,
+                ):
+                    return None
+                self._ga_place(ctx, placement, day_count, catisma_day_count, unit, t, oturum_sayisi_gun)
+                continue
+
+            candidates = [
+                t for t in range(K)
+                if self._ga_slot_valid(
+                    ctx, placement, day_count, catisma_day_count, unit, t,
+                    oturum_sayisi_gun, max_sinav_per_gun,
+                )
+            ]
+            if not candidates:
+                return None
+
+            if earliest_fit:
+                chosen = candidates[0]
+            else:
+                # Erken slotlara hafif egilim: adaylarin ilk ucte birinden rastgele sec
+                top = candidates[: max(1, len(candidates) // 3)]
+                chosen = rng.choice(top)
+            self._ga_place(ctx, placement, day_count, catisma_day_count, unit, chosen, oturum_sayisi_gun)
+
+        return placement
+
+    def _ga_build_population(self, ctx, K, oturum_sayisi_gun, max_sinav_per_gun,
+                              pop_size, rng, attempts_budget):
+        population = []
+        attempts = 0
+        while len(population) < pop_size and attempts < attempts_budget:
+            if self.is_cancelled():
+                raise RuntimeError("Adim 4 kullanici tarafindan durduruldu.")
+            attempts += 1
+            placement = self._ga_construct(ctx, K, oturum_sayisi_gun, max_sinav_per_gun, rng)
+            if placement is not None:
+                population.append(placement)
+        return population
+
+    def _ga_mutate(self, ctx, placement, K, oturum_sayisi_gun, max_sinav_per_gun, rng, mutation_rate):
+        """Bireyi yerinde mutasyona ugratir; sert kisitlar HER ZAMAN korunur
+        (gecerli bir tasima yoksa o birim degistirilmeden birakilir)."""
+        units = ctx["units"]
+        day_count, catisma_day_count = self._ga_recompute_counts(ctx, placement, oturum_sayisi_gun)
+
+        for unit in units:
+            if unit in ctx["fixed_unit_slot"]:
+                continue
+            if rng.random() >= mutation_rate:
+                continue
+
+            partner = ctx["day_partner"].get(unit)
+            old_t = placement[unit]
+
+            if partner is None or partner not in placement:
+                self._ga_unplace(ctx, placement, day_count, catisma_day_count, unit, oturum_sayisi_gun)
+                candidates = [
+                    t for t in range(K)
+                    if self._ga_slot_valid(
+                        ctx, placement, day_count, catisma_day_count, unit, t,
+                        oturum_sayisi_gun, max_sinav_per_gun,
+                    )
+                ]
+                if candidates:
+                    new_t = rng.choice(candidates)
+                    self._ga_place(ctx, placement, day_count, catisma_day_count, unit, new_t, oturum_sayisi_gun)
+                else:
+                    self._ga_place(ctx, placement, day_count, catisma_day_count, unit, old_t, oturum_sayisi_gun)
+            else:
+                # Gun bagli cift: birlikte yeni bir gune tasimayi dene, olmazsa geri al.
+                old_partner_t = placement[partner]
+                self._ga_unplace(ctx, placement, day_count, catisma_day_count, unit, oturum_sayisi_gun)
+                self._ga_unplace(ctx, placement, day_count, catisma_day_count, partner, oturum_sayisi_gun)
+
+                cand_unit = [
+                    t for t in range(K)
+                    if self._ga_slot_valid(
+                        ctx, placement, day_count, catisma_day_count, unit, t,
+                        oturum_sayisi_gun, max_sinav_per_gun,
+                    )
+                ]
+                rng.shuffle(cand_unit)
+                placed = False
+                for t1 in cand_unit:
+                    self._ga_place(ctx, placement, day_count, catisma_day_count, unit, t1, oturum_sayisi_gun)
+                    cand_partner = [
+                        t for t in range(K)
+                        if self._ga_slot_valid(
+                            ctx, placement, day_count, catisma_day_count, partner, t,
+                            oturum_sayisi_gun, max_sinav_per_gun,
+                        )
+                    ]
+                    if cand_partner:
+                        t2 = rng.choice(cand_partner)
+                        self._ga_place(ctx, placement, day_count, catisma_day_count, partner, t2, oturum_sayisi_gun)
+                        placed = True
+                        break
+                    self._ga_unplace(ctx, placement, day_count, catisma_day_count, unit, oturum_sayisi_gun)
+                if not placed:
+                    self._ga_place(ctx, placement, day_count, catisma_day_count, unit, old_t, oturum_sayisi_gun)
+                    self._ga_place(ctx, placement, day_count, catisma_day_count, partner, old_partner_t, oturum_sayisi_gun)
+
+        return placement
+
+    @staticmethod
+    def _ga_placement_to_ders(placement, ctx):
+        ders_to_slot: dict[str, int] = {}
+        for unit, t in placement.items():
+            for d in ctx["unit_courses"][unit]:
+                ders_to_slot[d] = t
         return ders_to_slot
+
+    @staticmethod
+    def _ga_fitness(placement, ctx, DERS_WEIGHT, ders_seviye_map, oturum_sayisi_gun):
+        """Yumusak amaclari puanlar (kucuk = iyi). Sert kisitlar yapici asamada
+        zaten garanti edildigi icin burada sadece optimizasyon hedefleri var:
+          - erken slot tercihi (kucuk agirlik)
+          - agir derslerin (cok sube) slotlara dengeli dagilmasi (kucuk agirlik)
+          - Kelebek cesitliligi: her slotta farkli seviyeden ders olmasi (odul)
+        """
+        slot_usage = 0
+        slot_courses: dict[int, list[str]] = defaultdict(list)
+        for unit, t in placement.items():
+            for d in ctx["unit_courses"][unit]:
+                slot_usage += t % oturum_sayisi_gun
+                slot_courses[t].append(d)
+
+        max_load_sum = 0
+        diversity_sum = 0
+        for t, courses in slot_courses.items():
+            max_load_sum += max((DERS_WEIGHT.get(d, 1) for d in courses), default=0)
+            if ders_seviye_map:
+                seviyeler: set = set()
+                for d in courses:
+                    seviyeler |= ders_seviye_map.get(d, set())
+                diversity_sum += len(seviyeler)
+
+        return 0.01 * slot_usage + 0.01 * max_load_sum - 0.5 * diversity_sum

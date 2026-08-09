@@ -21,7 +21,7 @@ def sinav_takvim_araliklari(sinavlar) -> dict:
     Her sınav için aktif TakvimUretim'in kapsadığı gerçek (üretilmiş) takvimin
     ilk ve son gününü döner: { sinav_id: (baslangic_tarihi, bitis_tarihi) }.
 
-    sinav_baslangic_tarihi alanı elle girilir ve ILP'ye başlangıç noktası olarak
+    sinav_baslangic_tarihi alanı elle girilir ve GA'ya başlangıç noktası olarak
     verilir; üretilen takvim tatil/çakışma yüzünden daha ileri bir tarihte
     başlayabilir veya beklenenden uzun sürebilir. Bu yüzden gerçek aralık,
     manuel alanla karıştırılmadan, üretilen Takvim kayıtlarından hesaplanır.

@@ -270,7 +270,7 @@ class DisVeri(models.Model):
 
 class AlgoritmaParametreleri(models.Model):
     """
-    Takvim (ILP) algoritma parametrelerini sınav bazında saklar.
+    Takvim (GA) algoritma parametrelerini sınav bazında saklar.
     Her SinavBilgisi kaydı için en fazla bir kayıt olur (OneToOne).
     """
     sinav = models.OneToOneField(
@@ -295,7 +295,7 @@ class AlgoritmaParametreleri(models.Model):
         default=2,
         verbose_name="Günde Maks. Sınav Sayısı",
         help_text="Bir öğrencinin (şubenin) aynı günde girebileceği en fazla sınav sayısı. "
-                  "ILP kısıtı bu değerle uygulanır.",
+                  "Sert kısıt bu değerle uygulanır.",
     )
 
     class Meta:

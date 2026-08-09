@@ -128,7 +128,7 @@
         <h2>Ülke Geneli Ortak Sınavlar (Sabit Tarih/Saat)</h2>
         <p class="helptext">
           Bu sınavların tarihi ve saati önceden belirlenmiştir.
-          ILP çözücü bu sınavları sabit slot olarak alır; optimize etmez.
+          GA bu sınavları sabit slot olarak alır; optimize etmez.
         </p>
       </div>
     </div>
@@ -192,7 +192,7 @@
         <h2>Seviye Çakışma Grupları</h2>
         <p class="helptext">
           Aynı gruptaki dersler, aynı sınıf seviyesi (9/10/11/12) için
-          aynı oturuma planlanamaz. ILP bu kısıtı çakışma grafiğine kenar
+          aynı oturuma planlanamaz. GA bu kısıtı çakışma grafiğine kenar
           olarak ekler.
         </p>
       </div>
@@ -236,11 +236,11 @@
         <p class="helptext">
           Farklı öğrenci gruplarına ait iki sınavın <strong>aynı oturumda eş zamanlı yapılabileceğini</strong>
           belirtir. Bu iki sınav ortak öğrenci paylaşmadığından çakışma olmadan aynı slota atanabilir;
-          ILP bu çiftleri mümkün olduğunca aynı slota yerleştirmeye çalışır.
+          GA bu çiftleri her zaman aynı slota yerleştirir.
         </p>
         <p class="helptext" style="margin-top:.3rem; color:#b45309;">
           <strong>Not:</strong> Aynı şubede okutulan (ortak öğrencisi olan) dersler hiçbir zaman
-          aynı slota atanamaz — böyle bir çift eklenirse ILP tarafından görmezden gelinir.
+          aynı slota atanamaz — böyle bir çift eklenirse GA tarafından görmezden gelinir.
         </p>
       </div>
     </div>

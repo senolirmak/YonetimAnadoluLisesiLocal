@@ -113,7 +113,7 @@
       </div>
 
       <details style="margin-top:.25rem;">
-        <summary style="cursor:pointer; font-size:.85rem; color:#6b7280;">Gelişmiş (ILP Süre Limitleri)</summary>
+        <summary style="cursor:pointer; font-size:.85rem; color:#6b7280;">Gelişmiş (GA Süre Limitleri)</summary>
         <div style="display:flex; flex-direction:column; gap:.75rem; margin-top:.6rem;">
           <div class="form-group">
             {{ alg_form.time_limit_phase1.label_tag }}
@@ -140,7 +140,7 @@
   </form>
 </details>
 
-<!-- ===== ILP ÇALIŞTIR ===== -->
+<!-- ===== GA ÇALIŞTIR ===== -->
 {% if sube_ders_sayisi == 0 %}
 <div class="card" style="border-left:4px solid #f59e0b; background:#fffbeb; color:#92400e;
      padding:.9rem 1.5rem; display:flex; justify-content:space-between; align-items:center;">
@@ -174,7 +174,7 @@
 
 <div class="card">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-    <h2>Sınav Takvimi Oluştur (ILP)</h2>
+    <h2>Sınav Takvimi Oluştur (GA)</h2>
     <div style="display:flex; gap:.5rem;">
       <button class="btn btn-success" id="btn-takvimolustur"
         {% if sube_ders_sayisi == 0 %}disabled title="Önce Ders Ayarlarını kaydedin"{% endif %}
