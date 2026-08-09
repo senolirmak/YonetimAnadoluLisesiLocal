@@ -2,16 +2,18 @@
 # =============================================================================
 # Sunucu Güncelleme Scripti
 # =============================================================================
-# Sunucuda : bash /opt/akalyonetim/deploy.sh
-# Uzaktan  : ssh kullanici@sunucu "bash /opt/akalyonetim/deploy.sh"
+# Sunucuda : bash /srv/akalyonetim/deploy.sh
+# Uzaktan  : ssh kullanici@sunucu "bash /srv/akalyonetim/deploy.sh"
 # =============================================================================
 
 set -euo pipefail
 
-PROJE_DIZIN="/opt/akalyonetim"
-VENV="$PROJE_DIZIN/venv"
+PROJE_DIZIN="/srv/akalyonetim"
+VENV="$PROJE_DIZIN/.venv"
 YEDEK_DIZIN="$PROJE_DIZIN/backups"
-SERVIS="gunicorn"
+
+SERVIS="akalyonetim.service"
+POSTGRES_CONTAINER="postgresql"
 
 KIRMIZI='\033[0;31m'
 YESIL='\033[0;32m'
@@ -26,12 +28,12 @@ hata()   { echo -e "${KIRMIZI}[HATA]${SIFIRLA}   $*" >&2; exit 1; }
 
 cd "$PROJE_DIZIN"
 
+# ─────────────────────────────────────────────────────────────
 # .env'den DB bilgilerini oku
-DB_NAME=$(grep  "^DB_NAME="     .env | cut -d= -f2 | xargs)
-DB_USER=$(grep  "^DB_USER="     .env | cut -d= -f2 | xargs)
-DB_PASS=$(grep  "^DB_PASSWORD=" .env | cut -d= -f2 | xargs)
-DB_HOST=$(grep  "^DB_HOST="     .env | cut -d= -f2 | xargs)
-DB_PORT=$(grep  "^DB_PORT="     .env | cut -d= -f2 | xargs)
+# ─────────────────────────────────────────────────────────────
+
+DB_NAME=$(grep "^DB_NAME=" .env | cut -d= -f2- | xargs)
+DB_USER=$(grep "^DB_USER=" .env | cut -d= -f2- | xargs)
 
 echo ""
 echo -e "${MAVI}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
@@ -39,22 +41,58 @@ echo -e "${MAVI}  Akal Yönetim — Sunucu Güncelleme${SIFIRLA}"
 echo -e "${MAVI}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
 echo ""
 
-# ── 1. Veritabanı yedeği (önce al) ───────────────────────────
+# ─────────────────────────────────────────────────────────────
+# 1. Ön kontroller
+# ─────────────────────────────────────────────────────────────
+
+bilgi "Sunucu bileşenleri kontrol ediliyor..."
+
+[[ -d "$PROJE_DIZIN" ]] || hata "Proje dizini bulunamadı: $PROJE_DIZIN"
+[[ -d "$VENV" ]] || hata "Python sanal ortamı bulunamadı: $VENV"
+[[ -f "$PROJE_DIZIN/.env" ]] || hata ".env dosyası bulunamadı"
+
+command -v podman >/dev/null 2>&1 \
+    || hata "Podman bulunamadı."
+
+podman container exists "$POSTGRES_CONTAINER" \
+    || hata "PostgreSQL container bulunamadı: $POSTGRES_CONTAINER"
+
+[[ -n "$(podman ps --filter "name=^${POSTGRES_CONTAINER}$" --filter status=running -q)" ]] \
+    || hata "PostgreSQL container çalışmıyor: $POSTGRES_CONTAINER"
+
+basari "Ön kontroller tamamlandı."
+
+# ─────────────────────────────────────────────────────────────
+# 2. Veritabanı yedeği
+# ─────────────────────────────────────────────────────────────
+
 bilgi "Veritabanı yedeği alınıyor..."
+
 mkdir -p "$YEDEK_DIZIN"
+
 YEDEK_DOSYA="$YEDEK_DIZIN/${DB_NAME}_deploy_$(date +%Y%m%d_%H%M%S).dump"
 
-PGPASSWORD="$DB_PASS" pg_dump -Fc \
-    -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" \
+podman exec "$POSTGRES_CONTAINER" \
+    pg_dump \
+    -U "$DB_USER" \
+    -d "$DB_NAME" \
+    -Fc \
     > "$YEDEK_DOSYA"
 
-basari "Yedek alındı → $YEDEK_DOSYA"
+if [[ ! -s "$YEDEK_DOSYA" ]]; then
+    rm -f "$YEDEK_DOSYA"
+    hata "Veritabanı yedeği oluşturulamadı."
+fi
 
-# ── 2. Servisi durdur ─────────────────────────────────────────
+basari "Veritabanı yedeği oluşturuldu:"
+echo "        $YEDEK_DOSYA"
+echo "        Boyut: $(du -h "$YEDEK_DOSYA" | cut -f1)"
+
+# ── 3. Servisi durdur ─────────────────────────────────────────
 bilgi "Servis durduruluyor..."
 sudo systemctl stop "$SERVIS" || uyari "Servis zaten durmuş olabilir."
 
-# ── 3. Kodu güncelle ─────────────────────────────────────────
+# ── 4. Kodu güncelle ─────────────────────────────────────────
 bilgi "Kod çekiliyor (git pull)..."
 
 if ! git diff --quiet HEAD; then
@@ -72,42 +110,58 @@ if [[ "$GIT_STASH_YAPILDI" -eq 1 ]]; then
     if git stash pop 2>/dev/null; then
         bilgi "Yerel değişiklikler geri yüklendi."
     else
-        uyari "Stash pop çakışmayla karşılaştı. Manuel kontrol: git stash list"
+        hata "Stash pop çakışmayla karşılaştı, repo tutarsız durumda. Manuel kontrol: git status / git stash list"
     fi
 fi
 
-# ── 4. Paketleri güncelle ─────────────────────────────────────
+# ── 5. Paketleri güncelle ─────────────────────────────────────
 bilgi "Paketler güncelleniyor..."
 source "$VENV/bin/activate"
 pip install -r requirements.txt --quiet
 basari "Paketler güncellendi."
 
-# ── 5. Migration ──────────────────────────────────────────────
+# ── 6. Migration ──────────────────────────────────────────────
 bilgi "Migration çalıştırılıyor..."
 python manage.py migrate --run-syncdb --settings=config.settings.production
 basari "Migration tamamlandı."
 
-# ── 6. Kullanıcı gruplarını güncelle ─────────────────────────
+# ── 7. Kullanıcı gruplarını güncelle ─────────────────────────
 bilgi "Kullanıcı grupları güncelleniyor..."
 python manage.py kullanici_gruplari_olustur --settings=config.settings.production
 basari "Kullanıcı grupları güncellendi."
 
-# ── 7. Static dosyalar ────────────────────────────────────────
+# ── 8. Static dosyalar ────────────────────────────────────────
 bilgi "Static dosyalar toplanıyor..."
 python manage.py collectstatic --noinput --clear -v 0 --settings=config.settings.production
 basari "Static dosyalar güncellendi."
 
-# ── 8. Nginx reload ──────────────────────────────────────────
+# ── 9. Nginx reload ──────────────────────────────────────────
 bilgi "Nginx yeniden yükleniyor..."
 sudo systemctl reload nginx || uyari "Nginx reload atlandı."
 basari "Nginx yeniden yüklendi."
 
-# ── 9. İzinleri düzelt ───────────────────────────────────────
-sudo chmod 600 "$PROJE_DIZIN/.env"
-sudo chown -R www-data:www-data "$PROJE_DIZIN/staticfiles" 2>/dev/null || true
-sudo chown -R www-data:www-data "$PROJE_DIZIN/media"       2>/dev/null || true
+# ── 10. İzinleri düzelt ───────────────────────────────────────
 
-# ── 10. Servisi başlat ────────────────────────────────────────
+bilgi "Dosya izinleri düzenleniyor..."
+
+# .env yalnızca uygulama kullanıcısı tarafından okunabilsin
+sudo chmod 600 "$PROJE_DIZIN/.env"
+sudo chown senolirmak:senolirmak "$PROJE_DIZIN/.env"
+
+# Static ve media dosyalarının sahibi uygulama kullanıcısı
+sudo chown -R senolirmak:senolirmak "$PROJE_DIZIN/staticfiles" 2>/dev/null || true
+sudo chown -R senolirmak:senolirmak "$PROJE_DIZIN/media" 2>/dev/null || true
+
+# Nginx'in okuyabilmesi için dizinleri erişilebilir yap
+sudo find "$PROJE_DIZIN/staticfiles" -type d -exec chmod 755 {} \; 2>/dev/null || true
+sudo find "$PROJE_DIZIN/staticfiles" -type f -exec chmod 644 {} \; 2>/dev/null || true
+
+sudo find "$PROJE_DIZIN/media" -type d -exec chmod 755 {} \; 2>/dev/null || true
+sudo find "$PROJE_DIZIN/media" -type f -exec chmod 644 {} \; 2>/dev/null || true
+
+basari "Dosya izinleri düzenlendi."
+
+# ── 11. Servisi başlat ────────────────────────────────────────
 bilgi "Servis başlatılıyor..."
 sudo systemctl start "$SERVIS"
 sleep 3
@@ -118,7 +172,7 @@ else
     hata "Servis başlatılamadı! Loglar: sudo journalctl -u $SERVIS -n 30"
 fi
 
-# ── 11. Kritik tablo özeti ────────────────────────────────────
+# ── 12. Kritik tablo özeti ────────────────────────────────────
 echo ""
 bilgi "Kritik tablo kayıt sayıları:"
 python - <<'PYEOF'
@@ -151,7 +205,7 @@ with connection.cursor() as cur:
             print(f"  {ad:<26} : tablo bulunamadı")
 PYEOF
 
-# ── 12. Eski yedekleri temizle (30 günden eski) ───────────────
+# ── 13. Eski yedekleri temizle (30 günden eski) ───────────────
 bilgi "30 günden eski yedekler temizleniyor..."
 find "$YEDEK_DIZIN" -name "*.dump" -mtime +30 -delete 2>/dev/null && \
     basari "Eski yedekler temizlendi." || \
