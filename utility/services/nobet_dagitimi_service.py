@@ -9,10 +9,11 @@ class AdvancedNobetDagitim:
 
     def __init__(
         self,
-        population_size: int = 600,
-        generations: int = 200,
+        population_size: int = 100,
+        generations: int = 60,
         initial_mutation_rate: float = 0.2,
         max_shifts: int = 2,
+        max_stagnation: int = 25,
     ) -> None:
         self.penalty_weights = {
             "unassigned": 100000,  # Atanamayan ders (Kritik - En yüksek öncelik)
@@ -29,6 +30,7 @@ class AdvancedNobetDagitim:
         self.initial_mutation_rate = initial_mutation_rate
         self.current_mutation_rate = initial_mutation_rate
         self.max_shifts = max_shifts
+        self.max_stagnation = max_stagnation
 
         # Uyarlanabilir mutasyon
         self.mutation_rate_min = 0.01
@@ -69,12 +71,16 @@ class AdvancedNobetDagitim:
         self.teachers = available_teachers
         self.teacher_ids = [t["ogretmen_id"] for t in available_teachers]
 
+        # Doldurulacak ders veya uygun öğretmen yoksa GA'yı hiç çalıştırmaya gerek yok
+        if not self.absent_classes or not self.teacher_ids:
+            return self.format_solution(self.create_individual())
+
         population = [self.create_individual() for _ in range(self.population_size)]
         best_penalty = float("inf")
         stagnation_count = 0
 
-        for generation in range(self.generations):
-            population.sort(key=lambda x: self.calculate_penalty(x))
+        for _generation in range(self.generations):
+            population.sort(key=self.calculate_penalty)
             current_best_penalty = self.calculate_penalty(population[0])
 
             if current_best_penalty < best_penalty:
@@ -95,6 +101,11 @@ class AdvancedNobetDagitim:
                     self.current_mutation_rate = max(
                         self.mutation_rate_min, self.current_mutation_rate * self.adaptation_factor
                     )
+
+            # 🔹 Erken durdurma: mükemmel çözüm bulunduysa ya da uzun süredir
+            # iyileşme yoksa (yerel optimuma saplanmışsa) daha fazla nesil harcamaya gerek yok.
+            if best_penalty == 0 or stagnation_count >= self.max_stagnation:
+                break
 
             new_population = [population[0]]  # Elitizm: en iyi bireyi koru
             while len(new_population) < self.population_size:
@@ -144,18 +155,23 @@ class AdvancedNobetDagitim:
     # ======================================================
     def calculate_penalty(self, solution: dict[str, Any]) -> float:
         penalty = 0
-        counts = list(solution["teacher_counts"].values())
+
+        # 🔸 Tüm uygun öğretmenler üzerinden TEK geçişte hesapla (defaultdict'e
+        # `[]` ile erişip yan etkili sıfır-kayıt eklemek yerine `.get` kullanılır;
+        # aksi halde her çağrıda tüm öğretmenler sözlüğe eklenir ve bu hem gereksiz
+        # yüktür hem de "inequality" cezasının çağrılar arası tutarsız hesaplanmasına
+        # yol açardı, çünkü henüz dokunulmamış 0 nöbetli öğretmenler bazen dahil
+        # edilmiyordu).
+        teacher_counts = solution["teacher_counts"]
+        counts = [teacher_counts.get(t_id, 0) for t_id in self.teacher_ids]
 
         if counts:
             penalty += (max(counts) - min(counts)) * self.penalty_weights["inequality"]
+        penalty += counts.count(0) * self.penalty_weights["no_duty"]
 
         penalty += (len(self.absent_classes) - len(solution["assignments"])) * self.penalty_weights[
             "unassigned"
         ]
-        penalty += (
-            len([t_id for t_id in self.teacher_ids if solution["teacher_counts"][t_id] == 0])
-            * self.penalty_weights["no_duty"]
-        )
 
         # 🔸 Aşırı yüklenme
         overload = sum(max(0, c - self.max_shifts) for c in counts)
@@ -173,11 +189,10 @@ class AdvancedNobetDagitim:
 
         # 🔸 Adalet (istatistik farkı)
         fairness_penalty = 0
-        for t_id, count in solution["teacher_counts"].items():
+        for t_id, count in zip(self.teacher_ids, counts):
             stats = self.teacher_stats.get(t_id)
             if stats:
                 haftalik = stats.get("haftalik_ortalama", 1.0)
-                _score = stats.get("agirlikli_puan", 1.0)
                 ideal = 1 / (haftalik + 1)
                 fairness_penalty += abs(count - ideal * self.max_shifts)
         penalty += fairness_penalty * self.penalty_weights["unfair"]
