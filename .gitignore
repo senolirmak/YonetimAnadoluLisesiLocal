@@ -87,3 +87,4 @@ secmelidersler_data.json
 
 # Yerel geliştirici araçları (asla GitHub'a gitmez)
 /devtools/
+/local_scripts/

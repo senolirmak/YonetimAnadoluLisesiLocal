@@ -1,0 +1,198 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<style>
+  .ay-sayfa { max-width: 1040px; margin: 0 auto; padding: 20px 16px; }
+  .ay-ust { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .arama-kart {
+    background: #fff; border: 1px solid #d1dde8; border-radius: 8px;
+    padding: 1rem 1.2rem; margin-bottom: 1.4rem;
+  }
+  .arama-kart h6 { font-size: .88rem; font-weight: 700; color: #1e3a5f; margin-bottom: .6rem; }
+  .arama-form { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+  .arama-form input[type=text] {
+    border: 1px solid #ced4da; border-radius: 5px; padding: .38rem .75rem;
+    font-size: .85rem; flex: 1; min-width: 220px; max-width: 380px;
+  }
+  .btn-ara { background: #417690; color: #fff; border: none; border-radius: 5px;
+             padding: .38rem 1rem; font-size: .84rem; font-weight: 600; cursor: pointer; }
+  .sonuc-tablo { width: 100%; border-collapse: collapse; font-size: .84rem; margin-top: .8rem; }
+  .sonuc-tablo th {
+    background: #f1f5f9; color: #475569; padding: .32rem .75rem;
+    font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+    border-bottom: 2px solid #e2e8f0; text-align: left;
+  }
+  .sonuc-tablo td { padding: .3rem .75rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  .sebep-select {
+    border: 1px solid #ced4da; border-radius: 5px; padding: .3rem .5rem; font-size: .82rem;
+  }
+  .btn-ekle {
+    background: #b91c1c; color: #fff; border: none; border-radius: 4px;
+    padding: .22rem .7rem; font-size: .78rem; font-weight: 700; cursor: pointer;
+  }
+  .btn-ekle:hover { background: #7f1d1d; }
+  .btn-duzenle {
+    background: none; border: none; color: #417690; cursor: pointer;
+    font-size: .8rem; padding: .15rem .35rem; border-radius: 3px; text-decoration: none;
+  }
+  .btn-duzenle:hover { background: #e0f2fe; }
+  .btn-sil {
+    background: none; border: none; color: #dc3545; cursor: pointer;
+    font-size: .8rem; padding: .15rem .35rem; border-radius: 3px;
+  }
+  .btn-sil:hover { background: #fee2e2; }
+  .liste-wrap { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+  .liste-baslik {
+    background: #7f1d1d; color: #fff;
+    padding: .5rem 1rem; font-size: .9rem; font-weight: 700;
+    display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  }
+  .liste-baslik select { font-size: .8rem; border-radius: 4px; border: none; padding: .18rem .5rem; }
+  .sebep-etiket {
+    display: inline-block; font-size: .76rem; font-weight: 700; padding: .12rem .5rem;
+    border-radius: 12px; background: #fee2e2; color: #991b1b;
+  }
+  .bos-durum { text-align: center; padding: 2.5rem; color: #94a3b8; font-size: .9rem; }
+</style>
+
+<div class="ay-sayfa">
+  <div class="ay-ust">
+    <a href="{% url 'ogrenci:ogrenci_liste' %}"
+       style="display:inline-flex;align-items:center;gap:.5rem;background:#6c757d;color:#fff;
+              padding:.4rem 1rem;border-radius:6px;text-decoration:none;font-size:.85rem;font-weight:600;">
+      ← Öğrenci Listesi
+    </a>
+    <h5 style="margin:0;font-size:1rem;font-weight:700;color:#7f1d1d;">🚪 {{ title }}</h5>
+  </div>
+
+  {% for m in messages %}
+  <div style="background:{% if m.tags == 'success' %}#d1fae5{% elif m.tags == 'warning' %}#fef9c3{% else %}#fee2e2{% endif %};
+              border-left:4px solid {% if m.tags == 'success' %}#16a34a{% elif m.tags == 'warning' %}#ca8a04{% else %}#dc2626{% endif %};
+              border-radius:4px;padding:.6rem 1rem;margin-bottom:.8rem;font-size:.85rem;
+              color:{% if m.tags == 'success' %}#065f46{% elif m.tags == 'warning' %}#713f12{% else %}#991b1b{% endif %};">
+    {{ m }}
+  </div>
+  {% endfor %}
+
+  {# ---- Öğrenci Arama & Ekleme ---- #}
+  <div class="arama-kart">
+    <h6><i class="fas fa-search"></i> Öğrenci Ara ve Ayrılma Kaydı Ekle</h6>
+    <form method="get" class="arama-form">
+      <input type="text" name="q" value="{{ arama }}" placeholder="Ad, soyad veya okul numarası…" autofocus>
+      <button type="submit" class="btn-ara"><i class="fas fa-search"></i> Ara</button>
+      {% if arama %}<a href="{% url 'ogrenci:ayrilma_listesi' %}" style="font-size:.83rem;color:#6c757d;">✕ Temizle</a>{% endif %}
+    </form>
+
+    {% if arama and not arama_sonuclari %}
+    <div style="margin-top:.7rem;font-size:.84rem;color:#6c757d;">
+      <i class="fas fa-info-circle"></i> Arama sonucu bulunamadı (ya da tüm bulunan öğrenciler zaten ayrılma listesinde).
+    </div>
+    {% endif %}
+
+    {% if arama_sonuclari %}
+    <table class="sonuc-tablo">
+      <thead>
+        <tr>
+          <th>Okul No</th><th>Ad Soyad</th><th>Sınıf / Şube</th><th>Sebep</th><th>Tarih</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ogr in arama_sonuclari %}
+        <form id="ekle-form-{{ ogr.pk }}" method="post" action="{% url 'ogrenci:ayrilma_ekle' %}">
+          {% csrf_token %}
+          <input type="hidden" name="ogrenci_pk" value="{{ ogr.pk }}">
+          <input type="hidden" name="q" value="{{ arama }}">
+        </form>
+        <tr>
+          <td style="font-family:monospace;color:#475569;">{{ ogr.okulno }}</td>
+          <td style="font-weight:600;color:#1e3a5f;">{{ ogr.adi }} {{ ogr.soyadi }}</td>
+          <td style="color:#64748b;">{{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}</td>
+          <td>
+            <select name="sebep" class="sebep-select" form="ekle-form-{{ ogr.pk }}" required>
+              <option value="">— Sebep seçin —</option>
+              {% for deger, etiket in sebep_secenekleri %}
+              <option value="{{ deger }}">{{ etiket }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td><input type="date" name="tarih" class="sebep-select" form="ekle-form-{{ ogr.pk }}"></td>
+          <td>
+            <button type="submit" class="btn-ekle" form="ekle-form-{{ ogr.pk }}">
+              <i class="fas fa-plus"></i> Ekle
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+  {# ---- Ayrılma Listesi ---- #}
+  <div class="liste-wrap">
+    <div class="liste-baslik">
+      <i class="fas fa-clipboard-list"></i>
+      Okuldan Ayrılan Öğrenciler
+      <form method="get" style="margin-left:auto;display:flex;align-items:center;gap:.4rem;">
+        {% if arama %}<input type="hidden" name="q" value="{{ arama }}">{% endif %}
+        <select name="sebep" onchange="this.form.submit()">
+          <option value="">Tüm sebepler</option>
+          {% for deger, etiket in sebep_secenekleri %}
+          <option value="{{ deger }}" {% if sebep_filtre == deger %}selected{% endif %}>{{ etiket }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      <span style="font-size:.8rem;background:rgba(255,255,255,.2);padding:.1rem .5rem;border-radius:4px;">
+        {{ toplam }} öğrenci
+      </span>
+    </div>
+
+    {% if not kayitlar %}
+    <div class="bos-durum">
+      <i class="fas fa-inbox" style="font-size:1.8rem;display:block;margin-bottom:.5rem;opacity:.3;"></i>
+      Henüz ayrılma kaydı bulunmuyor.
+    </div>
+    {% else %}
+    <table class="sonuc-tablo">
+      <thead>
+        <tr>
+          <th>#</th><th>Okul No</th><th>Ad Soyad</th><th>Sınıf / Şube</th>
+          <th>Sebep</th><th>Tarih</th><th>Açıklama</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for kayit in kayitlar %}
+        <tr style="background:{% cycle '#fffbfb' '#fff' %};">
+          <td style="color:#94a3b8;font-size:.75rem;">{{ forloop.counter }}</td>
+          <td style="font-family:monospace;font-weight:600;color:#475569;">{{ kayit.ogrenci.okulno }}</td>
+          <td style="font-weight:700;color:#7f1d1d;">{{ kayit.ogrenci.adi }} {{ kayit.ogrenci.soyadi }}</td>
+          <td style="color:#64748b;">{{ kayit.ogrenci.sinif }}{% if kayit.ogrenci.sube %}/{{ kayit.ogrenci.sube }}{% endif %}</td>
+          <td><span class="sebep-etiket">{{ kayit.get_sebep_display }}</span></td>
+          <td style="color:#64748b;font-size:.82rem;">
+            {% if kayit.tarih %}{{ kayit.tarih|date:"d.m.Y" }}{% else %}—{% endif %}
+          </td>
+          <td style="color:#64748b;font-size:.82rem;">{{ kayit.aciklama|default:"—" }}</td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a href="{% url 'ogrenci:ayrilma_duzenle' kayit.pk %}" class="btn-duzenle" title="Düzenle">
+              <i class="fas fa-pen"></i>
+            </a>
+            <form method="post" action="{% url 'ogrenci:ayrilma_sil' kayit.pk %}" style="display:inline;"
+                  onsubmit="return confirm('{{ kayit.ogrenci.adi }} {{ kayit.ogrenci.soyadi }} ayrılma listesinden çıkarılıp tekrar aktif hale getirilsin mi?')">
+              {% csrf_token %}
+              <button type="submit" class="btn-sil" title="Kaydı sil">
+                <i class="fas fa-times"></i> Çıkar
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

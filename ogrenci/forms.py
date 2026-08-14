@@ -1,7 +1,7 @@
 from django import forms
 from django.core.validators import RegexValidator
 
-from .models import Ogrenci, OgrenciAdres, OgrenciDetay
+from .models import Ogrenci, OgrenciAdres, OgrenciAyrilma, OgrenciDetay
 
 telefon_validator = RegexValidator(
     regex=r"^\(5\d{2}\) \d{3} \d{2} \d{2}$",
@@ -81,6 +81,17 @@ class OgrenciForm(forms.ModelForm):
                     f"{self.instance.sinif}/{sube} şubesi kapalı — öğrenci bu şubeye taşınamaz."
                 )
         return sube
+
+
+class OgrenciAyrilmaForm(forms.ModelForm):
+    class Meta:
+        model = OgrenciAyrilma
+        fields = ["sebep", "tarih", "aciklama"]
+        widgets = {
+            "sebep": forms.Select(attrs={"class": "vTextField"}),
+            "tarih": forms.DateInput(attrs={"class": "vTextField", "type": "date"}),
+            "aciklama": forms.TextInput(attrs={"class": "vTextField"}),
+        }
 
 
 class OgrenciAdresForm(forms.ModelForm):

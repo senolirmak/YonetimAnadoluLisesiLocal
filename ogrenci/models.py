@@ -6,6 +6,15 @@ CINSIYET_CHOICES = (
     ("K", "Kız"),
 )
 
+AYRILMA_SEBEBI_CHOICES = (
+    ("nakil", "Nakil"),
+    ("ogrenim_hakki", "Öğrenim Hakkını Tamamladı"),
+    ("mesem", "Mesem Sistemine Kayıt"),
+    ("yurtdisi", "Yurt Dışına Çıktı"),
+    ("vefat", "Vefat"),
+    ("diger", "Diğer"),
+)
+
 
 class Ogrenci(models.Model):
     okulno = models.PositiveIntegerField(unique=True, verbose_name="Okul No")
@@ -169,3 +178,38 @@ class SinifOturmaDuzeni(models.Model):
 
     def __str__(self):
         return f"{self.sinif_sube} — Sıra {self.sira_no}/{self.kolon_no}: {self.ogrenci.adi} {self.ogrenci.soyadi}"
+
+
+class OgrenciAyrilma(models.Model):
+    """Öğrencinin okuldan ayrılma bilgisi. Kaydedilince ilgili öğrenci otomatik
+    olarak pasife alınır (aktif=False); kayıt silinince tekrar aktif hale gelir."""
+
+    ogrenci = models.OneToOneField(
+        Ogrenci,
+        on_delete=models.CASCADE,
+        related_name="ayrilma",
+        verbose_name="Öğrenci",
+    )
+    sebep = models.CharField(
+        max_length=20, choices=AYRILMA_SEBEBI_CHOICES, verbose_name="Ayrılma Sebebi"
+    )
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="ogrenci_ayrilmalari",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    tarih = models.DateField(null=True, blank=True, verbose_name="Ayrılma Tarihi")
+    aciklama = models.CharField(max_length=300, blank=True, verbose_name="Açıklama")
+    olusturma = models.DateTimeField(auto_now_add=True, verbose_name="Kayıt Tarihi")
+
+    class Meta:
+        db_table = "ogrenci_ayrilma"
+        verbose_name = "Öğrenci Ayrılma Bilgisi"
+        verbose_name_plural = "Öğrenci Ayrılma Bilgileri"
+        ordering = ["-olusturma"]
+
+    def __str__(self):
+        return f"{self.ogrenci} — {self.get_sebep_display()}"

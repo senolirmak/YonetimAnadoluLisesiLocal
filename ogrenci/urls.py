@@ -16,4 +16,8 @@ urlpatterns = [
     path("yeni-kayit/<int:sinif>/<str:sube>/ekle/", views.yeni_kayit_ekle, name="yeni_kayit_ekle"),
     path("yeni-kayit/duzenle/<int:pk>/", views.yeni_kayit_duzenle, name="yeni_kayit_duzenle"),
     path("yeni-kayit/sil/<int:pk>/", views.yeni_kayit_sil, name="yeni_kayit_sil"),
+    path("ayrilma/", views.ayrilma_listesi, name="ayrilma_listesi"),
+    path("ayrilma/ekle/", views.ayrilma_ekle, name="ayrilma_ekle"),
+    path("ayrilma/<int:pk>/duzenle/", views.ayrilma_duzenle, name="ayrilma_duzenle"),
+    path("ayrilma/<int:pk>/sil/", views.ayrilma_sil, name="ayrilma_sil"),
 ]

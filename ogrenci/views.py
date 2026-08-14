@@ -12,8 +12,8 @@ from okul.auth import mudur_yardimcisi_required
 from okul.models import DersHavuzu, SinifSube
 from okul.utils import get_aktif_dp_tarihi, get_aktif_egitim_yili
 
-from .forms import OgrenciAdresForm, OgrenciDetayForm, OgrenciForm
-from .models import Ogrenci, OgrenciAdres, OgrenciDetay, OgrenciMuaf
+from .forms import OgrenciAdresForm, OgrenciAyrilmaForm, OgrenciDetayForm, OgrenciForm
+from .models import Ogrenci, OgrenciAdres, OgrenciAyrilma, OgrenciDetay, OgrenciMuaf
 
 
 def _gorunur_ogrenciler_ve_durum(ogrenciler):
@@ -582,3 +582,125 @@ def yeni_kayit_sil(request, pk):
     ogrenci.delete()
     messages.success(request, f"{ad} silindi.")
     return redirect("ogrenci:yeni_kayit_liste", sinif=sinif, sube=sube)
+
+
+# ─────────────────────────────────────────────
+# Okuldan Ayrılma Bilgileri CRUD
+# (Nakil, Öğrenim Hakkını Tamamladı, Mesem, Yurt Dışı, Vefat, Diğer)
+# ─────────────────────────────────────────────
+
+
+@mudur_yardimcisi_required
+def ayrilma_listesi(request):
+    from django.db.models import Q
+
+    kayitlar = (
+        OgrenciAyrilma.objects
+        .select_related("ogrenci")
+        .order_by("ogrenci__sinif", "ogrenci__sube", "ogrenci__okulno")
+    )
+
+    sebep_filtre = request.GET.get("sebep", "")
+    if sebep_filtre:
+        kayitlar = kayitlar.filter(sebep=sebep_filtre)
+
+    arama = request.GET.get("q", "").strip()
+    arama_sonuclari = []
+    if arama:
+        mevcut_ids = set(
+            OgrenciAyrilma.objects.values_list("ogrenci_id", flat=True)
+        )
+        arama_sonuclari = list(
+            Ogrenci.objects.filter(
+                Q(okulno__icontains=arama)
+                | Q(adi__icontains=arama)
+                | Q(soyadi__icontains=arama),
+                aktif=True,
+            ).exclude(pk__in=mevcut_ids).order_by("sinif", "sube", "okulno")[:20]
+        )
+
+    return render(request, "ogrenci/ayrilma_listesi.html", {
+        "title": "Okuldan Ayrılma Bilgileri",
+        "kayitlar": kayitlar,
+        "sebep_filtre": sebep_filtre,
+        "sebep_secenekleri": OgrenciAyrilma._meta.get_field("sebep").choices,
+        "arama": arama,
+        "arama_sonuclari": arama_sonuclari,
+        "toplam": kayitlar.count(),
+    })
+
+
+@mudur_yardimcisi_required
+def ayrilma_ekle(request):
+    if request.method != "POST":
+        return redirect("ogrenci:ayrilma_listesi")
+
+    ogrenci_pk = request.POST.get("ogrenci_pk")
+    ogr = Ogrenci.objects.filter(pk=ogrenci_pk).first()
+    if not ogr:
+        messages.error(request, "Öğrenci bulunamadı.")
+        return redirect("ogrenci:ayrilma_listesi")
+
+    if OgrenciAyrilma.objects.filter(ogrenci=ogr).exists():
+        messages.warning(request, f"{ogr.adi} {ogr.soyadi} için zaten bir ayrılma kaydı var.")
+        return redirect("ogrenci:ayrilma_listesi")
+
+    form = OgrenciAyrilmaForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Ayrılma sebebi seçilmedi ya da form geçersiz.")
+        return redirect("ogrenci:ayrilma_listesi")
+
+    ayrilma = form.save(commit=False)
+    ayrilma.ogrenci = ogr
+    ayrilma.egitim_yili = get_aktif_egitim_yili()
+    ayrilma.save()
+
+    if ogr.aktif:
+        ogr.aktif = False
+        ogr.save(update_fields=["aktif"])
+
+    messages.success(
+        request,
+        f"{ogr.adi} {ogr.soyadi} — {ayrilma.get_sebep_display()} olarak kaydedildi ve "
+        "aktif öğrenci listelerinden çıkarıldı.",
+    )
+    from django.urls import reverse as _rev
+    q = request.POST.get("q", "")
+    return redirect(f"{_rev('ogrenci:ayrilma_listesi')}?q={q}")
+
+
+@mudur_yardimcisi_required
+def ayrilma_duzenle(request, pk):
+    ayrilma = get_object_or_404(OgrenciAyrilma.objects.select_related("ogrenci"), pk=pk)
+
+    if request.method == "POST":
+        form = OgrenciAyrilmaForm(request.POST, instance=ayrilma)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"{ayrilma.ogrenci} ayrılma kaydı güncellendi.")
+            return redirect("ogrenci:ayrilma_listesi")
+    else:
+        form = OgrenciAyrilmaForm(instance=ayrilma)
+
+    return render(request, "ogrenci/ayrilma_form.html", {
+        "title": f"{ayrilma.ogrenci} — Ayrılma Kaydını Düzenle",
+        "form": form,
+        "ayrilma": ayrilma,
+    })
+
+
+@mudur_yardimcisi_required
+def ayrilma_sil(request, pk):
+    if request.method == "POST":
+        kayit = OgrenciAyrilma.objects.filter(pk=pk).select_related("ogrenci").first()
+        if kayit:
+            ogr = kayit.ogrenci
+            ad = f"{ogr.adi} {ogr.soyadi}"
+            kayit.delete()
+            if not ogr.aktif:
+                ogr.aktif = True
+                ogr.save(update_fields=["aktif"])
+            messages.success(
+                request, f"{ad} ayrılma kaydından çıkarıldı ve tekrar aktif hale getirildi."
+            )
+    return redirect("ogrenci:ayrilma_listesi")
