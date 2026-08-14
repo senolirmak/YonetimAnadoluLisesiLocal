@@ -9,7 +9,7 @@
 set -euo pipefail
 
 PROJE_DIZIN="/srv/akalyonetim"
-VENV="$PROJE_DIZIN/.venv"
+VENV="$PROJE_DIZIN/venv"
 YEDEK_DIZIN="$PROJE_DIZIN/backups"
 
 SERVIS="akalyonetim.service"
