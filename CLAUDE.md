@@ -12,8 +12,8 @@ dijital pano modüllerini tek bir Django projesinde barındırır. Kod ve arayü
 ## Komutlar
 
 ```bash
-# Sanal ortamı etkinleştir (proje .venv kullanır)
-source .venv/bin/activate
+# Sanal ortamı etkinleştir (proje venv kullanır)
+source venv/bin/activate
 
 # Geliştirme sunucusu (varsayılan settings: config.settings.development)
 python manage.py runserver

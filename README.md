@@ -66,9 +66,9 @@ cd nobet_proje
 ### 2. Sanal Ortam Oluşturun
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Linux/macOS
-.venv\Scripts\activate           # Windows
+python -m venv venv
+source venv/bin/activate         # Linux/macOS
+venv\Scripts\activate            # Windows
 ```
 
 ### 3. Bağımlılıkları Yükleyin
