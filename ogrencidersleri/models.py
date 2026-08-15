@@ -30,7 +30,10 @@ class OgrenciSecmeliDers(models.Model):
 
 
 class OgrenciMevcutDers(models.Model):
-    """Öğrencinin mevcut eğitim yılında okuduğu dersler (ders programından atanır)."""
+    """KULLANIMDAN KALDIRILDI — artık hiçbir view/komut bu modeli okumaz/yazmaz.
+    Öğrenci ders planlaması artık yalnızca OgrenciSecmeliDers ve OgrenciZorunluDers
+    üzerinden yürütülüyor. Model ve tablo, geçmiş veriyi kaybetmemek için (silmeden
+    önce onay gerekir) korunuyor — yeni kod bu modele bağımlı olmamalı."""
 
     ogrenci = models.ForeignKey(
         "ogrenci.Ogrenci",

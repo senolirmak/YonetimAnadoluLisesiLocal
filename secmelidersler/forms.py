@@ -160,7 +160,7 @@ class AlanForm(forms.ModelForm):
         self._egitim_yili = egitim_yili
 
         self.fields["sinif_seviyesi"].widget = forms.Select(
-            choices=[(11, "11. Sınıf"), (12, "12. Sınıf")]
+            choices=[(9, "9. Sınıf"), (10, "10. Sınıf"), (11, "11. Sınıf"), (12, "12. Sınıf")]
         )
         self.fields["sinif_seviyesi"].label = "Sınıf Seviyesi"
         self.fields["adi"].label = "Alan Adı"
@@ -172,7 +172,7 @@ class AlanForm(forms.ModelForm):
             for ad in AlanDers.objects.filter(alan=self.instance).select_related("ders"):
                 mevcut[ad.ders_id] = ad.secilen_saat
 
-        grup_qs = SecmeliDersGrubu.objects.filter(sinif_seviyesi__in=[11, 12])
+        grup_qs = SecmeliDersGrubu.objects.filter(sinif_seviyesi__in=[9, 10, 11, 12])
         if self._egitim_yili:
             grup_qs = grup_qs.filter(egitim_yili=self._egitim_yili)
         gruplar = grup_qs.prefetch_related("dersler").order_by("sinif_seviyesi", "sira")

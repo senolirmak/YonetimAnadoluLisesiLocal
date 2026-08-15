@@ -189,6 +189,7 @@
                 <div class="menu-section">
                     <div class="menu-group-title">Ders Programı İşlemleri</div>
                     <div class="menu-button-group">
+                        <a href="{% url 'dersprogrami_listesi' %}" class="btn btn-lg" style="background-color: #e83e8c; color: white;">Ders Programı Listesi</a>
                         <a href="{% url 'ogretmen_program' %}" class="btn btn-lg" style="background-color: #6f42c1; color: white;">Öğretmen Durum Bilgisi</a>
                         {% if is_tarih_degistirebilir %}
                         <a href="{% url 'sinif_program' %}" class="btn btn-lg" style="background-color: #17a2b8; color: white;">Sınıf Durum Bilgisi</a>

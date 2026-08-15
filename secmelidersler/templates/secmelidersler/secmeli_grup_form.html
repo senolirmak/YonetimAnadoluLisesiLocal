@@ -108,6 +108,7 @@
     <p class="bilgi-notu">
         Seçmeli ders grupları MEB haftalık ders çizelgesindeki bölümlere karşılık gelir.
         <strong>Zorunlu grup</strong> olarak işaretlenenler öğrenci seçim kurallarını etkiler.
+        {% if not grup and secili_yil %}Bu grup <strong>{{ secili_yil.egitim_yili }}</strong> yılına kaydedilecek.{% endif %}
     </p>
 
     {% if form.non_field_errors %}
@@ -121,6 +122,7 @@
         <div class="form-kart-govde">
             <form method="post">
                 {% csrf_token %}
+                <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
 
                 <div class="form-grup">
                     <label for="{{ form.sinif_seviyesi.id_for_label }}">{{ form.sinif_seviyesi.label }}</label>

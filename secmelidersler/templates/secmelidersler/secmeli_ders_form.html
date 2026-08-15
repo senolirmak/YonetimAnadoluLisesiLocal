@@ -129,6 +129,32 @@
         font-size: 0.95em;
         color: #c7254e;
     }
+    /* ── Saat pilleri — öğrenci seçmeli ders formundaki saat rozetleriyle aynı görsel dil ── */
+    .saat-pill-panel {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .saat-pill {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        font-size: 0.85em;
+        color: #495057;
+        background: #f1f3f5;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 3px 11px;
+        user-select: none;
+    }
+    .saat-pill:has(input:checked) {
+        background: #d4edda;
+        border-color: #28a745;
+        color: #155724;
+        font-weight: 600;
+    }
+    .saat-pill input[type=checkbox] { width: 13px; height: 13px; }
 </style>
 
 <div class="form-sayfa">
@@ -170,16 +196,25 @@
                 </div>
 
                 <div class="form-grup">
-                    <label for="{{ form.saat_secenekleri.id_for_label }}">{{ form.saat_secenekleri.label }}</label>
-                    {{ form.saat_secenekleri }}
+                    <label>{{ form.saat_secenekleri.label }}</label>
+                    <div class="saat-pill-panel" id="saat-pill-panel">
+                        {% for s in saat_secenek_araligi %}
+                        <label class="saat-pill">
+                            <input type="checkbox" class="saat-pill-chk" value="{{ s }}">
+                            {{ s }} saat
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden"
+                           id="{{ form.saat_secenekleri.id_for_label }}"
+                           name="{{ form.saat_secenekleri.html_name }}"
+                           value="{{ form.saat_secenekleri.value|default:'' }}">
                     {% if form.saat_secenekleri.errors %}
                     <div class="field-hata">{{ form.saat_secenekleri.errors.0 }}</div>
                     {% endif %}
                     <div class="ornek-kutu">
-                        <strong>Format:</strong> Virgülle ayrılmış pozitif tam sayılar.<br>
-                        <code>4</code> → sabit 4 saat &nbsp;|&nbsp;
-                        <code>2,4</code> → 2 veya 4 saat seçilebilir &nbsp;|&nbsp;
-                        <code>1,2,3</code> → 1, 2 veya 3 saat
+                        Tek pil seçilirse ders <strong>sabit saatli</strong> olur. Birden fazla pil seçilirse
+                        öğrenci seçim formunda ders seçilirken bunlardan biri seçilebilir (örn. 2 veya 4 saat).
                     </div>
                 </div>
 
@@ -217,4 +252,29 @@
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    const gizliAlan = document.getElementById("{{ form.saat_secenekleri.id_for_label }}");
+    const pilller = document.querySelectorAll("#saat-pill-panel .saat-pill-chk");
+
+    // Mevcut değeri (düzenleme modunda) pillere yansıt
+    const mevcutDegerler = (gizliAlan.value || "").split(",").map(s => s.trim()).filter(Boolean);
+    pilller.forEach(function (chk) {
+        if (mevcutDegerler.includes(chk.value)) chk.checked = true;
+    });
+
+    function guncelle() {
+        const secili = Array.from(pilller)
+            .filter(function (chk) { return chk.checked; })
+            .map(function (chk) { return parseInt(chk.value, 10); })
+            .sort(function (a, b) { return a - b; });
+        gizliAlan.value = secili.join(",");
+    }
+
+    pilller.forEach(function (chk) {
+        chk.addEventListener("change", guncelle);
+    });
+})();
+</script>
 {% endblock %}

@@ -110,11 +110,6 @@ class OkulBilgi(models.Model):
 class SinifSube(models.Model):
     sinif = models.IntegerField()
     sube = models.CharField(max_length=2)
-    acik = models.BooleanField(
-        default=True,
-        verbose_name="Açık",
-        help_text="Kapalı şubelere yeni öğrenci atanamaz.",
-    )
 
     class Meta:
         db_table = "nobet_sinifsube"
@@ -136,6 +131,61 @@ class SinifSube(models.Model):
     @property
     def salon(self):
         return f"Salon {self.sinif}/{self.sube}"
+
+    def acik_mi(self, egitim_yili=None):
+        """`egitim_yili` (verilmezse aktif eğitim-öğretim yılı) için bu sınıf/şubenin
+        açık olup olmadığını döner. Açık/kapalı durumu artık SinifSube üzerinde tek bir
+        bayrak değil, yıla göre değişebilen `SinifSubeYil` kayıtlarında tutulur — aynı
+        şube bir yıl açık, ertesi yıl kapalı, sonraki yıl yeniden açık olabilir (bkz.
+        commit geçmişi). O yıl için hiç kayıt yoksa varsayılan olarak açık sayılır
+        (yeni tanımlanan/henüz değerlendirilmemiş bir şube varsayılan açıktır).
+        """
+        yil = egitim_yili
+        if yil is None:
+            from okul.utils import get_aktif_egitim_yili
+            yil = get_aktif_egitim_yili()
+        if yil is None:
+            return True
+        durum = self.yil_durumlari.filter(egitim_yili=yil).values_list("acik", flat=True).first()
+        return True if durum is None else durum
+
+
+class SinifSubeYil(models.Model):
+    """Bir `SinifSube`nin belirli bir eğitim-öğretim yılındaki açık/kapalı durumu.
+
+    Her (sınıf/şube, yıl) çifti için ayrı bir kayıt tutulur — böylece örn. 9/G bir
+    yıl açık, ertesi yıl kapalı, sonraki yıl yeniden açık olabilir; tek bir global
+    bayrak bu geçmişi temsil edemez (bkz. commit geçmişi).
+    """
+
+    sinif_sube = models.ForeignKey(
+        SinifSube,
+        on_delete=models.CASCADE,
+        related_name="yil_durumlari",
+        verbose_name="Sınıf Şube",
+    )
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.CASCADE,
+        related_name="sinif_sube_durumlari",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    acik = models.BooleanField(
+        default=True,
+        verbose_name="Açık",
+        help_text="Kapalı şubelere bu yıl için yeni öğrenci atanamaz.",
+    )
+
+    class Meta:
+        db_table = "nobet_sinifsubeyil"
+        unique_together = ("sinif_sube", "egitim_yili")
+        ordering = ["-egitim_yili__egitim_baslangic"]
+        verbose_name = "Sınıf Şube — Yıl Durumu"
+        verbose_name_plural = "Sınıf Şube Yıl Durumları"
+
+    def __str__(self):
+        durum = "Açık" if self.acik else "Kapalı"
+        return f"{self.sinif_sube} — {self.egitim_yili} ({durum})"
 
 
 # ---------------------------------------------------------------------------

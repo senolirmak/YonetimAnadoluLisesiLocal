@@ -13,6 +13,7 @@ class OgrenciSecmeliDersForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.sinif_seviyesi = sinif_seviyesi
         self.ogrenci = ogrenci
+        self.egitim_yili = egitim_yili
 
         ortak_qs = OrtakDers.objects.filter(sinif_seviyesi=sinif_seviyesi)
         if egitim_yili:
@@ -22,9 +23,12 @@ class OgrenciSecmeliDersForm(forms.Form):
 
         mevcut = {}
         if ogrenci:
-            for secim in OgrenciSecmeliDers.objects.filter(
+            mevcut_qs = OgrenciSecmeliDers.objects.filter(
                 ogrenci=ogrenci, ders__grup__sinif_seviyesi=sinif_seviyesi
-            ).select_related("ders"):
+            )
+            if egitim_yili:
+                mevcut_qs = mevcut_qs.filter(ders__grup__egitim_yili=egitim_yili)
+            for secim in mevcut_qs.select_related("ders"):
                 mevcut[secim.ders_id] = secim.secilen_saat
 
         grup_qs = SecmeliDersGrubu.objects.filter(sinif_seviyesi=sinif_seviyesi)
@@ -101,7 +105,10 @@ class OgrenciSecmeliDersForm(forms.Form):
 
         zorunlu_qs = SecmeliDersGrubu.objects.filter(
             sinif_seviyesi=self.sinif_seviyesi, zorunlu_grup=True
-        ).prefetch_related("dersler")
+        )
+        if self.egitim_yili:
+            zorunlu_qs = zorunlu_qs.filter(egitim_yili=self.egitim_yili)
+        zorunlu_qs = zorunlu_qs.prefetch_related("dersler")
 
         secilen_ids = {ders.pk for ders, _ in secimler}
         secilen_zorunlu = sum(
@@ -122,15 +129,30 @@ class OgrenciSecmeliDersForm(forms.Form):
                     "birer ders seçmelidir."
                 )
 
+        # Bir dersin öğrenci başına en fazla kaç kez seçilebileceği (bkz.
+        # SecmeliDersHavuzu.secimsayisi) — bu ENGELLEYİCİ bir hata değil, yalnızca
+        # bilgilendirici bir uyarıdır; kaydetmeyi durdurmaz. `kaydet()` sonrası
+        # çağıran view bu listeyi `messages.warning()`a çevirir.
+        if self.ogrenci:
+            from secmelidersler.services.secim_sayisi import secim_sayisi_asim_uyarilari
+            self.secim_sayisi_uyarilari = secim_sayisi_asim_uyarilari(
+                self.ogrenci, secimler, haric_egitim_yili=self.egitim_yili
+            )
+        else:
+            self.secim_sayisi_uyarilari = []
+
         return cleaned
 
     def kaydet(self):
         if not self.ogrenci:
             return
-        OgrenciSecmeliDers.objects.filter(
+        eski_qs = OgrenciSecmeliDers.objects.filter(
             ogrenci=self.ogrenci,
             ders__grup__sinif_seviyesi=self.sinif_seviyesi,
-        ).delete()
+        )
+        if self.egitim_yili:
+            eski_qs = eski_qs.filter(ders__grup__egitim_yili=self.egitim_yili)
+        eski_qs.delete()
         for ders, saat in self.get_secimler():
             OgrenciSecmeliDers.objects.create(
                 ogrenci=self.ogrenci,

@@ -528,8 +528,8 @@
         {# ── Eylem çubuğu ── #}
         <div class="eylem-cubugu no-print">
             <button type="submit" class="btn-kaydet">Kaydet</button>
-            <a href="{% url 'ogrdrs_secmeli_pdf' ogrenci.pk %}" target="_blank" class="btn-yazdir">PDF Rapor</a>
-            <a href="{% url 'ogrdrs_detay' ogrenci.pk %}" class="btn-geri">← Geri</a>
+            {% if pdf_url %}<a href="{{ pdf_url }}" target="_blank" class="btn-yazdir">PDF Rapor</a>{% endif %}
+            <a href="{{ geri_url }}" class="btn-geri">← Geri</a>
         </div>
     </form>
 </div>
@@ -676,6 +676,17 @@
             document.querySelectorAll(".btn-alan").forEach(function (b) { b.classList.remove("aktif"); });
             tumunuTemizle();
         });
+    }
+
+    // Sınıf Dağılımı denetim ekranından "?alan=<pk>" ile gelindiyse, formu açar
+    // açmaz o alanın paketiyle doldur (kaydedilmeden önce incelenip değiştirilebilir).
+    const SECILI_ALAN = {{ secili_alan_pk|default:"null" }};
+    if (SECILI_ALAN) {
+        const btn = document.querySelector('.btn-alan[data-alan-id="' + SECILI_ALAN + '"]');
+        if (btn) {
+            btn.classList.add("aktif");
+            alandanDoldur(SECILI_ALAN);
+        }
     }
 })();
 </script>

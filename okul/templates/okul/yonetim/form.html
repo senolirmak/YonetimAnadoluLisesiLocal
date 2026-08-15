@@ -42,5 +42,60 @@
       </form>
     </div>
   </div>
+
+  {% if slug == "sinif-sube" and not is_create %}
+  <div class="card" style="margin-top:20px;">
+    <div class="card-header bg-primary">Eğitim-Öğretim Yılına Göre Açık/Kapalı Durumu</div>
+    <div class="form-box">
+      <p style="font-size:0.88em;color:#6c757d;margin-bottom:14px;">
+        Bu sınıf/şube her yıl aynı durumda olmak zorunda değildir (örn. bir yıl açık,
+        ertesi yıl kapalı, sonraki yıl yeniden açık olabilir). Aşağıda yıl için hiç
+        kayıt yoksa o yıl için varsayılan olarak <strong>açık</strong> kabul edilir.
+      </p>
+
+      {% if yil_durumlari %}
+      <table class="ay-tablo" style="margin-bottom:16px;">
+        <thead>
+          <tr>
+            <th>Eğitim-Öğretim Yılı</th>
+            <th>Durum</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for yd in yil_durumlari %}
+          <tr>
+            <td>{{ yd.egitim_yili }}</td>
+            <td>{% if yd.acik %}Açık{% else %}Kapalı{% endif %}</td>
+            <td class="ay-satir-eylem">
+              <form method="post" action="{% url 'okul:sinif_sube_yil_sil' pk=instance.pk yil_pk=yd.egitim_yili_id %}"
+                    onsubmit="return confirm('{{ yd.egitim_yili }} yılı için kayıt kaldırılsın mı? (o yıl için durum yeniden varsayılan \'açık\' olur)');">
+                {% csrf_token %}
+                <button type="submit" class="ay-sil-link" style="background:none;border:none;cursor:pointer;">Kaldır</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="ay-bos" style="margin-bottom:16px;">Henüz hiçbir yıl için özel bir durum kaydedilmemiş — tüm yıllarda açık kabul edilir.</p>
+      {% endif %}
+
+      <form method="post" action="{% url 'okul:sinif_sube_yil_ata' pk=instance.pk %}">
+        {% csrf_token %}
+        {% for field in yil_form %}
+        <div class="form-row">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+        </div>
+        {% endfor %}
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Yıl Durumu Ekle / Güncelle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

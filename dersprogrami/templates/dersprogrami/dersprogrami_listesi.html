@@ -63,22 +63,32 @@
     </div>
 
     <form method="get" class="filtre-form">
+        {% comment %}
+        Yıl/dönem/tarih seçimi ayrı bir JS-yönlendirmeli select — "Filtrele" ile birlikte
+        gönderilebilmesi için gizli alanlarda taşınır, aksi hâlde diğer filtreler
+        uygulanırken (GET formu yalnızca name'li alanları gönderir) sıfırlanır.
+        {% endcomment %}
+        <input type="hidden" name="yil" value="{{ secili_yil_id }}">
+        <input type="hidden" name="donem" value="{{ secili_donem_id }}">
+        <input type="hidden" name="tarih" value="{{ secili_tarih_str }}">
         <div>
             <label>Eğitim-Öğretim Yılı / Dönem:</label>
             <select onchange="
                 var v = this.value;
+                var diger = 'ogretmen={{ secilen_ogretmen }}&sinif_sube={{ secilen_sinif }}&gun={{ secilen_gun }}';
                 if (v) {
                     var parts = v.split('|');
-                    window.location.search = '?yil=' + parts[0] + '&donem=' + parts[1];
+                    window.location.search = '?yil=' + parts[0] + '&donem=' + parts[1] + '&tarih=' + parts[2] + '&' + diger;
                 } else {
-                    window.location.search = '';
+                    window.location.search = '?' + diger;
                 }
             ">
                 <option value="">-- Aktif (güncel) --</option>
                 {% for d in donemler %}
-                <option value="{{ d.egitim_yili_id }}|{{ d.donem_id }}"
-                    {% if secili_yil_id == d.egitim_yili_id|stringformat:"s" and secili_donem_id == d.donem_id|stringformat:"s" %}selected{% endif %}>
+                <option value="{{ d.egitim_yili_id }}|{{ d.donem_id }}|{{ d.uygulama_tarihi|date:'Y-m-d' }}"
+                    {% if secili_yil_id == d.egitim_yili_id|stringformat:"s" and secili_tarih_str == d.uygulama_tarihi|date:"Y-m-d" %}selected{% endif %}>
                     {{ d.egitim_yili__egitim_yili }} — {% if d.donem__donem == 1 %}1. Dönem{% elif d.donem__donem == 2 %}2. Dönem{% else %}—{% endif %}
+                    ({{ d.uygulama_tarihi|date:"d.m.Y" }} itibarıyla)
                 </option>
                 {% endfor %}
             </select>
@@ -120,6 +130,7 @@
     {% if gecmis_donem_secili %}
     <p style="margin:0 0 12px; color:#856404; background:#fff3cd; border:1px solid #ffeeba; border-radius:6px; padding:8px 12px; font-size:0.88em;">
         Geçmiş bir eğitim-öğretim yılı/dönem verisini görüntülüyorsunuz — salt okunur.
+        {% if secili_tarih %}({{ secili_tarih|date:"d.m.Y" }} itibarıyla uygulanan program.){% endif %}
     </p>
     {% endif %}
 

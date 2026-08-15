@@ -63,9 +63,9 @@
   .diger-renk { background: #f5f3ff; border-left-color: #7c3aed; color: #4c1d95; }
   .alan-btn-grup { display: inline-flex; gap: 4px; flex-wrap: wrap; }
   .btn-alan {
-    border: 1px solid #ced4da; border-radius: 4px; padding: 2px 9px;
+    display: inline-block; border: 1px solid #ced4da; border-radius: 4px; padding: 2px 9px;
     font-size: .74rem; font-weight: 700; cursor: pointer;
-    background: #e9ecef; color: #495057;
+    background: #e9ecef; color: #495057; text-decoration: none;
   }
   .btn-alan:hover { background: #dee2e6; }
   .btn-alan.secili { background: #16a34a; color: #fff; border-color: #16a34a; }
@@ -119,6 +119,242 @@
               border-radius:4px;padding:8px 14px;font-size:.86em;color:#bf360c;margin-bottom:1.6rem;">
     <i class="fas fa-exclamation-triangle"></i>
     <span>Aktif eğitim-öğretim yılı tanımlanmamış. Alan kayıtları yıldan bağımsız gösteriliyor.</span>
+  </div>
+  {% endif %}
+
+  {# -------- 9. SINIF DENETİMİ (yalnızca denetim modunda) -------- #}
+  {# 9-10. sınıfta gerçek bir Alan/izlence ayrımı yok — "YOK" adlı tek bir yer #}
+  {# tutucu Alan üzerinden aynı eşleştirme mekanizması kullanılır, bkz. views.sinif_dagilimi #}
+  {% if plan_9 %}
+  <div class="sd-plan-wrap">
+    <div class="sd-plan-baslik" style="background:#7c2d12;">
+      <i class="fas fa-arrow-up"></i>
+      9. Sınıf Denetimi ({{ secili_yil.egitim_yili }})
+    </div>
+    <div class="sd-ozet-bar">
+      <div>Eşleşen öğrenci: <strong>{{ plan_9.toplam_ogr }}</strong></div>
+      <div>Oluşan şube: <strong>{{ plan_9.toplam_sube }}</strong></div>
+      {% if plan_9.alan_yok %}<div style="color:#9a3412;">Ders seçimi eşleşmeyen: <strong>{{ plan_9.alan_yok|length }}</strong></div>{% endif %}
+    </div>
+    <div class="sd-plan-ic">
+      {% if not plan_9.alan_gruplari %}
+      <div class="bos-durum">
+        <i class="fas fa-inbox" style="font-size:1.8rem;display:block;margin-bottom:.5rem;opacity:.3;"></i>
+        9. sınıf için Alan tanımı bulunamadı.
+      </div>
+      {% else %}
+
+      {% for grup in plan_9.alan_gruplari %}
+      <div class="alan-blok">
+        <div class="alan-baslik diger-renk">
+          <i class="fas fa-graduation-cap"></i>
+          {{ grup.alan.adi }}
+          <span style="font-size:.76rem;font-weight:400;margin-left:.2rem;">— {{ grup.alan.sinif_seviyesi }}. sınıf</span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:.4rem;font-size:.78rem;">
+            <span style="background:rgba(0,0,0,.08);padding:.1rem .5rem;border-radius:4px;">{{ grup.ogrenci_sayisi }} öğrenci · {{ grup.sube_sayisi }} şube</span>
+            <span style="background:rgba(255,182,193,.35);color:#7c1c2f;padding:.1rem .5rem;border-radius:4px;font-weight:700;">K:{{ grup.toplam_kiz }}</span>
+            <span style="background:rgba(173,216,230,.35);color:#1a3a5c;padding:.1rem .5rem;border-radius:4px;font-weight:700;">E:{{ grup.toplam_erkek }}</span>
+          </span>
+        </div>
+
+        {% if not grup.subeler %}
+        <div style="color:#94a3b8;font-size:.83rem;padding:.3rem .5rem;">Bu grup için öğrenci yok.</div>
+        {% else %}
+        {% for sube in grup.subeler %}
+        <div class="sube-wrap">
+          <div class="sube-baslik-row">
+            <span class="badge-sube">{{ sube.label }}</span>
+            <span style="font-size:.78rem;color:#64748b;">{{ sube.ogrenciler|length }} öğrenci</span>
+            <span style="font-size:.76rem;background:#ffe4e8;color:#7c1c2f;padding:.1rem .4rem;border-radius:3px;font-weight:700;">K:{{ sube.kiz_sayi }}</span>
+            <span style="font-size:.76rem;background:#dbeafe;color:#1e40af;padding:.1rem .4rem;border-radius:3px;font-weight:700;">E:{{ sube.erkek_sayi }}</span>
+          </div>
+          <table class="sube-tablo">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Okul No</th>
+                <th>Ad Soyad</th>
+                <th style="text-align:center;">Cin.</th>
+                <th>Mevcut Sınıf/Şube</th>
+                <th>Önceki Sınıf/Şube</th>
+                <th>Alan Seçimi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ogr in sube.ogrenciler %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td style="font-family:monospace;color:#475569;">{{ ogr.okulno|default:"—" }}</td>
+                <td style="font-weight:600;color:#1e3a5f;">{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                <td style="text-align:center;">
+                  {% if ogr.cinsiyet == "K" %}
+                  <span style="font-size:.72rem;font-weight:700;background:#ffe4e8;color:#7c1c2f;padding:.1rem .35rem;border-radius:3px;">K</span>
+                  {% else %}
+                  <span style="font-size:.72rem;font-weight:700;background:#dbeafe;color:#1e40af;padding:.1rem .35rem;border-radius:3px;">E</span>
+                  {% endif %}
+                </td>
+                <td style="color:#64748b;">{{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}</td>
+                <td style="color:#94a3b8;">
+                  {% if ogr.onceki_sinif %}{{ ogr.onceki_sinif }}{% if ogr.onceki_sube %}/{{ ogr.onceki_sube }}{% endif %}{% else %}—{% endif %}
+                </td>
+                <td style="font-weight:600;">
+                  <div class="alan-btn-grup">
+                    {% for alan in aktif_alanlar_9 %}
+                    <a class="btn-alan{% if alan.adi == grup.alan.adi %} secili{% endif %}"
+                       href="{% url 'ogrdrs_secmeli_form_seviye' ogr.pk alan.sinif_seviyesi %}?yil={{ secili_yil.pk }}&amp;alan={{ alan.pk }}">{{ alan.adi }}</a>
+                    {% endfor %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      {% if plan_9.alan_yok %}
+      <div class="alan-yok-blok">
+        <i class="fas fa-exclamation-circle"></i>
+        <strong>Ders seçimi eşleşmeyen öğrenciler ({{ plan_9.alan_yok|length }})</strong>
+        <br><small>Bu öğrencilerin seçmeli ders seçimleri tanımlı paketle örtüşmüyor ya da seçim yapılmamış.</small>
+        <ul>
+          {% for ogr in plan_9.alan_yok %}
+          <li>
+            {{ ogr.adi }} {{ ogr.soyadi }} – {{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}
+            <span class="alan-btn-grup" style="margin-left:.5rem;">
+              {% for alan in aktif_alanlar_9 %}
+              <a class="btn-alan"
+                 href="{% url 'ogrdrs_secmeli_form_seviye' ogr.pk alan.sinif_seviyesi %}?yil={{ secili_yil.pk }}&amp;alan={{ alan.pk }}">{{ alan.adi }}</a>
+              {% endfor %}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# -------- 10. SINIF DENETİMİ (yalnızca denetim modunda) -------- #}
+  {% if plan_10 %}
+  <div class="sd-plan-wrap">
+    <div class="sd-plan-baslik" style="background:#4c1d95;">
+      <i class="fas fa-arrow-up"></i>
+      10. Sınıf Denetimi ({{ secili_yil.egitim_yili }})
+    </div>
+    <div class="sd-ozet-bar">
+      <div>Eşleşen öğrenci: <strong>{{ plan_10.toplam_ogr }}</strong></div>
+      <div>Oluşan şube: <strong>{{ plan_10.toplam_sube }}</strong></div>
+      {% if plan_10.alan_yok %}<div style="color:#9a3412;">Ders seçimi eşleşmeyen: <strong>{{ plan_10.alan_yok|length }}</strong></div>{% endif %}
+    </div>
+    <div class="sd-plan-ic">
+      {% if not plan_10.alan_gruplari %}
+      <div class="bos-durum">
+        <i class="fas fa-inbox" style="font-size:1.8rem;display:block;margin-bottom:.5rem;opacity:.3;"></i>
+        10. sınıf için Alan tanımı bulunamadı.
+      </div>
+      {% else %}
+
+      {% for grup in plan_10.alan_gruplari %}
+      <div class="alan-blok">
+        <div class="alan-baslik diger-renk">
+          <i class="fas fa-graduation-cap"></i>
+          {{ grup.alan.adi }}
+          <span style="font-size:.76rem;font-weight:400;margin-left:.2rem;">— {{ grup.alan.sinif_seviyesi }}. sınıf</span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:.4rem;font-size:.78rem;">
+            <span style="background:rgba(0,0,0,.08);padding:.1rem .5rem;border-radius:4px;">{{ grup.ogrenci_sayisi }} öğrenci · {{ grup.sube_sayisi }} şube</span>
+            <span style="background:rgba(255,182,193,.35);color:#7c1c2f;padding:.1rem .5rem;border-radius:4px;font-weight:700;">K:{{ grup.toplam_kiz }}</span>
+            <span style="background:rgba(173,216,230,.35);color:#1a3a5c;padding:.1rem .5rem;border-radius:4px;font-weight:700;">E:{{ grup.toplam_erkek }}</span>
+          </span>
+        </div>
+
+        {% if not grup.subeler %}
+        <div style="color:#94a3b8;font-size:.83rem;padding:.3rem .5rem;">Bu grup için öğrenci yok.</div>
+        {% else %}
+        {% for sube in grup.subeler %}
+        <div class="sube-wrap">
+          <div class="sube-baslik-row">
+            <span class="badge-sube">{{ sube.label }}</span>
+            <span style="font-size:.78rem;color:#64748b;">{{ sube.ogrenciler|length }} öğrenci</span>
+            <span style="font-size:.76rem;background:#ffe4e8;color:#7c1c2f;padding:.1rem .4rem;border-radius:3px;font-weight:700;">K:{{ sube.kiz_sayi }}</span>
+            <span style="font-size:.76rem;background:#dbeafe;color:#1e40af;padding:.1rem .4rem;border-radius:3px;font-weight:700;">E:{{ sube.erkek_sayi }}</span>
+          </div>
+          <table class="sube-tablo">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Okul No</th>
+                <th>Ad Soyad</th>
+                <th style="text-align:center;">Cin.</th>
+                <th>Mevcut Sınıf/Şube</th>
+                <th>Önceki Sınıf/Şube</th>
+                <th>Alan Seçimi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ogr in sube.ogrenciler %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td style="font-family:monospace;color:#475569;">{{ ogr.okulno|default:"—" }}</td>
+                <td style="font-weight:600;color:#1e3a5f;">{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                <td style="text-align:center;">
+                  {% if ogr.cinsiyet == "K" %}
+                  <span style="font-size:.72rem;font-weight:700;background:#ffe4e8;color:#7c1c2f;padding:.1rem .35rem;border-radius:3px;">K</span>
+                  {% else %}
+                  <span style="font-size:.72rem;font-weight:700;background:#dbeafe;color:#1e40af;padding:.1rem .35rem;border-radius:3px;">E</span>
+                  {% endif %}
+                </td>
+                <td style="color:#64748b;">{{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}</td>
+                <td style="color:#94a3b8;">
+                  {% if ogr.onceki_sinif %}{{ ogr.onceki_sinif }}{% if ogr.onceki_sube %}/{{ ogr.onceki_sube }}{% endif %}{% else %}—{% endif %}
+                </td>
+                <td style="font-weight:600;">
+                  <div class="alan-btn-grup">
+                    {% for alan in aktif_alanlar_10 %}
+                    <a class="btn-alan{% if alan.adi == grup.alan.adi %} secili{% endif %}"
+                       href="{% url 'ogrdrs_secmeli_form_seviye' ogr.pk alan.sinif_seviyesi %}?yil={{ secili_yil.pk }}&amp;alan={{ alan.pk }}">{{ alan.adi }}</a>
+                    {% endfor %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      {% if plan_10.alan_yok %}
+      <div class="alan-yok-blok">
+        <i class="fas fa-exclamation-circle"></i>
+        <strong>Ders seçimi eşleşmeyen öğrenciler ({{ plan_10.alan_yok|length }})</strong>
+        <br><small>Bu öğrencilerin seçmeli ders seçimleri tanımlı paketle örtüşmüyor ya da seçim yapılmamış.</small>
+        <ul>
+          {% for ogr in plan_10.alan_yok %}
+          <li>
+            {{ ogr.adi }} {{ ogr.soyadi }} – {{ ogr.sinif }}{% if ogr.sube %}/{{ ogr.sube }}{% endif %}
+            <span class="alan-btn-grup" style="margin-left:.5rem;">
+              {% for alan in aktif_alanlar_10 %}
+              <a class="btn-alan"
+                 href="{% url 'ogrdrs_secmeli_form_seviye' ogr.pk alan.sinif_seviyesi %}?yil={{ secili_yil.pk }}&amp;alan={{ alan.pk }}">{{ alan.adi }}</a>
+              {% endfor %}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% endif %}
+    </div>
   </div>
   {% endif %}
 
@@ -202,12 +438,8 @@
                   {% if salt_okunur %}
                   <div class="alan-btn-grup">
                     {% for alan in aktif_alanlar_11 %}
-                    <form method="post" action="{% url 'secmeli_sinif_dagilimi_alan_degistir' ogr.pk alan.pk %}"
-                          onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} — seçmeli ders seçimi {{ alan.adi }} alanına göre değiştirilsin mi?\nMevcut seçimler silinip alan dersleriyle değiştirilecek.')">
-                      {% csrf_token %}
-                      <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
-                      <button type="submit" class="btn-alan{% if alan.adi == grup.alan.adi %} secili{% endif %}">{{ alan.adi }}</button>
-                    </form>
+                    <a class="btn-alan{% if alan.adi == grup.alan.adi %} secili{% endif %}"
+                       href="{% url 'ogrdrs_secmeli_form_seviye' ogr.pk alan.sinif_seviyesi %}?yil={{ secili_yil.pk }}&amp;alan={{ alan.pk }}">{{ alan.adi }}</a>
                     {% endfor %}
                   </div>
                   {% else %}
@@ -236,12 +468,8 @@
             {% if salt_okunur %}
             <span class="alan-btn-grup" style="margin-left:.5rem;">
               {% for alan in aktif_alanlar_11 %}
-              <form method="post" action="{% url 'secmeli_sinif_dagilimi_alan_degistir' ogr.pk alan.pk %}" style="display:inline;"
-                    onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} — seçmeli ders seçimi {{ alan.adi }} alanına göre atansın mı?')">
-                {% csrf_token %}
-                <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
-                <button type="submit" class="btn-alan">{{ alan.adi }}</button>
-              </form>
+              <a class="btn-alan"
+                 href="{% url 'ogrdrs_secmeli_form_seviye' ogr.pk alan.sinif_seviyesi %}?yil={{ secili_yil.pk }}&amp;alan={{ alan.pk }}">{{ alan.adi }}</a>
               {% endfor %}
             </span>
             {% endif %}
@@ -359,12 +587,8 @@
                   {% if salt_okunur %}
                   <div class="alan-btn-grup">
                     {% for alan in aktif_alanlar_12 %}
-                    <form method="post" action="{% url 'secmeli_sinif_dagilimi_alan_degistir' ogr.pk alan.pk %}"
-                          onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} — seçmeli ders seçimi {{ alan.adi }} alanına göre değiştirilsin mi?\nMevcut seçimler silinip alan dersleriyle değiştirilecek.')">
-                      {% csrf_token %}
-                      <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
-                      <button type="submit" class="btn-alan{% if alan.adi == grup.alan.adi %} secili{% endif %}">{{ alan.adi }}</button>
-                    </form>
+                    <a class="btn-alan{% if alan.adi == grup.alan.adi %} secili{% endif %}"
+                       href="{% url 'ogrdrs_secmeli_form_seviye' ogr.pk alan.sinif_seviyesi %}?yil={{ secili_yil.pk }}&amp;alan={{ alan.pk }}">{{ alan.adi }}</a>
                     {% endfor %}
                   </div>
                   {% else %}
@@ -393,12 +617,8 @@
             {% if salt_okunur %}
             <span class="alan-btn-grup" style="margin-left:.5rem;">
               {% for alan in aktif_alanlar_12 %}
-              <form method="post" action="{% url 'secmeli_sinif_dagilimi_alan_degistir' ogr.pk alan.pk %}" style="display:inline;"
-                    onsubmit="return confirm('{{ ogr.adi }} {{ ogr.soyadi }} — seçmeli ders seçimi {{ alan.adi }} alanına göre atansın mı?')">
-                {% csrf_token %}
-                <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
-                <button type="submit" class="btn-alan">{{ alan.adi }}</button>
-              </form>
+              <a class="btn-alan"
+                 href="{% url 'ogrdrs_secmeli_form_seviye' ogr.pk alan.sinif_seviyesi %}?yil={{ secili_yil.pk }}&amp;alan={{ alan.pk }}">{{ alan.adi }}</a>
               {% endfor %}
             </span>
             {% endif %}

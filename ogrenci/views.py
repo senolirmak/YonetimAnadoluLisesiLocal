@@ -32,11 +32,16 @@ def _gorunur_ogrenciler_ve_durum(ogrenciler):
         o for o in ogrenciler if o.pk not in tasdikname_ids and o.pk not in mezun_ids
     ]
 
-    sinif_tekrari_ids = set(
-        OgrenciSinifTekrari.objects.filter(
-            ogrenci_id__in=[o.pk for o in ogr_listesi]
-        ).values_list("ogrenci_id", flat=True)
+    # `egitim_yili`ye göre kapsamlanır — aksi hâlde geçmiş bir yılda (örn. 2025-2026)
+    # sınıfta kalmış ama o yılı zaten tamamlayıp normal devam eden bir öğrenci de
+    # kalıcı olarak "Sınıf Tekrarı" etiketiyle görünür (bkz. commit geçmişi).
+    _aktif_yil = get_aktif_egitim_yili()
+    sinif_tekrari_qs = OgrenciSinifTekrari.objects.filter(
+        ogrenci_id__in=[o.pk for o in ogr_listesi]
     )
+    if _aktif_yil:
+        sinif_tekrari_qs = sinif_tekrari_qs.filter(egitim_yili=_aktif_yil)
+    sinif_tekrari_ids = set(sinif_tekrari_qs.values_list("ogrenci_id", flat=True))
 
     for ogr in ogr_listesi:
         etiketler = []
@@ -474,19 +479,42 @@ def ogrenci_muaf_duzenle(request, pk):
 # ─────────────────────────────────────────────
 
 
+def _yeni_kayit_ogrenci_qs(sinif, sube=None):
+    """'Yeni kayıt' öğrenci tanımı: aktif (ayrılma kaydı olan öğrenci `Ogrenci.aktif`
+    False'a düşer — bkz. `ayrilma_ekle`), VE sınıf tekrarı OLMAYAN öğrenciler.
+    Sınıf tekrarı yapan bir öğrenci (bkz. `OgrenciSinifTekrari`, aktif yıla göre)
+    devam eden bir kayıttır, yeni kayıt değildir — kendi seçmeli/zorunlu ders
+    ataması `secmeli:sinif_tekrari_listesi` / `secmeli:sinif_dagilimi` akışlarından
+    yürütülür, bu ekranla karıştırılmamalı (bkz. commit geçmişi).
+    """
+    from secmelidersler.models import OgrenciSinifTekrari
+
+    qs = Ogrenci.objects.filter(sinif=sinif, aktif=True)
+    if sube:
+        qs = qs.filter(sube__iexact=sube)
+
+    aktif_yil = get_aktif_egitim_yili()
+    tekrar_qs = OgrenciSinifTekrari.objects.filter(ogrenci__sinif=sinif)
+    if aktif_yil:
+        tekrar_qs = tekrar_qs.filter(egitim_yili=aktif_yil)
+    tekrar_ids = set(tekrar_qs.values_list("ogrenci_id", flat=True))
+
+    return qs.exclude(pk__in=tekrar_ids)
+
+
 @mudur_yardimcisi_required
 def yeni_kayit_hub(request, sinif):
     subeler = sorted(
         set(SinifSube.objects.filter(sinif=sinif).values_list("sube", flat=True))
         | set(Ogrenci.objects.filter(sinif=sinif).values_list("sube", flat=True).distinct())
     )
-    acik_map = dict(SinifSube.objects.filter(sinif=sinif).values_list("sube", "acik"))
+    sinifsube_map = {ss.sube: ss for ss in SinifSube.objects.filter(sinif=sinif)}
 
     sube_verileri = [
         {
             "sube": sube,
-            "toplam": Ogrenci.objects.filter(sinif=sinif, sube__iexact=sube).count(),
-            "acik": acik_map.get(sube, True),
+            "toplam": _yeni_kayit_ogrenci_qs(sinif, sube).count(),
+            "acik": sinifsube_map[sube].acik_mi() if sube in sinifsube_map else True,
         }
         for sube in subeler
     ]
@@ -500,15 +528,16 @@ def yeni_kayit_hub(request, sinif):
 
 
 def _sube_acik_mi(sinif, sube):
-    """SinifSube kaydı yoksa (henüz tanımlanmamış şube) açık kabul edilir."""
+    """SinifSube kaydı yoksa (henüz tanımlanmamış şube) açık kabul edilir. Açık/kapalı
+    durumu aktif eğitim-öğretim yılına göre değerlendirilir — bkz. SinifSube.acik_mi."""
     kayit = SinifSube.objects.filter(sinif=sinif, sube__iexact=sube).first()
-    return kayit.acik if kayit else True
+    return kayit.acik_mi() if kayit else True
 
 
 @mudur_yardimcisi_required
 def yeni_kayit_liste(request, sinif, sube):
     sube = sube.upper()
-    ogrenciler = Ogrenci.objects.filter(sinif=sinif, sube__iexact=sube).order_by("okulno")
+    ogrenciler = _yeni_kayit_ogrenci_qs(sinif, sube).order_by("okulno")
 
     return render(request, "ogrenci/yeni_kayit_liste.html", {
         "title": f"{sinif}/{sube} — Öğrenciler",

@@ -577,11 +577,24 @@ def dersprogrami_listesi(request):
     gun = request.GET.get("gun", "").strip()
     yil_id = request.GET.get("yil", "").strip()
     donem_id = request.GET.get("donem", "").strip()
+    tarih_str = request.GET.get("tarih", "").strip()
 
     secili_yil = EgitimOgretimYili.objects.filter(pk=yil_id).first() if yil_id else None
     secili_donem = OkulDonem.objects.filter(pk=donem_id).first() if donem_id else None
+    secili_tarih = None
+    if tarih_str:
+        try:
+            secili_tarih = datetime.strptime(tarih_str, "%Y-%m-%d").date()
+        except ValueError:
+            secili_tarih = None
 
-    if secili_yil and secili_donem:
+    if secili_yil and secili_tarih:
+        # Aynı (yıl, dönem) içinde birden fazla uygulama_tarihi (yeniden yükleme/güncelleme)
+        # olabilir — tarih belirtilmişse yalnızca O SPESİFİK versiyon gösterilir, aksi hâlde
+        # dönemin tüm versiyonları birleşik gelir (aşağıdaki geriye dönük dal).
+        qs = DersProgrami.objects.filter(egitim_yili=secili_yil, uygulama_tarihi=secili_tarih)
+        gecmis_donem_secili = True
+    elif secili_yil and secili_donem:
         qs = DersProgrami.objects.filter(egitim_yili=secili_yil, donem=secili_donem)
         gecmis_donem_secili = True
     else:
@@ -618,9 +631,9 @@ def dersprogrami_listesi(request):
 
     donemler = (
         DersProgrami.objects.exclude(egitim_yili__isnull=True)
-        .values("egitim_yili_id", "egitim_yili__egitim_yili", "donem_id", "donem__donem")
+        .values("egitim_yili_id", "egitim_yili__egitim_yili", "donem_id", "donem__donem", "uygulama_tarihi")
         .distinct()
-        .order_by("-egitim_yili__egitim_yili", "donem__donem")
+        .order_by("-egitim_yili__egitim_yili", "donem__donem", "uygulama_tarihi")
     )
 
     context = {
@@ -635,6 +648,8 @@ def dersprogrami_listesi(request):
         "donemler": donemler,
         "secili_yil_id": yil_id,
         "secili_donem_id": donem_id,
+        "secili_tarih": secili_tarih,
+        "secili_tarih_str": secili_tarih.isoformat() if secili_tarih else "",
         "gecmis_donem_secili": gecmis_donem_secili,
     }
     return render(request, "dersprogrami/dersprogrami_listesi.html", context)

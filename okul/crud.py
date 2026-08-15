@@ -20,8 +20,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from main.forms import EgitimOgretimYiliForm, OkulDonemForm
 from okul.auth import mudur_yardimcisi_required
-from okul.forms import BransForm, DersHavuzuFullForm, DersSaatleriForm, PersonelForm, SinifSubeForm
-from okul.models import Brans, DersHavuzu, DersSaatleri, EgitimOgretimYili, OkulDonem, Personel, SinifSube
+from okul.forms import (
+    BransForm, DersHavuzuFullForm, DersSaatleriForm, PersonelForm, SinifSubeForm, SinifSubeYilForm,
+)
+from okul.models import (
+    Brans, DersHavuzu, DersSaatleri, EgitimOgretimYili, OkulDonem, Personel, SinifSube, SinifSubeYil,
+)
 
 REGISTRY = {
     "egitim-yili": {
@@ -55,7 +59,7 @@ REGISTRY = {
         "list_fields": [
             ("sinif", "Sınıf"),
             ("sube", "Şube"),
-            ("acik", "Açık mı?"),
+            ("acik_mi", "Açık mı? (Aktif Yıl)"),
         ],
         "group_by": "sinif",
         "group_order": ["sube"],
@@ -202,9 +206,53 @@ def yonetim_update(request, slug, pk):
             return redirect("okul:yonetim_list", slug=slug)
     else:
         form = entry["form"](instance=instance)
-    return render(request, "okul/yonetim/form.html", {
+
+    context = {
         "entry": entry, "slug": slug, "form": form, "is_create": False, "instance": instance,
-    })
+    }
+
+    # Sınıf/Şube'nin açık/kapalı durumu artık tekil bir bayrak değil, yıla göre
+    # değişebilen SinifSubeYil kayıtlarıdır (bkz. commit geçmişi) — düzenleme
+    # sayfasında bu şubenin tüm yıllara göre açık/kapalı listesini ayrıca gösterip
+    # tek tek değiştirmeyi sağlar. Başka registry kaydını etkilemez.
+    if slug == "sinif-sube":
+        yil_durumlari = instance.yil_durumlari.select_related("egitim_yili").all()
+        context["yil_durumlari"] = yil_durumlari
+        context["yil_form"] = SinifSubeYilForm()
+
+    return render(request, "okul/yonetim/form.html", context)
+
+
+@mudur_yardimcisi_required
+def sinif_sube_yil_ata(request, pk):
+    """POST: Bir SinifSube için belirli bir eğitim-öğretim yılındaki açık/kapalı
+    durumunu ekler/günceller (aynı yıl için zaten kayıt varsa üzerine yazar)."""
+    instance = get_object_or_404(SinifSube, pk=pk)
+    if request.method == "POST":
+        form = SinifSubeYilForm(request.POST)
+        if form.is_valid():
+            SinifSubeYil.objects.update_or_create(
+                sinif_sube=instance,
+                egitim_yili=form.cleaned_data["egitim_yili"],
+                defaults={"acik": form.cleaned_data["acik"]},
+            )
+            messages.success(
+                request,
+                f"{instance} — {form.cleaned_data['egitim_yili']} yılı durumu kaydedildi.",
+            )
+        else:
+            messages.error(request, "Yıl durumu kaydedilemedi: " + "; ".join(form.errors))
+    return redirect("okul:yonetim_update", slug="sinif-sube", pk=pk)
+
+
+@mudur_yardimcisi_required
+def sinif_sube_yil_sil(request, pk, yil_pk):
+    """POST: Bir SinifSube'un belirli bir yıla ait açık/kapalı kaydını kaldırır —
+    o yıl için durum tekrar 'kayıt yok' (varsayılan: açık) haline döner."""
+    if request.method == "POST":
+        SinifSubeYil.objects.filter(sinif_sube_id=pk, egitim_yili_id=yil_pk).delete()
+        messages.success(request, "Yıl durumu kaydı kaldırıldı.")
+    return redirect("okul:yonetim_update", slug="sinif-sube", pk=pk)
 
 
 @mudur_yardimcisi_required

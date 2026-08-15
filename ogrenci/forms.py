@@ -76,7 +76,7 @@ class OgrenciForm(forms.ModelForm):
             from okul.models import SinifSube
 
             kayit = SinifSube.objects.filter(sinif=self.instance.sinif, sube__iexact=sube).first()
-            if kayit and not kayit.acik:
+            if kayit and not kayit.acik_mi():
                 raise forms.ValidationError(
                     f"{self.instance.sinif}/{sube} şubesi kapalı — öğrenci bu şubeye taşınamaz."
                 )

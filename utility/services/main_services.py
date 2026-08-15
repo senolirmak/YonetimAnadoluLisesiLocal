@@ -216,9 +216,20 @@ class EOkulVeriAktar:
             status["message"] = "İşlenecek veri yok."
             return status
 
-        from okul.utils import get_aktif_donem, get_aktif_egitim_yili
-        egitim_yili = get_aktif_egitim_yili()
-        donem = get_aktif_donem()
+        from okul.utils import donem_tarihe_gore, get_aktif_donem, get_aktif_egitim_yili
+        # Aktif yıl/dönem yalnızca FALLBACK'tir — tarihi kapsayan bir OkulDonem tanımlıysa
+        # (asıl doğru kaynak) o kullanılır; aksi hâlde sistemin o anki aktif yılına düşülür.
+        aktif_yil_fallback = get_aktif_egitim_yili()
+        aktif_donem_fallback = get_aktif_donem()
+        donem_cache: dict = {}
+
+        def _yil_donem_for(tarih):
+            if tarih not in donem_cache:
+                donem_cache[tarih] = donem_tarihe_gore(tarih)
+            donem_obj = donem_cache[tarih]
+            if donem_obj:
+                return donem_obj.egitim_yili, donem_obj
+            return aktif_yil_fallback, aktif_donem_fallback
 
         try:
             with transaction.atomic():
@@ -266,6 +277,7 @@ class EOkulVeriAktar:
                         if yer_adi not in yer_map:
                             yer_map[yer_adi], _ = NobetYerleri.objects.get_or_create(ad=yer_adi)
 
+                        egitim_yili, donem = _yil_donem_for(uygulama_tarihi.date())
                         objs_to_create.append(
                             NobetGorevi(
                                 ogretmen=ogretmen,
@@ -323,9 +335,21 @@ class EOkulVeriAktar:
             status["message"] = "İşlenecek veri yok."
             return status
 
-        from okul.utils import get_aktif_donem, get_aktif_egitim_yili
-        egitim_yili = get_aktif_egitim_yili()
-        donem = get_aktif_donem()
+        from okul.utils import donem_tarihe_gore, get_aktif_donem, get_aktif_egitim_yili
+        # Aktif yıl/dönem yalnızca FALLBACK'tir — tarihi kapsayan bir OkulDonem tanımlıysa
+        # (asıl doğru kaynak) o kullanılır; aksi hâlde (örn. dönem tarih aralıkları henüz
+        # girilmemişse) sistemin o anki aktif yılına düşülür.
+        aktif_yil_fallback = get_aktif_egitim_yili()
+        aktif_donem_fallback = get_aktif_donem()
+        donem_cache: dict = {}
+
+        def _yil_donem_for(tarih):
+            if tarih not in donem_cache:
+                donem_cache[tarih] = donem_tarihe_gore(tarih)
+            donem_obj = donem_cache[tarih]
+            if donem_obj:
+                return donem_obj.egitim_yili, donem_obj
+            return aktif_yil_fallback, aktif_donem_fallback
 
         try:
             with transaction.atomic():
@@ -382,6 +406,7 @@ class EOkulVeriAktar:
                         if ders_obj is None and ders_adi_str:
                             ders_obj, _ = DersHavuzu.objects.get_or_create(ders_adi=ders_adi_str)
                             ders_havuzu_map[ders_adi_str] = ders_obj
+                        egitim_yili, donem = _yil_donem_for(uygulama_tarihi.date())
                         objs_to_create.append(
                             DersProgrami(
                                 ogretmen=ogretmen,

@@ -179,16 +179,14 @@
         {% endfor %}
     </select>
     {% if salt_okunur %}
-    <span style="color:#856404; background:#fff3cd; border:1px solid #ffeeba; border-radius:4px; padding:4px 10px; font-size:0.85em; margin-left:8px;">Geçmiş yıl — salt okunur</span>
+    <span style="color:#856404; background:#fff3cd; border:1px solid #ffeeba; border-radius:4px; padding:4px 10px; font-size:0.85em; margin-left:8px;">Geçmiş yıl görüntüleniyor</span>
     {% endif %}
 
     {% for sinif, gruplar in sinif_gruplari %}
     <div class="sinif-bolum">
         <div class="sinif-bolum-baslik">
             <span class="sinif-bolum-baslik-metin">{{ sinif }}. Sınıf</span>
-            {% if not salt_okunur %}
-            <a href="{% url 'secmeli_grup_yeni' %}?sinif={{ sinif }}" class="yeni-grup-btn">+ Yeni Grup</a>
-            {% endif %}
+            <a href="{% url 'secmeli_grup_yeni' %}?sinif={{ sinif }}{% if secili_yil %}&yil={{ secili_yil.pk }}{% endif %}" class="yeni-grup-btn">+ Yeni Grup</a>
         </div>
 
         <div class="grup-grid">
@@ -201,17 +199,16 @@
                         {% if grup.zorunlu_grup %}<span class="zorunlu-etiket">Zorunlu</span>{% endif %}
                     </div>
                 </a>
-                {% if not salt_okunur %}
                 <div class="grup-kart-aksiyonlar">
-                    <a href="{% url 'secmeli_grup_duzenle' grup.pk %}" class="aksiyon-link">Düzenle</a>
+                    <a href="{% url 'secmeli_grup_duzenle' grup.pk %}{% if secili_yil %}?yil={{ secili_yil.pk }}{% endif %}" class="aksiyon-link">Düzenle</a>
                     <span class="ayirici">|</span>
                     <form method="post" action="{% url 'secmeli_grup_sil' grup.pk %}" class="sil-form-inline"
                           onsubmit="return confirm('{{ grup.adi }} grubunu ve tüm derslerini silmek istediğinizden emin misiniz?')">
                         {% csrf_token %}
+                        <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
                         <button type="submit" class="aksiyon-sil">Sil</button>
                     </form>
                 </div>
-                {% endif %}
             </div>
             {% empty %}
             <p class="yok-mesaj">Bu sınıf için henüz grup tanımlanmamış.</p>

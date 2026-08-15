@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from django import forms
-from okul.models import Brans, DersHavuzu, DersSaatleri, Personel, SinifSube
+from okul.models import Brans, DersHavuzu, DersSaatleri, Personel, SinifSube, SinifSubeYil
 
 
 class BransForm(forms.ModelForm):
@@ -36,8 +36,18 @@ class DersHavuzuFullForm(forms.ModelForm):
 class SinifSubeForm(forms.ModelForm):
     class Meta:
         model = SinifSube
-        fields = ["sinif", "sube", "acik"]
-        labels = {"sinif": "Sınıf", "sube": "Şube", "acik": "Açık"}
+        fields = ["sinif", "sube"]
+        labels = {"sinif": "Sınıf", "sube": "Şube"}
+
+
+class SinifSubeYilForm(forms.ModelForm):
+    """Bir SinifSube'un belirli bir eğitim-öğretim yılındaki açık/kapalı durumunu
+    ekler/günceller — bkz. `okul.crud.sinif_sube_yil_ata`."""
+
+    class Meta:
+        model = SinifSubeYil
+        fields = ["egitim_yili", "acik"]
+        labels = {"egitim_yili": "Eğitim-Öğretim Yılı", "acik": "Açık"}
 
 
 class DersSaatleriForm(forms.ModelForm):

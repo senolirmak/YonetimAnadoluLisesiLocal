@@ -285,8 +285,27 @@
         <a href="{% url 'secmeli_index' %}" class="geri-btn" style="background:#0f766e; border-color:#0f766e; color:#fff;">
             <i class="fas fa-layer-group"></i> Seçmeli ve Zorunlu Dersler
         </a>
+        {% if secilebilir_yillar|length > 1 %}
+        <select onchange="if(this.value){window.location.search='?yil='+this.value;}else{window.location.search='';}" style="padding:6px 10px; border:1px solid #dee2e6; border-radius:4px; font-size:0.88em;">
+            {% for y in secilebilir_yillar %}
+            <option value="{{ y.pk }}" {% if secili_yil.pk == y.pk %}selected{% endif %}>{{ y.egitim_yili }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        {% if salt_okunur %}
+        <span style="color:#856404; background:#fff3cd; border:1px solid #ffeeba; border-radius:4px; padding:4px 10px; font-size:0.85em;">
+            {{ secili_yil.egitim_yili }} — geçmiş yıl görünümü, salt okunur
+        </span>
+        {% endif %}
         <span class="toplam-chip">{{ ogr_listesi|length }} öğrenci</span>
     </div>
+
+    {% if gecis_yok %}
+    <div style="background:#fde8e8;border:1px solid #f5c6cb;border-radius:6px;padding:12px 16px;color:#c0392b;font-size:0.9em;margin-bottom:16px;">
+        {{ secili_yil.egitim_yili }} yılından başlayan uygulanmış bir sene sonu geçişi bulunamadı —
+        bu yılın öğrenci/ders atama verisi yeniden kurulamıyor.
+    </div>
+    {% endif %}
 
     {% for seviye in seviyeler %}
     <div class="seviye-blok">
@@ -306,7 +325,7 @@
                         <div class="sube-adi">{{ sube.sinif_sube }}</div>
                         <div class="sube-sayi">{{ sube.toplam }} öğrenci</div>
                     </div>
-                    <a href="{% url 'ogrdrs_listesi' %}" class="sube-kapat-btn" title="Kapat">✕</a>
+                    <a href="{% url 'ogrdrs_listesi' %}?yil={{ secili_yil.pk }}" class="sube-kapat-btn" title="Kapat">✕</a>
                 </div>
                 <div class="sube-ilerleme">
                     {% if sube.toplam > 0 %}
@@ -320,7 +339,7 @@
             </div>
             {% else %}
             {# ── Normal şube kartı ── #}
-            <a href="?sinif={{ seviye.sinif_no }}&sube={{ sube.sube }}#ogr-tablo"
+            <a href="?sinif={{ seviye.sinif_no }}&sube={{ sube.sube }}&yil={{ secili_yil.pk }}#ogr-tablo"
                class="sube-kart">
                 <div class="sube-adi">{{ sube.sinif_sube }}</div>
                 <div class="sube-sayi">{{ sube.toplam }} öğrenci</div>
@@ -342,26 +361,12 @@
         {% for sube in seviye.subeler %}
         {% if secilen_sinif == seviye.sinif_no|stringformat:'s' and secilen_sube == sube.sube %}
 
+        {% if salt_okunur %}
+        <div style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:6px;padding:10px 16px;font-size:0.86em;color:#6c757d;margin-bottom:6px;">
+            Geçmiş yıl görünümü — toplu atama işlemleri bu ekranda kapalıdır, sadece o yılın kayıtlı verileri görüntülenir.
+        </div>
+        {% else %}
         <div class="islem-kart-grid">
-
-            <div class="islem-kart">
-                <div class="islem-kart-ust">
-                    <span class="islem-kart-ikon">📋</span>
-                    <div class="islem-kart-baslik-metin">Mevcut Yıl Derslerini Ata</div>
-                </div>
-                <div class="islem-kart-aciklama">
-                    Aktif ders programından <strong>{{ sube.sinif_sube }}</strong> şubesinin
-                    haftalık çizelgesi alınarak tüm <strong>{{ sube.toplam }} öğrenciye</strong>
-                    mevcut yıl dersleri atanır. Varsa önceki atamalar silinip yeniden oluşturulur.
-                </div>
-                <form method="post" action="{% url 'ogrdrs_toplu_ders_ata' %}"
-                      onsubmit="return confirm('{{ sube.sinif_sube }} — {{ sube.toplam }} öğrenciye ders programından mevcut yıl dersleri atanacak.\nMevcut atamalar silinip yeniden oluşturulacak.\nDevam edilsin mi?')">
-                    {% csrf_token %}
-                    <input type="hidden" name="sinif" value="{{ seviye.sinif_no }}">
-                    <input type="hidden" name="sube" value="{{ sube.sube }}">
-                    <button type="submit" class="btn-toplu-ata">Toplu Ata</button>
-                </form>
-            </div>
 
             <div class="islem-kart">
                 <div class="islem-kart-ust">
@@ -414,6 +419,7 @@
             {% endif %}
 
         </div>
+        {% endif %}
 
         <div class="ogr-tablo-blok" id="ogr-detay-tablo" style="display:block;margin-top:10px;">
             <div class="ogr-tablo-baslik">
@@ -430,14 +436,17 @@
                         <th class="col-c">Seçmeli</th>
                         <th class="col-c">Durum</th>
                         <th class="col-c">Alan</th>
-                        <th class="col-c">İşlem</th>
+                        {% if not salt_okunur %}<th class="col-c">İşlem</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for ogr in sube.ogrenciler %}
                     <tr data-ogr-pk="{{ ogr.ogrenci.pk }}">
                         <td>{{ ogr.ogrenci.okulno }}</td>
-                        <td>{{ ogr.ogrenci.adi }} {{ ogr.ogrenci.soyadi }}</td>
+                        <td>
+                            {{ ogr.ogrenci.adi }} {{ ogr.ogrenci.soyadi }}
+                            {% if ogr.sinif_tekrari %}<span class="bos-chip" title="Sınıf Tekrarı">Tekrar</span>{% endif %}
+                        </td>
                         <td class="col-c">
                             {% if ogr.son_sinif %}
                             <span class="mezun-chip">Mezun</span>
@@ -445,7 +454,7 @@
                             {{ ogr.gelecek_sinif }}.
                             {% endif %}
                         </td>
-                        <td class="col-c">{{ ogr.zorunlu_sayi }}</td>
+                        <td class="col-c">{% if not ogr.son_sinif %}{{ ogr.zorunlu_sayi }}{% else %}—{% endif %}</td>
                         <td class="col-c">
                             {% if not ogr.son_sinif %}
                             {{ ogr.secmeli_saat }} / {{ ogr.secmeli_maks }}
@@ -463,7 +472,9 @@
                             {% endif %}
                         </td>
                         <td class="col-c">
-                            {% if ogr.alan_secenekleri %}
+                            {% if salt_okunur %}
+                            {{ ogr.secili_alan_ad|default:"—" }}
+                            {% elif ogr.alan_secenekleri %}
                             <div class="alan-btn-grup">
                                 {% for alan in ogr.alan_secenekleri %}
                                 <form method="post"
@@ -481,9 +492,11 @@
                             </div>
                             {% else %}—{% endif %}
                         </td>
+                        {% if not salt_okunur %}
                         <td class="col-c">
                             <a href="{% url 'ogrdrs_detay' ogr.ogrenci.pk %}" class="btn-detay">Detay →</a>
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>

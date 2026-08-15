@@ -215,11 +215,11 @@ class SecmeliDers(models.Model):
 
 
 # ---------------------------------------------------------------------------
-# Alan (11–12. Sınıf)
+# Alan
 # ---------------------------------------------------------------------------
 
 class Alan(models.Model):
-    SINIF_CHOICES = [(11, "11. Sınıf"), (12, "12. Sınıf")]
+    SINIF_CHOICES = [(9, "9. Sınıf"), (10, "10. Sınıf"), (11, "11. Sınıf"), (12, "12. Sınıf")]
     egitim_yili = models.ForeignKey(
         "okul.EgitimOgretimYili",
         on_delete=models.PROTECT,
@@ -262,107 +262,6 @@ class AlanDers(models.Model):
 
     def __str__(self):
         return f"{self.alan.adi} — {self.ders.ders_adi} ({self.secilen_saat}s)"
-
-
-# ---------------------------------------------------------------------------
-# Ders — Öğretmen Ataması (gelecek yıl şube/alan ders dağılımı)
-# ---------------------------------------------------------------------------
-
-class DersOgretmenAtama(models.Model):
-    """
-    Gelecek yıl bir şube/alan biriminde okutulacak bir dersi bir öğretmene atar.
-
-    11-12. sınıfta ders paketi ALAN bazında sabittir (OrtakDers + AlanDers);
-    birim = (alan, sube_no) — sube_no alan içindeki paralel şube sırasıdır
-    (gerçek A/B/C harfi henüz kesinleşmemiştir, bkz. sinif_dagilimi).
-    9→10 geçişinde Alan yoktur; birim = mevcut şube harfi (sube), ders listesi
-    OrtakDers + o şubedeki öğrencilerin OgrenciSecmeliDers seçimlerinden gelir.
-    Bu yüzden alan/sube_no ile sube alanları karşılıklı dışlayıcıdır.
-    """
-
-    egitim_yili = models.ForeignKey(
-        "okul.EgitimOgretimYili",
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="ders_ogretmen_atamalari",
-        verbose_name="Eğitim-Öğretim Yılı",
-    )
-    gelecek_sinif = models.IntegerField(choices=SINIF_SEVIYELERI, verbose_name="Gelecek Sınıf Seviyesi")
-    alan = models.ForeignKey(
-        Alan,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="ders_ogretmen_atamalari",
-        verbose_name="Alan",
-    )
-    sube_no = models.PositiveSmallIntegerField(
-        default=1,
-        verbose_name="Şube No",
-        help_text="Alan içindeki paralel şube sırası (Şube 1, Şube 2, ...).",
-    )
-    sube = models.CharField(max_length=2, blank=True, verbose_name="Mevcut Şube Harfi")
-    ortak_ders = models.ForeignKey(
-        OrtakDers,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="ogretmen_atamalari",
-        verbose_name="Ortak Ders",
-    )
-    secmeli_ders = models.ForeignKey(
-        SecmeliDers,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="ogretmen_atamalari",
-        verbose_name="Seçmeli Ders",
-    )
-    haftalik_saat = models.PositiveSmallIntegerField(verbose_name="Haftalık Saat")
-    ogretmen = models.ForeignKey(
-        "okul.Personel",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="ders_atamalari",
-        verbose_name="Öğretmen",
-    )
-
-    class Meta:
-        ordering = ["gelecek_sinif", "alan__sira", "sube", "sube_no"]
-        constraints = [
-            models.CheckConstraint(
-                condition=(
-                    models.Q(ortak_ders__isnull=False, secmeli_ders__isnull=True)
-                    | models.Q(ortak_ders__isnull=True, secmeli_ders__isnull=False)
-                ),
-                name="dersogretmenatama_tek_ders_turu",
-            ),
-        ]
-        # alan/sube_no (11-12) ve sube (9→10) birbirini dışlar; her satır türü
-        # kendi kolonunu sabit tutup diğerini ayırt edici olarak kullandığından
-        # tek bir kolon seti her iki durumu da doğru ayırt eder.
-        unique_together = [
-            ("egitim_yili", "gelecek_sinif", "alan", "sube_no", "sube", "ortak_ders"),
-            ("egitim_yili", "gelecek_sinif", "alan", "sube_no", "sube", "secmeli_ders"),
-        ]
-        verbose_name = "Ders Öğretmen Ataması"
-        verbose_name_plural = "Ders Öğretmen Atamaları"
-
-    def __str__(self):
-        ders = self.ortak_ders.ders_adi if self.ortak_ders_id else self.secmeli_ders.ders_adi
-        birim = f"{self.alan.adi} Şube {self.sube_no}" if self.alan_id else f"{self.gelecek_sinif}/{self.sube}"
-        ogretmen = self.ogretmen.adi_soyadi if self.ogretmen_id else "— atanmadı —"
-        return f"{birim} — {ders} ({self.haftalik_saat}s) — {ogretmen}"
-
-    @property
-    def ders(self):
-        return self.ortak_ders if self.ortak_ders_id else self.secmeli_ders
-
-    @property
-    def birim_etiketi(self):
-        return f"{self.alan.adi} — Şube {self.sube_no}" if self.alan_id else f"{self.gelecek_sinif}/{self.sube}"
 
 
 # ---------------------------------------------------------------------------

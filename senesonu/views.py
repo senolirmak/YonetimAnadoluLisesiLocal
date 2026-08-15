@@ -96,7 +96,7 @@ def satir_duzenle(request, pk):
     hedef_sinif = int(yeni_sinif) if yeni_sinif else satir.yeni_sinif
     if yeni_sube and hedef_sinif:
         kayit = SinifSube.objects.filter(sinif=hedef_sinif, sube__iexact=yeni_sube).first()
-        if kayit and not kayit.acik:
+        if kayit and not kayit.acik_mi(satir.gecis.yeni_egitim_yili):
             messages.warning(
                 request,
                 f"{hedef_sinif}/{yeni_sube} şubesi şu an kapalı — geçiş uygulandığında "

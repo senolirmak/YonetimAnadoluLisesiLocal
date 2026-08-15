@@ -10,24 +10,23 @@ from django.utils import timezone
 from .models import SeneSonuGecisi, SeneSonuOgrenciGecisi
 
 
-def _yeni_subeler_belirle(sinif_no, adet):
+def _yeni_subeler_belirle(sinif_no, adet, egitim_yili):
     """`sinif_no` seviyesi için `adet` kadar şube harfi belirler.
 
-    Önce o sınıf seviyesindeki KAPALI şubeler (varsa, harf sırasına göre) yeniden
-    kullanılır; kalan ihtiyaç için henüz hiç kullanılmayan (ne açık ne kapalı bir
-    kaydı olan) sıradaki yeni harfler üretilir. Şubelerin fiilen açılması/oluşturulması
-    `gecis_uygula` içinde yapılır — bu fonksiyon yalnızca hangi harflerin kullanılacağını
-    belirler.
+    Önce o sınıf seviyesinde `egitim_yili` itibarıyla KAPALI şubeler (varsa, harf
+    sırasına göre) yeniden kullanılır; kalan ihtiyaç için henüz hiç kullanılmayan
+    (ne açık ne kapalı bir kaydı olan) sıradaki yeni harfler üretilir. Açık/kapalı
+    durumu yıla göre değişebildiğinden (bkz. SinifSube.acik_mi — commit geçmişi) bu
+    fonksiyon `egitim_yili`yi açıkça alır; şubelerin fiilen açılması/oluşturulması
+    `gecis_uygula` içinde yapılır — bu fonksiyon yalnızca hangi harflerin
+    kullanılacağını belirler.
     """
     from okul.models import SinifSube
     from secmelidersler.services.ders_dagilimi import HARFLER
 
-    kapali_harfler = list(
-        SinifSube.objects.filter(sinif=sinif_no, acik=False)
-        .order_by("sube")
-        .values_list("sube", flat=True)
-    )
-    kullanimda = set(SinifSube.objects.filter(sinif=sinif_no).values_list("sube", flat=True))
+    tum_subeler = list(SinifSube.objects.filter(sinif=sinif_no))
+    kapali_harfler = sorted(ss.sube for ss in tum_subeler if not ss.acik_mi(egitim_yili))
+    kullanimda = {ss.sube for ss in tum_subeler}
 
     secilen = kapali_harfler[:adet]
     for harf in HARFLER:
@@ -53,10 +52,15 @@ def gecis_olustur(eski_yil, yeni_yil, kullanici=None):
         satirlar = []
 
         def _sinif_tekrari_ids(sinif_no):
+            # `eski_yil`e göre kapsamlanır — aksi hâlde geçmiş bir yılda sınıfta
+            # kalmış ama o yılı zaten tamamlayıp normal terfi eden bir öğrenci de
+            # kalıcı olarak sınıf-tekrarı kabul edilip bu geçişte de yanlışlıkla
+            # aynı seviyede tutulur (bkz. commit geçmişi).
             return set(
                 OgrenciSinifTekrari.objects.filter(
                     ogrenci__aktif=True,
                     ogrenci__sinif=sinif_no,
+                    egitim_yili=eski_yil,
                 ).values_list("ogrenci_id", flat=True)
             )
 
@@ -84,7 +88,7 @@ def gecis_olustur(eski_yil, yeni_yil, kullanici=None):
         # önce kapalı şubeler yeniden kullanılır, sonra sıradaki yeni harf(ler) üretilir.
         plan = plan_sinif_dagilimi(10, 11, eski_yil)
         toplam_sube_ihtiyaci = sum(len(g["subeler"]) for g in plan["alan_gruplari"])
-        gercek_harfler = iter(_yeni_subeler_belirle(11, toplam_sube_ihtiyaci))
+        gercek_harfler = iter(_yeni_subeler_belirle(11, toplam_sube_ihtiyaci, yeni_yil))
         for grup in plan["alan_gruplari"]:
             for sube in grup["subeler"]:
                 gercek_harf = next(gercek_harfler)
@@ -135,7 +139,7 @@ def gecis_olustur(eski_yil, yeni_yil, kullanici=None):
 
 def gecis_uygula(gecis):
     from ogrenci.models import Ogrenci
-    from okul.models import OkulBilgi, SinifSube
+    from okul.models import OkulBilgi, SinifSube, SinifSubeYil
 
     if gecis.uygulandi:
         raise ValueError("Bu geçiş zaten uygulanmış.")
@@ -153,14 +157,15 @@ def gecis_uygula(gecis):
     }
 
     with transaction.atomic():
-        # Hedef şube yoksa oluşturulur; kapalıysa sene sonu geçişi kapsamında yeniden açılır.
+        # Hedef şube yoksa oluşturulur; geçişin ULAŞTIĞI yıl (yeni_egitim_yili) için
+        # açık olarak işaretlenir/yeniden açılır — açık/kapalı durumu yıla göre
+        # değişebildiğinden (bkz. SinifSube.acik_mi) bu yalnızca o yılı etkiler,
+        # şubenin başka yıllardaki durumuna dokunmaz.
         for sinif_no, sube in gerekli_sinif_sube:
-            kayit, olusturuldu = SinifSube.objects.get_or_create(
-                sinif=sinif_no, sube=sube, defaults={"acik": True}
+            kayit, _ = SinifSube.objects.get_or_create(sinif=sinif_no, sube=sube)
+            SinifSubeYil.objects.update_or_create(
+                sinif_sube=kayit, egitim_yili=gecis.yeni_egitim_yili, defaults={"acik": True}
             )
-            if not olusturuldu and not kayit.acik:
-                kayit.acik = True
-                kayit.save(update_fields=["acik"])
 
         mezun_ids = [s.ogrenci_id for s in satirlar if s.durum == "mezun"]
         if mezun_ids:

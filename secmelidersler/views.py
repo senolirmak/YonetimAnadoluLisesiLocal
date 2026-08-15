@@ -1,16 +1,15 @@
 from django.contrib import messages
-from django.db.models import Count, Max, Sum, Value
+from django.db.models import Count, Max, Value
 from django.urls import reverse
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from okul.auth import mudur_yardimcisi_required
-from okul.models import Personel
 
 from .forms import AlanForm, OrtakDersHavuzuForm, SecmeliDersForm, SecmeliDersGrubuForm, SecmeliDersHavuzuForm, SinifSeviyeToplamSaatForm
 from .models import (
-    Alan, AlanDers, DersOgretmenAtama, OgrenciOrtalama, OgrenciSinifTekrari, OgrenciTasdikname,
+    Alan, AlanDers, OgrenciOrtalama, OgrenciSinifTekrari, OgrenciTasdikname,
     OrtakDers, OrtakDersHavuzu,
     SecmeliDers, SecmeliDersGrubu, SecmeliDersHavuzu,
     SinifSeviyeToplamSaat,
@@ -18,9 +17,7 @@ from .models import (
 )
 from okul.models import EgitimOgretimYili
 from .services import donem_kopyala
-from .services.ders_dagilimi import (
-    alan_ders_paketi, plan_sinif_dagilimi, plan_sinif_dagilimi_gecmis, sube_ders_paketi,
-)
+from .services.ders_dagilimi import baskin_egitim_yili, plan_sinif_dagilimi, plan_sinif_dagilimi_gecmis
 
 _SINIFLAR = [9, 10, 11, 12]
 
@@ -31,8 +28,9 @@ def _yf(qs, aktif_yil):
 
 
 def _secili_yil(request, aktif_yil):
-    """GET ?yil=<pk> verilmişse o EgitimOgretimYili'ni, yoksa aktif_yil'i döner."""
-    yil_pk = request.GET.get("yil", "").strip()
+    """?yil=<pk> (GET'te ya da POST body'sindeki gizli alanda) verilmişse o
+    EgitimOgretimYili'ni, yoksa aktif_yil'i döner."""
+    yil_pk = (request.GET.get("yil") or request.POST.get("yil") or "").strip()
     if yil_pk:
         secili = EgitimOgretimYili.objects.filter(pk=yil_pk).first()
         if secili:
@@ -53,12 +51,15 @@ def index(request):
 def alan_listesi(request):
     aktif_yil = get_aktif_egitim_yili()
     secili_yil = _secili_yil(request, aktif_yil)
-    alanlar_11 = _yf(Alan.objects.filter(sinif_seviyesi=11), secili_yil).prefetch_related("dersler").order_by("sira")
-    alanlar_12 = _yf(Alan.objects.filter(sinif_seviyesi=12), secili_yil).prefetch_related("dersler").order_by("sira")
+    alanlar = _yf(Alan.objects.all(), secili_yil).prefetch_related("dersler").order_by("sinif_seviyesi", "sira")
+    alan_map = {}
+    for a in alanlar:
+        alan_map.setdefault(a.sinif_seviyesi, []).append(a)
+    sinif_alanlari = [(sv, alan_map.get(sv, [])) for sv in _SINIFLAR]
     return render(request, "secmelidersler/alan_listesi.html", {
-        "title": "Alan Tanımları (11–12. Sınıf)",
-        "alanlar_11": alanlar_11,
-        "alanlar_12": alanlar_12,
+        "title": "Alan Tanımları",
+        "sinif_alanlari": sinif_alanlari,
+        "alan_var": bool(alan_map),
         "aktif_yil": secili_yil,
         "tum_yillar": EgitimOgretimYili.objects.all(),
         "secili_yil": secili_yil,
@@ -72,32 +73,43 @@ def alan_form(request, pk=None):
     if pk:
         alan = get_object_or_404(Alan, pk=pk)
         title = f"Alan Düzenle — {alan.sinif_seviyesi}. Sınıf / {alan.adi}"
+        # Düzenlenen alanın kendi yılı esas alınır — hangi ?yil= ile buraya gelindiğinden
+        # bağımsız olarak doğru kataloğu (ders seçenekleri) gösterir.
+        secili_yil = alan.egitim_yili or _secili_yil(request, aktif_yil)
     else:
         alan = None
         title = "Yeni Alan Tanımla"
+        # Yeni alan, hangi yıl görüntülenirken oluşturulduysa o yıla (secili_yil) etiketlenir —
+        # bkz. secmeli_grup_form'daki aynı gerekçe.
+        secili_yil = _secili_yil(request, aktif_yil)
 
     sinif_ozet = {}
-    for sv in (11, 12):
-        toplam = get_toplam_saat(sv, egitim_yili=aktif_yil)
-        ortak = _yf(OrtakDers.objects.filter(sinif_seviyesi=sv), aktif_yil).aggregate(
-            toplam=Coalesce(Sum("haftalik_saat"), Value(0))
-        )["toplam"]
+    for sv in (9, 10, 11, 12):
+        toplam = get_toplam_saat(sv, egitim_yili=secili_yil)
+        ortak_dersler = list(
+            _yf(OrtakDers.objects.filter(sinif_seviyesi=sv), secili_yil).order_by("sira")
+        )
+        ortak = sum(od.haftalik_saat for od in ortak_dersler)
         sinif_ozet[sv] = {
             "toplam": toplam,
             "ortak": ortak,
+            "ortak_dersler": ortak_dersler,
             "secmeli_maks": toplam - ortak,
         }
 
     if request.method == "POST":
-        form = AlanForm(request.POST, instance=alan, egitim_yili=aktif_yil)
+        form = AlanForm(request.POST, instance=alan, egitim_yili=secili_yil)
         if form.is_valid():
             if not form.instance.pk:
-                form.instance.egitim_yili = aktif_yil
+                form.instance.egitim_yili = secili_yil
             form.save()
             messages.success(request, "Alan kaydedildi.")
-            return redirect("secmeli_alan_listesi")
+            yonlendir = reverse("secmeli_alan_listesi")
+            if secili_yil:
+                yonlendir += f"?yil={secili_yil.pk}"
+            return redirect(yonlendir)
     else:
-        form = AlanForm(instance=alan, egitim_yili=aktif_yil)
+        form = AlanForm(instance=alan, egitim_yili=secili_yil)
 
     return render(request, "secmelidersler/alan_form.html", {
         "title": title,
@@ -105,6 +117,7 @@ def alan_form(request, pk=None):
         "alan": alan,
         "sinif_ozet": sinif_ozet,
         "aktif_yil": aktif_yil,
+        "secili_yil": secili_yil,
     })
 
 
@@ -114,7 +127,11 @@ def alan_sil(request, pk):
     if request.method == "POST":
         alan.delete()
         messages.success(request, f"'{alan.adi}' alanı silindi.")
-    return redirect("secmeli_alan_listesi")
+    yil_param = request.POST.get("yil") or request.GET.get("yil", "")
+    yonlendir = reverse("secmeli_alan_listesi")
+    if yil_param:
+        yonlendir += f"?yil={yil_param}"
+    return redirect(yonlendir)
 
 
 @mudur_yardimcisi_required
@@ -143,6 +160,11 @@ def secmeli_grup_listesi(request):
 @mudur_yardimcisi_required
 def secmeli_grup_form(request, pk=None):
     aktif_yil = get_aktif_egitim_yili()
+    # Yeni grup, hangi yıl görüntülenirken oluşturulduysa o yıla (secili_yil) etiketlenir —
+    # her zaman aktif_yil'e sabitlersek geçmiş yıl (?yil=) görüntülenirken oluşturulan bir
+    # grup yanlış yıla bağlanır (bkz. secmeli_grup_listesi — artık yıl kilidi yok, her iki
+    # yılda da grup/ders oluşturulabilir).
+    secili_yil = _secili_yil(request, aktif_yil)
     if pk:
         grup = get_object_or_404(SecmeliDersGrubu, pk=pk)
         title = f"Grup Düzenle — {grup.sinif_seviyesi}. Sınıf / {grup.adi}"
@@ -155,10 +177,13 @@ def secmeli_grup_form(request, pk=None):
         if form.is_valid():
             yeni_grup = form.save(commit=False)
             if not yeni_grup.pk:
-                yeni_grup.egitim_yili = aktif_yil
+                yeni_grup.egitim_yili = secili_yil
             yeni_grup.save()
             messages.success(request, "Grup kaydedildi.")
-            return redirect("secmeli_grup_listesi")
+            yonlendir = reverse("secmeli_grup_listesi")
+            if secili_yil:
+                yonlendir += f"?yil={secili_yil.pk}"
+            return redirect(yonlendir)
     else:
         initial = {}
         sinif_param = request.GET.get("sinif", "").strip()
@@ -171,6 +196,7 @@ def secmeli_grup_form(request, pk=None):
         "form": form,
         "grup": grup,
         "aktif_yil": aktif_yil,
+        "secili_yil": secili_yil,
     })
 
 
@@ -180,7 +206,11 @@ def secmeli_grup_sil(request, pk):
     if request.method == "POST":
         grup.delete()
         messages.success(request, f"'{grup.adi}' grubu ve tüm dersleri silindi.")
-    return redirect("secmeli_grup_listesi")
+    yil_param = request.POST.get("yil") or request.GET.get("yil", "")
+    yonlendir = reverse("secmeli_grup_listesi")
+    if yil_param:
+        yonlendir += f"?yil={yil_param}"
+    return redirect(yonlendir)
 
 
 @mudur_yardimcisi_required
@@ -244,6 +274,7 @@ def secmeli_ders_form(request, grup_pk, pk=None):
         "form": form,
         "grup": grup,
         "ders": ders,
+        "saat_secenek_araligi": range(1, 13),
     })
 
 
@@ -578,48 +609,55 @@ def sinif_dagilimi(request):
     gecmis_yil = secili_yil != aktif_yil
 
     if denetim_modu:
+        # 9. ve 10. sınıfta gerçek bir Alan (izlence) ayrımı yok — yalnızca "YOK" adlı
+        # tek bir yer tutucu Alan/AlanDers kaydı var. Yine de denetim ekranının geri
+        # kalanıyla (11./12. sınıf) aynı Alan-eşleştirme mekanizması burada da
+        # kullanılır; ileriye dönük ("plan") modda bu iki seviye için doğal bir
+        # kaynak kohort (8. sınıftan gelen ya da 9. sınıfa alan seçimiyle giren
+        # öğrenci) olmadığından yalnızca denetim modunda gösterilir.
+        plan_9 = plan_sinif_dagilimi_gecmis(9, secili_yil)
+        plan_10 = plan_sinif_dagilimi_gecmis(10, secili_yil)
         plan_11 = plan_sinif_dagilimi_gecmis(11, secili_yil)
         plan_12 = plan_sinif_dagilimi_gecmis(12, secili_yil)
     else:
+        plan_9 = None
+        plan_10 = None
         plan_11 = plan_sinif_dagilimi(10, 11, aktif_yil)
         plan_12 = plan_sinif_dagilimi(11, 12, aktif_yil)
 
     # Alan-değiştir butonları, hangi yılın denetim kartı görüntülenirse görüntülensin,
     # o sınıf seviyesindeki kohortun ÇOĞUNLUĞUNUN zaten bağlı olduğu yılın Alan kayıtlarını
-    # kullanır (kayıt yoksa aktif yıla düşer). Aksi hâlde (örn. hep aktif yıl kullansaydık)
-    # 11. sınıf gibi seçimi bir önceki yıl yapılmış bir kohortta yapılacak bir atama, o
-    # öğrenciyi kohortun geri kalanından farklı bir yılın kataloğuna bağlar — tutarsızlık
-    # yaratır (yaşandı: bkz. commit geçmişi).
-    def _kohort_yili(sinif_seviyesi):
-        from ogrencidersleri.models import OgrenciSecmeliDers
-
-        baskin = (
-            OgrenciSecmeliDers.objects.filter(ders__grup__sinif_seviyesi=sinif_seviyesi)
-            .values("ders__grup__egitim_yili")
-            .annotate(n=Count("id"))
-            .order_by("-n")
-            .first()
-        )
-        if baskin and baskin["ders__grup__egitim_yili"]:
-            return EgitimOgretimYili.objects.filter(pk=baskin["ders__grup__egitim_yili"]).first() or aktif_yil
-        return aktif_yil
-
+    # kullanır (kayıt yoksa aktif yıla düşer) — bkz. `baskin_egitim_yili`. Bu, YUKARIDAKİ
+    # `plan_sinif_dagilimi_gecmis` eşleştirmesiyle AYNI kaynağı kullanmalı; aksi hâlde
+    # (örn. hep aktif yıl kullansaydık) 11. sınıf gibi seçimi bir önceki yıl yapılmış bir
+    # kohortta yapılacak bir atama, o öğrenciyi kohortun geri kalanından farklı bir yılın
+    # kataloğuna bağlar — tutarsızlık yaratır (yaşandı: bkz. commit geçmişi).
+    aktif_alanlar_9 = list(
+        Alan.objects.filter(sinif_seviyesi=9, egitim_yili=baskin_egitim_yili(9, aktif_yil)).order_by("sira")
+    )
+    aktif_alanlar_10 = list(
+        Alan.objects.filter(sinif_seviyesi=10, egitim_yili=baskin_egitim_yili(10, aktif_yil)).order_by("sira")
+    )
     aktif_alanlar_11 = list(
-        Alan.objects.filter(sinif_seviyesi=11, egitim_yili=_kohort_yili(11)).order_by("sira")
+        Alan.objects.filter(sinif_seviyesi=11, egitim_yili=baskin_egitim_yili(11, aktif_yil)).order_by("sira")
     )
     aktif_alanlar_12 = list(
-        Alan.objects.filter(sinif_seviyesi=12, egitim_yili=_kohort_yili(12)).order_by("sira")
+        Alan.objects.filter(sinif_seviyesi=12, egitim_yili=baskin_egitim_yili(12, aktif_yil)).order_by("sira")
     )
 
     return render(request, "secmelidersler/sinif_dagilimi.html", {
         "title": "Sınıf Dağılımı",
         "aktif_yil": aktif_yil,
+        "plan_9": plan_9,
+        "plan_10": plan_10,
         "plan_11": plan_11,
         "plan_12": plan_12,
         "tum_yillar": EgitimOgretimYili.objects.all(),
         "secili_yil": secili_yil,
         "salt_okunur": denetim_modu,
         "gecmis_yil": gecmis_yil,
+        "aktif_alanlar_9": aktif_alanlar_9,
+        "aktif_alanlar_10": aktif_alanlar_10,
         "aktif_alanlar_11": aktif_alanlar_11,
         "aktif_alanlar_12": aktif_alanlar_12,
     })
@@ -641,8 +679,14 @@ def sinif_dagilimi_alan_degistir(request, ogrenci_pk, alan_pk):
     if not alan_dersler:
         messages.error(request, f"{alan.adi} alanı için tanımlı ders bulunmuyor.")
     else:
+        from .services.secim_sayisi import secim_sayisi_asim_uyarilari
+        secimler = [(ad.ders, ad.secilen_saat) for ad in alan_dersler]
+        uyarilar = secim_sayisi_asim_uyarilari(ogrenci, secimler, haric_egitim_yili=alan.egitim_yili)
+
         OgrenciSecmeliDers.objects.filter(
-            ogrenci=ogrenci, ders__grup__sinif_seviyesi=alan.sinif_seviyesi
+            ogrenci=ogrenci,
+            ders__grup__sinif_seviyesi=alan.sinif_seviyesi,
+            ders__grup__egitim_yili=alan.egitim_yili,
         ).delete()
         OgrenciSecmeliDers.objects.bulk_create([
             OgrenciSecmeliDers(ogrenci=ogrenci, ders=ad.ders, secilen_saat=ad.secilen_saat)
@@ -655,201 +699,14 @@ def sinif_dagilimi_alan_degistir(request, ogrenci_pk, alan_pk):
             request,
             f"{ogrenci.adi} {ogrenci.soyadi} — seçmeli ders seçimi {alan.adi} alanına göre güncellendi.",
         )
+        for uyari in uyarilar:
+            messages.warning(request, uyari)
 
     yil_pk = request.POST.get("yil", "").strip()
     url = reverse("secmeli_sinif_dagilimi")
     if yil_pk:
         url += f"?yil={yil_pk}"
     return redirect(url)
-
-
-# ---------------------------------------------------------------------------
-# Ders — Öğretmen Ataması (gelecek yıl şube/alan ders dağılımı)
-# ---------------------------------------------------------------------------
-
-def _atama_field_adi(satir):
-    return f"ogretmen_{satir['tur']}_{satir['ders'].pk}"
-
-
-def _atama_satirlari(paket, mevcut_atamalar):
-    """Ders paketini, mevcut atamalarla eşleştirip template'e hazır hale getirir."""
-    satirlar = []
-    for satir in paket:
-        ders = satir["ders"]
-        anahtar = (ders.pk, None) if satir["tur"] == "ortak" else (None, ders.pk)
-        atama = mevcut_atamalar.get(anahtar)
-        brans_id_listesi = list(ders.branslar.values_list("pk", flat=True))
-        ogretmen_secenekleri = (
-            Personel.objects.filter(brans_id__in=brans_id_listesi).order_by("brans__ad", "adi_soyadi")
-            if brans_id_listesi
-            else Personel.objects.none()
-        )
-        satirlar.append({
-            **satir,
-            "field_adi": _atama_field_adi(satir),
-            "secili_ogretmen_id": atama.ogretmen_id if atama else None,
-            "ogretmen_secenekleri": list(ogretmen_secenekleri),
-            "brans_yok": not brans_id_listesi,
-        })
-    return satirlar
-
-
-def _atama_kaydet(paket, ortak_kwargs, request):
-    for satir in paket:
-        ders = satir["ders"]
-        field_adi = _atama_field_adi(satir)
-        ogretmen_id_str = request.POST.get(field_adi, "").strip()
-        ogretmen_id = int(ogretmen_id_str) if ogretmen_id_str.isdigit() else None
-        DersOgretmenAtama.objects.update_or_create(
-            **ortak_kwargs,
-            ortak_ders=ders if satir["tur"] == "ortak" else None,
-            secmeli_ders=ders if satir["tur"] == "secmeli" else None,
-            defaults={"haftalik_saat": satir["haftalik_saat"], "ogretmen_id": ogretmen_id},
-        )
-
-
-@mudur_yardimcisi_required
-def ders_dagilimi_listesi(request):
-    aktif_yil = get_aktif_egitim_yili()
-
-    birimler_11_12 = []
-    for mevcut_sinif, gelecek_sinif in ((10, 11), (11, 12)):
-        plan = plan_sinif_dagilimi(mevcut_sinif, gelecek_sinif, aktif_yil)
-        for grup in plan["alan_gruplari"]:
-            if grup["sube_sayisi"] == 0:
-                continue
-            paket = alan_ders_paketi(grup["alan"], aktif_yil)
-            for sube_no in range(1, grup["sube_sayisi"] + 1):
-                atanan = DersOgretmenAtama.objects.filter(
-                    alan=grup["alan"], sube_no=sube_no, ogretmen__isnull=False
-                ).count()
-                birimler_11_12.append({
-                    "gelecek_sinif": gelecek_sinif,
-                    "alan": grup["alan"],
-                    "sube_no": sube_no,
-                    "ders_sayisi": len(paket),
-                    "atanan": atanan,
-                })
-
-    from ogrenci.models import Ogrenci
-
-    birimler_9_10 = []
-    sube_listesi = (
-        Ogrenci.objects.filter(sinif=9, aktif=True)
-        .values_list("sube", flat=True).distinct().order_by("sube")
-    )
-    for sube in sube_listesi:
-        if not sube:
-            continue
-        paket = sube_ders_paketi(9, sube, 10, aktif_yil)
-        atanan = DersOgretmenAtama.objects.filter(
-            gelecek_sinif=10, alan__isnull=True, sube=sube, ogretmen__isnull=False
-        ).count()
-        birimler_9_10.append({
-            "gelecek_sinif": 10,
-            "sube": sube,
-            "ders_sayisi": len(paket),
-            "atanan": atanan,
-        })
-
-    return render(request, "secmelidersler/ders_dagilimi_listesi.html", {
-        "title": "Ders Dağılımı — Öğretmen Ataması",
-        "aktif_yil": aktif_yil,
-        "birimler_11_12": birimler_11_12,
-        "birimler_9_10": birimler_9_10,
-    })
-
-
-@mudur_yardimcisi_required
-def ders_dagilimi_alan_detay(request, gelecek_sinif, alan_pk, sube_no):
-    aktif_yil = get_aktif_egitim_yili()
-    alan = get_object_or_404(Alan, pk=alan_pk, sinif_seviyesi=gelecek_sinif)
-    paket = alan_ders_paketi(alan, aktif_yil)
-
-    ortak_kwargs = {
-        "egitim_yili": aktif_yil,
-        "gelecek_sinif": gelecek_sinif,
-        "alan": alan,
-        "sube_no": sube_no,
-    }
-
-    if request.method == "POST":
-        _atama_kaydet(paket, ortak_kwargs, request)
-        messages.success(request, f"{alan.adi} — Şube {sube_no} ders/öğretmen ataması kaydedildi.")
-        return redirect("secmeli_ders_dagilimi_alan_detay", gelecek_sinif=gelecek_sinif, alan_pk=alan_pk, sube_no=sube_no)
-
-    mevcut_atamalar = {
-        (a.ortak_ders_id, a.secmeli_ders_id): a
-        for a in DersOgretmenAtama.objects.filter(alan=alan, sube_no=sube_no).select_related("ogretmen")
-    }
-    satirlar = _atama_satirlari(paket, mevcut_atamalar)
-
-    return render(request, "secmelidersler/ders_dagilimi_detay.html", {
-        "title": f"{alan.adi} — Şube {sube_no} Ders Dağılımı",
-        "aktif_yil": aktif_yil,
-        "birim_etiketi": f"{alan.adi} — Şube {sube_no}",
-        "satirlar": satirlar,
-        "toplam_saat": sum(s["haftalik_saat"] for s in paket),
-        "geri_url_adi": "secmeli_ders_dagilimi_listesi",
-    })
-
-
-@mudur_yardimcisi_required
-def ders_dagilimi_sube_detay(request, mevcut_sinif, sube):
-    aktif_yil = get_aktif_egitim_yili()
-    gelecek_sinif = mevcut_sinif + 1
-    paket = sube_ders_paketi(mevcut_sinif, sube, gelecek_sinif, aktif_yil)
-
-    ortak_kwargs = {
-        "egitim_yili": aktif_yil,
-        "gelecek_sinif": gelecek_sinif,
-        "alan": None,
-        "sube": sube,
-    }
-
-    if request.method == "POST":
-        _atama_kaydet(paket, ortak_kwargs, request)
-        messages.success(request, f"{gelecek_sinif}/{sube} ders/öğretmen ataması kaydedildi.")
-        return redirect("secmeli_ders_dagilimi_sube_detay", mevcut_sinif=mevcut_sinif, sube=sube)
-
-    mevcut_atamalar = {
-        (a.ortak_ders_id, a.secmeli_ders_id): a
-        for a in DersOgretmenAtama.objects.filter(
-            alan__isnull=True, gelecek_sinif=gelecek_sinif, sube=sube
-        ).select_related("ogretmen")
-    }
-    satirlar = _atama_satirlari(paket, mevcut_atamalar)
-
-    return render(request, "secmelidersler/ders_dagilimi_detay.html", {
-        "title": f"{gelecek_sinif}/{sube} Ders Dağılımı",
-        "aktif_yil": aktif_yil,
-        "birim_etiketi": f"{mevcut_sinif}/{sube} → {gelecek_sinif}/{sube}",
-        "satirlar": satirlar,
-        "toplam_saat": sum(s["haftalik_saat"] for s in paket),
-        "geri_url_adi": "secmeli_ders_dagilimi_listesi",
-    })
-
-
-@mudur_yardimcisi_required
-def ogretmen_yuku_raporu(request):
-    aktif_yil = get_aktif_egitim_yili()
-    qs = _yf(DersOgretmenAtama.objects, aktif_yil)
-
-    atanmamis_sayisi = qs.filter(ogretmen__isnull=True).count()
-
-    yukler = (
-        qs.filter(ogretmen__isnull=False)
-        .values("ogretmen_id", "ogretmen__adi_soyadi", "ogretmen__brans__ad")
-        .annotate(toplam_saat=Sum("haftalik_saat"), ders_sayisi=Count("pk"))
-        .order_by("ogretmen__brans__ad", "ogretmen__adi_soyadi")
-    )
-
-    return render(request, "secmelidersler/ogretmen_yuku_raporu.html", {
-        "title": "Öğretmen Ders Yükü Raporu",
-        "aktif_yil": aktif_yil,
-        "yukler": yukler,
-        "atanmamis_sayisi": atanmamis_sayisi,
-    })
 
 
 # ---------------------------------------------------------------------------
@@ -1137,6 +994,12 @@ def sinif_tekrari_listesi(request):
         .select_related("ogrenci")
         .order_by("ogrenci__sinif", "ogrenci__sube", "ogrenci__okulno")
     )
+    # Yalnızca AKTİF yıla ait tekrar kayıtları listelenir — aksi hâlde geçmiş bir
+    # yılda (örn. 2025-2026) sınıfta kalmış ama o yılı zaten tamamlayıp normal
+    # devam eden öğrenciler de bu listede kalıcı olarak görünür (bkz. commit
+    # geçmişi).
+    if aktif_yil:
+        kayitlar = kayitlar.filter(egitim_yili=aktif_yil)
 
     arama = request.GET.get("q", "").strip()
     arama_sonuclari = []
@@ -1177,14 +1040,33 @@ def sinif_tekrari_ekle(request):
         messages.error(request, "Öğrenci bulunamadı.")
         return redirect("sinif_tekrari_listesi")
 
-    _, created = OgrenciSinifTekrari.objects.get_or_create(
+    # `ogrenci` alanı OneToOne olduğundan (bir öğrencinin en fazla bir tekrar kaydı
+    # olabilir) `update_or_create` kullanılır — öğrencinin ESKİ bir yıla (örn.
+    # 2025-2026) ait kaydı varsa bu, "ekle" işlemiyle AKTİF yıla taşınır/güncellenir;
+    # aksi hâlde eski yıl bilgisiyle kalıp öğrenci yanlışlıkla o yılda tekrarcı
+    # görünmeye devam eder (bkz. commit geçmişi). Güncellemeden ÖNCEKİ hâli
+    # (`mevcut_tekrar`) — ikinci tekrar tespiti için gerekli — burada yakalanır.
+    mevcut_tekrar = OgrenciSinifTekrari.objects.filter(ogrenci=ogr).first()
+
+    _, created = OgrenciSinifTekrari.objects.update_or_create(
         ogrenci=ogr,
         defaults={"egitim_yili": aktif_yil, "aciklama": aciklama},
     )
-    if created:
+
+    from secmelidersler.services.sinif_tekrari import ikinci_tekrar_ise_ogrenim_hakkini_sonlandir
+    ikinci_mi = ikinci_tekrar_ise_ogrenim_hakkini_sonlandir(ogr, mevcut_tekrar, aktif_yil)
+
+    if ikinci_mi:
+        messages.warning(
+            request,
+            f"{ogr.adi} {ogr.soyadi} — bu İKİNCİ sınıf tekrarı kaydı ({mevcut_tekrar.egitim_yili} → "
+            f"{aktif_yil}); öğrenim hakkı tamamlandı kabul edilip tasdikname/ayrılma kaydı otomatik "
+            "oluşturuldu, öğrenci pasife alındı.",
+        )
+    elif created:
         messages.success(request, f"{ogr.adi} {ogr.soyadi} sınıf tekrarı listesine eklendi.")
     else:
-        messages.warning(request, f"{ogr.adi} {ogr.soyadi} zaten listede.")
+        messages.success(request, f"{ogr.adi} {ogr.soyadi} sınıf tekrarı kaydı {aktif_yil} yılına güncellendi.")
 
     from django.urls import reverse as _rev
     q = request.POST.get("q", "")

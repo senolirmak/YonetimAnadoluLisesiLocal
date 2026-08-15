@@ -74,7 +74,6 @@
         letter-spacing: .04em;
         color: #fff;
     }
-    .kart-baslik.yesil  { background: #20894b; }
     .kart-baslik.mavi   { background: #0891b2; }
     .kart-baslik.mor    { background: #6f42c1; }
 
@@ -111,7 +110,6 @@
     .saat-chip.gri  { background: #e9ecef; color: #495057; }
     .saat-chip.mavi { background: #0891b2; color: #fff; }
     .saat-chip.mor  { background: #6f42c1; color: #fff; }
-    .saat-chip.yesil { background: #20894b; color: #fff; }
     .tam-badge {
         display: inline-block;
         background: #28a745;
@@ -154,8 +152,6 @@
         cursor: pointer;
         text-decoration: none;
     }
-    .btn-ata.yesil { background: #20894b; }
-    .btn-ata.yesil:hover { background: #166637; }
     .btn-ata.mavi { background: #0891b2; }
     .btn-ata.mavi:hover { background: #0e7490; }
     .btn-ata.mor { background: #6f42c1; }
@@ -180,11 +176,6 @@
         font-size: 0.9em;
     }
 
-    /* ── Mevcut yıl tablo (geniş kart) ── */
-    .mevcut-tablo { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-    .mevcut-tablo td { padding: 6px 14px; border-bottom: 1px solid #f1f3f5; }
-    .mevcut-tablo tr:last-child td { border-bottom: none; }
-    .mevcut-tablo tr:hover td { background: #f0faf4; }
 </style>
 
 <div class="container-fluid py-3">
@@ -198,72 +189,7 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════
-         BÖLÜM 1 — Mevcut Eğitim Öğretim Yılı Dersleri
-    ══════════════════════════════════════════════════════ -->
-    <div class="bolum-baslik">Mevcut Eğitim Öğretim Yılı — {{ ogrenci.sinif }}. Sınıf</div>
-
-    <div class="kart">
-        <div class="kart-baslik yesil">
-            <span>{{ ogrenci.sinif }}/{{ ogrenci.sube }} Ders Programı</span>
-            {% if mevcut_tamamlandi %}
-            <span class="tam-badge">Tamamlandı ✓</span>
-            {% elif mevcut_dersler %}
-            <span style="font-size:0.82em;font-weight:400;">{{ mevcut_dersler|length }} / {{ dp_ders_sayisi }} ders</span>
-            {% endif %}
-        </div>
-        <div>
-            {% if mevcut_dersler %}
-            <table class="mevcut-tablo">
-                <tbody>
-                {% for md in mevcut_dersler %}
-                <tr>
-                    <td>{{ md.ders.ders_adi }}</td>
-                    <td style="text-align:right;width:90px;">
-                        <span class="saat-chip yesil">{{ md.haftalik_saat }} saat</span>
-                    </td>
-                    <td style="width:40px;text-align:center;">
-                        <form method="post" action="{% url 'ogrdrs_mevcut_sil' ogrenci.pk md.ders.pk %}" class="sil-form"
-                              onsubmit="return confirm('{{ md.ders.ders_adi }} kaldırılsın mı?')">
-                            {% csrf_token %}
-                            <button type="submit" class="btn-sil-kk" title="Kaldır">✕</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            <div class="toplam-satir">
-                <span>Toplam</span>
-                <span class="saat-chip yesil">{{ mevcut_toplam_saat }} saat</span>
-            </div>
-            {% else %}
-            <div class="bos-durum">Mevcut yıl ders ataması yapılmamış.</div>
-            {% endif %}
-        </div>
-        <div class="aksiyon-bar">
-            {% if sinif_sube_obj %}
-            <form method="post" action="{% url 'ogrdrs_mevcut_ata' ogrenci.pk %}">
-                {% csrf_token %}
-                <button type="submit" class="btn-ata yesil"
-                        onclick="return {% if mevcut_dersler %}confirm('Mevcut atamalar silinip ders programından yeniden oluşturulsun mu?'){% else %}true{% endif %}">
-                    {% if mevcut_dersler %}Ders Programından Güncelle{% else %}Ders Programından Ata{% endif %}
-                </button>
-            </form>
-            {% else %}
-            <span style="font-size:0.85em;color:#dc3545;">
-                {{ ogrenci.sinif }}/{{ ogrenci.sube }} sınıf/şubesi ders programında tanımlı değil.
-            </span>
-            {% endif %}
-            {% if dp_ders_sayisi %}
-            <span style="font-size:0.82em;color:#6c757d;">
-                Ders programında {{ dp_ders_sayisi }} ders mevcut.
-            </span>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- ══════════════════════════════════════════════════════
-         BÖLÜM 2 — Sonraki Eğitim Öğretim Yılı Planlaması
+         Sonraki Eğitim Öğretim Yılı Planlaması
     ══════════════════════════════════════════════════════ -->
     <div class="bolum-baslik">Sonraki Eğitim Öğretim Yılı Planlaması — {{ gelecek_sinif }}. Sınıf</div>
 
