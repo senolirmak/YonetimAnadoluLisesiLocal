@@ -286,7 +286,15 @@
       <span class="aktar-chevron">▼</span>
     </summary>
     <div class="aktar-card-body">
-      <p class="hint">Her sınıf seviyesi için şubeleri virgülle ayırarak giriniz (Örn: A,B,C,D).</p>
+      <p class="hint">Her sınıf seviyesi için şubeleri virgülle ayırarak giriniz (Örn: A,B,C,D).
+        {% if aktif_egitim_yili %}Aşağıdaki liste <strong>{{ aktif_egitim_yili }}</strong> eğitim-öğretim
+        yılında açık olan şubeleri gösterir.{% endif %}</p>
+      {% if kapali_siniflar %}
+      <p class="hint">
+        <strong>{{ aktif_egitim_yili }}</strong> için kapalı şubeler (listede görünmüyor):
+        {{ kapali_siniflar|join:", " }}
+      </p>
+      {% endif %}
       <form method="post">
         {% csrf_token %}
         <div class="aktar-form-row">

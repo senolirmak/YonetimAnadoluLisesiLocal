@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from okul.models import SinifSube, SinifSubeYil
 
 
@@ -18,8 +20,14 @@ def sinif_sube_kaydet(sinif_bilgileri):
     olmadığından (bkz. SinifSubeImportForm), açılan/kapatılan durum AKTİF eğitim-
     öğretim yılına yazılır; aktif yıl tanımlı değilse (OkulBilgi kurulmamışsa) açık/
     kapalı durumu güncellenmez — yalnızca eksik sınıf/şube kayıtları eklenir.
+
+    Her iki durumda da (aktif yıl tanımlı olsun/olmasın) `okul_aktif_veri_konfigurasyonu`
+    tablosundaki "sinif_sube" kaydı bugünün tarihiyle güncellenir — böylece diğer
+    app'ler `get_aktif_tarih("sinif_sube")` ile sınıf/şube listesinin en son ne zaman
+    içe aktarıldığını sorgulayabilir (bkz. ders_programi/personel_listesi/nobet_listesi
+    ile aynı örüntü, `okul/utils.py`).
     """
-    from okul.utils import get_aktif_egitim_yili
+    from okul.utils import get_aktif_egitim_yili, set_aktif_tarih
 
     mevcut = {(ss.sinif, ss.sube): ss for ss in SinifSube.objects.all()}
     yeni_kume = {
@@ -33,6 +41,8 @@ def sinif_sube_kaydet(sinif_bilgileri):
     ]
     if eklenecekler:
         SinifSube.objects.bulk_create(eklenecekler, ignore_conflicts=True)
+
+    set_aktif_tarih("sinif_sube", timezone.localdate())
 
     aktif_yil = get_aktif_egitim_yili()
     if aktif_yil is None:

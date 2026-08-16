@@ -492,6 +492,7 @@ class AktifVeriKonfigurasyonu(models.Model):
         ("ders_programi", "Haftalık Ders Programı"),
         ("personel_listesi", "Personel Listesi"),
         ("nobet_listesi", "Nöbet Listesi"),
+        ("sinif_sube", "Sınıf/Şube Listesi"),
     ]
 
     veri_turu = models.CharField(

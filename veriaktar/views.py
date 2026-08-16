@@ -6,8 +6,9 @@ from django.shortcuts import redirect, render
 
 from dersprogrami.models import DersProgrami
 from nobet.models import NobetGorevi, NobetPersonel
-from okul.models import SinifSube
+from okul.models import SinifSube, SinifSubeYil
 from okul.models import OkulBilgi
+from okul.utils import get_aktif_egitim_yili
 
 from .forms import (
     DersProgramiImportForm,
@@ -45,6 +46,19 @@ def veriaktar_ana(request):
         "okul_muduru": mevcut_okul.okul_muduru if mevcut_okul else "",
     }
 
+    # Form her açıldığında AKTİF eğitim-öğretim yılına göre güncel (açık) şube listesini
+    # göstermeli — aksi hâlde geçen yıl kapatılmış bir şube burada hâlâ "varmış" gibi
+    # görünüp, değişiklik yapılmadan tekrar kaydedilince yanlışlıkla yeniden açılabilir.
+    aktif_yil = get_aktif_egitim_yili()
+    kapali_kume = set()
+    kapali_siniflar = []
+    if aktif_yil is not None:
+        kapali_kume = set(
+            SinifSubeYil.objects.filter(egitim_yili=aktif_yil, acik=False).values_list(
+                "sinif_sube__sinif", "sinif_sube__sube"
+            )
+        )
+
     mevcut_siniflar = defaultdict(list)
     if not SinifSube.objects.exists():
         defaults = {
@@ -57,6 +71,9 @@ def veriaktar_ana(request):
             mevcut_siniflar[k] = v
     else:
         for s in SinifSube.objects.all().order_by("sinif", "sube"):
+            if (s.sinif, s.sube) in kapali_kume:
+                kapali_siniflar.append(f"{s.sinif}/{s.sube}")
+                continue
             mevcut_siniflar[s.sinif].append(s.sube)
     sinif_initial = {f"sinif_{k}": ",".join(v) for k, v in mevcut_siniflar.items()}
 
@@ -158,5 +175,7 @@ def veriaktar_ana(request):
             "adimlar": adimlar,
             "tamamlanan": tamamlanan,
             "aktif_adim": aktif_adim,
+            "aktif_egitim_yili": aktif_yil,
+            "kapali_siniflar": kapali_siniflar,
         },
     )
