@@ -763,7 +763,10 @@ def gorevlendirme(request, sinav_pk):
             val = request.POST.get(field_name, "").strip()
             if val:
                 try:
-                    personel = Personel.objects.get(pk=int(val))
+                    # .gorevde(): dropdown zaten yalnızca "Görevde" personeli listeler (bkz.
+                    # gorevlendirme_baglami_olustur) — burada da filtrelemek form tampering'e
+                    # veya seçimden sonra personelin durumunun değişmesine karşı korur.
+                    personel = Personel.objects.gorevde().get(pk=int(val))
                 except (Personel.DoesNotExist, ValueError):
                     return None
                 if personel.pk in muaf_ids:

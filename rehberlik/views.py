@@ -136,7 +136,7 @@ def gorusme_olustur(request):
         return redirect("index")
 
     ogrenciler = Ogrenci.objects.filter(aktif=True).select_related("detay").order_by("sinif", "sube", "okulno")
-    personeller = NobetPersonel.objects.all().order_by("adi_soyadi")
+    personeller = NobetPersonel.objects.gorevde().order_by("adi_soyadi")
     sinifsube_secenekleri = _sinifsube_secenekleri()
 
     if request.method == "POST":
@@ -275,7 +275,7 @@ def gorusme_duzenle(request, pk):
         return redirect("rehberlik:gorusme_detay", pk=pk)
 
     ogrenciler = Ogrenci.objects.filter(aktif=True).select_related("detay").order_by("sinif", "sube", "okulno")
-    personeller = NobetPersonel.objects.all().order_by("adi_soyadi")
+    personeller = NobetPersonel.objects.gorevde().order_by("adi_soyadi")
     sinifsube_secenekleri = _sinifsube_secenekleri()
 
     if request.method == "POST":

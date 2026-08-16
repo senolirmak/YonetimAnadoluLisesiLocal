@@ -50,10 +50,12 @@ class Command(BaseCommand):
         kaydet = options["kaydet"]
         ogretmen_grubu, _ = Group.objects.get_or_create(name="ogretmen")
 
-        # Kullanıcısı olmayan VEYA ogretmen grubunda olmayan personeller
-        eksikler = NobetPersonel.objects.filter(
+        # Kullanıcısı olmayan VEYA ogretmen grubunda olmayan personeller — yalnızca
+        # "Görevde" olanlar için (ayrılmış/emekli personele giriş hesabı açılmaz).
+        gorevdekiler = NobetPersonel.objects.gorevde()
+        eksikler = gorevdekiler.filter(
             user__isnull=True
-        ) | NobetPersonel.objects.exclude(
+        ) | gorevdekiler.exclude(
             user__groups__name="ogretmen"
         ).filter(user__isnull=False)
 

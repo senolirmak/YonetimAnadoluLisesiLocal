@@ -127,7 +127,9 @@ class SorumluGorevMuafForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         muaf_ids = SorumluGorevMuafPersonel.objects.values_list("personel_id", flat=True)
-        self.fields["personel"].queryset = Personel.objects.exclude(pk__in=muaf_ids).order_by("adi_soyadi")
+        self.fields["personel"].queryset = (
+            Personel.objects.gorevde().exclude(pk__in=muaf_ids).order_by("adi_soyadi")
+        )
         self.fields["personel"].empty_label = "— Personel Seçin —"
 
 
