@@ -1,5 +1,6 @@
 import re
 
+from django.contrib.auth.models import User
 from django.db import models
 
 SINIF_SEVIYELERI = [(9, "9. Sınıf"), (10, "10. Sınıf"), (11, "11. Sınıf"), (12, "12. Sınıf")]
@@ -262,6 +263,334 @@ class AlanDers(models.Model):
 
     def __str__(self):
         return f"{self.alan.adi} — {self.ders.ders_adi} ({self.secilen_saat}s)"
+
+
+class SecmeliDersBransPaylasimi(models.Model):
+    """Birden fazla branşa atanmış bir SecmeliDers'in (bkz. `SecmeliDers.branslar`),
+    belirli bir Alan'da (bu `AlanDers`) okutulduğu GERÇEK şubelerin, branşlar
+    arasında NASIL PAYLAŞTIRILDIĞINI tutar.
+
+    Gizli hata: bir ders birden fazla branşa atanmışsa (örn. "TÜRK SOSYAL
+    HAYATINDA AİLE" hem Tarih hem Felsefe'ye atanmış), `services/ders_yuku.
+    hesapla()` varsayılan olarak TAM saati HER İKİ branşa da ekler
+    (branş↔ders eşleştirmesinde saatler paylaştırılmaz kuralı) — bu, aynı
+    şubelerin saatinin iki (veya daha fazla) kez sayılması demektir. Bu model
+    bunu çözer: bir AlanDers için en az bir `SecmeliDersBransPaylasimi` kaydı
+    varsa, o AlanDers'in saati artık her branşa TAM olarak değil, burada
+    belirtilen GERÇEK şube alt kümesi kadar paylaştırılarak hesaba katılır.
+
+    İstisna: bazı ZORUNLU (Ortak) dersler de aynı çift-sayım hatasına
+    sahiptir — örn. 12. sınıf "BEDEN EĞİTİMİ VE SPOR/GÖRSEL SANATLAR/MÜZİK"
+    dersi üç branşa birden atanmıştır, ama gerçekte her öğrenci bunlardan
+    yalnızca birini seçer. `services/ders_yuku.BRANS_PAYLASIM_ISTISNA_ORTAK_DERSLER`
+    içinde adı geçen `OrtakDers` kayıtları için bu paylaşım `alan_ders` yerine
+    `ortak_ders` alanı üzerinden tutulur — bir kayıtta ikisinden yalnızca biri
+    dolu olur.
+    """
+
+    alan_ders = models.ForeignKey(
+        AlanDers,
+        on_delete=models.CASCADE,
+        related_name="brans_paylasimlari",
+        verbose_name="Alan Dersi",
+        null=True,
+        blank=True,
+    )
+    ortak_ders = models.ForeignKey(
+        OrtakDers,
+        on_delete=models.CASCADE,
+        related_name="brans_paylasimlari",
+        verbose_name="Ortak Ders (istisna)",
+        null=True,
+        blank=True,
+        help_text="Yalnızca BRANS_PAYLASIM_ISTISNA_ORTAK_DERSLER'de tanımlı istisna Ortak Dersler için kullanılır.",
+    )
+    brans = models.ForeignKey(
+        "okul.Brans", on_delete=models.CASCADE, related_name="+", verbose_name="Branş",
+    )
+    subeler = models.CharField(
+        max_length=100,
+        verbose_name="Şubeler",
+        help_text="Bu branşa ayrılan gerçek şubeler, virgülle ayrılmış. Örn: A,B",
+    )
+
+    class Meta:
+        db_table = "secmelidersler_secmeli_ders_brans_paylasimi"
+        unique_together = [("alan_ders", "brans"), ("ortak_ders", "brans")]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(alan_ders__isnull=False, ortak_ders__isnull=True)
+                    | models.Q(alan_ders__isnull=True, ortak_ders__isnull=False)
+                ),
+                name="secmelidersler_brans_paylasimi_tek_kaynak",
+            ),
+        ]
+        verbose_name = "Seçmeli Ders Branş Paylaşımı"
+        verbose_name_plural = "Seçmeli Ders Branş Paylaşımları"
+
+    def __str__(self):
+        kaynak = self.alan_ders or self.ortak_ders
+        return f"{kaynak} — {self.brans.ad}: {self.subeler}"
+
+    @property
+    def sube_listesi(self):
+        return [s.strip().upper() for s in self.subeler.split(",") if s.strip()]
+
+    @property
+    def sube_sayisi(self):
+        return len(self.sube_listesi)
+
+    @property
+    def etiket_listesi(self):
+        """`sube_listesi` ile aynı sırada, kullanıcıya gösterilecek okunur
+        etiketler — bölünmemiş bir şube için düz harf ('A'), bölünmüş bir
+        parça için 'A·2s' gibi saat ekiyle (bkz. SecmeliDersSubeBolunmesi;
+        token biçimi orada da ayrıca ayrıştırılır — bkz.
+        `services.ders_yuku._sube_token_etiket`)."""
+        sonuc = []
+        for token in self.sube_listesi:
+            parcalar = token.split("#")
+            if len(parcalar) == 3:
+                harf, _sira, saat = parcalar
+                sonuc.append(f"{harf}·{saat}s")
+            else:
+                sonuc.append(token)
+        return sonuc
+
+    @property
+    def rozetler(self):
+        """`sube_listesi`/`etiket_listesi`yi şablonun TEK bir döngüde
+        kullanabileceği şekilde birleştirir: [{"sube": token, "etiket": str,
+        "bolunmus": bool}, ...]. `bolunmus=False` olan rozetler için "Böl"
+        düğmesi gösterilir (zaten bölünmüş bir parça yeniden bölünemez)."""
+        return [
+            {"sube": token, "etiket": etiket, "bolunmus": "#" in token}
+            for token, etiket in zip(self.sube_listesi, self.etiket_listesi)
+        ]
+
+
+class SecmeliDersSubeBolunmesi(models.Model):
+    """Bir (AlanDers|OrtakDers, şube) çiftinin ders saatinin BİRDEN FAZLA
+    PARÇAYA bölündüğünü tutar — bkz. `services/ders_yuku` modül docstring'i
+    "Şube Bölme" bölümü. Bölünme YOKSA (bu tabloda kayıt yoksa) şube TEK PARÇA
+    (tüm ders saati) olarak davranır; `SecmeliDersBransPaylasimi` ile eski
+    davranışla tam uyumludur.
+
+    İki kullanım biçimi vardır (ikisi de aynı mekanizmayı — parça listesi —
+    kullanır, aralarındaki fark yalnızca parçaların TOPLAMIdır):
+      - GERÇEK SAAT BÖLÜNMESİ: parçaların toplamı dersin toplam saatine
+        EŞİTTİR (örn. 3 saatlik "HEDEF TEMELLİ DESTEK EĞİTİMİ" için "1,2" ya
+        da "1,1,1") — her parça FARKLI bir branşa, kendi saatiyle paylaştırılır.
+      - İKİZ (tam kopya): her parça dersin TAM saatine EŞİTTİR (örn. 2 saatlik
+        "BEDEN EĞİTİMİ VE SPOR/GÖRSEL SANATLAR/MÜZİK" için "2,2,2") — aynı
+        şubenin farklı öğrencileri AYNI saatte FARKLI branşlarda ders
+        gördüğünden (paralel şube-içi seçim) her branş TAM saat alır;
+        parçaların toplamı dersin saatini AŞAR — bu durumda normaldir.
+    """
+
+    alan_ders = models.ForeignKey(
+        AlanDers,
+        on_delete=models.CASCADE,
+        related_name="sube_bolunmeleri",
+        verbose_name="Alan Dersi",
+        null=True,
+        blank=True,
+    )
+    ortak_ders = models.ForeignKey(
+        OrtakDers,
+        on_delete=models.CASCADE,
+        related_name="sube_bolunmeleri",
+        verbose_name="Ortak Ders (istisna)",
+        null=True,
+        blank=True,
+    )
+    sube = models.CharField(max_length=2, verbose_name="Şube")
+    parcalar = models.CharField(
+        max_length=60,
+        verbose_name="Saat Parçaları",
+        help_text="Virgülle ayrılmış saat değerleri. Örn: 1,2 ya da 2,2,2",
+    )
+
+    class Meta:
+        db_table = "secmelidersler_secmeli_ders_sube_bolunmesi"
+        unique_together = [("alan_ders", "sube"), ("ortak_ders", "sube")]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(alan_ders__isnull=False, ortak_ders__isnull=True)
+                    | models.Q(alan_ders__isnull=True, ortak_ders__isnull=False)
+                ),
+                name="secmelidersler_sube_bolunmesi_tek_kaynak",
+            ),
+        ]
+        verbose_name = "Seçmeli Ders Şube Bölünmesi"
+        verbose_name_plural = "Seçmeli Ders Şube Bölünmeleri"
+
+    def __str__(self):
+        kaynak = self.alan_ders or self.ortak_ders
+        return f"{kaynak} — {self.sube}: {self.parcalar}"
+
+    @property
+    def parca_listesi(self):
+        """Saat parçalarını (pozitif tamsayı) sırasıyla döner; geçersiz/boş
+        girişler atlanır."""
+        sonuc = []
+        for p in self.parcalar.split(","):
+            p = p.strip()
+            if not p:
+                continue
+            try:
+                deger = int(p)
+            except ValueError:
+                continue
+            if deger > 0:
+                sonuc.append(deger)
+        return sonuc
+
+
+class AlanSubeAtama(models.Model):
+    """Bir Alan'ın (bkz. Alan modeli) ders yükü hesabında kullanılacak şube
+    listesinin ELLE atanmış hâli.
+
+    Ders yükü raporu (services/ders_yuku.py) 11-12. sınıf Alanları için şube
+    sayısını `ders_dagilimi.plan_sinif_dagilimi_gecmis` ile OTOMATİK tespit
+    eder — ama bu, öğrencilerin GERÇEK seçimlerinin hangi Alan/AlanDers
+    kataloğuna (hangi eğitim-öğretim yılına) bağlı olduğuna dayanır ve her
+    zaman doğru sonuç vermeyebilir (örn. henüz seçim yapılmamış yeni bir yıl,
+    veya kohort eşleştirmesinin belirsiz kaldığı durumlar). Bu kayıt varsa
+    otomatik tespitin ÜZERİNE YAZAR.
+    """
+
+    alan = models.OneToOneField(
+        Alan, on_delete=models.CASCADE, related_name="sube_atamasi", verbose_name="Alan"
+    )
+    subeler = models.CharField(
+        max_length=100,
+        verbose_name="Şubeler",
+        help_text="Virgülle ayrılmış şube harfleri. Örn: A,B,C",
+    )
+    guncelleme_tarihi = models.DateTimeField(auto_now=True, verbose_name="Güncellenme Tarihi")
+
+    class Meta:
+        db_table = "secmelidersler_alan_sube_atama"
+        verbose_name = "Alan Şube Ataması"
+        verbose_name_plural = "Alan Şube Atamaları"
+
+    def __str__(self):
+        return f"{self.alan} — {self.subeler}"
+
+    @property
+    def sube_listesi(self):
+        return [s.strip().upper() for s in self.subeler.split(",") if s.strip()]
+
+    @property
+    def sube_sayisi(self):
+        return len(self.sube_listesi)
+
+
+class YoneticiZorunluDersYuku(models.Model):
+    """Okul Müdürü / Müdür Yardımcısı gibi yönetici görevindeki personelin
+    haftalık ZORUNLU ders yükü (saat) — idari görevleri nedeniyle normal
+    öğretmenlerden çok daha düşük olan azaltılmış ders yükümlülüğü.
+
+    Branş bazlı norm kadro hesabında (services/ders_yuku.py `hesapla()`) bu
+    saat, ilgili branşın toplam ders yükünden DÜŞÜLÜP norm ondan sonra
+    hesaplanır — aksi hâlde yönetici "1 mevcut" olarak sayılırken aslında
+    yalnızca birkaç saat ders okuttuğu hâlde tam kapasiteli bir öğretmenmiş
+    gibi normu dengelermiş yanıltıcı bir izlenim oluşurdu.
+    """
+
+    personel = models.OneToOneField(
+        "okul.Personel",
+        on_delete=models.CASCADE,
+        related_name="zorunlu_ders_yuku",
+        verbose_name="Personel",
+    )
+    saat = models.PositiveSmallIntegerField(
+        default=0, verbose_name="Zorunlu Ders Yükü (Saat)"
+    )
+    guncelleme_tarihi = models.DateTimeField(auto_now=True, verbose_name="Güncellenme Tarihi")
+
+    class Meta:
+        db_table = "secmelidersler_yonetici_zorunlu_ders_yuku"
+        verbose_name = "Yönetici Zorunlu Ders Yükü"
+        verbose_name_plural = "Yönetici Zorunlu Ders Yükleri"
+
+    def __str__(self):
+        return f"{self.personel.adi_soyadi} — {self.saat}s"
+
+
+class NormKadroArsivi(models.Model):
+    """Branş norm kadro hesabının belirli bir TARİHTE alınmış, DEĞİŞMEZ anlık
+    görüntüsü (snapshot).
+
+    Norm ile ilgili güncellemeler (Alan Şube Ataması, Yönetici Zorunlu Ders
+    Yükü, branş/ders atamaları vb.) bittiğinde bu arşiv oluşturulur; sonradan
+    alttaki veriler (ders programı, personel, şube sayıları) değişse bile
+    arşivlenen satırlar SABİT kalır — "o tarihte norm hesabı böyleydi" diye
+    tarihe damgalanmış bir kayıt işlevi görür. `services/ders_yuku.arsivle()`
+    ile oluşturulur; CRUD arayüzü yalnızca oluşturma ve listeleme sağlar,
+    düzenleme/silme YOKTUR (bkz. views.py).
+    """
+
+    egitim_yili = models.ForeignKey(
+        "okul.EgitimOgretimYili",
+        on_delete=models.PROTECT,
+        related_name="norm_kadro_arsivleri",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    tarih = models.DateTimeField(auto_now_add=True, verbose_name="Arşivlenme Tarihi")
+    olusturan = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Oluşturan",
+    )
+
+    class Meta:
+        db_table = "secmelidersler_norm_kadro_arsivi"
+        ordering = ["-tarih"]
+        verbose_name = "Norm Kadro Arşivi"
+        verbose_name_plural = "Norm Kadro Arşivleri"
+
+    def __str__(self):
+        return f"{self.egitim_yili} — {self.tarih:%d.%m.%Y %H:%M}"
+
+
+class NormKadroArsiviSatiri(models.Model):
+    """`NormKadroArsivi`nin tek bir branşa ait donmuş satırı — bkz. o modelin
+    docstring'i. Alanlar `services/ders_yuku.hesapla()`nın döndürdüğü sözlükle
+    birebir eşleşir."""
+
+    arsiv = models.ForeignKey(
+        NormKadroArsivi, on_delete=models.CASCADE, related_name="satirlar",
+        verbose_name="Arşiv",
+    )
+    brans = models.ForeignKey(
+        "okul.Brans", on_delete=models.PROTECT, related_name="+", verbose_name="Branş",
+    )
+    ortak_saat = models.PositiveIntegerField(default=0, verbose_name="Ortak Saat")
+    secmeli_saat = models.PositiveIntegerField(default=0, verbose_name="Seçmeli Saat")
+    toplam_saat = models.PositiveIntegerField(default=0, verbose_name="Toplam Saat")
+    yonetici_dusum_saat = models.PositiveIntegerField(default=0, verbose_name="Yönetici Düşümü")
+    norm_hesap_saati = models.PositiveIntegerField(default=0, verbose_name="Norm Hesap Saati")
+    norm_kadro = models.PositiveSmallIntegerField(default=0, verbose_name="Norm Kadro")
+    mevcut = models.PositiveSmallIntegerField(default=0, verbose_name="Mevcut")
+    fazla = models.PositiveSmallIntegerField(default=0, verbose_name="Fazla")
+    eksik = models.PositiveSmallIntegerField(default=0, verbose_name="Eksik")
+
+    class Meta:
+        db_table = "secmelidersler_norm_kadro_arsivi_satiri"
+        unique_together = [("arsiv", "brans")]
+        ordering = ["brans__ad"]
+        verbose_name = "Norm Kadro Arşivi Satırı"
+        verbose_name_plural = "Norm Kadro Arşivi Satırları"
+
+    def __str__(self):
+        return f"{self.arsiv} — {self.brans.ad}"
 
 
 # ---------------------------------------------------------------------------

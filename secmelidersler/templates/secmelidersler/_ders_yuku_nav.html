@@ -1,0 +1,29 @@
+{% comment %}
+Norm Kadro hesaplama akışının paylaşılan üst çubuğu: geri/yıl seçici + adım
+navigasyonu. Her adım sayfası (ders_yuku_raporu, alan_sube_atama,
+yonetici_ders_yuku, brans_paylasimi) bunu {% include %} eder ve `aktif_adim`
+context değişkenini ("sonuc" | "alan_sube" | "yonetici" | "brans_paylasimi" |
+"arsiv") kendi adına ayarlar — CSS (.dy-adim-bar, .dy-adim, .ust-bar,
+.geri-btn) her sayfanın kendi <style> bloğunda tekrarlanır (bu app'teki
+şablonların ortak deseni).
+{% endcomment %}
+<div class="ust-bar">
+    <a href="{% url 'secmeli_index' %}" class="geri-btn">← Seçmeli Dersler</a>
+    {% if tum_yillar %}
+    <form method="get" style="display:flex;align-items:center;gap:6px;">
+        <label for="id_yil" style="font-size:0.85em;color:#495057;">Yıl:</label>
+        <select name="yil" id="id_yil" onchange="this.form.submit()" style="padding:4px 8px;border:1px solid #ced4da;border-radius:4px;font-size:0.85em;">
+            {% for yil in tum_yillar %}
+            <option value="{{ yil.pk }}" {% if secili_yil.pk == yil.pk %}selected{% endif %}>{{ yil.egitim_yili }}</option>
+            {% endfor %}
+        </select>
+    </form>
+    {% endif %}
+</div>
+<div class="dy-adim-bar">
+    <a href="{% url 'secmeli_ders_yuku' %}?yil={{ secili_yil.pk }}" class="dy-adim {% if aktif_adim == 'sonuc' %}aktif{% endif %}">📊 Sonuç Tablosu</a>
+    <a href="{% url 'secmeli_alan_sube_atama' %}?yil={{ secili_yil.pk }}" class="dy-adim {% if aktif_adim == 'alan_sube' %}aktif{% endif %}">🛠 Alan Şube Ataması</a>
+    <a href="{% url 'secmeli_yonetici_ders_yuku' %}?yil={{ secili_yil.pk }}" class="dy-adim {% if aktif_adim == 'yonetici' %}aktif{% endif %}">🧑‍💼 Yönetici Ders Yükü</a>
+    <a href="{% url 'secmeli_brans_paylasimi' %}?yil={{ secili_yil.pk }}" class="dy-adim {% if aktif_adim == 'brans_paylasimi' %}aktif{% endif %}">🔀 Branş Paylaşımı</a>
+    <a href="{% url 'secmeli_norm_kadro_arsiv_listesi' %}" class="dy-adim {% if aktif_adim == 'arsiv' %}aktif{% endif %}">🗄 Arşiv</a>
+</div>

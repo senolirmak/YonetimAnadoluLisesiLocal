@@ -1,0 +1,461 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .sayfa { max-width: 960px; margin: 0 auto; padding: 20px 16px; }
+    .ust-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+    }
+    .dy-adim-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .dy-adim {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 6px;
+        background: #f1f5f8;
+        color: #2d5469;
+        text-decoration: none;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1px solid #e2e8f0;
+    }
+    .dy-adim.aktif { background: #2d5469; color: #fff; border-color: #2d5469; }
+    .bos-liste { font-size: 0.85em; color: #6c757d; }
+
+    /* Ders Ekle çubuğu */
+    .ekle-cubuk {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        background: #f8f9fa;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-bottom: 18px;
+    }
+    .ekle-cubuk select {
+        padding: 4px 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.85em;
+    }
+
+    /* Ders kartı */
+    .ders-blok {
+        background: #fff;
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        overflow: hidden;
+    }
+    .ders-baslik {
+        background: #f8f9fa;
+        padding: 10px 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .ders-baslik .ad { font-weight: 700; color: #2d5469; font-size: 0.95em; }
+    .ders-baslik .detay { font-size: 0.78em; color: #6c757d; margin-top: 2px; }
+    .ders-govde { padding: 14px 16px; }
+
+    /* Sürükle-bırak kutuları */
+    .dnd-alan { display: flex; flex-direction: column; gap: 10px; }
+    .dnd-kutu {
+        border: 1.5px dashed #c5d8e8;
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: #fafcfe;
+        transition: background .15s, border-color .15s;
+    }
+    .dnd-kutu.surukle-uzerinde { background: #eaf3ff; border-color: #2d5469; }
+    .dnd-kutu.havuz-kutu { border-style: solid; background: #f1f5f8; }
+    .zone-baslik {
+        font-size: 0.78em;
+        font-weight: 700;
+        color: #495057;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .havuz-kutu .zone-baslik { color: #6c757d; }
+    .brans-kaldir-btn {
+        background: none;
+        border: none;
+        color: #adb5bd;
+        font-size: 0.95em;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 2px;
+        font-weight: 700;
+    }
+    .brans-kaldir-btn:hover { color: #dc3545; }
+    .rozet-liste {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        min-height: 32px;
+    }
+    .sube-rozet {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        padding: 0 8px;
+        height: 26px;
+        border-radius: 14px;
+        background: #2d5469;
+        color: #fff;
+        font-size: 0.78em;
+        font-weight: 700;
+        cursor: grab;
+        user-select: none;
+        box-shadow: 0 1px 2px rgba(0,0,0,.15);
+    }
+    .sube-rozet .alan-etiketi { opacity: .75; font-weight: 500; }
+    .sube-rozet:active { cursor: grabbing; }
+    .sube-rozet.surukleniyor { opacity: 0.35; }
+    .rozet-liste:empty::after {
+        content: "— boş, buraya sürükleyin —";
+        font-size: 0.75em;
+        color: #adb5bd;
+        font-style: italic;
+    }
+    .sube-bol-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        margin-top: 3px;
+        background: none;
+        border: 1px dashed #c5d8e8;
+        border-radius: 50%;
+        color: #6c757d;
+        font-size: 0.72em;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+    }
+    .sube-bol-btn:hover { color: #2d5469; border-color: #2d5469; }
+    .sube-birlestir-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        margin-top: 3px;
+        background: none;
+        border: 1px dashed #f3c98b;
+        border-radius: 50%;
+        color: #b8790a;
+        font-size: 0.72em;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+    }
+    .sube-birlestir-btn:hover { color: #dc3545; border-color: #dc3545; }
+
+    /* Branş ekle mini formu */
+    .brans-ekle-form {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+    }
+    .brans-ekle-form select {
+        padding: 3px 6px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.78em;
+    }
+    .brans-ekle-form button {
+        padding: 3px 10px;
+        font-size: 0.78em;
+    }
+</style>
+
+<div class="sayfa">
+    {% include "secmelidersler/_ders_yuku_nav.html" with aktif_adim="brans_paylasimi" %}
+
+    <h5 class="mb-2">{{ title }}</h5>
+
+    <p style="font-size:0.85em;color:#6c757d;margin-bottom:14px;line-height:1.5;">
+        Birden fazla branşa atanmış seçmeli dersler (örn. Tarih + Felsefe) burada otomatik listelenir
+        — aynı ders birden fazla Alan'da (örn. DİL/MF/TM) okutuluyorsa hepsi TEK kart altında
+        birleşir. Her ders için gerçek şubeler <strong>rozet</strong> olarak "Atanmamış Şubeler"
+        havuzunda başlar (rozet üzerindeki küçük harf hangi Alan'dan geldiğini gösterir); bir rozeti
+        sürükleyip bir branşın kutusuna bırakırsanız o şube o branşa <strong>paylaştırılmış</strong>
+        sayılır (çift sayım önlenir). Havuzda kalan şubelerin saati hiçbir branşa eklenmez — hiçbir
+        rozet taşınmadığı sürece dersin saati her branşa TAM eklenen eski (varsayılan) davranış
+        geçerlidir. Sürüklemeler bittiğinde her ders kartının altındaki "Kaydet" butonuna basmayı
+        unutmayın.
+    </p>
+
+    {% if eklenebilir_dersler %}
+    <form method="post" action="{% url 'secmeli_ders_brans_paylasim_ekle' %}" class="ekle-cubuk">
+        {% csrf_token %}
+        <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
+        <strong style="font-size:0.82em;color:#2d5469;">➕ Ders Ekle:</strong>
+        <select name="ders" required style="max-width:280px;">
+            <option value="">— Seçmeli ders seçin —</option>
+            {% regroup eklenebilir_dersler by grup.sinif_seviyesi as seviye_listesi %}
+            {% for seviye in seviye_listesi %}
+            <optgroup label="{{ seviye.grouper }}. Sınıf">
+                {% for ders in seviye.list %}
+                <option value="{{ ders.pk }}">{{ ders.ders_adi }}</option>
+                {% endfor %}
+            </optgroup>
+            {% endfor %}
+        </select>
+        <select name="brans" required>
+            <option value="">— İlişkilendirilecek branş —</option>
+            {% for b in tum_branslar %}
+            <option value="{{ b.pk }}">{{ b.ad }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary" style="padding:4px 12px;font-size:0.82em;">Ekle</button>
+    </form>
+    {% endif %}
+
+    {% if coklu_brans_satirlari %}
+    {% for s in coklu_brans_satirlari %}
+    <div class="ders-blok">
+        <div class="ders-baslik">
+            <div class="ad">{{ s.ders.ders_adi }} — {{ s.sinif_seviyesi }}. Sınıf</div>
+            <div class="detay">
+                Alanlar:
+                {% for ad in s.alan_dersler %}{{ ad.alan.adi }} ({{ ad.secilen_saat }}s){% if not forloop.last %}, {% endif %}{% endfor %}
+            </div>
+        </div>
+        <form method="post" action="{% url 'secmeli_ders_brans_paylasim_kaydet' %}" class="ders-govde">
+            {% csrf_token %}
+            <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
+            <input type="hidden" name="ders" value="{{ s.ders.pk }}">
+            <div class="dnd-alan">
+                <div class="dnd-kutu havuz-kutu" data-zone="havuz">
+                    <div class="zone-baslik">📦 Atanmamış Şubeler</div>
+                    <div class="rozet-liste" data-role="havuz">
+                        {% for r in s.havuz_rozetleri %}
+                        <span class="sube-rozet" draggable="true" data-sube="{{ r.sube }}" data-alanders="{{ r.alan_ders.pk }}">
+                            {{ r.etiket }}<span class="alan-etiketi">{{ r.alan_ders.alan.adi }}</span>
+                        </span>
+                        {% if r.bolunmus %}
+                        <button type="button" class="sube-birlestir-btn" title="{{ r.etiket }} bölünmesini kaldır (birleştir)"
+                                onclick="dySubeBirlestir(event, '{{ r.alan_ders.pk }}', '{{ s.kaynak_tur }}', '{{ r.sube }}', '{{ secili_yil.pk }}');">↺</button>
+                        {% else %}
+                        <button type="button" class="sube-bol-btn" title="{{ r.sube }} şubesini saat parçalarına böl"
+                                onclick="dySubeBol(event, '{{ r.alan_ders.pk }}', '{{ s.kaynak_tur }}', '{{ r.sube }}', '{{ secili_yil.pk }}');">✂</button>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% for b in s.brans_satirlari %}
+                <div class="dnd-kutu" data-brans="{{ b.brans.pk }}">
+                    <div class="zone-baslik">
+                        <span>{{ b.brans.ad }}</span>
+                        <button type="button"
+                                class="brans-kaldir-btn" title="{{ b.brans.ad }} ilişkisini kaldır"
+                                onclick="dyBransKaldir(event, '{{ s.ders.pk }}', '{{ b.brans.pk }}', '{{ secili_yil.pk }}', '{{ s.kaynak_tur }}', '{{ s.ders.ders_adi|escapejs }} — {{ b.brans.ad|escapejs }}');">✕</button>
+                    </div>
+                    <div class="rozet-liste" data-role="brans">
+                        {% for hucre in b.hucreler %}
+                        {% if hucre.paylasim %}
+                        {% for r in hucre.paylasim.rozetler %}
+                        <span class="sube-rozet" draggable="true" data-sube="{{ r.sube }}" data-alanders="{{ hucre.alan_ders.pk }}">
+                            {{ r.etiket }}<span class="alan-etiketi">{{ hucre.alan_ders.alan.adi }}</span>
+                        </span>
+                        {% if r.bolunmus %}
+                        <button type="button" class="sube-birlestir-btn" title="{{ r.etiket }} bölünmesini kaldır (birleştir)"
+                                onclick="dySubeBirlestir(event, '{{ hucre.alan_ders.pk }}', '{{ s.kaynak_tur }}', '{{ r.sube }}', '{{ secili_yil.pk }}');">↺</button>
+                        {% else %}
+                        <button type="button" class="sube-bol-btn" title="{{ r.sube }} şubesini saat parçalarına böl"
+                                onclick="dySubeBol(event, '{{ hucre.alan_ders.pk }}', '{{ s.kaynak_tur }}', '{{ r.sube }}', '{{ secili_yil.pk }}');">✂</button>
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% for hucre in b.hucreler %}
+                    <input type="hidden" name="subeler_{{ hucre.alan_ders.pk }}_{{ b.brans.pk }}"
+                           data-alanders="{{ hucre.alan_ders.pk }}" data-brans="{{ b.brans.pk }}"
+                           value="{% if hucre.paylasim %}{{ hucre.paylasim.subeler }}{% endif %}">
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="form-actions" style="margin-top:12px;">
+                <button type="submit" class="btn btn-primary" style="padding:5px 16px;font-size:0.85em;">Kaydet</button>
+            </div>
+        </form>
+        <div style="padding:0 16px 14px;">
+            <form method="post" action="{% url 'secmeli_ders_brans_paylasim_ekle' %}" class="brans-ekle-form">
+                {% csrf_token %}
+                <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
+                <input type="hidden" name="ders" value="{{ s.ders.pk }}">
+                <input type="hidden" name="ders_tur" value="{{ s.kaynak_tur }}">
+                <span style="font-size:0.78em;color:#6c757d;">+ Branş ekle:</span>
+                <select name="brans" required>
+                    <option value="">— seçin —</option>
+                    {% for b in tum_branslar %}
+                    <option value="{{ b.pk }}">{{ b.ad }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Ekle</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="bos-liste">Henüz paylaşım eklenmiş bir seçmeli ders yok — yukarıdan "Ders Ekle" ile başlayabilirsiniz.</p>
+    {% endif %}
+</div>
+
+<script>
+    // Sürükle-bırak: bir .sube-rozet başka bir .rozet-liste kutusuna bırakılınca
+    // DOM'da taşınır, ardından o ders kartındaki TÜM branş kutularının gizli
+    // input'ları yeniden hesaplanır. Bir branş kutusu, o dersin BİRDEN FAZLA
+    // Alan'ından gelen rozetleri aynı anda içerebilir — her rozet kendi
+    // data-alanders'ini taşıdığından, her (AlanDers, Branş) çiftine ait gizli
+    // input yalnızca O ALAN'a ait rozetlerden yeniden oluşturulur (data-alanders
+    // eşleşmesiyle), böylece farklı Alanların şubeleri birbirine karışmaz.
+    // Havuz kutusunun gizli input'u yoktur (kaydedilmez).
+    // Kaldır/Böl butonları: "Kaydet" formunun İÇİNDE olduğu için formaction ile
+    // farklı bir URL'ye submit etmek yerine (bazı durumlarda güvenilmez
+    // davranabiliyor), ayrı ve bağımsız bir <form> DOM'a eklenip gönderiliyor —
+    // iç içe form riski yok.
+    function dyGizliFormGonder(action, alanlar) {
+        var csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        var form = document.createElement("form");
+        form.method = "post";
+        form.action = action;
+        form.style.display = "none";
+        [["csrfmiddlewaretoken", csrfInput ? csrfInput.value : ""]].concat(alanlar).forEach(function (pair) {
+            var input = document.createElement("input");
+            input.type = "hidden";
+            input.name = pair[0];
+            input.value = pair[1];
+            form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    function dyBransKaldir(event, dersPk, bransPk, yilPk, dersTur, etiket) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!window.confirm(etiket + " ilişkisi ve bu dersteki tüm Alanlardaki şube paylaşımı kaldırılsın mı?")) {
+            return;
+        }
+        dyGizliFormGonder("{% url 'secmeli_ders_brans_paylasim_kaldir' %}", [
+            ["ders", dersPk], ["brans", bransPk], ["yil", yilPk], ["ders_tur", dersTur],
+        ]);
+    }
+
+    // Şube böl: bir sütunun (AlanDers ya da istisna Ortak Ders) tek bir
+    // şubesini, virgülle girilen saat parçalarına böler — örn. "1,2" (3
+    // saatlik bir dersi 1+2 olarak GERÇEKTEN böler) ya da "2,2" (2 saatlik
+    // bir dersin İKİZİni oluşturur, her parça TAM saat taşır — bkz.
+    // SecmeliDersSubeBolunmesi docstring'i). Boş bırakılırsa bölünme kaldırılır.
+    function dySubeBol(event, sutunPk, dersTur, sube, yilPk) {
+        event.preventDefault();
+        event.stopPropagation();
+        var deger = window.prompt(
+            sube + " şubesini kaç saat parçaya bölmek istersiniz? Virgülle ayırıp saat değerlerini " +
+            "girin — örn. 3 saatlik bir ders için \"1,2\" ya da 2 saatlik bir dersin İKİZİ için \"2,2\".\n" +
+            "Bölünmeyi kaldırmak için boş bırakıp Tamam'a basın.",
+            ""
+        );
+        if (deger === null) return;
+        dyGizliFormGonder("{% url 'secmeli_ders_sube_bol' %}", [
+            ["sutun", sutunPk], ["ders_tur", dersTur], ["sube", sube], ["parcalar", deger.trim()], ["yil", yilPk],
+        ]);
+    }
+
+    // Şube birleştir: bölünmüş bir şubenin (hangi parçasından tıklanırsa
+    // tıklansın — hepsi aynı SecmeliDersSubeBolunmesi kaydına ait) TÜM
+    // parçalarını kaldırıp tek/düz rozete geri döndürür (dySubeBol'u boş
+    // parcalar ile çağırmakla aynı — bkz. secmeli_ders_sube_bol view'ı).
+    function dySubeBirlestir(event, sutunPk, dersTur, token, yilPk) {
+        event.preventDefault();
+        event.stopPropagation();
+        var harf = token.split("#")[0];
+        if (!window.confirm(harf + " şubesinin bölünmesi kaldırılıp tek parçaya döndürülsün mü? Bu şubeye ait mevcut branş atamaları sıfırlanır, yeniden sürüklemeniz gerekir.")) {
+            return;
+        }
+        dyGizliFormGonder("{% url 'secmeli_ders_sube_bol' %}", [
+            ["sutun", sutunPk], ["ders_tur", dersTur], ["sube", harf], ["parcalar", ""], ["yil", yilPk],
+        ]);
+    }
+
+    (function () {
+        var surukelenen = null;
+
+        function rozetOlaylariBagla(rozet) {
+            rozet.addEventListener("dragstart", function () {
+                surukelenen = rozet;
+                rozet.classList.add("surukleniyor");
+            });
+            rozet.addEventListener("dragend", function () {
+                rozet.classList.remove("surukleniyor");
+                surukelenen = null;
+            });
+        }
+
+        function inputlariGuncelle(dersBlok) {
+            dersBlok.querySelectorAll("input[type=hidden][data-alanders]").forEach(function (input) {
+                var adPk = input.dataset.alanders;
+                var bransPk = input.dataset.brans;
+                var kutu = dersBlok.querySelector('.dnd-kutu[data-brans="' + bransPk + '"]');
+                if (!kutu) return;
+                var subeler = [];
+                kutu.querySelectorAll(".sube-rozet").forEach(function (r) {
+                    if (r.dataset.alanders === adPk) subeler.push(r.dataset.sube);
+                });
+                input.value = subeler.join(",");
+            });
+        }
+
+        document.querySelectorAll(".sube-rozet").forEach(rozetOlaylariBagla);
+
+        document.querySelectorAll(".rozet-liste").forEach(function (liste) {
+            var kutu = liste.closest(".dnd-kutu");
+            kutu.addEventListener("dragover", function (e) {
+                e.preventDefault();
+                kutu.classList.add("surukle-uzerinde");
+            });
+            kutu.addEventListener("dragleave", function () {
+                kutu.classList.remove("surukle-uzerinde");
+            });
+            kutu.addEventListener("drop", function (e) {
+                e.preventDefault();
+                kutu.classList.remove("surukle-uzerinde");
+                if (!surukelenen) return;
+                liste.appendChild(surukelenen);
+                var dersBlok = kutu.closest(".ders-blok");
+                if (dersBlok) inputlariGuncelle(dersBlok);
+            });
+        });
+    })();
+</script>
+{% endblock %}
