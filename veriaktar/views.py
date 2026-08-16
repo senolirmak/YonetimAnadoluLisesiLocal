@@ -149,6 +149,7 @@ def veriaktar_ana(request):
         return redirect(request.path)
 
     from ogrenci.models import Ogrenci as OgrenciModel
+    from okul.models import VeriAktarimGecmisi
 
     adimlar = [
         OkulBilgi.objects.exists(),
@@ -160,6 +161,10 @@ def veriaktar_ana(request):
     ]
     tamamlanan = sum(adimlar)
     aktif_adim = next((i + 1 for i, done in enumerate(adimlar) if not done), 7)
+
+    son_aktarimlar = VeriAktarimGecmisi.objects.select_related("kullanici").order_by(
+        "-yukleme_tarihi"
+    )[:10]
 
     return render(
         request,
@@ -177,5 +182,6 @@ def veriaktar_ana(request):
             "aktif_adim": aktif_adim,
             "aktif_egitim_yili": aktif_yil,
             "kapali_siniflar": kapali_siniflar,
+            "son_aktarimlar": son_aktarimlar,
         },
     )

@@ -86,6 +86,29 @@
     border-radius: 5px;
     font-size: 14px;
   }
+  .aktar-history-title {
+    font-size: 1em;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+  }
+  .aktar-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875em;
+  }
+  .aktar-history-table th {
+    padding: 6px 10px;
+    border-bottom: 1px solid #dee2e6;
+    text-align: left;
+    background: #f8f9fa;
+  }
+  .aktar-history-table td {
+    padding: 5px 10px;
+    border-bottom: 1px solid #f1f1f1;
+  }
   .progress-bar-wrap {
     display: flex;
     align-items: center;
@@ -414,6 +437,54 @@
       </form>
     </div>
   </details>
+
+  {% if son_aktarimlar %}
+  <div class="aktar-card">
+    <div class="aktar-card-body">
+      <h3 class="aktar-history-title">Son Aktarımlar</h3>
+      <div style="overflow-x:auto;">
+        <table class="aktar-history-table">
+          <thead>
+            <tr>
+              <th>Tür</th>
+              <th>Dosya</th>
+              <th>Tarih</th>
+              <th>Yükleyen</th>
+              <th style="text-align:center;">Kayıt</th>
+              <th style="text-align:center;">Hata</th>
+              <th>Durum</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in son_aktarimlar %}
+            <tr>
+              <td>{{ a.get_dosya_turu_display }}</td>
+              <td style="color:#6c757d;font-size:0.85em;">{{ a.dosya_adi }}</td>
+              <td style="white-space:nowrap;">{{ a.yukleme_tarihi|date:"d.m.Y H:i" }}</td>
+              <td>{{ a.kullanici|default:"-" }}</td>
+              <td style="text-align:center;">{{ a.kayit_sayisi }}</td>
+              <td style="text-align:center;">
+                {% if a.hata_sayisi %}
+                <span style="color:#dc3545;font-weight:600;">{{ a.hata_sayisi }}</span>
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if a.durum == "basarili" %}
+                <span style="color:#28a745;">✔ Başarılı</span>
+                {% elif a.durum == "kismi" %}
+                <span style="color:#fd7e14;">⚠ Kısmi</span>
+                {% else %}
+                <span style="color:#dc3545;">✖ Hatalı</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
 </div>
 {% endblock %}
