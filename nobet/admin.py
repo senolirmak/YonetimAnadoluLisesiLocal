@@ -1,5 +1,3 @@
-from collections import defaultdict
-
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
@@ -10,18 +8,6 @@ from django.urls import path
 
 from dersprogrami.models import DersProgrami
 from personeldevamsizlik.models import Devamsizlik
-from veriaktar.forms import (
-    DersProgramiImportForm,
-    NobetImportForm,
-    OkulBilgiForm,
-    PersonelImportForm,
-    SinifSubeImportForm,
-)
-from veriaktar.services.default_path_service import DefaultPath
-from veriaktar.services.ders_programi_import_service import DersProgramiIsleyici
-from veriaktar.services.nobet_import_service import NobetIsleyici
-from veriaktar.services.personel_import_service import PersonelIsleyici
-from veriaktar.services.sinifsube_import_service import sinif_sube_kaydet
 
 from .models import (
     EgitimOgretimYili,
@@ -32,7 +18,6 @@ from .models import (
     OkulBilgi,
     OkulDonem,
     SinifSube,
-    VeriYukleme,
 )
 
 
@@ -227,162 +212,6 @@ class DevamsizlikAdmin(admin.ModelAdmin):
         return obj.get_devamsiz_tur_display()
 
     get_devamsiz_tur_display.short_description = "Devamsızlık Türü"
-
-
-@admin.register(VeriYukleme)
-class VeriYuklemeAdmin(admin.ModelAdmin):
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    def get_urls(self):
-        urls = super().get_urls()
-        my_urls = [
-            path(
-                "",
-                self.admin_site.admin_view(self.yukleme_view),
-                name="nobet_veriyukleme_changelist",
-            ),
-        ]
-        return my_urls + urls
-
-    def yukleme_view(self, request):
-        # ── Okul Bilgisi ──────────────────────────────────────
-        mevcut_okul = OkulBilgi.objects.first()
-        okul_initial = {
-            "okul_kodu": mevcut_okul.okul_kodu if mevcut_okul else "",
-            "okul_adi": mevcut_okul.okul_adi if mevcut_okul else "",
-            "okul_muduru": mevcut_okul.okul_muduru if mevcut_okul else "",
-        }
-
-        # ── Sınıf/Şube başlangıç değerleri ────────────────────
-        mevcut_siniflar = defaultdict(list)
-        if not SinifSube.objects.exists():
-            defaults = {
-                9: ["A", "B", "C", "D", "E", "F", "G"],
-                10: ["A", "B", "C", "D", "E", "F", "G", "H", "İ"],
-                11: ["A", "B", "C", "D", "E", "F", "G", "H"],
-                12: ["A", "B", "C", "D", "E", "F", "G"],
-            }
-            for k, v in defaults.items():
-                mevcut_siniflar[k] = v
-        else:
-            for s in SinifSube.objects.all().order_by("sinif", "sube"):
-                mevcut_siniflar[s.sinif].append(s.sube)
-
-        sinif_initial = {f"sinif_{k}": ",".join(v) for k, v in mevcut_siniflar.items()}
-
-        # ── Form nesneleri ─────────────────────────────────────
-        okul_form = OkulBilgiForm(request.POST or None, prefix="okul", initial=okul_initial)
-        personel_form = PersonelImportForm(
-            request.POST or None, request.FILES or None, prefix="personel"
-        )
-        sinif_form = SinifSubeImportForm(
-            request.POST or None, prefix="sinif", initial=sinif_initial
-        )
-        ders_form = DersProgramiImportForm(
-            request.POST or None, request.FILES or None, prefix="ders"
-        )
-        nobet_form = NobetImportForm(request.POST or None, request.FILES or None, prefix="nobet")
-
-        if request.method == "POST":
-            dp = DefaultPath()
-            try:
-                if "okul_bilgi_aktar" in request.POST and okul_form.is_valid():
-                    OkulBilgi.objects.update_or_create(
-                        id=1,
-                        defaults={
-                            "okul_kodu": okul_form.cleaned_data["okul_kodu"],
-                            "okul_adi": okul_form.cleaned_data["okul_adi"],
-                            "okul_muduru": okul_form.cleaned_data["okul_muduru"],
-                        },
-                    )
-                    messages.success(request, "Okul bilgileri başarıyla kaydedildi.")
-
-                elif "personel_aktar" in request.POST and personel_form.is_valid():
-                    f = request.FILES["personel-dosya"]
-                    tarih = personel_form.cleaned_data["uygulama_tarihi"]
-                    path = self.save_file(f, dp)
-                    PersonelIsleyici(personel_path=path.name, uygulama_tarihi=tarih, kullanici=request.user).calistir()
-                    messages.success(request, "Personel listesi başarıyla aktarıldı.")
-
-                elif "sinif_sube_aktar" in request.POST and sinif_form.is_valid():
-                    sinif_bilgileri = {}
-                    for level in [9, 10, 11, 12]:
-                        raw = sinif_form.cleaned_data.get(f"sinif_{level}", "")
-                        sinif_bilgileri[level] = [
-                            s.strip().upper() for s in raw.split(",") if s.strip()
-                        ]
-                    sinif_sube_kaydet(sinif_bilgileri)
-                    messages.success(request, "Sınıf ve Şube bilgileri başarıyla güncellendi.")
-
-                elif "ders_programi_aktar" in request.POST and ders_form.is_valid():
-                    f = request.FILES["ders-dosya"]
-                    tarih = ders_form.cleaned_data["uygulama_tarihi"]
-                    path = self.save_file(f, dp)
-                    DersProgramiIsleyici(file_path=path.name, uygulama_tarihi=tarih, kullanici=request.user).calistir()
-                    messages.success(request, "Ders programı başarıyla aktarıldı.")
-
-                elif "nobet_aktar" in request.POST and nobet_form.is_valid():
-                    f = request.FILES["nobet-dosya"]
-                    tarih = nobet_form.cleaned_data["uygulama_tarihi"]
-                    path = self.save_file(f, dp)
-                    NobetIsleyici(nobet_path=path.name, uygulama_tarihi=tarih, kullanici=request.user).calistir()
-                    messages.success(request, "Nöbetçi listesi başarıyla aktarıldı.")
-
-            except Exception as e:
-                messages.error(request, f"Hata oluştu: {str(e)}")
-
-            return redirect(request.path)
-
-        # ── Adım tamamlanma durumları ──────────────────────────
-        adimlar = [
-            OkulBilgi.objects.exists(),
-            NobetPersonel.objects.exists(),
-            SinifSube.objects.exists(),
-            DersProgrami.objects.exists(),
-            NobetGorevi.objects.exists(),
-        ]
-        tamamlanan = sum(adimlar)
-        aktif_adim = next((i + 1 for i, done in enumerate(adimlar) if not done), 6)
-
-        # ── Son aktarım kayıtları ──────────────────────────────
-        from okul.models import VeriAktarimGecmisi
-        son_aktarimlar = (
-            VeriAktarimGecmisi.objects
-            .filter(dosya_turu__in=["personel_listesi", "ders_programi", "nobet_listesi"])
-            .order_by("-yukleme_tarihi")[:10]
-        )
-
-        context = {
-            "title": "Kurulum Sihirbazı",
-            "opts": self.model._meta,
-            "okul_form": okul_form,
-            "personel_form": personel_form,
-            "sinif_form": sinif_form,
-            "ders_form": ders_form,
-            "nobet_form": nobet_form,
-            "adimlar": adimlar,
-            "tamamlanan": tamamlanan,
-            "aktif_adim": aktif_adim,
-            "son_aktarimlar": son_aktarimlar,
-            "media": self.media,
-        }
-        context.update(self.admin_site.each_context(request))
-        return render(request, "admin/nobet/veriyukleme/change_list.html", context)
-
-    def save_file(self, f, dp):
-        """Yüklenen dosyayı DefaultPath.VERI_DIR altına kaydeder."""
-        file_path = dp.VERI_DIR / f.name
-        with open(file_path, "wb+") as destination:
-            for chunk in f.chunks():
-                destination.write(chunk)
-        return file_path
 
 
 # ──────────────────────────────────────────────

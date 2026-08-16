@@ -24,7 +24,8 @@ from okul.forms import (
     BransForm, DersHavuzuFullForm, DersSaatleriForm, PersonelForm, SinifSubeForm, SinifSubeYilForm,
 )
 from okul.models import (
-    Brans, DersHavuzu, DersSaatleri, EgitimOgretimYili, OkulDonem, Personel, SinifSube, SinifSubeYil,
+    Brans, DersHavuzu, DersSaatleri, EgitimOgretimYili, OgretmenlikAlanCizelgesi, OkulDonem,
+    Personel, SinifSube, SinifSubeYil,
 )
 
 REGISTRY = {
@@ -220,6 +221,18 @@ def yonetim_update(request, slug, pk):
         context["yil_durumlari"] = yil_durumlari
         context["yil_form"] = SinifSubeYilForm()
 
+    # Personelin okutma yetkisini (TTKB çizelgesi eşleştirmesi) düzenleme sayfasında
+    # ayrıca gösterip elle atama/kaldırma imkanı sunar — bkz. okul/services/
+    # ogretmenlik_alani.py. Başka registry kaydını etkilemez.
+    if slug == "personel":
+        from okul.services.ogretmenlik_alani import brans_adaylari, onerilen_alan
+
+        context["brans_adaylari"] = brans_adaylari(instance)
+        context["onerilen_alan"] = (
+            None if instance.ogretmenlik_alani_id else onerilen_alan(instance)
+        )
+        context["okuttugudersler"] = instance.okuttugudersler
+
     return render(request, "okul/yonetim/form.html", context)
 
 
@@ -253,6 +266,29 @@ def sinif_sube_yil_sil(request, pk, yil_pk):
         SinifSubeYil.objects.filter(sinif_sube_id=pk, egitim_yili_id=yil_pk).delete()
         messages.success(request, "Yıl durumu kaydı kaldırıldı.")
     return redirect("okul:yonetim_update", slug="sinif-sube", pk=pk)
+
+
+@mudur_yardimcisi_required
+def personel_okutma_yetkisi_ata(request, pk):
+    """POST: Bir Personel için OgretmenlikAlanCizelgesi eşleştirmesini elle atar/kaldırır.
+
+    Boş `ogretmenlik_alani` gönderilirse (öneri kaldır) elle atama silinir — bu durumda
+    okuttugudersler tekrar otomatik eşleştirmeye (varsa) döner.
+    """
+    instance = get_object_or_404(Personel, pk=pk)
+    if request.method == "POST":
+        alan_id = request.POST.get("ogretmenlik_alani", "").strip()
+        if alan_id:
+            alan = get_object_or_404(OgretmenlikAlanCizelgesi, pk=alan_id)
+            instance.ogretmenlik_alani = alan
+            messages.success(
+                request, f"{instance.adi_soyadi} için okutma yetkisi '{alan}' olarak atandı."
+            )
+        else:
+            instance.ogretmenlik_alani = None
+            messages.success(request, f"{instance.adi_soyadi} için elle atanmış okutma yetkisi kaldırıldı.")
+        instance.save(update_fields=["ogretmenlik_alani"])
+    return redirect("okul:yonetim_update", slug="personel", pk=pk)
 
 
 @mudur_yardimcisi_required

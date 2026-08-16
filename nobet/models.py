@@ -237,12 +237,3 @@ class MazeretSalonGorevi(models.Model):
 
     def __str__(self):
         return f"{self.tarih} – {self.salon} – {self.saat}. Ders – {self.ogretmen}"
-
-
-class VeriYukleme(models.Model):
-    """Admin panelinde veri yükleme arayüzü için kullanılan proxy model."""
-
-    class Meta:
-        managed = False  # Veritabanında tablo oluşturmaz
-        verbose_name = "Veri Yükleme ve Aktarım"
-        verbose_name_plural = "Veri Yükleme ve Aktarım"

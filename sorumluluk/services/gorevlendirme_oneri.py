@@ -196,7 +196,9 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
     uyarilar = []
 
     muaf_ids = set(SorumluGorevMuafPersonel.objects.values_list("personel_id", flat=True))
-    personel_listesi = list(Personel.objects.select_related("brans").exclude(pk__in=muaf_ids))
+    personel_listesi = list(
+        Personel.objects.gorevde().select_related("brans").exclude(pk__in=muaf_ids)
+    )
 
     katalog_brans = {
         k.ders_adi: set(k.branslar.values_list("pk", flat=True))
@@ -338,7 +340,7 @@ def gorevlendirme_baglami_olustur(sinav, takvim_rows, active_salons, komisyon_di
     (öneri, kaydedilmemiş) view'larının ortak render bağlamını üretir."""
     muaf_ids = SorumluGorevMuafPersonel.objects.values_list("personel_id", flat=True)
     personel_listesi = list(
-        Personel.objects.select_related("brans").exclude(pk__in=muaf_ids).order_by("adi_soyadi")
+        Personel.objects.gorevde().select_related("brans").exclude(pk__in=muaf_ids).order_by("adi_soyadi")
     )
 
     oturumlar = []

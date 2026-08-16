@@ -262,7 +262,24 @@ class Brans(models.Model):
 # Personel modeli
 # ---------------------------------------------------------------------------
 
+class PersonelQuerySet(models.QuerySet):
+    def gorevde(self):
+        """Yalnızca `durum="Görevde"` olan personeli döner.
+
+        Diğer app'lerin "yeni bir görev/işlem için personel seç" ekranlarında (nöbet,
+        rehberlik görüşmesi, sorumluluk sınavı görevlendirmesi, kullanıcı hesabı açma vb.)
+        varsayılan aday havuzu bu olmalıdır — `ogrenci.Ogrenci.aktif` ile aynı ilke (bkz.
+        CLAUDE.md). İstisnalar aynı şekilde geçerlidir: zaten var olan bir kaydı pk ile
+        çekmek, geçmiş rapor/filtre dropdown'ları ve personelin kendi genel yönetim
+        sayfaları (personel/ app, okul/yonetim/personel) — bunlar ayrılmış/emekli
+        personeli de görebilmeli.
+        """
+        return self.filter(durum="Görevde")
+
+
 class Personel(models.Model):
+    objects = PersonelQuerySet.as_manager()
+
     user = models.OneToOneField(
         User,
         on_delete=models.SET_NULL,
@@ -319,6 +336,20 @@ class Personel(models.Model):
         max_length=30, choices=DURUM_CHOICES, default="Görevde", verbose_name="Durum",
     )
     sabit_nobet = models.BooleanField(default=False)
+    ogretmenlik_alani = models.ForeignKey(
+        "OgretmenlikAlanCizelgesi",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="personeller",
+        verbose_name="Okutma Yetkisi (TTKB Eşleştirmesi)",
+        help_text=(
+            "Branş + mezun olduğu program üzerinden okutabileceği dersleri belirleyen "
+            "TTKB çizelgesi satırı. Boş bırakılırsa branş/mezunokul otomatik eşleştirilmeye "
+            "çalışılır (bkz. okul/services/ogretmenlik_alani.py); eşleşme belirsizse "
+            "(mezunokul metni çizelgeyle birebir uyuşmuyorsa) burada elle seçilmelidir."
+        ),
+    )
 
     class Meta:
         db_table = "nobet_personel"
@@ -327,6 +358,18 @@ class Personel(models.Model):
 
     def __str__(self):
         return self.adi_soyadi
+
+    @property
+    def okuttugudersler(self) -> str:
+        """Bu personelin okutmaya yetkili olduğu dersler (TTKB çizelgesinden).
+
+        Elle atanmış `ogretmenlik_alani` varsa onu kullanır; yoksa branş+mezunokul
+        otomatik eşleştirmesi denenir (bkz. okul/services/ogretmenlik_alani.py).
+        Eşleşme yoksa/belirsizse boş string döner.
+        """
+        from okul.services.ogretmenlik_alani import okuttugu_dersler
+
+        return okuttugu_dersler(self)
 
 
 # ---------------------------------------------------------------------------
@@ -492,6 +535,7 @@ class AktifVeriKonfigurasyonu(models.Model):
         ("ders_programi", "Haftalık Ders Programı"),
         ("personel_listesi", "Personel Listesi"),
         ("nobet_listesi", "Nöbet Listesi"),
+        ("sinif_sube", "Sınıf/Şube Listesi"),
     ]
 
     veri_turu = models.CharField(

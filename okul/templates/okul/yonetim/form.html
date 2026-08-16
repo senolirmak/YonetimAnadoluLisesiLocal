@@ -97,5 +97,63 @@
     </div>
   </div>
   {% endif %}
+
+  {% if slug == "personel" and not is_create %}
+  <div class="card" style="margin-top:20px;">
+    <div class="card-header bg-primary">Okutma Yetkisi (TTKB Çizelgesi Eşleştirmesi)</div>
+    <div class="form-box">
+      <p style="font-size:0.88em;color:#6c757d;margin-bottom:14px;">
+        Branş ve mezun olduğu program üzerinden bu personelin okutabileceği dersler TTKB
+        çizelgesinden belirlenir. Mezunokul serbest metin olduğundan otomatik eşleştirme
+        yalnızca çizelgeyle birebir aynıysa yapılır; aksi hâlde aşağıdan elle seçim yapınız.
+      </p>
+
+      {% if okuttugudersler %}
+      <p style="margin-bottom:14px;"><strong>Okuttuğu Dersler:</strong> {{ okuttugudersler }}</p>
+      {% else %}
+      <p class="ay-bos" style="margin-bottom:14px;">Okutma yetkisi eşleşmedi — aşağıdan elle seçim yapınız.</p>
+      {% endif %}
+
+      {% if instance.ogretmenlik_alani %}
+      <p style="margin-bottom:10px;">
+        <strong>Elle atanmış eşleştirme:</strong> {{ instance.ogretmenlik_alani }}
+      </p>
+      <form method="post" action="{% url 'okul:personel_okutma_yetkisi_ata' pk=instance.pk %}" style="margin-bottom:16px;">
+        {% csrf_token %}
+        <input type="hidden" name="ogretmenlik_alani" value="">
+        <button type="submit" class="ay-sil-link" style="background:none;border:none;cursor:pointer;">
+          Elle atamayı kaldır (otomatik eşleştirmeye dön)
+        </button>
+      </form>
+      {% elif onerilen_alan %}
+      <p style="margin-bottom:10px;">
+        Önerilen eşleşme (branş + mezunokul birebir uyuyor): <strong>{{ onerilen_alan }}</strong>
+      </p>
+      {% endif %}
+
+      {% if brans_adaylari %}
+      <form method="post" action="{% url 'okul:personel_okutma_yetkisi_ata' pk=instance.pk %}">
+        {% csrf_token %}
+        <div class="form-row">
+          <label for="id_ogretmenlik_alani">Branşa uygun mezuniyet programları</label>
+          <select name="ogretmenlik_alani" id="id_ogretmenlik_alani">
+            <option value="">— Seçiniz —</option>
+            {% for aday in brans_adaylari %}
+            <option value="{{ aday.pk }}" {% if instance.ogretmenlik_alani_id == aday.pk %}selected{% endif %}>
+              {{ aday.mezunokul }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Elle Ata</button>
+        </div>
+      </form>
+      {% else %}
+      <p class="ay-bos">Bu personelin branşı için TTKB çizelgesinde kayıt bulunamadı — önce branş bilgisini kontrol edin.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -17,4 +17,10 @@ urlpatterns = [
 
     path("yonetim/sinif-sube/<int:pk>/yil/ata/", crud.sinif_sube_yil_ata, name="sinif_sube_yil_ata"),
     path("yonetim/sinif-sube/<int:pk>/yil/<int:yil_pk>/sil/", crud.sinif_sube_yil_sil, name="sinif_sube_yil_sil"),
+
+    path(
+        "yonetim/personel/<int:pk>/okutma-yetkisi/",
+        crud.personel_okutma_yetkisi_ata,
+        name="personel_okutma_yetkisi_ata",
+    ),
 ]
