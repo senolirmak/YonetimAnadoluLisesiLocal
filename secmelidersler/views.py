@@ -9,14 +9,16 @@ from okul.auth import mudur_yardimcisi_required
 
 from .forms import AlanForm, OrtakDersHavuzuForm, SecmeliDersForm, SecmeliDersGrubuForm, SecmeliDersHavuzuForm, SinifSeviyeToplamSaatForm
 from .models import (
-    Alan, AlanDers, OgrenciOrtalama, OgrenciSinifTekrari, OgrenciTasdikname,
+    Alan, AlanDers, AlanSubeAtama, NormKadroArsivi, OgrenciOrtalama, OgrenciSinifTekrari,
+    OgrenciTasdikname,
     OrtakDers, OrtakDersHavuzu,
-    SecmeliDers, SecmeliDersGrubu, SecmeliDersHavuzu,
-    SinifSeviyeToplamSaat,
+    SecmeliDers, SecmeliDersBransPaylasimi, SecmeliDersGrubu, SecmeliDersHavuzu,
+    SecmeliDersSubeBolunmesi,
+    SinifSeviyeToplamSaat, YoneticiZorunluDersYuku,
     get_aktif_egitim_yili, get_toplam_saat,
 )
-from okul.models import EgitimOgretimYili
-from .services import donem_kopyala
+from okul.models import Brans, EgitimOgretimYili
+from .services import donem_kopyala, ders_yuku
 from .services.ders_dagilimi import baskin_egitim_yili, plan_sinif_dagilimi, plan_sinif_dagilimi_gecmis
 
 _SINIFLAR = [9, 10, 11, 12]
@@ -595,6 +597,482 @@ def sinif_toplam_saat_listesi(request):
         "title": "Sınıf Seviyesi Toplam Ders Saati",
         "satırlar": satirlar,
         "aktif_yil": aktif_yil,
+    })
+
+
+@mudur_yardimcisi_required
+def ders_yuku_raporu(request):
+    """Branş bazlı haftalık ders yükü (saat) raporu — Norm Kadro hesaplama
+    akışının SONUÇ sayfası. Hesaplamada kullanılan girdiler (Alan Şube
+    Ataması, Yönetici Ders Yükü, Branş Paylaşımı) artık ayrı sayfalarda
+    düzenlenir — bkz. alan_sube_atama_sayfa / yonetici_ders_yuku_sayfa /
+    brans_paylasimi_sayfa ve _ders_yuku_nav.html'deki adım çubuğu.
+
+    Ortak dersler: haftalik_saat × açık şube sayısı (kesin). Seçmeli dersler:
+    Alan/AlanDers üzerinden fiilen atılı olan dersler — secilen_saat × Alan'ın
+    şube sayısı (9-10. sınıfta seviyenin tüm şubeleri, 11-12. sınıfta MF/TM/DİL
+    alanının gerçek şube sayısı; bkz. services/ders_yuku.py docstring'i). Branş
+    eşleştirmesi OrtakDers/SecmeliDers.branslar M2M alanlarından okunur; boş
+    bırakılmış dersler ayrıca uyarı olarak listelenir.
+    """
+    aktif_yil = get_aktif_egitim_yili()
+    secili_yil = _secili_yil(request, aktif_yil)
+
+    satirlar = ders_yuku.hesapla(secili_yil)
+    ortak_bos, secmeli_bos = ders_yuku.atanmamis_dersler(secili_yil)
+    sube_map = ders_yuku.sube_sayilari(secili_yil)
+    son_arsiv = (
+        NormKadroArsivi.objects.filter(egitim_yili=secili_yil).order_by("-tarih").first()
+        if secili_yil else None
+    )
+
+    return render(request, "secmelidersler/ders_yuku_raporu.html", {
+        "title": "Branş Bazlı Ders Yükü — Sonuç",
+        "satirlar": satirlar,
+        "ortak_bos": ortak_bos,
+        "secmeli_bos": secmeli_bos,
+        "sube_map": sube_map,
+        "son_arsiv": son_arsiv,
+        "aktif_yil": secili_yil,
+        "tum_yillar": EgitimOgretimYili.objects.all(),
+        "secili_yil": secili_yil,
+    })
+
+
+@mudur_yardimcisi_required
+def alan_sube_atama_sayfa(request):
+    """Norm Kadro hesaplama akışının "Alan Şube Ataması" adım sayfası —
+    bkz. ders_yuku_raporu / _ders_yuku_nav.html."""
+    aktif_yil = get_aktif_egitim_yili()
+    secili_yil = _secili_yil(request, aktif_yil)
+    return render(request, "secmelidersler/alan_sube_atama.html", {
+        "title": "Alan Şube Ataması",
+        "alan_sube_gruplari": ders_yuku.alan_sube_detaylari(secili_yil),
+        "aktif_yil": secili_yil,
+        "tum_yillar": EgitimOgretimYili.objects.all(),
+        "secili_yil": secili_yil,
+    })
+
+
+@mudur_yardimcisi_required
+def yonetici_ders_yuku_sayfa(request):
+    """Norm Kadro hesaplama akışının "Yönetici Zorunlu Ders Yükü" adım
+    sayfası — bkz. ders_yuku_raporu / _ders_yuku_nav.html."""
+    aktif_yil = get_aktif_egitim_yili()
+    secili_yil = _secili_yil(request, aktif_yil)
+    return render(request, "secmelidersler/yonetici_ders_yuku.html", {
+        "title": "Yönetici Zorunlu Ders Yükü",
+        "yonetici_satirlari": ders_yuku.yonetici_ders_yuku_detaylari(),
+        "aktif_yil": secili_yil,
+        "tum_yillar": EgitimOgretimYili.objects.all(),
+        "secili_yil": secili_yil,
+    })
+
+
+@mudur_yardimcisi_required
+def brans_paylasimi_sayfa(request):
+    """Norm Kadro hesaplama akışının "Seçmeli Ders Branş Paylaşımı" adım
+    sayfası — bkz. ders_yuku_raporu / _ders_yuku_nav.html."""
+    aktif_yil = get_aktif_egitim_yili()
+    secili_yil = _secili_yil(request, aktif_yil)
+    return render(request, "secmelidersler/brans_paylasimi.html", {
+        "title": "Seçmeli Ders Branş Paylaşımı",
+        "coklu_brans_satirlari": ders_yuku.brans_paylasimi_kartlari(secili_yil),
+        "eklenebilir_dersler": ders_yuku.tum_secmeli_dersler(secili_yil),
+        "tum_branslar": Brans.objects.order_by("ad"),
+        "aktif_yil": secili_yil,
+        "tum_yillar": EgitimOgretimYili.objects.all(),
+        "secili_yil": secili_yil,
+    })
+
+
+@mudur_yardimcisi_required
+@require_POST
+def alan_sube_toplu_kaydet(request):
+    """POST: ders-yuku/ sayfasındaki TÜM Alan şube kutularını tek seferde kaydeder.
+
+    Alanlar sayfa açılışında otomatik tespit edilen değerle (ya da varsa önceki
+    elle atamayla) DOLU gelir — kullanıcı istediğini düzenleyip tek "Kaydet"le
+    gönderir. Bir alanın gönderilen değeri o anki OTOMATİK tespitle aynıysa
+    (boşluk/sıra farkı önemsiz) kalıcı bir elle atama OLUŞTURULMAZ — dokunulmayan
+    alanlar otomatik takibe devam eder (öğrenci seçimleri değiştikçe güncellenir).
+    Yalnızca gerçekten FARKLI girilen alanlar `AlanSubeAtama`ya yazılır; boş
+    bırakılan alanlar için varsa önceki elle atama kaldırılır.
+    """
+    secili_yil_pk = request.POST.get("yil", "").strip()
+    secili_yil = (
+        EgitimOgretimYili.objects.filter(pk=secili_yil_pk).first()
+        if secili_yil_pk else get_aktif_egitim_yili()
+    )
+
+    detay = ders_yuku.alan_sube_detaylari(secili_yil)
+    degisen = 0
+    kaldirilan = 0
+    for grup in detay:
+        for satir in grup["alanlar"]:
+            alan = satir["alan"]
+            field = f"subeler_{alan.pk}"
+            if field not in request.POST:
+                continue
+            girilen = request.POST.get(field, "").strip()
+
+            if not girilen:
+                silinen, _ = AlanSubeAtama.objects.filter(alan=alan).delete()
+                kaldirilan += 1 if silinen else 0
+                continue
+
+            auto_norm = ders_yuku.normalize_sube_metni(",".join(satir["auto_subeler"]))
+            girilen_norm = ders_yuku.normalize_sube_metni(girilen)
+            if girilen_norm == auto_norm:
+                silinen, _ = AlanSubeAtama.objects.filter(alan=alan).delete()
+                kaldirilan += 1 if silinen else 0
+            else:
+                AlanSubeAtama.objects.update_or_create(alan=alan, defaults={"subeler": girilen})
+                degisen += 1
+
+    if degisen or kaldirilan:
+        ek = f", {kaldirilan} alan otomatik tespite döndü" if kaldirilan else ""
+        messages.success(request, f"Alan şube ataması kaydedildi — {degisen} alan elle güncellendi{ek}.")
+    else:
+        messages.info(request, "Değişiklik yapılmadı — tüm alanlar zaten otomatik tespitle aynı.")
+
+    url = reverse("secmeli_alan_sube_atama")
+    if secili_yil_pk:
+        url = f"{url}?yil={secili_yil_pk}"
+    return redirect(url)
+
+
+@mudur_yardimcisi_required
+@require_POST
+def yonetici_ders_yuku_toplu_kaydet(request):
+    """POST: ders-yuku/ sayfasındaki "Yönetici Zorunlu Ders Yükü" formundaki
+    tüm satırları (aktif Okul Müdürü/Müdür Yardımcısı) tek seferde kaydeder.
+    Geçersiz/boş değer 0 kabul edilir (düşüm uygulanmaz)."""
+    guncellenen = 0
+    for satir in ders_yuku.yonetici_ders_yuku_detaylari():
+        personel = satir["personel"]
+        field = f"saat_{personel.pk}"
+        if field not in request.POST:
+            continue
+        try:
+            saat = int(request.POST.get(field, "0").strip() or 0)
+        except ValueError:
+            saat = 0
+        saat = max(0, saat)
+        YoneticiZorunluDersYuku.objects.update_or_create(personel=personel, defaults={"saat": saat})
+        guncellenen += 1
+
+    messages.success(request, f"Yönetici zorunlu ders yükü kaydedildi ({guncellenen} kişi).")
+    yil_param = request.POST.get("yil", "").strip()
+    url = reverse("secmeli_yonetici_ders_yuku")
+    if yil_param:
+        url = f"{url}?yil={yil_param}"
+    return redirect(url)
+
+
+@mudur_yardimcisi_required
+@require_POST
+def secmeli_ders_brans_paylasim_toplu_kaydet(request):
+    """POST: ders-yuku/ sayfasındaki "Seçmeli Ders Branş Paylaşımı" formundaki
+    tüm satırları tek seferde kaydeder. Her (sütun, Branş) çifti için alan adı:
+    subeler_<sütun_pk>_<brans_pk> — sütun normal bir kartta gerçek bir AlanDers,
+    istisna bir Ortak Ders kartında (bkz. `istisna_ortak_ders_kartlari`) sanal
+    `_OrtakDersSutunu`dur; hangisi olduğu `ders_satiri["kaynak_tur"]`den (view
+    içinde, POST'a güvenmeden) belirlenir. Boş bırakılan bir alan için varsa
+    önceki paylaşım kaldırılır (o sütunun o branş payı 0 olur — TÜM branşlar
+    için boş bırakılırsa sütun varsayılan/paylaştırmama davranışına DÖNMEZ,
+    çünkü en az bir paylaşım kaydı kaldıkça "paylaştırılmış" sayılır; tamamen
+    varsayılana dönmek için tüm branş kutuları boşaltılmalıdır — bu durumda
+    hiç paylaşım kalmaz ve hesapla() otomatik olarak eski davranışa döner)."""
+    secili_yil_pk = request.POST.get("yil", "").strip()
+    secili_yil = (
+        EgitimOgretimYili.objects.filter(pk=secili_yil_pk).first()
+        if secili_yil_pk else get_aktif_egitim_yili()
+    )
+
+    guncellenen = 0
+    kaldirilan = 0
+    for ders_satiri in ders_yuku.brans_paylasimi_kartlari(secili_yil):
+        ortak_mi = ders_satiri["kaynak_tur"] == "ortak"
+        for b in ders_satiri["brans_satirlari"]:
+            brans = b["brans"]
+            for hucre in b["hucreler"]:
+                sutun = hucre["alan_ders"]
+                field = f"subeler_{sutun.pk}_{brans.pk}"
+                if field not in request.POST:
+                    continue
+                girilen = request.POST.get(field, "").strip()
+                kaynak_kwargs = (
+                    {"ortak_ders": sutun.ortak_ders} if ortak_mi else {"alan_ders": sutun}
+                )
+                if girilen:
+                    SecmeliDersBransPaylasimi.objects.update_or_create(
+                        brans=brans, defaults={"subeler": girilen}, **kaynak_kwargs
+                    )
+                    guncellenen += 1
+                else:
+                    silinen, _ = SecmeliDersBransPaylasimi.objects.filter(
+                        brans=brans, **kaynak_kwargs
+                    ).delete()
+                    kaldirilan += 1 if silinen else 0
+
+    if guncellenen or kaldirilan:
+        ek = f", {kaldirilan} kaydı kaldırıldı" if kaldirilan else ""
+        messages.success(request, f"Seçmeli ders branş paylaşımı kaydedildi ({guncellenen} satır güncellendi{ek}).")
+    else:
+        messages.info(request, "Değişiklik yapılmadı.")
+
+    url = reverse("secmeli_brans_paylasimi")
+    if secili_yil_pk:
+        url = f"{url}?yil={secili_yil_pk}"
+    return redirect(url)
+
+
+@mudur_yardimcisi_required
+@require_POST
+def secmeli_ders_brans_paylasim_ekle(request):
+    """POST: "Seçmeli Ders Branş Paylaşımı" kartına, otomatik tespit edilenlerin
+    (birden fazla branşa atanmış dersler) dışında ELLE bir (Ders, Branş) satırı
+    ekler — yalnızca ders ve branş seçimi yeterlidir, şube paylaşımı BOŞ olarak
+    oluşturulur; asıl şube dağılımı sürükle-bırakla doldurulur. Ders bu yıl
+    fiilen atılı HERHANGİ bir SecmeliDers olabilir (tek branşlı olsa bile) ve
+    branş, dersin SecmeliDers.branslar'ındaki branşlarla SINIRLI DEĞİLDİR
+    (bkz. tum_secmeli_dersler / okul.Brans). `ders_tur="ortak"` gönderilirse
+    (yalnızca kartın kendi "+ Branş ekle" mini formu bunu gönderir — üstteki
+    "Ders Ekle" seçim kutusu her zaman bir SecmeliDers'tir) `ders`, istisna bir
+    `OrtakDers` pk'sı olarak yorumlanır (bkz. BRANS_PAYLASIM_ISTISNA_ORTAK_DERSLER).
+
+    Ders birden fazla Alan'da okutuluyorsa (örn. 11. sınıfta DİL+MF+TM) bu
+    dersin O YILKI TÜM AlanDers'leri için paylaşım satırı oluşturulur — böylece
+    ders kartı hangi Alan'dan gelirse gelsin her Alan için bir sürükle-bırak
+    hedefi hazır olur (bkz. coklu_brans_dersleri). Bir istisna Ortak Ders'te
+    Alan ayrımı olmadığından TEK bir paylaşım satırı oluşturulur. Zaten var
+    olan çiftlere DOKUNULMAZ — mevcut şube değeri korunur."""
+    ders_pk = request.POST.get("ders", "").strip()
+    brans_pk = request.POST.get("brans", "").strip()
+    ders_tur = (request.POST.get("ders_tur", "").strip() or "secmeli")
+    secili_yil_pk = request.POST.get("yil", "").strip()
+    secili_yil = (
+        EgitimOgretimYili.objects.filter(pk=secili_yil_pk).first()
+        if secili_yil_pk else get_aktif_egitim_yili()
+    )
+
+    if ders_pk and brans_pk:
+        brans = get_object_or_404(Brans, pk=brans_pk)
+
+        if ders_tur == "ortak":
+            ders = get_object_or_404(OrtakDers, pk=ders_pk)
+            _, olusturuldu = SecmeliDersBransPaylasimi.objects.get_or_create(
+                ortak_ders=ders, brans=brans, defaults={"subeler": ""}
+            )
+            olusturulan = 1 if olusturuldu else 0
+            ek = ""
+        else:
+            ders = get_object_or_404(SecmeliDers, pk=ders_pk)
+            sube_map = ders_yuku.sube_sayilari(secili_yil)
+            alan_sube_map = ders_yuku.alan_sube_sayilari(secili_yil, sube_map)
+            alan_dersler = AlanDers.objects.filter(ders=ders, alan__in=alan_sube_map.keys())
+
+            olusturulan = 0
+            for alan_ders in alan_dersler:
+                _, olusturuldu = SecmeliDersBransPaylasimi.objects.get_or_create(
+                    alan_ders=alan_ders, brans=brans, defaults={"subeler": ""}
+                )
+                olusturulan += 1 if olusturuldu else 0
+            ek = f" ({olusturulan} Alan için)" if olusturulan else ""
+
+        if olusturulan:
+            messages.success(
+                request,
+                f"{ders.ders_adi} — {brans.ad} eklendi{ek}. Şimdi şube rozetlerini sürükleyip kaydedin.",
+            )
+        else:
+            messages.info(request, f"{ders.ders_adi} — {brans.ad} zaten listede.")
+    else:
+        messages.error(request, "Ders ve branş seçimi zorunludur.")
+
+    url = reverse("secmeli_brans_paylasimi")
+    if secili_yil_pk:
+        url = f"{url}?yil={secili_yil_pk}"
+    return redirect(url)
+
+
+@mudur_yardimcisi_required
+@require_POST
+def secmeli_ders_brans_paylasim_kaldir(request):
+    """POST: bir dersin bir branşla ilişkisini TAMAMEN kaldırır. Kart üzerindeki
+    bir branş kutusu iki farklı kaynaktan gelebilir: (1) dersin RESMİ
+    `branslar` M2M'i (SecmeliDers ya da istisna bir OrtakDers'in kendi
+    tanımında zaten atanmış branş), (2) bu sayfadan "Branş Ekle" ile eklenmiş
+    EKSTRA bir `SecmeliDersBransPaylasimi` satırı. Kutuyu tamamen kaldırmak
+    için ikisi de temizlenir — yalnızca paylaşım satırlarını silmek, resmi
+    M2M'den gelen bir branş için hiçbir şey değiştirmez (kutu bir sonraki
+    render'da yine görünür). Tek bir şubeyi kaldırmak için rozeti havuza
+    sürükleyip "Kaydet"e basmak yeterlidir; bu buton branşın kendisini (o
+    derse ilişkin tüm şubeleriyle birlikte) kaldırır. `ders_tur="ortak"`
+    gönderilirse `ders`, istisna bir `OrtakDers` pk'sı olarak yorumlanır."""
+    ders_pk = request.POST.get("ders", "").strip()
+    brans_pk = request.POST.get("brans", "").strip()
+    ders_tur = (request.POST.get("ders_tur", "").strip() or "secmeli")
+    secili_yil_pk = request.POST.get("yil", "").strip()
+
+    if ders_pk and brans_pk:
+        brans = get_object_or_404(Brans, pk=brans_pk)
+        if ders_tur == "ortak":
+            ders = get_object_or_404(OrtakDers, pk=ders_pk)
+            silinen, _ = SecmeliDersBransPaylasimi.objects.filter(
+                ortak_ders=ders, brans=brans
+            ).delete()
+        else:
+            ders = get_object_or_404(SecmeliDers, pk=ders_pk)
+            silinen, _ = SecmeliDersBransPaylasimi.objects.filter(
+                alan_ders__ders=ders, brans=brans
+            ).delete()
+        resmi_kaldirildi = ders.branslar.filter(pk=brans.pk).exists()
+        if resmi_kaldirildi:
+            ders.branslar.remove(brans)
+        if silinen or resmi_kaldirildi:
+            messages.success(request, f"{ders.ders_adi} — {brans.ad} paylaşımı kaldırıldı.")
+        else:
+            messages.info(request, f"{ders.ders_adi} — {brans.ad} için zaten bir paylaşım yoktu.")
+    else:
+        messages.error(request, "Ders ve branş bilgisi zorunludur.")
+
+    url = reverse("secmeli_brans_paylasimi")
+    if secili_yil_pk:
+        url = f"{url}?yil={secili_yil_pk}"
+    return redirect(url)
+
+
+@mudur_yardimcisi_required
+@require_POST
+def secmeli_ders_sube_bol(request):
+    """POST: bir (sütun, şube) çiftinin ders saatini birden fazla PARÇAYA
+    böler — bkz. `SecmeliDersSubeBolunmesi` docstring'i. "sütun", normal bir
+    kartta gerçek bir `AlanDers.pk`, istisna bir Ortak Ders kartında sanal
+    `_OrtakDersSutunu.pk` ("o<pk>")dur (bkz. `ders_yuku.brans_paylasimi_
+    kartlari`); hangisi olduğu `ders_tur` alanından anlaşılır.
+
+    `parcalar` boş gönderilirse bölünme KALDIRILIR (şube tekrar tek/düz
+    rozete döner). Her iki yönde de (bölme ya da kaldırma) o şubeye ait
+    ESKİ token'lar (bölünmeden önceki düz harf YA DA bölünmeden önceki
+    parça token'ları) o sütunun TÜM `SecmeliDersBransPaylasimi.subeler`
+    alanlarından temizlenir — aksi hâlde artık geçerli olmayan "hayalet"
+    rozetler branş kutularında kalıp bir sonraki Kaydet'te geri yazılabilir;
+    kullanıcı yeni parçaları sürükleyip yeniden dağıtmalıdır."""
+    sutun_pk = request.POST.get("sutun", "").strip()
+    ders_tur = (request.POST.get("ders_tur", "").strip() or "secmeli")
+    sube = request.POST.get("sube", "").strip().upper()
+    parcalar_metni = request.POST.get("parcalar", "").strip()
+    secili_yil_pk = request.POST.get("yil", "").strip()
+
+    url = reverse("secmeli_brans_paylasimi")
+    if secili_yil_pk:
+        url = f"{url}?yil={secili_yil_pk}"
+
+    if not (sutun_pk and sube):
+        messages.error(request, "Şube ve sütun bilgisi zorunludur.")
+        return redirect(url)
+
+    if ders_tur == "ortak":
+        ortak_pk = sutun_pk[1:] if sutun_pk.startswith("o") else sutun_pk
+        ortak_ders = get_object_or_404(OrtakDers, pk=ortak_pk)
+        kaynak_kwargs = {"alan_ders": None, "ortak_ders": ortak_ders}
+    else:
+        alan_ders = get_object_or_404(AlanDers, pk=sutun_pk)
+        kaynak_kwargs = {"alan_ders": alan_ders, "ortak_ders": None}
+
+    onceki = SecmeliDersSubeBolunmesi.objects.filter(sube=sube, **kaynak_kwargs).first()
+    eski_tokenlar = {sube}
+    if onceki:
+        eski_tokenlar.update(f"{sube}#{i}#{s}" for i, s in enumerate(onceki.parca_listesi, start=1))
+
+    if parcalar_metni:
+        try:
+            parcalar = [int(p.strip()) for p in parcalar_metni.split(",") if p.strip()]
+        except ValueError:
+            parcalar = []
+        parcalar = [p for p in parcalar if p > 0]
+        if len(parcalar) < 2:
+            messages.error(request, "En az 2 saat parçası girilmelidir (örn. 1,2).")
+            return redirect(url)
+        SecmeliDersSubeBolunmesi.objects.update_or_create(
+            sube=sube, defaults={"parcalar": ",".join(str(p) for p in parcalar)}, **kaynak_kwargs
+        )
+        mesaj = f"{sube} şubesi {'+'.join(str(p) for p in parcalar)} saat olarak bölündü."
+    else:
+        SecmeliDersSubeBolunmesi.objects.filter(sube=sube, **kaynak_kwargs).delete()
+        mesaj = f"{sube} şubesinin bölünmesi kaldırıldı."
+
+    temizlenen = 0
+    for p in SecmeliDersBransPaylasimi.objects.filter(**kaynak_kwargs):
+        kalan = [t for t in p.sube_listesi if t not in eski_tokenlar]
+        if len(kalan) != len(p.sube_listesi):
+            temizlenen += 1
+            if kalan:
+                p.subeler = ",".join(kalan)
+                p.save(update_fields=["subeler"])
+            else:
+                p.delete()
+
+    if temizlenen:
+        mesaj += f" {temizlenen} branş kutusundaki eski atama sıfırlandı — parçaları yeniden sürükleyin."
+    messages.success(request, mesaj)
+    return redirect(url)
+
+
+@mudur_yardimcisi_required
+@require_POST
+def norm_kadro_arsivle(request):
+    """POST: Şu anki branş norm kadro hesabının DEĞİŞMEZ bir anlık görüntüsünü
+    arşivler (bkz. services/ders_yuku.arsivle). Arşivlenen kayıt bir daha
+    düzenlenemez/silinemez — yalnızca norm_kadro_arsiv_listesi/detay ile
+    salt-okunur görüntülenir."""
+    secili_yil_pk = request.POST.get("yil", "").strip()
+    secili_yil = (
+        EgitimOgretimYili.objects.filter(pk=secili_yil_pk).first()
+        if secili_yil_pk else get_aktif_egitim_yili()
+    )
+    if secili_yil is None:
+        messages.error(request, "Arşivlemek için bir eğitim-öğretim yılı seçilmeli.")
+    else:
+        arsiv = ders_yuku.arsivle(secili_yil, kullanici=request.user)
+        messages.success(
+            request,
+            f"Norm kadro hesabı arşivlendi — {arsiv.tarih:%d.%m.%Y %H:%M} "
+            f"({arsiv.satirlar.count()} branş).",
+        )
+    url = reverse("secmeli_ders_yuku")
+    if secili_yil_pk:
+        url = f"{url}?yil={secili_yil_pk}"
+    return redirect(url)
+
+
+@mudur_yardimcisi_required
+def norm_kadro_arsiv_listesi(request):
+    """Geçmiş norm kadro arşivlerinin salt-okunur listesi. Düzenleme/silme
+    imkanı YOKTUR — arşiv kayıtları kasıtlı olarak değişmezdir."""
+    arsivler = (
+        NormKadroArsivi.objects.select_related("egitim_yili", "olusturan")
+        .annotate(satir_sayisi=Count("satirlar"))
+    )
+    return render(request, "secmelidersler/norm_kadro_arsiv_listesi.html", {
+        "title": "Norm Kadro Arşivi",
+        "arsivler": arsivler,
+    })
+
+
+@mudur_yardimcisi_required
+def norm_kadro_arsiv_detay(request, pk):
+    """Bir norm kadro arşivinin dondurulmuş, salt-okunur satırları."""
+    arsiv = get_object_or_404(
+        NormKadroArsivi.objects.select_related("egitim_yili", "olusturan"), pk=pk
+    )
+    satirlar = arsiv.satirlar.select_related("brans").order_by("brans__ad")
+    return render(request, "secmelidersler/norm_kadro_arsiv_detay.html", {
+        "title": f"Norm Kadro Arşivi — {arsiv.tarih:%d.%m.%Y %H:%M}",
+        "arsiv": arsiv,
+        "satirlar": satirlar,
     })
 
 

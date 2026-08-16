@@ -1,0 +1,100 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .sayfa { max-width: 800px; margin: 0 auto; padding: 20px 16px; }
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #2d5469;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.85em;
+        color: #2d5469;
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+        margin-bottom: 20px;
+    }
+    .kart {
+        background: #fff;
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .arsiv-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .arsiv-tablo thead th {
+        background: #f1f5f8;
+        color: #495057;
+        padding: 9px 16px;
+        font-size: 0.82em;
+        text-align: left;
+    }
+    .arsiv-tablo td {
+        padding: 8px 16px;
+        border-top: 1px solid #f1f1f1;
+    }
+    .bos-liste {
+        font-size: 0.85em;
+        color: #6c757d;
+        padding: 20px;
+        text-align: center;
+    }
+</style>
+
+<div class="sayfa">
+    <a href="{% url 'secmeli_ders_yuku' %}" class="geri-btn">← Branş Bazlı Ders Yükü</a>
+    <h5 class="mb-2">{{ title }}</h5>
+
+    <p class="bilgi-notu">
+        Norm kadro hesabının belirli tarihlerde alınmış anlık görüntüleri (snapshot). Bir arşiv
+        kaydı oluşturulduktan sonra alttaki veriler (ders programı, personel, şube sayıları) değişse
+        bile buradaki satırlar <strong>sabit kalır</strong> — düzenlenemez, silinemez.
+    </p>
+
+    <div class="kart">
+        {% if arsivler %}
+        <table class="arsiv-tablo">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Eğitim-Öğretim Yılı</th>
+                    <th>Oluşturan</th>
+                    <th style="text-align:right;">Branş Sayısı</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in arsivler %}
+                <tr>
+                    <td>{{ a.tarih|date:"d.m.Y H:i" }}</td>
+                    <td>{{ a.egitim_yili }}</td>
+                    <td>{{ a.olusturan|default:"—" }}</td>
+                    <td style="text-align:right;">{{ a.satir_sayisi }}</td>
+                    <td><a href="{% url 'secmeli_norm_kadro_arsiv_detay' pk=a.pk %}">Görüntüle →</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="bos-liste">Henüz arşivlenmiş bir norm kadro hesabı yok.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

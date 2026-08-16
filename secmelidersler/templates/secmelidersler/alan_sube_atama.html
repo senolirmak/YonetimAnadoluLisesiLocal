@@ -1,0 +1,93 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .sayfa { max-width: 900px; margin: 0 auto; padding: 20px 16px; }
+    .ust-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+    }
+    .dy-adim-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .dy-adim {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 6px;
+        background: #f1f5f8;
+        color: #2d5469;
+        text-decoration: none;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1px solid #e2e8f0;
+    }
+    .dy-adim.aktif { background: #2d5469; color: #fff; border-color: #2d5469; }
+    .kart {
+        background: #fff;
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        padding: 16px 18px;
+    }
+    .bos-liste { font-size: 0.85em; color: #6c757d; }
+</style>
+
+<div class="sayfa">
+    {% include "secmelidersler/_ders_yuku_nav.html" with aktif_adim="alan_sube" %}
+
+    <h5 class="mb-2">{{ title }}</h5>
+
+    <p style="font-size:0.85em;color:#6c757d;margin-bottom:14px;line-height:1.5;">
+        Her Alan için kutu, otomatik tespit edilen şubelerle (ya da varsa önceki elle atamayla) dolu
+        gelir — dilediğinizi düzenleyip aşağıdaki <strong>tek</strong> "Kaydet" butonuyla hepsini birden
+        kaydedebilirsiniz. Dokunmadığınız (otomatikle aynı bıraktığınız) alanlar elle atama olarak
+        kaydedilmez, otomatik takibe devam eder — yalnızca gerçekten değiştirdiğiniz alanlar kalıcı
+        olur. Bir kutuyu boşaltıp kaydederseniz o alandaki elle atama kaldırılır.
+    </p>
+
+    <div class="kart">
+        {% if alan_sube_gruplari %}
+        <form method="post" action="{% url 'secmeli_alan_sube_toplu_kaydet' %}">
+            {% csrf_token %}
+            <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
+            {% for grup in alan_sube_gruplari %}
+            <div style="margin-bottom:10px;">
+                <div style="font-weight:600;color:#2d5469;font-size:0.85em;margin-bottom:4px;">{{ grup.sinif_seviyesi }}. Sınıf</div>
+                {% for a in grup.alanlar %}
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+                    <span style="min-width:60px;font-size:0.85em;">{{ a.alan.adi }}</span>
+                    <input type="text" name="subeler_{{ a.alan.pk }}"
+                           value="{% if a.manuel %}{{ a.manuel.subeler }}{% else %}{{ a.auto_subeler|join:"," }}{% endif %}"
+                           style="flex:1;min-width:160px;max-width:260px;padding:4px 8px;border:1px solid #ced4da;border-radius:4px;font-size:0.85em;">
+                    <span style="font-size:0.78em;color:#6c757d;white-space:nowrap;">
+                        {% if a.manuel %}elle atanmış ({{ a.kullanilan_sayi }} şube){% else %}otomatik ({{ a.kullanilan_sayi }} şube){% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            <div class="form-actions" style="margin-top:6px;">
+                <button type="submit" class="btn btn-primary" style="padding:5px 16px;font-size:0.85em;">Tümünü Kaydet</button>
+            </div>
+        </form>
+        {% else %}
+        <p class="bos-liste">Bu yıl için tanımlı bir Alan bulunamadı.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

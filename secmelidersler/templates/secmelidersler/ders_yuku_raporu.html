@@ -1,0 +1,272 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .sayfa { max-width: 900px; margin: 0 auto; padding: 20px 16px; }
+    .bilgi-notu {
+        background: #e8f4fd;
+        border-left: 4px solid #2d5469;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.85em;
+        color: #2d5469;
+        margin-bottom: 16px;
+        line-height: 1.5;
+    }
+    .uyari-notu {
+        background: #fff3e0;
+        border-left: 4px solid #e65100;
+        border-radius: 4px;
+        padding: 8px 14px;
+        font-size: 0.85em;
+        color: #bf360c;
+        margin-bottom: 16px;
+        line-height: 1.5;
+    }
+    .ust-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+    .geri-btn {
+        display: inline-block;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 0.88em;
+        text-decoration: none;
+        background: #fff;
+    }
+    .dy-adim-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .dy-adim {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 6px;
+        background: #f1f5f8;
+        color: #2d5469;
+        text-decoration: none;
+        font-size: 0.82em;
+        font-weight: 600;
+        border: 1px solid #e2e8f0;
+    }
+    .dy-adim.aktif { background: #2d5469; color: #fff; border-color: #2d5469; }
+    .sube-ozet {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 0.82em;
+        color: #495057;
+    }
+    .sube-ozet span {
+        background: #f1f5f8;
+        border-radius: 4px;
+        padding: 3px 10px;
+    }
+    .brans-kart {
+        background: #fff;
+        border: 1px solid #c5d8e8;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        overflow: hidden;
+    }
+    .brans-kart summary {
+        padding: 10px 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        list-style: none;
+        background: #f8f9fa;
+        user-select: none;
+    }
+    .brans-kart summary::-webkit-details-marker { display: none; }
+    .brans-adi { font-weight: 700; color: #2d5469; flex: 1; font-size: 0.95em; }
+    .brans-saat { font-size: 0.85em; color: #495057; white-space: nowrap; }
+    .brans-saat strong { color: #2d5469; font-size: 1.05em; }
+    .brans-detay-tablo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85em;
+    }
+    .brans-detay-tablo th {
+        background: #f1f5f8;
+        color: #495057;
+        padding: 6px 16px;
+        text-align: left;
+        font-size: 0.82em;
+    }
+    .brans-detay-tablo td {
+        padding: 6px 16px;
+        border-top: 1px solid #f1f1f1;
+    }
+    .etiket {
+        font-size: 0.75em;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    .etiket.ortak { background: #dbeafe; color: #1e40af; }
+    .etiket.secmeli { background: #ede9fe; color: #5b21b6; }
+    .etiket.norm, .etiket.mevcut, .etiket.fazla, .etiket.eksik, .etiket.dengede {
+        font-size: 0.95em;
+        padding: 2px 10px;
+    }
+    .etiket.norm { background: #dcfce7; color: #166534; margin-left: 6px; font-weight: 700; }
+    .etiket.mevcut { background: #e2e8f0; color: #334155; margin-left: 6px; }
+    .etiket.fazla { background: #fef9c3; color: #854d0e; margin-left: 6px; font-weight: 700; }
+    .etiket.eksik { background: #fee2e2; color: #991b1b; margin-left: 6px; font-weight: 700; }
+    .etiket.dengede { background: #dcfce7; color: #166534; margin-left: 6px; }
+    .bos-liste {
+        font-size: 0.85em;
+        color: #6c757d;
+    }
+    .ogretmen-listesi {
+        flex-basis: 100%;
+        margin-top: 8px;
+        padding: 8px 12px;
+        background: #f8f9fa;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.82em;
+        color: #334155;
+        line-height: 1.6;
+        cursor: default;
+    }
+</style>
+
+<div class="sayfa">
+    {% include "secmelidersler/_ders_yuku_nav.html" with aktif_adim="sonuc" %}
+
+    <h5 class="mb-2">{{ title }}</h5>
+
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+        <form method="post" action="{% url 'secmeli_norm_kadro_arsivle' %}"
+              onsubmit="return confirm('Şu anki norm kadro hesabı arşivlenecek. Arşivlenen kayıt daha sonra düzenlenemez. Devam edilsin mi?');">
+            {% csrf_token %}
+            <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
+            <button type="submit" class="btn btn-primary" style="padding:6px 16px;font-size:0.85em;">📌 Normu Arşivle</button>
+        </form>
+        {% if son_arsiv %}
+        <span style="font-size:0.8em;color:#6c757d;">
+            Son arşiv: <a href="{% url 'secmeli_norm_kadro_arsiv_detay' pk=son_arsiv.pk %}">{{ son_arsiv.tarih|date:"d.m.Y H:i" }}</a>
+        </span>
+        {% endif %}
+    </div>
+
+    <p class="bilgi-notu">
+        Her branş için haftalık ders yükü, o branşa <strong>okul/ Ders Yönetimi</strong>nde atanmış
+        Ortak (Zorunlu) ve Seçmeli derslerden hesaplanır. Ortak ders saati = haftalık saat × açık şube
+        sayısı. Seçmeli ders saati = <strong>Alan</strong> sayfasında (secmeli/alanlar/) o derse seçilen
+        saat × Alan'ın şube sayısı — 9-10. sınıfta o seviyenin tüm şubeleri, 11-12. sınıfta ise
+        MF/TM/DİL alanının kendi şube sayısı kullanılır (yalnızca bir Alan'a fiilen atanmış dersler
+        hesaba girer, ders havuzundaki her seçmeli ders değil; yukarıdaki <strong>Alan Şube Ataması</strong>
+        ve <strong>Branş Paylaşımı</strong> adımlarında bu şube/branş eşleştirmeleri düzenlenir). Bir ders
+        birden fazla branşa atanmışsa (örn. Görsel Sanatlar/Müzik) ve bir paylaşım girilmemişse saati her
+        ikisinin altında da tam olarak görünür — branşlar arası toplanabilir bir "genel toplam" yoktur.
+        <strong>Norm Kadro</strong>, önce varsa o branştaki yöneticilerin (<strong>Yönetici Ders Yükü</strong>
+        adımında girilen) azaltılmış ders yükü toplam saatten düşülüp, kalan saatten şöyle hesaplanır:
+        6-31 saat arası 1, 31-42 saat arası 2 norm; 42'den sonra her (başlayan) 21 saatlik dilim için +1
+        norm daha eklenir.
+    </p>
+
+    {% if sube_map %}
+    <div class="sube-ozet mb-3">
+        {% for sv, n in sube_map.items %}
+        <span>{{ sv }}. Sınıf: {{ n }} şube</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if ortak_bos or secmeli_bos %}
+    <div class="uyari-notu">
+        <strong>⚠ Branş atanmamış dersler</strong> — bu dersler hiçbir branşın yükü altında görünmüyor:
+        {% if ortak_bos %}
+        <div style="margin-top:4px;">Ortak: {% for d in ortak_bos %}{{ d.sinif_seviyesi }}/{{ d.ders_adi }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+        {% endif %}
+        {% if secmeli_bos %}
+        <div style="margin-top:4px;">Seçmeli: {% for d in secmeli_bos %}{{ d.grup.sinif_seviyesi }}/{{ d.ders_adi }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if satirlar %}
+    {% for s in satirlar %}
+    <details class="brans-kart">
+        <summary>
+            <span class="brans-adi">{{ s.brans.ad }}</span>
+            <span class="brans-saat">
+                Ortak: {{ s.ortak_saat }}s · Seçmeli: {{ s.secmeli_saat }}s · <strong>Toplam: {{ s.toplam_saat }}s</strong>
+                {% if s.yonetici_dusum_saat %}
+                <span style="color:#92400e;">(Yönetici düşümü: −{{ s.yonetici_dusum_saat }}s → Norm hesabı: {{ s.norm_hesap_saati }}s)</span>
+                {% endif %}
+                <span class="etiket norm">Norm: {{ s.norm_kadro }}</span>
+                <span class="etiket mevcut" style="cursor:pointer;text-decoration:underline dotted;"
+                      title="Öğretmenleri göster/gizle"
+                      onclick="dersYukuOgretmenGoster(event, 'ogr-{{ s.brans.pk }}')">Mevcut: {{ s.mevcut }}</span>
+                {% if s.fazla %}
+                <span class="etiket fazla">Fazla: {{ s.fazla }}</span>
+                {% elif s.eksik %}
+                <span class="etiket eksik">Eksik: {{ s.eksik }}</span>
+                {% else %}
+                <span class="etiket dengede">Dengede</span>
+                {% endif %}
+            </span>
+            <div id="ogr-{{ s.brans.pk }}" class="ogretmen-listesi" style="display:none;">
+                <strong>{{ s.brans.ad }} — Mevcut Öğretmenler ({{ s.mevcut }}):</strong>
+                {% if s.ogretmenler %}
+                {% for p in s.ogretmenler %}{{ p.adi_soyadi }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                {% else %}
+                Bu branşta aktif (Görevde) öğretmen bulunamadı.
+                {% endif %}
+            </div>
+        </summary>
+        <table class="brans-detay-tablo">
+            <thead>
+                <tr>
+                    <th>Tür</th>
+                    <th>Sınıf</th>
+                    <th>Ders</th>
+                    <th>Hesap</th>
+                    <th style="text-align:right;">Saat</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in s.dersler %}
+                <tr>
+                    <td><span class="etiket {{ d.tur }}">{% if d.tur == "ortak" %}Ortak{% else %}Seçmeli{% endif %}</span></td>
+                    <td>{{ d.sinif_seviyesi }}</td>
+                    <td>{{ d.ders_adi }}</td>
+                    <td style="color:#6c757d;">{{ d.detay }}</td>
+                    <td style="text-align:right;font-weight:600;">{{ d.saat }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </details>
+    {% endfor %}
+    {% else %}
+    <p class="bos-liste">Bu yıl için hesaplanacak Ortak/Seçmeli ders veya branş ataması bulunamadı.</p>
+    {% endif %}
+</div>
+
+<script>
+    // "Mevcut" etiketine tıklanınca yalnızca o branşın öğretmen listesini
+    // aç/kapat — branş kartının kendisini aç/kapamasın diye default davranış
+    // ve yayılma (bubbling) durduruluyor.
+    function dersYukuOgretmenGoster(event, id) {
+        event.preventDefault();
+        event.stopPropagation();
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.style.display = (el.style.display === "block") ? "none" : "block";
+    }
+</script>
+{% endblock %}
