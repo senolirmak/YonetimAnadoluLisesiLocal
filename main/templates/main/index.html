@@ -102,6 +102,7 @@
                         <a href="/admin/" class="btn btn-primary btn-lg">Yönetici Paneline Git</a>
                         <a href="{% url 'okul_ayarlari' %}" class="btn btn-lg" style="background-color: #495057; color: white;">Okul Yapılandırması</a>
                         <a href="{% url 'okul:yonetim_index' %}" class="btn btn-lg" style="background-color: #417690; color: white;">Okul Yönetimi (CRUD)</a>
+                        <a href="{% url 'yedekleme:yedek_listesi' %}" class="btn btn-lg" style="background-color: #7f1d1d; color: white;">Veritabanı Yedekleri</a>
                         {% if is_tarih_degistirebilir %}
                         <a href="{% url 'senesonu:gecis_listesi' %}" class="btn btn-lg" style="background-color: #b45309; color: white;">Sene Sonu Geçişleri</a>
                         {% endif %}

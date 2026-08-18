@@ -39,7 +39,6 @@ yedekler/
 *.dump
 *.sql
 *.backup
-
 # Geçici ve önbellek dosyaları
 *.cache
 .cache/

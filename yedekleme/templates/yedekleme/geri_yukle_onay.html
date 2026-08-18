@@ -1,0 +1,51 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}Yedeği Geri Yükle – Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+{% include "okul/yonetim/_style.html" %}
+
+<div class="container">
+  <a class="ay-ust-link" href="{% url 'yedekleme:yedek_listesi' %}">← Veritabanı Yedekleri</a>
+
+  <div class="ay-kart ay-kart-half" style="max-width:560px;">
+    <div class="ay-baslik">Yedeği Geri Yükle</div>
+
+    {% include "okul/yonetim/_mesajlar.html" %}
+
+    <ul class="ay-mesajlar">
+      <li class="ay-mesaj-error">
+        <strong>Dikkat:</strong> Bu işlem veritabanındaki tüm mevcut veriyi
+        <strong>{{ yedek.name }}</strong> içeriğiyle değiştirir ve geri alınamaz.
+        İşlem öncesi otomatik bir güvenlik yedeği alınacaktır.
+      </li>
+    </ul>
+
+    <form method="post" action="{% url 'yedekleme:yedek_geri_yukle' %}">
+      {% csrf_token %}
+      {{ form.dosya_adi }}
+
+      <div class="ay-form-group" style="margin-bottom:1rem;">
+        <label for="{{ form.dogrulama.id_for_label }}">{{ form.dogrulama.label }}</label>
+        {{ form.dogrulama }}
+        {% if form.dogrulama.errors %}<div class="ay-error">{{ form.dogrulama.errors.0 }}</div>{% endif %}
+        <p style="font-size:.78rem;color:#6b7280;margin:0;">{{ form.dogrulama.help_text }}</p>
+      </div>
+
+      <div class="ay-form-group" style="margin-bottom:1rem;">
+        <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;">
+          {{ form.onay }} {{ form.onay.label }}
+        </label>
+        {% if form.onay.errors %}<div class="ay-error">{{ form.onay.errors.0 }}</div>{% endif %}
+      </div>
+
+      <div class="ay-btn-row">
+        <button type="submit" class="btn-kaydet btn-tehlike">Geri Yüklemeyi Onayla</button>
+        <a class="btn-kaydet btn-vazgec" href="{% url 'yedekleme:yedek_listesi' %}">Vazgeç</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

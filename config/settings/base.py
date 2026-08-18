@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "secmelidersler",
     "ogrencidersleri",
     "senesonu",
+    "yedekleme",
 ]
 
 MIDDLEWARE = [
