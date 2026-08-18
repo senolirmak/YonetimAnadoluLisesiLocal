@@ -38,6 +38,38 @@ Okul personelinin haftalık nöbet görevlerini, ders doldurma listelerini, deva
 
 ## Kurulum
 
+> **Hızlı kurulum:** Aşağıdaki tüm adımları (sanal ortam, bağımlılıklar, `.env`, PostgreSQL,
+> migration, gruplar, süper kullanıcı, statik dosyalar) tek seferde otomatikleştiren bir Python
+> kurulum sihirbazı kullanılabilir — üçüncü parti bir pakete ihtiyaç duymadan yalnızca standart
+> kütüphaneyle çalışan `bootstrap.py`'yi çalıştırmanız yeterli:
+>
+> ```bash
+> python3 bootstrap.py
+> ```
+>
+> `bootstrap.py` sanal ortamı oluşturur, projeyi `pip install -e .` ile (bağımlılıklar
+> `pyproject.toml` üzerinden `setuptools`'un `dynamic dependencies` özelliğiyle `requirements.txt`'ten
+> okunur) kurar ve asıl interaktif akışı — `kurulumcu` paketinin sağladığı `okulyonetim-kur` konsol
+> komutunu — sanal ortam içinden devralır. Proje zaten `pip install -e .` ile kuruluysa (venv aktifken)
+> doğrudan `okulyonetim-kur` de çalıştırılabilir.
+>
+> Sihirbaz önce kurulum modunu sorar:
+> - **Yerel geliştirme**: `python manage.py runserver` ile çalıştırılır.
+> - **Sunucu / üretim**: Gunicorn + Nginx + systemd ile site gerçekten ayağa kaldırılır — apt/dnf
+>   otomatik algılanır, gerekli sistem paketleri (nginx, poppler-utils, gerekiyorsa PostgreSQL
+>   sunucusu) kurulur, `DEBUG=False`/`ALLOWED_HOSTS` ile `.env` yazılır, systemd servis dosyası ve
+>   Nginx reverse proxy yapılandırması oluşturulup başlatılır. **Bu mod yalnızca `/srv/akalyonetim`
+>   dizininden çalıştırılmalıdır** (bkz. `deploy.sh` — sonraki güncellemeler o script ile yapılır).
+>
+> Her iki modda da PostgreSQL için iki seçenek sunulur:
+> - **Native**: zaten kurulu/çalışan bir PostgreSQL sunucusuna bağlanır (superuser bilgisi ister;
+>   sunucu modunda eksikse otomatik kurulur).
+> - **Konteyner**: sistemde `podman` veya `docker` varsa (otomatik algılanır), PostgreSQL'i
+>   `--restart=always` ile ayrı bir konteynerde başlatır — ayrıca PostgreSQL kurmanıza gerek kalmaz.
+>
+> Tekrar çalıştırıldığında zaten tamamlanmış adımları atlar. Aşağıdaki adımlar yerel geliştirme
+> modunun manuel anlatımıdır.
+
 ### Gereksinimler
 
 - Python 3.12+
@@ -195,6 +227,7 @@ Uygulama `http://127.0.0.1:8000/` adresinde çalışacaktır.
 | `muduriyetcagri` | `/muduriyetcagri/` | Müdüriyet görüşme kayıtları |
 | `ogrencinobet` | `/ogrencinobet/` | Öğrenci nöbet görevleri |
 | `pano` | `/pano/` | Dijital pano / kiosk |
+| `yedekleme` | `/yedekleme/` | Veritabanı yedeği oluşturma/indirme/silme/geri yükleme — yalnızca müdür yardımcısı |
 | `admin` | `/admin/` | Django yönetim paneli |
 
 **Auth URL'leri:**
@@ -222,6 +255,26 @@ Personel, nöbet, ders programı ve sınıf/şube verilerini içeri aktarmak iç
 ---
 
 ## Veritabanı Yedeği
+
+Müdür yardımcısı rolündeki kullanıcılar `/yedekleme/` üzerinden web arayüzünden yedek
+alabilir, mevcut yedekleri listeleyip indirebilir/silebilir ve (çift onaylı, veritabanı
+adını yazarak doğrulanan, öncesinde otomatik güvenlik yedeği alan bir akışla) geri
+yükleyebilir — bkz. `yedekleme` app'i. `backups/` dizinindeki tüm `.dump` dosyaları
+(manuel, web üzerinden ve `deploy.sh`'in otomatik aldıkları dahil) bu ekranda listelenir.
+
+`yedekleme` varsayılan olarak host'ta kurulu `pg_dump`/`pg_restore` ikili dosyalarını
+TCP üzerinden kullanır. PostgreSQL bir Podman/Docker konteynerinde çalışıyorsa (host'ta
+istemci araçları kurulu olmayabilir), `.env`'e aşağıdaki isteğe bağlı değişkenler
+eklenerek işlemler doğrudan konteyner içinde (`podman/docker exec`) çalıştırılabilir —
+bkz. `.env.example`:
+
+```env
+YEDEKLEME_POSTGRES_KONTEYNER=postgres      # konteyner adı
+YEDEKLEME_KOMUT_ONEKI=flatpak-spawn --host # sandbox'tan host'a çıkmak gerekiyorsa
+YEDEKLEME_KONTEYNER_ARACI=docker           # podman yerine docker kullanılacaksa
+```
+
+Komut satırından manuel olarak da alınabilir/geri yüklenebilir:
 
 ```bash
 PGPASSWORD=<şifre> pg_dump -U nobet_user -h localhost -F c -f backups/nobet_db_$(date +%Y%m%d_%H%M%S).dump nobet_db

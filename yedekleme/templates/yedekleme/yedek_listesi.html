@@ -1,0 +1,60 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}Veritabanı Yedekleri – Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+{% include "okul/yonetim/_style.html" %}
+
+<div class="container">
+  <a class="ay-ust-link" href="{% url 'index' %}">← Ana Sayfa</a>
+
+  <div class="ay-kart ay-kart-full">
+    <div class="ay-baslik" style="display:flex;align-items:center;gap:.75rem;justify-content:space-between;">
+      <span>Veritabanı Yedekleri</span>
+      <form method="post" action="{% url 'yedekleme:yedek_olustur' %}" style="margin:0;">
+        {% csrf_token %}
+        <button type="submit" class="btn-kaydet">+ Yeni Yedek Al</button>
+      </form>
+    </div>
+
+    {% include "okul/yonetim/_mesajlar.html" %}
+
+    <p style="color:#6b7280; font-size:.85rem; margin:-0.5rem 0 1rem;">
+      Bu sayfa <code>backups/</code> dizinindeki tüm <code>.dump</code> dosyalarını listeler —
+      manuel alınan yedekler ve <code>deploy.sh</code>'in her güncelleme öncesi otomatik
+      aldığı yedekler dahil.
+    </p>
+
+    <div style="overflow-x:auto;">
+    <table class="ay-tablo">
+      <thead>
+        <tr>
+          <th>Dosya</th>
+          <th>Boyut</th>
+          <th>Oluşturma Tarihi</th>
+          <th>İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for yedek in yedekler %}
+        <tr>
+          <td>{{ yedek.ad }}</td>
+          <td>{{ yedek.boyut_mb }} MB</td>
+          <td>{{ yedek.olusturma_tarihi|date:"d.m.Y H:i" }}</td>
+          <td class="ay-satir-eylem">
+            <a href="{% url 'yedekleme:yedek_indir' dosya_adi=yedek.ad %}">İndir</a>
+            <a href="{% url 'yedekleme:yedek_geri_yukle_onay' dosya_adi=yedek.ad %}" style="color:#b45309;">Geri Yükle</a>
+            <a class="ay-sil-link" href="{% url 'yedekleme:yedek_sil_onay' dosya_adi=yedek.ad %}">Sil</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="ay-bos">Henüz yedek alınmamış.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

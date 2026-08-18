@@ -13,6 +13,17 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # unique_together "ders_saati" alanını kapsadığı için, SQLite bu alanı
+        # kaldırıp aynı adla yeniden oluştururken (tablo yeniden kurularak
+        # uygulanan ALTER TABLE emülasyonu) otomatik unique index'i eski sütunla
+        # karıştırıp hata verebiliyor (Postgres'te sorun yok, gerçek ALTER TABLE
+        # RENAME COLUMN kullanılıyor). Kısıtı alan değişikliklerinden önce
+        # geçici olarak kaldırıp sonrasında aynı adla geri ekliyoruz — nihai
+        # model state (ve zaten uygulanmış Postgres veritabanları) değişmiyor.
+        migrations.AlterUniqueTogether(
+            name="dersdefteri",
+            unique_together=set(),
+        ),
         migrations.RemoveField(
             model_name="dersdefteri",
             name="ders_saati",
@@ -29,5 +40,9 @@ class Migration(migrations.Migration):
             model_name="dersdefteri",
             old_name="ders_saati_fk",
             new_name="ders_saati",
+        ),
+        migrations.AlterUniqueTogether(
+            name="dersdefteri",
+            unique_together={("ogretmen", "tarih", "sinif_sube", "ders_saati")},
         ),
     ]

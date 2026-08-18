@@ -1,3 +1,23 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "okul-yonetim-sistemi"
+version = "0.1.0"
+description = "Nöbet, sınav, ders programı ve öğrenci takibi için Django tabanlı okul yönetim sistemi."
+requires-python = ">=3.12"
+dynamic = ["dependencies"]
+
+[project.scripts]
+okulyonetim-kur = "kurulumcu.cli:main"
+
+[tool.setuptools]
+packages = ["kurulumcu"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
