@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "okul-yonetim-sistemi"
-version = "0.1.0"
+version = "1.1.0"
 description = "Nöbet, sınav, ders programı ve öğrenci takibi için Django tabanlı okul yönetim sistemi."
 requires-python = ">=3.12"
 dynamic = ["dependencies"]
