@@ -50,6 +50,44 @@ def konteyner_araci_tespit_et() -> str | None:
     return None
 
 
+def sunucu_surumu(ayar: DBAyarlari) -> str | None:
+    """Bağlı PostgreSQL sunucusunun kısa sürüm bilgisini döner (örn. 'PostgreSQL 18.3');
+    bağlanılamıyorsa ya da psycopg2 yoksa None. Yalnızca bilgilendirme amaçlıdır."""
+    try:
+        import psycopg2
+    except ImportError:
+        return None
+    try:
+        baglanti = psycopg2.connect(
+            dbname=ayar.ad,
+            user=ayar.kullanici,
+            password=ayar.sifre,
+            host=ayar.host,
+            port=ayar.port,
+            connect_timeout=3,
+        )
+        try:
+            with baglanti.cursor() as imlec:
+                imlec.execute("SHOW server_version;")
+                surum = imlec.fetchone()[0]
+        finally:
+            baglanti.close()
+        return f"PostgreSQL {surum}"
+    except Exception:
+        return None
+
+
+def konteyner_calisiyor_mu(arac: str, ayar: DBAyarlari) -> str | None:
+    """`<db_adı>_pg` adında, `konteyner_ile_kur`'un oluşturduğu kalıpta çalışan bir
+    konteyner varsa adını döner — zaten bağlanılabilen bir DB'nin konteynerde mi
+    yoksa native mi çalıştığını bilgilendirmek için kullanılır."""
+    konteyner_adi = f"{ayar.ad}_pg"
+    var_mi = y.cikti(
+        [arac, "ps", "--filter", f"name=^{konteyner_adi}$", "--filter", "status=running", "-q"]
+    )
+    return konteyner_adi if var_mi else None
+
+
 def konteyner_ile_kur(arac: str, ayar: DBAyarlari, imaj: str = VARSAYILAN_IMAJ) -> str:
     """Konteyneri oluşturur/başlatır, hazır olmasını bekler ve konteyner adını döner."""
     konteyner_adi = f"{ayar.ad}_pg"
@@ -75,8 +113,11 @@ def konteyner_ile_kur(arac: str, ayar: DBAyarlari, imaj: str = VARSAYILAN_IMAJ) 
                 f"POSTGRES_USER={ayar.kullanici}",
                 "-e",
                 f"POSTGRES_PASSWORD={ayar.sifre}",
+                # Yalnızca localhost'a bağla — sunucuda public IP varsa DB portunun
+                # dışarıdan erişilebilir kalmasını önler (uygulama zaten aynı
+                # makinede localhost/127.0.0.1 üzerinden bağlanıyor).
                 "-p",
-                f"{ayar.port}:5432",
+                f"127.0.0.1:{ayar.port}:5432",
                 "-v",
                 f"{volume_adi}:/var/lib/postgresql/data",
                 imaj,

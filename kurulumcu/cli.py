@@ -122,8 +122,16 @@ def main() -> None:
         y.bilgi(f"Konteyner aracı bulundu: {konteyner_araci} (PostgreSQL konteynerle başlatılabilir)")
     elif y.komut_var_mi("psql"):
         y.bilgi("Konteyner aracı (podman/docker) bulunamadı; native PostgreSQL kullanılacak (psql mevcut).")
+    elif paket_yon:
+        y.bilgi(
+            "Konteyner aracı (podman/docker) ve psql bulunamadı; PostgreSQL adımında "
+            "'Konteyner ile başlat' seçilirse podman otomatik kurulacak."
+        )
     elif not sunucu_modu:
-        y.hata("Ne podman/docker ne de psql bulundu. PostgreSQL'e bağlanmak veya başlatmak için en az birini kurun.")
+        y.hata(
+            "Ne podman/docker ne de psql bulundu, otomatik kurulum için bir paket yöneticisi "
+            "(apt/dnf) da yok. PostgreSQL'e bağlanmak veya başlatmak için en az birini kurun."
+        )
 
     if sunucu_modu:
         if not paket_yon:
@@ -187,19 +195,29 @@ def main() -> None:
 
     konteyner_adi: str | None = None
     if veritabani.baglanabiliyor_mu(ayar):
-        y.basari(
-            f"Veritabanına zaten bağlanılabiliyor ({ayar.kullanici}@{ayar.host}:{ayar.port}/{ayar.ad}), "
-            "bu adım atlanıyor."
-        )
+        detaylar = [f"{ayar.kullanici}@{ayar.host}:{ayar.port}/{ayar.ad}"]
+        surum = veritabani.sunucu_surumu(ayar)
+        if surum:
+            detaylar.append(surum)
+        if konteyner_araci:
+            calisan_konteyner = veritabani.konteyner_calisiyor_mu(konteyner_araci, ayar)
+            if calisan_konteyner:
+                detaylar.append(f"konteynerde çalışıyor: {calisan_konteyner}")
+        y.basari(f"Veritabanına zaten bağlanılabiliyor ({', '.join(detaylar)}), bu adım atlanıyor.")
     else:
         print()
         print("PostgreSQL nasıl çalıştırılsın?")
         print("  1) Zaten kurulu/çalışan bir sunucuya bağlan (native)")
         if konteyner_araci:
-            print(f"  2) Konteyner ile başlat (algılanan araç: {konteyner_araci})")
-        db_mod = y.sor("Seçim", "1")
+            print(f"  2) Konteyner ile başlat (Önerilen — algılanan araç: {konteyner_araci})")
+        elif paket_yon:
+            print("  2) Konteyner ile başlat (Önerilen — podman otomatik kurulacak)")
+        varsayilan_secim = "2" if (konteyner_araci or paket_yon) else "1"
+        db_mod = y.sor("Seçim", varsayilan_secim)
 
-        if db_mod == "2" and konteyner_araci:
+        if db_mod == "2" and (konteyner_araci or paket_yon):
+            if not konteyner_araci:
+                konteyner_araci = paket_yoneticisi.konteyner_araci_kur(paket_yon)
             konteyner_adi = veritabani.konteyner_ile_kur(konteyner_araci, ayar)
         else:
             veritabani.native_ile_kur(ayar, paket_yon, sunucu_modu)
