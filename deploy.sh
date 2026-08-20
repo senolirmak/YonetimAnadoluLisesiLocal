@@ -13,7 +13,6 @@ VENV="$PROJE_DIZIN/venv"
 YEDEK_DIZIN="$PROJE_DIZIN/backups"
 
 SERVIS="akalyonetim.service"
-POSTGRES_CONTAINER="postgresql"
 
 KIRMIZI='\033[0;31m'
 YESIL='\033[0;32m'
@@ -34,6 +33,12 @@ cd "$PROJE_DIZIN"
 
 DB_NAME=$(grep "^DB_NAME=" .env | cut -d= -f2- | xargs)
 DB_USER=$(grep "^DB_USER=" .env | cut -d= -f2- | xargs)
+
+# kurulumcu, PostgreSQL konteynerini "<DB_NAME>_pg" adıyla oluşturur (bkz.
+# kurulumcu/veritabani.py). .env'de YEDEKLEME_POSTGRES_KONTEYNER tanımlıysa
+# (yedekleme app'inin de kullandığı aynı override) o değer önceliklidir.
+POSTGRES_CONTAINER=$(grep "^YEDEKLEME_POSTGRES_KONTEYNER=" .env 2>/dev/null | cut -d= -f2- | xargs || true)
+POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-${DB_NAME}_pg}"
 
 echo ""
 echo -e "${MAVI}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${SIFIRLA}"
