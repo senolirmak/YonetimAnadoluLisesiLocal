@@ -11,20 +11,27 @@
   <a class="ay-ust-link" href="{% url 'index' %}">← Ana Sayfa</a>
 
   <div class="ay-kart ay-kart-full">
-    <div class="ay-baslik" style="display:flex;align-items:center;gap:.75rem;justify-content:space-between;">
+    <div class="ay-baslik" style="display:flex;align-items:center;gap:.75rem;justify-content:space-between;flex-wrap:wrap;">
       <span>Veritabanı Yedekleri</span>
-      <form method="post" action="{% url 'yedekleme:yedek_olustur' %}" style="margin:0;">
-        {% csrf_token %}
-        <button type="submit" class="btn-kaydet">+ Yeni Yedek Al</button>
-      </form>
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <form method="post" action="{% url 'yedekleme:yedek_yukle' %}" enctype="multipart/form-data" style="margin:0;display:flex;align-items:center;gap:.4rem;">
+          {% csrf_token %}
+          <input type="file" name="dosya" accept=".dump" required>
+          <button type="submit" class="btn-kaydet">Yedek Yükle</button>
+        </form>
+        <form method="post" action="{% url 'yedekleme:yedek_olustur' %}" style="margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn-kaydet">+ Yeni Yedek Al</button>
+        </form>
+      </div>
     </div>
 
     {% include "okul/yonetim/_mesajlar.html" %}
 
     <p style="color:#6b7280; font-size:.85rem; margin:-0.5rem 0 1rem;">
       Bu sayfa <code>backups/</code> dizinindeki tüm <code>.dump</code> dosyalarını listeler —
-      manuel alınan yedekler ve <code>deploy.sh</code>'in her güncelleme öncesi otomatik
-      aldığı yedekler dahil.
+      manuel alınan yedekler, <code>deploy.sh</code>'in her güncelleme öncesi otomatik
+      aldığı yedekler ve başka bir ortamdan yüklenen dosyalar dahil.
     </p>
 
     <div style="overflow-x:auto;">

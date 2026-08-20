@@ -15,7 +15,7 @@
 
     <p><strong>{{ yedek.name }}</strong> dosyasını silmek üzeresiniz. Bu işlem geri alınamaz.</p>
 
-    <form method="post">
+    <form method="post" action="{% url 'yedekleme:yedek_sil' dosya_adi=yedek.name %}">
       {% csrf_token %}
       <div class="ay-btn-row">
         <button type="submit" class="btn-kaydet btn-tehlike">Evet, Sil</button>

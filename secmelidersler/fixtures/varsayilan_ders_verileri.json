@@ -1,0 +1,2294 @@
+{
+  "branslar": [
+    "Almanca",
+    "Beden Eğitimi",
+    "Bilinmiyor",
+    "Biyoloji",
+    "Coğrafya",
+    "Din Kültürü ve Ahlâk Bilgisi",
+    "Felsefe",
+    "Fizik",
+    "Görsel Sanatlar",
+    "İngilizce",
+    "Kimya / Kimya Teknolojisi",
+    "Matematik",
+    "Müzik",
+    "Rehberlik",
+    "Tarih",
+    "Türk Dili ve Edebiyatı"
+  ],
+  "ortak_ders_havuzu": [
+    {
+      "ders_adi": "TÜRK DİLİ VE EDEBİYATI",
+      "derssaati": "5",
+      "sira": 0,
+      "aktif": true,
+      "branslar": [
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "ders_adi": "DİN KÜLTÜRÜ VE AHLAK BİLGİSİ",
+      "derssaati": "2",
+      "sira": 1,
+      "aktif": true,
+      "branslar": [
+        "Din Kültürü ve Ahlâk Bilgisi"
+      ]
+    },
+    {
+      "ders_adi": "TARİH",
+      "derssaati": "2",
+      "sira": 2,
+      "aktif": true,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "T.C. İNKILAP TARİHİ VE ATATÜRKÇÜLÜK",
+      "derssaati": "2",
+      "sira": 3,
+      "aktif": true,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "COĞRAFYA",
+      "derssaati": "2",
+      "sira": 4,
+      "aktif": true,
+      "branslar": [
+        "Coğrafya"
+      ]
+    },
+    {
+      "ders_adi": "MATEMATİK",
+      "derssaati": "6",
+      "sira": 5,
+      "aktif": true,
+      "branslar": [
+        "Matematik"
+      ]
+    },
+    {
+      "ders_adi": "FİZİK",
+      "derssaati": "2",
+      "sira": 6,
+      "aktif": true,
+      "branslar": [
+        "Fizik"
+      ]
+    },
+    {
+      "ders_adi": "KİMYA",
+      "derssaati": "2",
+      "sira": 7,
+      "aktif": true,
+      "branslar": [
+        "Kimya / Kimya Teknolojisi"
+      ]
+    },
+    {
+      "ders_adi": "BİYOLOJİ",
+      "derssaati": "2",
+      "sira": 8,
+      "aktif": true,
+      "branslar": [
+        "Biyoloji"
+      ]
+    },
+    {
+      "ders_adi": "FELSEFE",
+      "derssaati": "2",
+      "sira": 9,
+      "aktif": true,
+      "branslar": [
+        "Felsefe"
+      ]
+    },
+    {
+      "ders_adi": "BİRİNCİ YABANCI DİL",
+      "derssaati": "4",
+      "sira": 10,
+      "aktif": true,
+      "branslar": [
+        "İngilizce"
+      ]
+    },
+    {
+      "ders_adi": "BEDEN EĞİTİMİ VE SPOR",
+      "derssaati": "2",
+      "sira": 11,
+      "aktif": true,
+      "branslar": [
+        "Beden Eğitimi"
+      ]
+    },
+    {
+      "ders_adi": "GÖRSEL SANATLAR/MÜZİK",
+      "derssaati": "2",
+      "sira": 12,
+      "aktif": true,
+      "branslar": [
+        "Görsel Sanatlar",
+        "Müzik"
+      ]
+    },
+    {
+      "ders_adi": "BEDEN EĞİTİMİ VE SPOR/GÖRSEL SANATLAR/MÜZİK",
+      "derssaati": "2",
+      "sira": 13,
+      "aktif": true,
+      "branslar": [
+        "Beden Eğitimi",
+        "Görsel Sanatlar",
+        "Müzik"
+      ]
+    },
+    {
+      "ders_adi": "SAĞLIK BİLGİSİ VE TRAFİK KÜLTÜRÜ",
+      "derssaati": "1",
+      "sira": 14,
+      "aktif": true,
+      "branslar": [
+        "Biyoloji"
+      ]
+    },
+    {
+      "ders_adi": "REHBERLİK VE YÖNLENDİRME",
+      "derssaati": "1",
+      "sira": 15,
+      "aktif": true,
+      "branslar": [
+        "Almanca",
+        "Biyoloji",
+        "Coğrafya",
+        "Din Kültürü ve Ahlâk Bilgisi",
+        "Felsefe",
+        "Fizik",
+        "İngilizce",
+        "Kimya / Kimya Teknolojisi",
+        "Matematik",
+        "Tarih",
+        "Türk Dili ve Edebiyatı"
+      ]
+    }
+  ],
+  "secmeli_ders_havuzu": [
+    {
+      "ders_adi": "FEN BİLİMLERİ UYGULAMALARI",
+      "derssaati": "2,3",
+      "secimsayisi": 2,
+      "sira": 0,
+      "aktif": true,
+      "branslar": [
+        "Biyoloji",
+        "Fizik",
+        "Kimya / Kimya Teknolojisi"
+      ]
+    },
+    {
+      "ders_adi": "TÜRK SOSYAL HAYATINDA AİLE",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 1,
+      "aktif": true,
+      "branslar": [
+        "Felsefe",
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "ADABIMUAŞERET",
+      "derssaati": "1",
+      "secimsayisi": 1,
+      "sira": 2,
+      "aktif": true,
+      "branslar": [
+        "Almanca",
+        "Felsefe"
+      ]
+    },
+    {
+      "ders_adi": "ASTRONOMİ VE UZAY BİLİMLERİ",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 3,
+      "aktif": true,
+      "branslar": [
+        "Fizik"
+      ]
+    },
+    {
+      "ders_adi": "KUR’AN-I KERİM",
+      "derssaati": "2",
+      "secimsayisi": 4,
+      "sira": 4,
+      "aktif": true,
+      "branslar": [
+        "Din Kültürü ve Ahlâk Bilgisi"
+      ]
+    },
+    {
+      "ders_adi": "İSLAM BİLİM TARİHİ",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 5,
+      "aktif": true,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "SEÇMELİ MATEMATİK",
+      "derssaati": "6",
+      "secimsayisi": 2,
+      "sira": 6,
+      "aktif": true,
+      "branslar": [
+        "Matematik"
+      ]
+    },
+    {
+      "ders_adi": "TÜRK KÜLTÜR VE MEDENİYET TARİHİ",
+      "derssaati": "2",
+      "secimsayisi": 1,
+      "sira": 7,
+      "aktif": true,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "MATEMATİK UYGULAMALARI",
+      "derssaati": "2,3",
+      "secimsayisi": 2,
+      "sira": 8,
+      "aktif": true,
+      "branslar": [
+        "Matematik"
+      ]
+    },
+    {
+      "ders_adi": "SOSYAL BİLİM ÇALIŞMALARI",
+      "derssaati": "2,3",
+      "secimsayisi": 2,
+      "sira": 9,
+      "aktif": true,
+      "branslar": [
+        "Coğrafya",
+        "Felsefe",
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "TEMEL MATEMATİK",
+      "derssaati": "2",
+      "secimsayisi": 2,
+      "sira": 10,
+      "aktif": true,
+      "branslar": [
+        "Matematik"
+      ]
+    },
+    {
+      "ders_adi": "BİLİŞİM TEKNOLOJİLERİ VE YAZILIM",
+      "derssaati": "1,2,3,4",
+      "secimsayisi": 4,
+      "sira": 11,
+      "aktif": true,
+      "branslar": []
+    },
+    {
+      "ders_adi": "KUR’AN-I KERİM’İN ANLAM DÜNYASI",
+      "derssaati": "2",
+      "secimsayisi": 2,
+      "sira": 12,
+      "aktif": true,
+      "branslar": []
+    },
+    {
+      "ders_adi": "İSLAM KÜLTÜR VE MEDENİYETİ",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 13,
+      "aktif": true,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "PEYGAMBERİMİZİN HAYATI",
+      "derssaati": "1,2",
+      "secimsayisi": 4,
+      "sira": 14,
+      "aktif": true,
+      "branslar": [
+        "Din Kültürü ve Ahlâk Bilgisi"
+      ]
+    },
+    {
+      "ders_adi": "TEMEL DİNÎ BİLGİLER",
+      "derssaati": "1,2",
+      "secimsayisi": 2,
+      "sira": 15,
+      "aktif": true,
+      "branslar": [
+        "Din Kültürü ve Ahlâk Bilgisi"
+      ]
+    },
+    {
+      "ders_adi": "SEÇMELİ FİZİK",
+      "derssaati": "4",
+      "secimsayisi": 2,
+      "sira": 16,
+      "aktif": true,
+      "branslar": [
+        "Fizik"
+      ]
+    },
+    {
+      "ders_adi": "PROJE TASARIMI VE UYGULAMALARI",
+      "derssaati": "2,3,4",
+      "secimsayisi": 4,
+      "sira": 17,
+      "aktif": true,
+      "branslar": [
+        "Fizik",
+        "Kimya / Kimya Teknolojisi"
+      ]
+    },
+    {
+      "ders_adi": "SPOR EĞİTİMİ",
+      "derssaati": "1,2,3",
+      "secimsayisi": 3,
+      "sira": 18,
+      "aktif": true,
+      "branslar": [
+        "Beden Eğitimi"
+      ]
+    },
+    {
+      "ders_adi": "SANAT EĞİTİMİ",
+      "derssaati": "1,2,3",
+      "secimsayisi": 3,
+      "sira": 19,
+      "aktif": true,
+      "branslar": [
+        "Görsel Sanatlar"
+      ]
+    },
+    {
+      "ders_adi": "DÜŞÜNME EĞİTİMİ",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 20,
+      "aktif": true,
+      "branslar": [
+        "Felsefe"
+      ]
+    },
+    {
+      "ders_adi": "SEÇMELİ KİMYA",
+      "derssaati": "4",
+      "secimsayisi": 2,
+      "sira": 21,
+      "aktif": true,
+      "branslar": [
+        "Kimya / Kimya Teknolojisi"
+      ]
+    },
+    {
+      "ders_adi": "TÜRK DÜŞÜNCE TARİHİ",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 22,
+      "aktif": true,
+      "branslar": [
+        "Felsefe",
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "KLASİK AHLAK METİNLERİ",
+      "derssaati": "1,2",
+      "secimsayisi": 3,
+      "sira": 23,
+      "aktif": true,
+      "branslar": [
+        "Felsefe",
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "ders_adi": "SEÇMELİ BİYOLOJİ",
+      "derssaati": "4",
+      "secimsayisi": 2,
+      "sira": 24,
+      "aktif": true,
+      "branslar": [
+        "Biyoloji"
+      ]
+    },
+    {
+      "ders_adi": "DEMOKRASİ VE İNSAN HAKLARI",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 25,
+      "aktif": true,
+      "branslar": [
+        "Felsefe"
+      ]
+    },
+    {
+      "ders_adi": "SÜRDÜRÜLEBİLİR TARIM VE GIDA GÜVENLİĞİ",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 26,
+      "aktif": true,
+      "branslar": [
+        "Coğrafya"
+      ]
+    },
+    {
+      "ders_adi": "SEÇMELİ TÜRK DİLİ VE EDEBİYATI",
+      "derssaati": "3,5",
+      "secimsayisi": 2,
+      "sira": 27,
+      "aktif": true,
+      "branslar": [
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "ders_adi": "İKLİM, ÇEVRE VE YENİLİKÇİ ÇÖZÜMLER",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 28,
+      "aktif": true,
+      "branslar": [
+        "Coğrafya"
+      ]
+    },
+    {
+      "ders_adi": "SEÇMELİ TARİH",
+      "derssaati": "2,4",
+      "secimsayisi": 1,
+      "sira": 29,
+      "aktif": true,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "METİN TAHLİLLERİ",
+      "derssaati": "1,2",
+      "secimsayisi": 2,
+      "sira": 30,
+      "aktif": true,
+      "branslar": [
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "ders_adi": "TEMEL HUKUK BİLGİSİ",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 31,
+      "aktif": true,
+      "branslar": []
+    },
+    {
+      "ders_adi": "ÇAĞDAŞ TÜRK VE DÜNYA TARİHİ",
+      "derssaati": "2",
+      "secimsayisi": 1,
+      "sira": 32,
+      "aktif": true,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "GİRİŞİMCİLİK",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 33,
+      "aktif": true,
+      "branslar": []
+    },
+    {
+      "ders_adi": "SEÇMELİ COĞRAFYA",
+      "derssaati": "2,4",
+      "secimsayisi": 2,
+      "sira": 34,
+      "aktif": true,
+      "branslar": [
+        "Coğrafya"
+      ]
+    },
+    {
+      "ders_adi": "SEÇMELİ İKİNCİ YABANCI DİL",
+      "derssaati": "1,2,4",
+      "secimsayisi": 4,
+      "sira": 35,
+      "aktif": true,
+      "branslar": [
+        "Almanca"
+      ]
+    },
+    {
+      "ders_adi": "PSİKOLOJİ",
+      "derssaati": "2",
+      "secimsayisi": 1,
+      "sira": 36,
+      "aktif": true,
+      "branslar": [
+        "Felsefe"
+      ]
+    },
+    {
+      "ders_adi": "OSMANLI TÜRKÇESİ",
+      "derssaati": "2",
+      "secimsayisi": 3,
+      "sira": 37,
+      "aktif": true,
+      "branslar": [
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "ders_adi": "SOSYOLOJİ",
+      "derssaati": "2",
+      "secimsayisi": 1,
+      "sira": 38,
+      "aktif": true,
+      "branslar": [
+        "Felsefe"
+      ]
+    },
+    {
+      "ders_adi": "MANTIK",
+      "derssaati": "2",
+      "secimsayisi": 1,
+      "sira": 39,
+      "aktif": true,
+      "branslar": [
+        "Felsefe"
+      ]
+    },
+    {
+      "ders_adi": "TÜRK DÜNYASI COĞRAFYASI",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 40,
+      "aktif": true,
+      "branslar": [
+        "Coğrafya"
+      ]
+    },
+    {
+      "ders_adi": "SEÇMELİ BİRİNCİ YABANCI DİL",
+      "derssaati": "2,10,12",
+      "secimsayisi": 2,
+      "sira": 41,
+      "aktif": true,
+      "branslar": [
+        "İngilizce"
+      ]
+    },
+    {
+      "ders_adi": "ORTAK TÜRK EDEBİYATI",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 42,
+      "aktif": true,
+      "branslar": [
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "ders_adi": "ORTAK TÜRK TARİHİ",
+      "derssaati": "1,2",
+      "secimsayisi": 1,
+      "sira": 43,
+      "aktif": true,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "ders_adi": "HEDEF TEMELLİ DESTEK EĞİTİMİ",
+      "derssaati": "3,4,5,6",
+      "secimsayisi": 1,
+      "sira": 44,
+      "aktif": true,
+      "branslar": [
+        "Biyoloji",
+        "Fizik",
+        "İngilizce",
+        "Kimya / Kimya Teknolojisi",
+        "Matematik",
+        "Tarih",
+        "Türk Dili ve Edebiyatı"
+      ]
+    }
+  ],
+  "ortak_dersler": [
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "TÜRK DİLİ VE EDEBİYATI",
+      "haftalik_saat": 5,
+      "sira": 0,
+      "branslar": [
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "DİN KÜLTÜRÜ VE AHLAK BİLGİSİ",
+      "haftalik_saat": 2,
+      "sira": 2,
+      "branslar": [
+        "Din Kültürü ve Ahlâk Bilgisi"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "TARİH",
+      "haftalik_saat": 2,
+      "sira": 3,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "COĞRAFYA",
+      "haftalik_saat": 2,
+      "sira": 5,
+      "branslar": [
+        "Coğrafya"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "MATEMATİK",
+      "haftalik_saat": 6,
+      "sira": 6,
+      "branslar": [
+        "Matematik"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "FİZİK",
+      "haftalik_saat": 2,
+      "sira": 7,
+      "branslar": [
+        "Fizik"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "KİMYA",
+      "haftalik_saat": 2,
+      "sira": 8,
+      "branslar": [
+        "Kimya / Kimya Teknolojisi"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "BİYOLOJİ",
+      "haftalik_saat": 2,
+      "sira": 9,
+      "branslar": [
+        "Biyoloji"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "BİRİNCİ YABANCI DİL",
+      "haftalik_saat": 4,
+      "sira": 11,
+      "branslar": [
+        "İngilizce"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "BEDEN EĞİTİMİ VE SPOR",
+      "haftalik_saat": 2,
+      "sira": 12,
+      "branslar": [
+        "Beden Eğitimi"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "GÖRSEL SANATLAR/MÜZİK",
+      "haftalik_saat": 2,
+      "sira": 13,
+      "branslar": [
+        "Görsel Sanatlar",
+        "Müzik"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "SAĞLIK BİLGİSİ VE TRAFİK KÜLTÜRÜ",
+      "haftalik_saat": 1,
+      "sira": 15,
+      "branslar": [
+        "Biyoloji"
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "ders_adi": "REHBERLİK VE YÖNLENDİRME",
+      "haftalik_saat": 1,
+      "sira": 16,
+      "branslar": [
+        "Almanca",
+        "Biyoloji",
+        "Coğrafya",
+        "Din Kültürü ve Ahlâk Bilgisi",
+        "Felsefe",
+        "Fizik",
+        "İngilizce",
+        "Kimya / Kimya Teknolojisi",
+        "Matematik",
+        "Tarih",
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "TÜRK DİLİ VE EDEBİYATI",
+      "haftalik_saat": 5,
+      "sira": 1,
+      "branslar": [
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "DİN KÜLTÜRÜ VE AHLAK BİLGİSİ",
+      "haftalik_saat": 2,
+      "sira": 2,
+      "branslar": [
+        "Din Kültürü ve Ahlâk Bilgisi"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "TARİH",
+      "haftalik_saat": 2,
+      "sira": 3,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "COĞRAFYA",
+      "haftalik_saat": 2,
+      "sira": 5,
+      "branslar": [
+        "Coğrafya"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "MATEMATİK",
+      "haftalik_saat": 6,
+      "sira": 6,
+      "branslar": [
+        "Matematik"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "FİZİK",
+      "haftalik_saat": 2,
+      "sira": 7,
+      "branslar": [
+        "Fizik"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "KİMYA",
+      "haftalik_saat": 2,
+      "sira": 8,
+      "branslar": [
+        "Kimya / Kimya Teknolojisi"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "BİYOLOJİ",
+      "haftalik_saat": 2,
+      "sira": 9,
+      "branslar": [
+        "Biyoloji"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "FELSEFE",
+      "haftalik_saat": 2,
+      "sira": 10,
+      "branslar": [
+        "Felsefe"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "BİRİNCİ YABANCI DİL",
+      "haftalik_saat": 4,
+      "sira": 11,
+      "branslar": [
+        "İngilizce"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "BEDEN EĞİTİMİ VE SPOR",
+      "haftalik_saat": 2,
+      "sira": 12,
+      "branslar": [
+        "Beden Eğitimi"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "GÖRSEL SANATLAR/MÜZİK",
+      "haftalik_saat": 2,
+      "sira": 13,
+      "branslar": [
+        "Görsel Sanatlar",
+        "Müzik"
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "ders_adi": "REHBERLİK VE YÖNLENDİRME",
+      "haftalik_saat": 1,
+      "sira": 14,
+      "branslar": [
+        "Almanca",
+        "Biyoloji",
+        "Coğrafya",
+        "Din Kültürü ve Ahlâk Bilgisi",
+        "Felsefe",
+        "Fizik",
+        "İngilizce",
+        "Kimya / Kimya Teknolojisi",
+        "Matematik",
+        "Tarih",
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "ders_adi": "TÜRK DİLİ VE EDEBİYATI",
+      "haftalik_saat": 5,
+      "sira": 1,
+      "branslar": [
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "ders_adi": "DİN KÜLTÜRÜ VE AHLAK BİLGİSİ",
+      "haftalik_saat": 2,
+      "sira": 2,
+      "branslar": [
+        "Din Kültürü ve Ahlâk Bilgisi"
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "ders_adi": "TARİH",
+      "haftalik_saat": 2,
+      "sira": 3,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "ders_adi": "FELSEFE",
+      "haftalik_saat": 2,
+      "sira": 10,
+      "branslar": [
+        "Felsefe"
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "ders_adi": "BİRİNCİ YABANCI DİL",
+      "haftalik_saat": 4,
+      "sira": 11,
+      "branslar": [
+        "İngilizce"
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "ders_adi": "BEDEN EĞİTİMİ VE SPOR",
+      "haftalik_saat": 2,
+      "sira": 12,
+      "branslar": [
+        "Beden Eğitimi"
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "ders_adi": "GÖRSEL SANATLAR/MÜZİK",
+      "haftalik_saat": 2,
+      "sira": 13,
+      "branslar": [
+        "Görsel Sanatlar",
+        "Müzik"
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "ders_adi": "REHBERLİK VE YÖNLENDİRME",
+      "haftalik_saat": 1,
+      "sira": 14,
+      "branslar": [
+        "Almanca",
+        "Biyoloji",
+        "Coğrafya",
+        "Din Kültürü ve Ahlâk Bilgisi",
+        "Felsefe",
+        "Fizik",
+        "İngilizce",
+        "Kimya / Kimya Teknolojisi",
+        "Matematik",
+        "Tarih",
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "sinif_seviyesi": 12,
+      "ders_adi": "TÜRK DİLİ VE EDEBİYATI",
+      "haftalik_saat": 5,
+      "sira": 1,
+      "branslar": [
+        "Türk Dili ve Edebiyatı"
+      ]
+    },
+    {
+      "sinif_seviyesi": 12,
+      "ders_adi": "DİN KÜLTÜRÜ VE AHLAK BİLGİSİ",
+      "haftalik_saat": 2,
+      "sira": 2,
+      "branslar": [
+        "Din Kültürü ve Ahlâk Bilgisi"
+      ]
+    },
+    {
+      "sinif_seviyesi": 12,
+      "ders_adi": "T.C. İNKILAP TARİHİ VE ATATÜRKÇÜLÜK",
+      "haftalik_saat": 2,
+      "sira": 4,
+      "branslar": [
+        "Tarih"
+      ]
+    },
+    {
+      "sinif_seviyesi": 12,
+      "ders_adi": "BİRİNCİ YABANCI DİL",
+      "haftalik_saat": 4,
+      "sira": 11,
+      "branslar": [
+        "İngilizce"
+      ]
+    },
+    {
+      "sinif_seviyesi": 12,
+      "ders_adi": "BEDEN EĞİTİMİ VE SPOR/GÖRSEL SANATLAR/MÜZİK",
+      "haftalik_saat": 2,
+      "sira": 14,
+      "branslar": []
+    },
+    {
+      "sinif_seviyesi": 12,
+      "ders_adi": "REHBERLİK VE YÖNLENDİRME",
+      "haftalik_saat": 1,
+      "sira": 15,
+      "branslar": [
+        "Almanca",
+        "Biyoloji",
+        "Coğrafya",
+        "Din Kültürü ve Ahlâk Bilgisi",
+        "Felsefe",
+        "Fizik",
+        "İngilizce",
+        "Kimya / Kimya Teknolojisi",
+        "Matematik",
+        "Tarih",
+        "Türk Dili ve Edebiyatı"
+      ]
+    }
+  ],
+  "secmeli_ders_gruplari": [
+    {
+      "sinif_seviyesi": 9,
+      "adi": "AKADEMİK ÇALIŞMALAR",
+      "zorunlu_grup": false,
+      "sira": 1,
+      "dersler": []
+    },
+    {
+      "sinif_seviyesi": 9,
+      "adi": "İNSAN, TOPLUM VE BİLİM",
+      "zorunlu_grup": true,
+      "sira": 2,
+      "dersler": [
+        {
+          "ders_adi": "SOSYAL BİLİM ÇALIŞMALARI (2)",
+          "saat_secenekleri": "2,3",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Coğrafya",
+            "Felsefe",
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "BİLİŞİM TEKNOLOJİLERİ VE YAZILIM (4)",
+          "saat_secenekleri": "1",
+          "sira": 3,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "PROJE TASARIMI VE UYGULAMALARI (4)",
+          "saat_secenekleri": "2,3,4",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Kimya / Kimya Teknolojisi"
+          ]
+        },
+        {
+          "ders_adi": "DÜŞÜNME EĞİTİMİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "DEMOKRASİ VE İNSAN HAKLARI (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Felsefe",
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "METİN TAHLİLLERİ (2)",
+          "saat_secenekleri": "1,2",
+          "sira": 7,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ İKİNCİ YABANCI DİL (4)",
+          "saat_secenekleri": "1,2,4",
+          "sira": 8,
+          "aktif": true,
+          "branslar": [
+            "Almanca"
+          ]
+        },
+        {
+          "ders_adi": "OSMANLI TÜRKÇESİ (3)",
+          "saat_secenekleri": "2",
+          "sira": 9,
+          "aktif": true,
+          "branslar": [
+            "Tarih",
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "ASTRONOMİ VE UZAY BİLİMLERİ",
+          "saat_secenekleri": "1,2",
+          "sira": 10,
+          "aktif": true,
+          "branslar": [
+            "Fizik"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "adi": "DİN, AHLAK VE DEĞER",
+      "zorunlu_grup": true,
+      "sira": 3,
+      "dersler": [
+        {
+          "ders_adi": "KUR’AN-I KERİM (4)",
+          "saat_secenekleri": "2",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "PEYGAMBERİMİZİN HAYATI (4)",
+          "saat_secenekleri": "1,2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "TEMEL DİNÎ BİLGİLER (2)",
+          "saat_secenekleri": "1,2",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "KLASİK AHLAK METİNLERİ (3)",
+          "saat_secenekleri": "1,2",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Felsefe",
+            "Türk Dili ve Edebiyatı"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 9,
+      "adi": "KÜLTÜR, SANAT VE SPOR",
+      "zorunlu_grup": true,
+      "sira": 4,
+      "dersler": [
+        {
+          "ders_adi": "ADABIMUAŞERET (1)",
+          "saat_secenekleri": "1",
+          "sira": 0,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "TÜRK SOSYAL HAYATINDA AİLE (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "İSLAM BİLİM TARİHİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "İSLAM KÜLTÜR VE MEDENİYETİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "TÜRK KÜLTÜR VE MEDENİYET TARİHİ (1)",
+          "saat_secenekleri": "2",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "SPOR EĞİTİMİ (3)",
+          "saat_secenekleri": "1,2,3",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Beden Eğitimi"
+          ]
+        },
+        {
+          "ders_adi": "SANAT EĞİTİMİ (3)",
+          "saat_secenekleri": "1,2,3",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Görsel Sanatlar"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "adi": "AKADEMİK ÇALIŞMALAR",
+      "zorunlu_grup": false,
+      "sira": 1,
+      "dersler": []
+    },
+    {
+      "sinif_seviyesi": 10,
+      "adi": "İNSAN, TOPLUM VE BİLİM",
+      "zorunlu_grup": true,
+      "sira": 2,
+      "dersler": [
+        {
+          "ders_adi": "ASTRONOMİ VE UZAY BİLİMLERİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 0,
+          "aktif": true,
+          "branslar": [
+            "Fizik"
+          ]
+        },
+        {
+          "ders_adi": "SOSYAL BİLİM ÇALIŞMALARI (2)",
+          "saat_secenekleri": "2,3",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "BİLİŞİM TEKNOLOJİLERİ VE YAZILIM (4)",
+          "saat_secenekleri": "1,2,3",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Matematik"
+          ]
+        },
+        {
+          "ders_adi": "PROJE TASARIMI VE UYGULAMALARI (4)",
+          "saat_secenekleri": "2,3,4",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Biyoloji",
+            "Kimya / Kimya Teknolojisi"
+          ]
+        },
+        {
+          "ders_adi": "DÜŞÜNME EĞİTİMİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "DEMOKRASİ VE İNSAN HAKLARI (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "SÜRDÜRÜLEBİLİR TARIM VE GIDA GÜVENLİĞİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Biyoloji"
+          ]
+        },
+        {
+          "ders_adi": "İKLİM, ÇEVRE VE YENİLİKÇİ ÇÖZÜMLER (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 7,
+          "aktif": true,
+          "branslar": [
+            "Coğrafya"
+          ]
+        },
+        {
+          "ders_adi": "TEMEL HUKUK BİLGİSİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 8,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "METİN TAHLİLLERİ (2)",
+          "saat_secenekleri": "1,2",
+          "sira": 9,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ İKİNCİ YABANCI DİL (4)",
+          "saat_secenekleri": "1,2,4",
+          "sira": 9,
+          "aktif": true,
+          "branslar": [
+            "Almanca"
+          ]
+        },
+        {
+          "ders_adi": "OSMANLI TÜRKÇESİ (3)",
+          "saat_secenekleri": "2",
+          "sira": 10,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "TÜRK DÜNYASI COĞRAFYASI (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 11,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "ORTAK TÜRK EDEBİYATI (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 12,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "ORTAK TÜRK TARİHİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 13,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "adi": "DİN, AHLAK VE DEĞER",
+      "zorunlu_grup": true,
+      "sira": 3,
+      "dersler": [
+        {
+          "ders_adi": "KUR’AN-I KERİM (4)",
+          "saat_secenekleri": "2",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "PEYGAMBERİMİZİN HAYATI (4)",
+          "saat_secenekleri": "1,2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "TEMEL DİNÎ BİLGİLER (2)",
+          "saat_secenekleri": "1,2",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "TÜRK DÜŞÜNCE TARİHİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "KLASİK AHLAK METİNLERİ (3)",
+          "saat_secenekleri": "1,2",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 10,
+      "adi": "KÜLTÜR, SANAT VE SPOR",
+      "zorunlu_grup": true,
+      "sira": 4,
+      "dersler": [
+        {
+          "ders_adi": "ADABIMUAŞERET (1)",
+          "saat_secenekleri": "1",
+          "sira": 0,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "TÜRK SOSYAL HAYATINDA AİLE (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Felsefe",
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "İSLAM BİLİM TARİHİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "TÜRK KÜLTÜR VE MEDENİYET TARİHİ (1)",
+          "saat_secenekleri": "2",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "İSLAM KÜLTÜR VE MEDENİYETİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "SPOR EĞİTİMİ (3)",
+          "saat_secenekleri": "1,2,3",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Beden Eğitimi"
+          ]
+        },
+        {
+          "ders_adi": "SANAT EĞİTİMİ (3)",
+          "saat_secenekleri": "1,2,3",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Görsel Sanatlar"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "adi": "AKADEMİK ÇALIŞMALAR",
+      "zorunlu_grup": false,
+      "sira": 1,
+      "dersler": [
+        {
+          "ders_adi": "SEÇMELİ MATEMATİK (2)",
+          "saat_secenekleri": "6",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Matematik"
+          ]
+        },
+        {
+          "ders_adi": "TEMEL MATEMATİK (2)",
+          "saat_secenekleri": "2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Matematik"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ FİZİK (2)",
+          "saat_secenekleri": "4",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Fizik"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ KİMYA (2)",
+          "saat_secenekleri": "4",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Kimya / Kimya Teknolojisi"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ BİYOLOJİ (2)",
+          "saat_secenekleri": "4",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Biyoloji"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ TÜRK DİLİ VE EDEBİYATI (2)",
+          "saat_secenekleri": "3,5",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ TARİH (1)",
+          "saat_secenekleri": "2,4",
+          "sira": 7,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ COĞRAFYA (2)",
+          "saat_secenekleri": "2,4",
+          "sira": 8,
+          "aktif": true,
+          "branslar": [
+            "Coğrafya"
+          ]
+        },
+        {
+          "ders_adi": "PSİKOLOJİ (1)",
+          "saat_secenekleri": "2",
+          "sira": 9,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "SOSYOLOJİ (1)",
+          "saat_secenekleri": "2",
+          "sira": 10,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "MANTIK (1)",
+          "saat_secenekleri": "2",
+          "sira": 11,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ BİRİNCİ YABANCI DİL (2)",
+          "saat_secenekleri": "2,10,12",
+          "sira": 12,
+          "aktif": true,
+          "branslar": [
+            "İngilizce"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "adi": "İNSAN, TOPLUM VE BİLİM",
+      "zorunlu_grup": true,
+      "sira": 2,
+      "dersler": [
+        {
+          "ders_adi": "FEN BİLİMLERİ UYGULAMALARI (2)",
+          "saat_secenekleri": "2,3",
+          "sira": 0,
+          "aktif": true,
+          "branslar": [
+            "Biyoloji",
+            "Fizik",
+            "Kimya / Kimya Teknolojisi"
+          ]
+        },
+        {
+          "ders_adi": "MATEMATİK UYGULAMALARI (2)",
+          "saat_secenekleri": "2,3",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Matematik"
+          ]
+        },
+        {
+          "ders_adi": "ASTRONOMİ VE UZAY BİLİMLERİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Fizik"
+          ]
+        },
+        {
+          "ders_adi": "SOSYAL BİLİM ÇALIŞMALARI (2)",
+          "saat_secenekleri": "2,3",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Coğrafya",
+            "Felsefe",
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "BİLİŞİM TEKNOLOJİLERİ VE YAZILIM (4)",
+          "saat_secenekleri": "1,2,3",
+          "sira": 4,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "PROJE TASARIMI VE UYGULAMALARI (4)",
+          "saat_secenekleri": "2,3,4",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Biyoloji",
+            "Kimya / Kimya Teknolojisi"
+          ]
+        },
+        {
+          "ders_adi": "DEMOKRASİ VE İNSAN HAKLARI (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "SÜRDÜRÜLEBİLİR TARIM VE GIDA GÜVENLİĞİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 7,
+          "aktif": true,
+          "branslar": [
+            "Coğrafya"
+          ]
+        },
+        {
+          "ders_adi": "İKLİM, ÇEVRE VE YENİLİKÇİ ÇÖZÜMLER (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 8,
+          "aktif": true,
+          "branslar": [
+            "Coğrafya"
+          ]
+        },
+        {
+          "ders_adi": "TEMEL HUKUK BİLGİSİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 9,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "GİRİŞİMCİLİK (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 10,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "METİN TAHLİLLERİ (2)",
+          "saat_secenekleri": "1,2",
+          "sira": 11,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ İKİNCİ YABANCI DİL (4)",
+          "saat_secenekleri": "1,2,4",
+          "sira": 12,
+          "aktif": true,
+          "branslar": [
+            "Almanca"
+          ]
+        },
+        {
+          "ders_adi": "OSMANLI TÜRKÇESİ (3)",
+          "saat_secenekleri": "2",
+          "sira": 13,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "TÜRK DÜNYASI COĞRAFYASI (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 14,
+          "aktif": true,
+          "branslar": [
+            "Coğrafya"
+          ]
+        },
+        {
+          "ders_adi": "ORTAK TÜRK EDEBİYATI (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 15,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "ORTAK TÜRK TARİHİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 16,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "adi": "DİN, AHLAK VE DEĞER",
+      "zorunlu_grup": true,
+      "sira": 3,
+      "dersler": [
+        {
+          "ders_adi": "KUR’AN-I KERİM (4)",
+          "saat_secenekleri": "2",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "KUR’AN-I KERİM’İN ANLAM DÜNYASI (2)",
+          "saat_secenekleri": "2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "PEYGAMBERİMİZİN HAYATI (4)",
+          "saat_secenekleri": "1,2",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "TEMEL DİNÎ BİLGİLER (2)",
+          "saat_secenekleri": "1,2",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "TÜRK DÜŞÜNCE TARİHİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "KLASİK AHLAK METİNLERİ (3)",
+          "saat_secenekleri": "1,2",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "İSLAM BİLİM TARİHİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 8,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 11,
+      "adi": "KÜLTÜR, SANAT VE SPOR",
+      "zorunlu_grup": true,
+      "sira": 4,
+      "dersler": [
+        {
+          "ders_adi": "TÜRK SOSYAL HAYATINDA AİLE (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 0,
+          "aktif": true,
+          "branslar": [
+            "Felsefe",
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "İSLAM BİLİM TARİHİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "TÜRK KÜLTÜR VE MEDENİYET TARİHİ (1)",
+          "saat_secenekleri": "2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "İSLAM KÜLTÜR VE MEDENİYETİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "SPOR EĞİTİMİ (3)",
+          "saat_secenekleri": "1,2",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Beden Eğitimi"
+          ]
+        },
+        {
+          "ders_adi": "SANAT EĞİTİMİ (3)",
+          "saat_secenekleri": "1,2",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Görsel Sanatlar"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 12,
+      "adi": "AKADEMİK ÇALIŞMALAR",
+      "zorunlu_grup": false,
+      "sira": 1,
+      "dersler": [
+        {
+          "ders_adi": "SEÇMELİ MATEMATİK (2)",
+          "saat_secenekleri": "6",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Matematik"
+          ]
+        },
+        {
+          "ders_adi": "TEMEL MATEMATİK (2)",
+          "saat_secenekleri": "2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Matematik"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ FİZİK (2)",
+          "saat_secenekleri": "4",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Fizik"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ KİMYA (2)",
+          "saat_secenekleri": "4",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Kimya / Kimya Teknolojisi"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ BİYOLOJİ (2)",
+          "saat_secenekleri": "4",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Biyoloji"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ TÜRK DİLİ VE EDEBİYATI (2)",
+          "saat_secenekleri": "3,5",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ TARİH (1)",
+          "saat_secenekleri": "2,4",
+          "sira": 7,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "ÇAĞDAŞ TÜRK VE DÜNYA TARİHİ",
+          "saat_secenekleri": "2",
+          "sira": 8,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ COĞRAFYA (2)",
+          "saat_secenekleri": "2,4",
+          "sira": 9,
+          "aktif": true,
+          "branslar": [
+            "Coğrafya"
+          ]
+        },
+        {
+          "ders_adi": "PSİKOLOJİ (1)",
+          "saat_secenekleri": "2",
+          "sira": 10,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "SOSYOLOJİ (1)",
+          "saat_secenekleri": "2",
+          "sira": 11,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "MANTIK (1)",
+          "saat_secenekleri": "2",
+          "sira": 12,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "SEÇMELİ BİRİNCİ YABANCI DİL (2)",
+          "saat_secenekleri": "2,10,12",
+          "sira": 13,
+          "aktif": true,
+          "branslar": [
+            "İngilizce"
+          ]
+        },
+        {
+          "ders_adi": "HEDEF TEMELLİ DESTEK EĞİTİMİ",
+          "saat_secenekleri": "3,4,5,6",
+          "sira": 14,
+          "aktif": true,
+          "branslar": []
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 12,
+      "adi": "İNSAN, TOPLUM VE BİLİM",
+      "zorunlu_grup": true,
+      "sira": 2,
+      "dersler": [
+        {
+          "ders_adi": "FEN BİLİMLERİ UYGULAMALARI (2)",
+          "saat_secenekleri": "2,3",
+          "sira": 0,
+          "aktif": true,
+          "branslar": [
+            "Biyoloji",
+            "Fizik",
+            "Kimya / Kimya Teknolojisi"
+          ]
+        },
+        {
+          "ders_adi": "MATEMATİK UYGULAMALARI (2)",
+          "saat_secenekleri": "2,3",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Matematik"
+          ]
+        },
+        {
+          "ders_adi": "ASTRONOMİ VE UZAY BİLİMLERİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Fizik"
+          ]
+        },
+        {
+          "ders_adi": "SOSYAL BİLİM ÇALIŞMALARI (2)",
+          "saat_secenekleri": "2,3",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Coğrafya",
+            "Felsefe",
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "BİLİŞİM TEKNOLOJİLERİ VE YAZILIM (4)",
+          "saat_secenekleri": "1,2,4",
+          "sira": 4,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "PROJE TASARIMI VE UYGULAMALARI (4)",
+          "saat_secenekleri": "2,3,4",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Biyoloji",
+            "Kimya / Kimya Teknolojisi"
+          ]
+        },
+        {
+          "ders_adi": "DEMOKRASİ VE İNSAN HAKLARI (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Felsefe"
+          ]
+        },
+        {
+          "ders_adi": "TEMEL HUKUK BİLGİSİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 7,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "GİRİŞİMCİLİK (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 8,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "SEÇMELİ İKİNCİ YABANCI DİL (4)",
+          "saat_secenekleri": "1,2,4",
+          "sira": 9,
+          "aktif": true,
+          "branslar": [
+            "Almanca"
+          ]
+        },
+        {
+          "ders_adi": "OSMANLI TÜRKÇESİ (3)",
+          "saat_secenekleri": "2",
+          "sira": 10,
+          "aktif": true,
+          "branslar": [
+            "Türk Dili ve Edebiyatı"
+          ]
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 12,
+      "adi": "DİN, AHLAK VE DEĞER",
+      "zorunlu_grup": true,
+      "sira": 3,
+      "dersler": [
+        {
+          "ders_adi": "KUR’AN-I KERİM (4)",
+          "saat_secenekleri": "2",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "KUR’AN-I KERİM’İN ANLAM DÜNYASI (2)",
+          "saat_secenekleri": "2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": []
+        },
+        {
+          "ders_adi": "PEYGAMBERİMİZİN HAYATI (4)",
+          "saat_secenekleri": "1,2",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "TEMEL DİNÎ BİLGİLER (2)",
+          "saat_secenekleri": "1,2",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Din Kültürü ve Ahlâk Bilgisi"
+          ]
+        },
+        {
+          "ders_adi": "TÜRK DÜŞÜNCE TARİHİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "KLASİK AHLAK METİNLERİ (3)",
+          "saat_secenekleri": "1,2",
+          "sira": 6,
+          "aktif": true,
+          "branslar": []
+        }
+      ]
+    },
+    {
+      "sinif_seviyesi": 12,
+      "adi": "KÜLTÜR, SANAT VE SPOR",
+      "zorunlu_grup": true,
+      "sira": 4,
+      "dersler": [
+        {
+          "ders_adi": "TÜRK KÜLTÜR VE MEDENİYET TARİHİ (1)",
+          "saat_secenekleri": "2",
+          "sira": 1,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "İSLAM KÜLTÜR VE MEDENİYETİ (1)",
+          "saat_secenekleri": "1,2",
+          "sira": 2,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "SPOR EĞİTİMİ (3)",
+          "saat_secenekleri": "1,2",
+          "sira": 3,
+          "aktif": true,
+          "branslar": [
+            "Beden Eğitimi"
+          ]
+        },
+        {
+          "ders_adi": "SANAT EĞİTİMİ (3)",
+          "saat_secenekleri": "1,2",
+          "sira": 4,
+          "aktif": true,
+          "branslar": [
+            "Görsel Sanatlar"
+          ]
+        },
+        {
+          "ders_adi": "TÜRK SOSYAL HAYATINDA AİLE",
+          "saat_secenekleri": "1,2",
+          "sira": 5,
+          "aktif": true,
+          "branslar": [
+            "Felsefe",
+            "Tarih"
+          ]
+        },
+        {
+          "ders_adi": "İSLAM BİLİM TARİHİ",
+          "saat_secenekleri": "1,2",
+          "sira": 6,
+          "aktif": true,
+          "branslar": [
+            "Tarih"
+          ]
+        }
+      ]
+    }
+  ]
+}
