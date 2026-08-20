@@ -1,17 +1,36 @@
-"""Yedek dosyalarını Google Drive'a (bir servis hesabı ile) yükleme servisi.
+"""Yedek dosyalarını Google Drive'a (OAuth ile, kişisel Drive hesabına) yükleme servisi.
 
 Felaket kurtarma amaçlıdır: `backups/` dizini sunucunun kendisiyle birlikte
 kaybolabileceği için, yedeklerin bir kopyasının site-dışında (Drive'da)
 tutulması hedeflenir.
 
-Yapılandırma (`.env`):
-    YEDEKLEME_GDRIVE_SA_ANAHTARI=/yol/servis-hesabi.json
-    YEDEKLEME_GDRIVE_KLASOR_ID=<paylaşılan Drive klasörünün ID'si>
+Servis hesapları (service account) KİŞİSEL Google Drive'da depolama kotasına
+sahip değildir — bir klasör paylaşılsa bile yükleme "storageQuotaExceeded"
+ile başarısız olur (Google Workspace'in Paylaşılan Drive'ları ya da
+domain-wide delegation dışında bir yolu yoktur, ikisi de kurumsal/ücretli
+hesap gerektirir). Bu yüzden burada OAuth 2.0 "installed app" akışı
+kullanılır: yedekler doğrudan SİZİN Drive hesabınıza yüklenir.
 
-İkisi de tanımlı değilse özellik sessizce devre dışıdır (`aktif_mi()` False
-döner) — hata fırlatmaz, var olan yedekleme akışını etkilemez. Servis hesabı,
-hedef klasörle en az "İçerik Yöneticisi/Düzenleyen" olarak paylaşılmış
-olmalıdır; aksi halde yükleme 403 ile başarısız olur.
+Yapılandırma (`.env`):
+    YEDEKLEME_GDRIVE_OAUTH_ISTEMCI=/yol/client_secret_....json
+        (Google Cloud Console → Credentials → OAuth Client ID → "Masaüstü
+        uygulaması" tipinde indirilen dosya)
+    YEDEKLEME_GDRIVE_TOKEN=/yol/gdrive-token.json
+        (ilk yetkilendirmede otomatik oluşturulur/güncellenir — elle
+        oluşturulmaz)
+    YEDEKLEME_GDRIVE_KLASOR_ID=<hedef Drive klasörünün ID'si>
+
+Üçü de tanımlı DEĞİLSE ya da token dosyası henüz oluşmadıysa özellik
+sessizce devre dışıdır (`aktif_mi()` False döner). İlk kurulumda, tarayıcısı
+olan bir makineden BİR KEZ:
+
+    python manage.py gdrive_yetkilendir
+
+çalıştırılıp Google hesabıyla giriş yapılıp izin verilmesi gerekir (bkz.
+`oauth_yetkilendir()`); sonrasında token otomatik yenilenir, tekrar tarayıcı
+gerekmez — sunucuda headless çalışır. Token sunucuda oluşturulamıyorsa
+(tarayıcı yoksa), yerelde oluşturulup `YEDEKLEME_GDRIVE_TOKEN` dosyası
+sunucuya kopyalanabilir.
 
 Aynı ada sahip bir dosya klasörde zaten varsa üzerine yazılır (yeni bir
 kopya oluşturulmaz) — böylece tekrar tekrar yüklemek (otomatik + manuel)
@@ -29,42 +48,104 @@ _SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 
 def aktif_mi() -> bool:
-    """Google Drive yüklemesi için gereken iki .env değişkeni de tanımlı mı."""
-    return bool(_sa_anahtar_yolu() and _klasor_id())
+    """Yapılandırma tamamsa VE ilk (tarayıcı tabanlı) yetkilendirme daha önce
+    yapılıp token dosyası oluşmuşsa True döner."""
+    token_yolu = _token_yolu()
+    return bool(_oauth_istemci_yolu() and token_yolu and _klasor_id() and Path(token_yolu).is_file())
 
 
-def _sa_anahtar_yolu() -> str | None:
-    return os.getenv("YEDEKLEME_GDRIVE_SA_ANAHTARI") or None
+def _oauth_istemci_yolu() -> str | None:
+    return os.getenv("YEDEKLEME_GDRIVE_OAUTH_ISTEMCI") or None
+
+
+def _token_yolu() -> str | None:
+    return os.getenv("YEDEKLEME_GDRIVE_TOKEN") or None
 
 
 def _klasor_id() -> str | None:
     return os.getenv("YEDEKLEME_GDRIVE_KLASOR_ID") or None
 
 
-def _servis_olustur():
-    """Drive API v3 istemcisini servis hesabı kimlik bilgileriyle oluşturur."""
+def oauth_yetkilendir() -> Path:
+    """Tarayıcı tabanlı, bir kerelik interaktif OAuth akışını başlatır (yerel
+    bir geçici sunucu açıp Google'ın izin sayfasına yönlendirir), sonucu
+    token dosyasına kaydedip yolunu döner.
+
+    Yalnızca tarayıcısı olan bir makineden çalıştırılabilir — bkz.
+    `yedekleme/management/commands/gdrive_yetkilendir.py`.
+    """
     try:
-        from google.oauth2 import service_account
+        from google_auth_oauthlib.flow import InstalledAppFlow
+    except ImportError as exc:
+        raise YedekHatasi(
+            "google-auth-oauthlib kurulu değil. 'pip install -r requirements.txt' ile kurun."
+        ) from exc
+
+    istemci_yolu = _oauth_istemci_yolu()
+    if not istemci_yolu or not Path(istemci_yolu).is_file():
+        raise YedekHatasi(
+            "YEDEKLEME_GDRIVE_OAUTH_ISTEMCI tanımlı değil ya da dosya bulunamadı. .env dosyasına "
+            "Google Cloud Console'dan indirilen client_secret_*.json dosyasının yolunu ekleyin."
+        )
+    token_yolu = _token_yolu()
+    if not token_yolu:
+        raise YedekHatasi(
+            "YEDEKLEME_GDRIVE_TOKEN tanımlı değil (.env'de token'ın kaydedileceği dosya yolu)."
+        )
+
+    akis = InstalledAppFlow.from_client_secrets_file(istemci_yolu, _SCOPES)
+    kimlik_bilgileri = akis.run_local_server(port=0)
+
+    hedef = Path(token_yolu)
+    hedef.write_text(kimlik_bilgileri.to_json(), encoding="utf-8")
+    hedef.chmod(0o600)
+    return hedef
+
+
+def _kimlik_bilgileri_al():
+    try:
+        from google.auth.transport.requests import Request
+        from google.oauth2.credentials import Credentials
+    except ImportError as exc:
+        raise YedekHatasi(
+            "Google Drive entegrasyonu için gerekli paketler kurulu değil "
+            "(google-auth, google-auth-oauthlib). 'pip install -r requirements.txt' ile kurun."
+        ) from exc
+
+    token_yolu = _token_yolu()
+    if not token_yolu or not Path(token_yolu).is_file():
+        raise YedekHatasi(
+            "Google Drive için henüz yetkilendirme yapılmamış. Önce (tarayıcısı olan bir "
+            "makineden) 'python manage.py gdrive_yetkilendir' çalıştırın."
+        )
+
+    kimlik_bilgileri = Credentials.from_authorized_user_file(token_yolu, _SCOPES)
+
+    if kimlik_bilgileri.expired and kimlik_bilgileri.refresh_token:
+        kimlik_bilgileri.refresh(Request())
+        Path(token_yolu).write_text(kimlik_bilgileri.to_json(), encoding="utf-8")
+        Path(token_yolu).chmod(0o600)
+
+    if not kimlik_bilgileri.valid:
+        raise YedekHatasi(
+            "Google Drive token'ı geçersiz/süresi dolmuş ve yenilenemedi. "
+            "'python manage.py gdrive_yetkilendir' ile yeniden yetkilendirin."
+        )
+    return kimlik_bilgileri
+
+
+def _servis_olustur():
+    """Drive API v3 istemcisini OAuth kullanıcı kimlik bilgileriyle oluşturur."""
+    try:
         from googleapiclient.discovery import build
     except ImportError as exc:
         raise YedekHatasi(
             "Google Drive entegrasyonu için gerekli paketler kurulu değil "
-            "(google-api-python-client, google-auth, google-auth-httplib2). "
+            "(google-api-python-client, google-auth-httplib2). "
             "'pip install -r requirements.txt' ile kurun."
         ) from exc
 
-    anahtar_yolu = _sa_anahtar_yolu()
-    if not anahtar_yolu or not Path(anahtar_yolu).is_file():
-        raise YedekHatasi(f"Google Drive servis hesabı anahtar dosyası bulunamadı: {anahtar_yolu}")
-
-    try:
-        kimlik_bilgileri = service_account.Credentials.from_service_account_file(
-            anahtar_yolu, scopes=_SCOPES
-        )
-    except Exception as exc:
-        raise YedekHatasi(f"Servis hesabı anahtar dosyası okunamadı/geçersiz: {exc}") from exc
-
-    return build("drive", "v3", credentials=kimlik_bilgileri, cache_discovery=False)
+    return build("drive", "v3", credentials=_kimlik_bilgileri_al(), cache_discovery=False)
 
 
 def _var_olan_dosya_id(servis, ad: str, klasor_id: str) -> str | None:
@@ -84,8 +165,9 @@ def yedek_yukle(yol: Path) -> str:
 
     if not aktif_mi():
         raise YedekHatasi(
-            "Google Drive yüklemesi yapılandırılmamış. .env dosyasına "
-            "YEDEKLEME_GDRIVE_SA_ANAHTARI ve YEDEKLEME_GDRIVE_KLASOR_ID ekleyin."
+            "Google Drive yüklemesi yapılandırılmamış ya da henüz yetkilendirilmemiş. "
+            ".env dosyasına YEDEKLEME_GDRIVE_OAUTH_ISTEMCI/YEDEKLEME_GDRIVE_TOKEN/"
+            "YEDEKLEME_GDRIVE_KLASOR_ID ekleyip 'python manage.py gdrive_yetkilendir' çalıştırın."
         )
     if not yol.is_file():
         raise YedekHatasi(f"Yüklenecek dosya bulunamadı: {yol}")
