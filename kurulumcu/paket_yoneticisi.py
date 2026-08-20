@@ -29,6 +29,20 @@ def sunucu_paketlerini_kur(paket_yoneticisi: str) -> None:
     y.basari("Sunucu paketleri hazır.")
 
 
+def konteyner_araci_kur(paket_yoneticisi: str) -> str:
+    """PostgreSQL'i konteynerle çalıştırmak için podman kurar (Docker'a göre bu
+    projede tercih edilen araç — rootless çalışabilir, ayrı bir daemon
+    gerektirmez) ve kurulan aracın adını döner."""
+    y.bilgi("Konteyner aracı (podman) kuruluyor...")
+    if paket_yoneticisi == "apt":
+        y.calistir(["apt-get", "update", "-qq"], sudo=True)
+        y.calistir(["apt-get", "install", "-y", "podman"], sudo=True, sessiz=True)
+    else:
+        y.calistir(["dnf", "install", "-y", "podman"], sudo=True, sessiz=True)
+    y.basari("Podman kuruldu.")
+    return "podman"
+
+
 def postgresql_kur(paket_yoneticisi: str) -> None:
     y.bilgi("PostgreSQL sunucusu kuruluyor...")
     if paket_yoneticisi == "apt":
