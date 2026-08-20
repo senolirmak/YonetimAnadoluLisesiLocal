@@ -9,7 +9,7 @@ traversal koruması) ve yetki sınırı (yalnızca mudur_yardimcisi).
 import subprocess
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -17,7 +17,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 
 from yedekleme.forms import GeriYuklemeOnayForm
-from yedekleme.services import yedek_servisi
+from yedekleme.services import gdrive_servisi, yedek_servisi
 
 
 class GuvenliYolTestCase(TestCase):
@@ -409,3 +409,144 @@ class YetkiTestCase(TestCase):
         yanit = self.client.post("/yedekleme/yukle/", {"dosya": dosya}, follow=True)
         mesajlar = [str(m) for m in yanit.context["messages"]]
         self.assertTrue(any(".dump" in m for m in mesajlar))
+
+
+class GdriveAktifMiTestCase(TestCase):
+    def test_ikisi_de_tanimliyken_aktif(self):
+        with patch.dict(
+            "os.environ",
+            {"YEDEKLEME_GDRIVE_SA_ANAHTARI": "/tmp/x.json", "YEDEKLEME_GDRIVE_KLASOR_ID": "abc"},
+        ):
+            self.assertTrue(gdrive_servisi.aktif_mi())
+
+    def test_biri_eksikken_pasif(self):
+        with patch.dict("os.environ", {"YEDEKLEME_GDRIVE_SA_ANAHTARI": "/tmp/x.json"}, clear=True):
+            self.assertFalse(gdrive_servisi.aktif_mi())
+
+    def test_ikisi_de_yokken_pasif(self):
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertFalse(gdrive_servisi.aktif_mi())
+
+
+class GdriveYedekYukleTestCase(TestCase):
+    def setUp(self):
+        self.gecici_dizin = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.dosya = self.gecici_dizin / "ornek.dump"
+        self.dosya.write_bytes(b"PGDMP-sahte-icerik")
+        self._env_patch = patch.dict(
+            "os.environ",
+            {
+                "YEDEKLEME_GDRIVE_SA_ANAHTARI": str(self.gecici_dizin / "sahte-anahtar.json"),
+                "YEDEKLEME_GDRIVE_KLASOR_ID": "klasor-123",
+            },
+        )
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
+
+    def test_yapilandirilmamisken_hata_verir(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(yedek_servisi.YedekHatasi):
+                gdrive_servisi.yedek_yukle(self.dosya)
+
+    def test_dosya_yoksa_hata_verir(self):
+        with self.assertRaises(yedek_servisi.YedekHatasi):
+            gdrive_servisi.yedek_yukle(self.gecici_dizin / "olmayan.dump")
+
+    @patch("yedekleme.services.gdrive_servisi._servis_olustur")
+    def test_ayni_adli_dosya_yoksa_yeni_olusturulur(self, mock_servis_olustur):
+        servis = MagicMock()
+        mock_servis_olustur.return_value = servis
+        servis.files().list().execute.return_value = {"files": []}
+        servis.files().create().execute.return_value = {"id": "yeni-dosya-id"}
+
+        sonuc = gdrive_servisi.yedek_yukle(self.dosya)
+
+        self.assertEqual(sonuc, "yeni-dosya-id")
+        servis.files().create.assert_called()
+        servis.files().update.assert_not_called()
+
+    @patch("yedekleme.services.gdrive_servisi._servis_olustur")
+    def test_ayni_adli_dosya_varsa_uzerine_yazilir(self, mock_servis_olustur):
+        servis = MagicMock()
+        mock_servis_olustur.return_value = servis
+        servis.files().list().execute.return_value = {"files": [{"id": "eski-dosya-id"}]}
+        servis.files().update().execute.return_value = {"id": "eski-dosya-id"}
+
+        sonuc = gdrive_servisi.yedek_yukle(self.dosya)
+
+        self.assertEqual(sonuc, "eski-dosya-id")
+        servis.files().update.assert_called()
+        servis.files().create.assert_not_called()
+
+    @patch("yedekleme.services.gdrive_servisi._servis_olustur")
+    def test_http_hatasi_yedekhatasina_cevrilir(self, mock_servis_olustur):
+        from googleapiclient.errors import HttpError
+
+        servis = MagicMock()
+        mock_servis_olustur.return_value = servis
+        servis.files().list().execute.return_value = {"files": []}
+        sahte_yanit = MagicMock(status=403, reason="Forbidden")
+        servis.files().create().execute.side_effect = HttpError(sahte_yanit, b"yetkisiz")
+
+        with self.assertRaises(yedek_servisi.YedekHatasi):
+            gdrive_servisi.yedek_yukle(self.dosya)
+
+
+class YedekOlusturGdriveEntegrasyonuTestCase(TestCase):
+    """yedek_olustur view'ının, gdrive aktifse otomatik yüklemeyi tetiklediğini
+    (ve gdrive hatasının yerel yedek başarısını geçersiz kılmadığını) doğrular —
+    gerçek pg_dump/Drive çağrısı yapılmaz, ikisi de mock'lanır."""
+
+    def setUp(self):
+        self.client = Client()
+        self.mudur_yardimcisi = User.objects.create_user("mudur-gdrive", password="test-pass-123")
+        grup, _ = Group.objects.get_or_create(name="mudur_yardimcisi")
+        self.mudur_yardimcisi.groups.add(grup)
+        self.client.login(username="mudur-gdrive", password="test-pass-123")
+
+        self.gecici_dizin = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self._orijinal_backup_dir = yedek_servisi.BACKUP_DIR
+        yedek_servisi.BACKUP_DIR = self.gecici_dizin
+
+    def tearDown(self):
+        yedek_servisi.BACKUP_DIR = self._orijinal_backup_dir
+
+    @patch("yedekleme.views.gdrive_servisi.yedek_yukle")
+    @patch("yedekleme.views.gdrive_servisi.aktif_mi", return_value=True)
+    @patch("yedekleme.views.yedek_servisi.yedek_olustur")
+    def test_gdrive_aktifken_otomatik_yuklenir(self, mock_yedek_olustur, mock_aktif_mi, mock_gdrive_yukle):
+        sahte_yol = self.gecici_dizin / "sahte.dump"
+        sahte_yol.write_bytes(b"PGDMP")
+        mock_yedek_olustur.return_value = sahte_yol
+
+        yanit = self.client.post("/yedekleme/olustur/", follow=True)
+
+        mock_gdrive_yukle.assert_called_once_with(sahte_yol)
+        mesajlar = [str(m) for m in yanit.context["messages"]]
+        self.assertTrue(any("Drive" in m for m in mesajlar))
+
+    @patch("yedekleme.views.gdrive_servisi.yedek_yukle")
+    @patch("yedekleme.views.gdrive_servisi.aktif_mi", return_value=True)
+    @patch("yedekleme.views.yedek_servisi.yedek_olustur")
+    def test_gdrive_hatasi_yerel_yedegi_gecersiz_kilmaz(
+        self, mock_yedek_olustur, mock_aktif_mi, mock_gdrive_yukle
+    ):
+        sahte_yol = self.gecici_dizin / "sahte.dump"
+        sahte_yol.write_bytes(b"PGDMP")
+        mock_yedek_olustur.return_value = sahte_yol
+        mock_gdrive_yukle.side_effect = yedek_servisi.YedekHatasi("ağ hatası")
+
+        yanit = self.client.post("/yedekleme/olustur/", follow=True)
+
+        mesajlar = [str(m) for m in yanit.context["messages"]]
+        self.assertTrue(any("Yedek oluşturuldu" in m for m in mesajlar))
+        self.assertTrue(any("yüklenemedi" in m for m in mesajlar))
+
+    @patch("yedekleme.views.gdrive_servisi.aktif_mi", return_value=False)
+    def test_gdrive_pasifken_hic_cagrilmaz(self, mock_aktif_mi):
+        sahte_yol = self.gecici_dizin / "sahte.dump"
+        sahte_yol.write_bytes(b"PGDMP")
+        with patch("yedekleme.views.yedek_servisi.yedek_olustur", return_value=sahte_yol):
+            with patch("yedekleme.views.gdrive_servisi.yedek_yukle") as mock_gdrive_yukle:
+                self.client.post("/yedekleme/olustur/")
+                mock_gdrive_yukle.assert_not_called()

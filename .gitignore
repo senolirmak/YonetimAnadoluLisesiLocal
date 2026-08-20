@@ -32,6 +32,11 @@ media/
 # kurulumcu tarafından üretilen, DB şifresini düz metin taşıyan compose dosyası (GİZLİ)
 docker-compose.yaml
 
+# yedekleme/ Google Drive servis hesabı anahtarı (GİZLİ) — admin projeye
+# kopyalarsa diye önlem; normalde repo dışında bir yolda tutulması önerilir
+gdrive-service-account*.json
+*-service-account.json
+
 # Tahta kurulum gizli yapılandırması (şablon: config.default)
 bildirim_gonderici/board_agent/config.txt
 SunucuTarifi.md
