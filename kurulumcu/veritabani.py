@@ -123,8 +123,13 @@ def konteyner_ile_kur(arac: str, ayar: DBAyarlari, imaj: str = VARSAYILAN_IMAJ) 
                 # makinede localhost/127.0.0.1 üzerinden bağlanıyor).
                 "-p",
                 f"127.0.0.1:{ayar.port}:5432",
+                # Resmi postgres imajı 18'den itibaren veriyi doğrudan
+                # /var/lib/postgresql/data'ya değil, /var/lib/postgresql altına
+                # (sürüm numaralı alt dizinde, pg_ctlcluster tarzı) yazıyor;
+                # eski mount noktası "unused mount/volume" hatasıyla reddediliyor
+                # (bkz. https://github.com/docker-library/postgres/pull/1259).
                 "-v",
-                f"{volume_adi}:/var/lib/postgresql/data",
+                f"{volume_adi}:/var/lib/postgresql",
                 imaj,
             ],
             sessiz=True,
