@@ -219,6 +219,12 @@ def main() -> None:
             if not konteyner_araci:
                 konteyner_araci = paket_yoneticisi.konteyner_araci_kur(paket_yon)
             konteyner_adi = veritabani.konteyner_ile_kur(konteyner_araci, ayar, PROJE_DIZIN, paket_yon)
+            # yedekleme/ app'i pg_dump/pg_restore'u konteyner içinde çalıştırabilsin
+            # diye — konteyner modunda host'a bu istemci araçları hiç kurulmuyor,
+            # bu satır olmadan yedekleme tamamen çalışmaz (bkz.
+            # yedekleme/services/yedek_servisi.py).
+            env_dosyasi.anahtar_ayarla(env_yolu, "YEDEKLEME_POSTGRES_KONTEYNER", konteyner_adi)
+            y.basari(f"'.env' güncellendi: YEDEKLEME_POSTGRES_KONTEYNER={konteyner_adi}")
         else:
             veritabani.native_ile_kur(ayar, paket_yon, sunucu_modu)
 

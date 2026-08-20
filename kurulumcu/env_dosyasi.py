@@ -34,3 +34,23 @@ def yaz(yol: Path, degerler: dict[str, str]) -> None:
 
     yol.write_text("\n".join(satirlar) + "\n")
     yol.chmod(0o600)
+
+
+def anahtar_ayarla(yol: Path, anahtar: str, deger: str) -> None:
+    """Var olan bir .env dosyasında tek bir anahtarı günceller ya da (yoksa)
+    sona ekler; diğer satırları ve sırayı korur. `yaz()`'ın aksine sabit bir
+    şema varsaymaz — SATIR_SIRASI'nda olmayan anahtarlar (örn.
+    YEDEKLEME_POSTGRES_KONTEYNER) için kullanılır. Dosya yoksa hiçbir şey
+    yapmaz."""
+    if not yol.is_file():
+        return
+    satirlar = yol.read_text().splitlines()
+    on_ek = f"{anahtar}="
+    for i, satir in enumerate(satirlar):
+        if satir.strip().startswith(on_ek):
+            satirlar[i] = f"{anahtar}={deger}"
+            break
+    else:
+        satirlar.append(f"{anahtar}={deger}")
+    yol.write_text("\n".join(satirlar) + "\n")
+    yol.chmod(0o600)
