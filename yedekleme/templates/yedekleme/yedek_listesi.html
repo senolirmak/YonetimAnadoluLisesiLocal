@@ -36,7 +36,9 @@
         Google Drive yüklemesi etkin — yeni alınan her yedek otomatik olarak da oraya yüklenir.
       {% else %}
         Google Drive yüklemesi devre dışı — etkinleştirmek için <code>.env</code> dosyasına
-        <code>YEDEKLEME_GDRIVE_SA_ANAHTARI</code> ve <code>YEDEKLEME_GDRIVE_KLASOR_ID</code> ekleyin.
+        <code>YEDEKLEME_GDRIVE_OAUTH_ISTEMCI</code>, <code>YEDEKLEME_GDRIVE_TOKEN</code> ve
+        <code>YEDEKLEME_GDRIVE_KLASOR_ID</code> ekleyip
+        <code>python manage.py gdrive_yetkilendir</code> çalıştırın.
       {% endif %}
     </p>
 

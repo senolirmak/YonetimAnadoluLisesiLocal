@@ -412,20 +412,87 @@ class YetkiTestCase(TestCase):
 
 
 class GdriveAktifMiTestCase(TestCase):
-    def test_ikisi_de_tanimliyken_aktif(self):
+    def setUp(self):
+        self.gecici_dizin = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.token_yolu = self.gecici_dizin / "token.json"
+
+    def test_ucu_de_tanimli_ve_token_varken_aktif(self):
+        self.token_yolu.write_text("{}")
         with patch.dict(
             "os.environ",
-            {"YEDEKLEME_GDRIVE_SA_ANAHTARI": "/tmp/x.json", "YEDEKLEME_GDRIVE_KLASOR_ID": "abc"},
+            {
+                "YEDEKLEME_GDRIVE_OAUTH_ISTEMCI": "/tmp/istemci.json",
+                "YEDEKLEME_GDRIVE_TOKEN": str(self.token_yolu),
+                "YEDEKLEME_GDRIVE_KLASOR_ID": "abc",
+            },
+            clear=True,
         ):
             self.assertTrue(gdrive_servisi.aktif_mi())
 
-    def test_biri_eksikken_pasif(self):
-        with patch.dict("os.environ", {"YEDEKLEME_GDRIVE_SA_ANAHTARI": "/tmp/x.json"}, clear=True):
+    def test_token_dosyasi_henuz_yoksa_pasif(self):
+        # .env'de üç değişken de tanımlı ama henüz gdrive_yetkilendir hiç
+        # çalıştırılmamış (token dosyası oluşmamış) — yapılandırma tamam
+        # görünse de tarayıcı tabanlı ilk adım atlanmışsa aktif sayılmamalı.
+        with patch.dict(
+            "os.environ",
+            {
+                "YEDEKLEME_GDRIVE_OAUTH_ISTEMCI": "/tmp/istemci.json",
+                "YEDEKLEME_GDRIVE_TOKEN": str(self.token_yolu),
+                "YEDEKLEME_GDRIVE_KLASOR_ID": "abc",
+            },
+            clear=True,
+        ):
             self.assertFalse(gdrive_servisi.aktif_mi())
 
-    def test_ikisi_de_yokken_pasif(self):
+    def test_biri_eksikken_pasif(self):
+        self.token_yolu.write_text("{}")
+        with patch.dict(
+            "os.environ",
+            {"YEDEKLEME_GDRIVE_OAUTH_ISTEMCI": "/tmp/istemci.json", "YEDEKLEME_GDRIVE_TOKEN": str(self.token_yolu)},
+            clear=True,
+        ):
+            self.assertFalse(gdrive_servisi.aktif_mi())
+
+    def test_ucu_de_yokken_pasif(self):
         with patch.dict("os.environ", {}, clear=True):
             self.assertFalse(gdrive_servisi.aktif_mi())
+
+
+class GdriveOauthYetkilendirTestCase(TestCase):
+    def setUp(self):
+        self.gecici_dizin = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.istemci_yolu = self.gecici_dizin / "client_secret.json"
+        self.istemci_yolu.write_text("{}")
+        self.token_yolu = self.gecici_dizin / "token.json"
+        self._env_patch = patch.dict(
+            "os.environ",
+            {
+                "YEDEKLEME_GDRIVE_OAUTH_ISTEMCI": str(self.istemci_yolu),
+                "YEDEKLEME_GDRIVE_TOKEN": str(self.token_yolu),
+            },
+            clear=True,
+        )
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
+
+    def test_istemci_dosyasi_yoksa_hata_verir(self):
+        with patch.dict("os.environ", {"YEDEKLEME_GDRIVE_OAUTH_ISTEMCI": "/olmayan/yol.json"}):
+            with self.assertRaises(yedek_servisi.YedekHatasi):
+                gdrive_servisi.oauth_yetkilendir()
+
+    @patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file")
+    def test_basarili_akista_token_dosyaya_yazilir(self, mock_from_client_secrets):
+        sahte_akis = MagicMock()
+        sahte_kimlik = MagicMock()
+        sahte_kimlik.to_json.return_value = '{"token": "sahte"}'
+        sahte_akis.run_local_server.return_value = sahte_kimlik
+        mock_from_client_secrets.return_value = sahte_akis
+
+        sonuc_yolu = gdrive_servisi.oauth_yetkilendir()
+
+        self.assertEqual(sonuc_yolu, self.token_yolu)
+        self.assertEqual(self.token_yolu.read_text(), '{"token": "sahte"}')
+        self.assertEqual(oct(self.token_yolu.stat().st_mode)[-3:], "600")
 
 
 class GdriveYedekYukleTestCase(TestCase):
@@ -433,12 +500,16 @@ class GdriveYedekYukleTestCase(TestCase):
         self.gecici_dizin = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.dosya = self.gecici_dizin / "ornek.dump"
         self.dosya.write_bytes(b"PGDMP-sahte-icerik")
+        self.token_yolu = self.gecici_dizin / "token.json"
+        self.token_yolu.write_text("{}")
         self._env_patch = patch.dict(
             "os.environ",
             {
-                "YEDEKLEME_GDRIVE_SA_ANAHTARI": str(self.gecici_dizin / "sahte-anahtar.json"),
+                "YEDEKLEME_GDRIVE_OAUTH_ISTEMCI": str(self.gecici_dizin / "sahte-istemci.json"),
+                "YEDEKLEME_GDRIVE_TOKEN": str(self.token_yolu),
                 "YEDEKLEME_GDRIVE_KLASOR_ID": "klasor-123",
             },
+            clear=True,
         )
         self._env_patch.start()
         self.addCleanup(self._env_patch.stop)
