@@ -43,6 +43,18 @@ def konteyner_araci_kur(paket_yoneticisi: str) -> str:
     return "podman"
 
 
+def podman_compose_kur(paket_yoneticisi: str) -> None:
+    """Podman kurulu olsa bile 'podman compose' bir compose sağlayıcı (bu paket)
+    olmadan çalışmaz — apt/dnf ile podman-compose kurar."""
+    y.bilgi("Compose sağlayıcısı (podman-compose) kuruluyor...")
+    if paket_yoneticisi == "apt":
+        y.calistir(["apt-get", "update", "-qq"], sudo=True)
+        y.calistir(["apt-get", "install", "-y", "podman-compose"], sudo=True, sessiz=True)
+    else:
+        y.calistir(["dnf", "install", "-y", "podman-compose"], sudo=True, sessiz=True)
+    y.basari("podman-compose kuruldu.")
+
+
 def postgresql_kur(paket_yoneticisi: str) -> None:
     y.bilgi("PostgreSQL sunucusu kuruluyor...")
     if paket_yoneticisi == "apt":
