@@ -102,24 +102,40 @@ def konteyner_calisiyor_mu(arac: str, ayar: DBAyarlari) -> str | None:
     return konteyner_adi if var_mi else None
 
 
-def _compose_icerik(ayar: DBAyarlari, konteyner_adi: str, volume_adi: str, imaj: str) -> str:
-    # DB adı/kullanıcı/şifre gibi kullanıcı girdisi değerler YAML'da özel anlam
-    # taşıyan karakterler (:, #, başta *&! vb.) içerebilir. json.dumps'ın ürettiği
-    # çift tırnaklı JSON string'i aynı zamanda geçerli bir YAML çift tırnaklı
-    # skalerdir (YAML bunu JSON'ın üst kümesi olarak tanımlar) — PyYAML gibi ek
-    # bir bağımlılık gerekmeden güvenli kaçışlama sağlar.
-    db_adi = json.dumps(ayar.ad)
-    kullanici = json.dumps(ayar.kullanici)
-    sifre = json.dumps(ayar.sifre)
+def _postgres_env_dosyasi_yaz(proje_dizin: Path, ayar: DBAyarlari) -> Path:
+    """POSTGRES_DB/USER/PASSWORD'u `docker-compose.yaml`'ın kendisine değil, ayrı
+    ve kısıtlı izinli bir dosyaya yazar (`env_file:` ile referans verilir).
+
+    Bunun tek bir amacı var: compose'un `${DEĞİŞKEN}` enterpolasyonu, dosyayı
+    YAML olarak ayrıştırmadan ÖNCE ham metin üzerinde çalışır — yani şifre özel
+    bir YAML karakteri (`:`, `"` vb.) içeriyorsa enterpolasyonla gömmek yine
+    bozuk YAML üretebilirdi. `env_file:` ise KEY=VALUE satırlarını hiç YAML
+    ayrıştırmadan, ham şekilde okur (tıpkı .env'in kendisi gibi) — bu yüzden
+    tamamen güvenlidir ve şifre docker-compose.yaml dosyasında hiç görünmez.
+    """
+    yol = proje_dizin / ".env.postgres"
+    yol.write_text(
+        f"POSTGRES_DB={ayar.ad}\nPOSTGRES_USER={ayar.kullanici}\nPOSTGRES_PASSWORD={ayar.sifre}\n",
+        encoding="utf-8",
+    )
+    yol.chmod(0o600)
+    return yol
+
+
+def _compose_icerik(ayar: DBAyarlari, konteyner_adi: str, volume_adi: str, imaj: str, env_dosya_adi: str) -> str:
+    # DB_USER gizli değildir (şifrenin aksine) ama healthcheck komutunun içine
+    # gömülüyor; YAML'da özel anlam taşıyan karakterler içerebileceğinden
+    # json.dumps ile güvenli şekilde kaçışlanıyor (YAML çift tırnaklı skaler
+    # sözdizimi JSON'ın üst kümesidir).
     saglik_komutu = json.dumps(f"pg_isready -U {ayar.kullanici}")
     return f"""services:
   {konteyner_adi}:
     image: {imaj}
     container_name: {konteyner_adi}
-    environment:
-      POSTGRES_DB: {db_adi}
-      POSTGRES_USER: {kullanici}
-      POSTGRES_PASSWORD: {sifre}
+    # POSTGRES_DB/USER/PASSWORD burada değil, {env_dosya_adi} içinde — bkz.
+    # _postgres_env_dosyasi_yaz(). Bu dosyada gizli bilgi bulunmaz.
+    env_file:
+      - {env_dosya_adi}
     volumes:
       # Resmi postgres imajı 18'den itibaren veriyi doğrudan
       # /var/lib/postgresql/data'ya değil, /var/lib/postgresql altına (sürüm
@@ -192,10 +208,13 @@ def konteyner_ile_kur(
 
     _mevcut_konteyneri_compose_icin_hazirla(arac, konteyner_adi)
 
+    env_yolu = _postgres_env_dosyasi_yaz(proje_dizin, ayar)
+
     compose_yolu = proje_dizin / "docker-compose.yaml"
-    y.bilgi(f"Docker Compose yapılandırması yazılıyor: {compose_yolu}")
-    compose_yolu.write_text(_compose_icerik(ayar, konteyner_adi, volume_adi, imaj), encoding="utf-8")
-    compose_yolu.chmod(0o600)  # DB şifresini düz metin taşır, .env gibi kısıtlı izinli olmalı
+    y.bilgi(f"Docker Compose yapılandırması yazılıyor: {compose_yolu} (gizli bilgi içermez)")
+    compose_yolu.write_text(
+        _compose_icerik(ayar, konteyner_adi, volume_adi, imaj, env_yolu.name), encoding="utf-8"
+    )
 
     y.bilgi(f"PostgreSQL konteyneri başlatılıyor: {konteyner_adi} (imaj: {imaj})")
     y.calistir([arac, "compose", "-f", str(compose_yolu), "up", "-d"], sessiz=True)
