@@ -3,6 +3,8 @@
 Tümü yalnızca müdür yardımcısına açıktır (mudur_yardimcisi_required) — geri
 yükleme canlı veritabanının tamamını değiştirebilen, geri alınamaz bir işlem
 olduğu için README'deki rol tablosundaki en yüksek yetkiyle sınırlandırılmıştır.
+Aynı gerekçeyle `yedek_yukle` de bu yetkiyle sınırlıdır: dışarıdan yüklenen bir
+dosya da (bir sonraki adımda) geri yükleme akışına girebilir.
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from okul.auth import mudur_yardimcisi_required
-from yedekleme.forms import GeriYuklemeOnayForm
+from yedekleme.forms import GeriYuklemeOnayForm, YedekYuklemeForm
 from yedekleme.services import yedek_servisi
 
 
@@ -39,6 +41,25 @@ def yedek_olustur(request):
         messages.error(request, str(exc))
     else:
         messages.success(request, f"Yedek oluşturuldu: {yol.name}")
+    return redirect("yedekleme:yedek_listesi")
+
+
+@mudur_yardimcisi_required
+@require_POST
+def yedek_yukle(request):
+    form = YedekYuklemeForm(request.POST, request.FILES)
+    if not form.is_valid():
+        for hatalar in form.errors.values():
+            for hata in hatalar:
+                messages.error(request, hata)
+        return redirect("yedekleme:yedek_listesi")
+
+    try:
+        yol = yedek_servisi.yedek_yukle(form.cleaned_data["dosya"])
+    except yedek_servisi.YedekHatasi as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, f"Yedek yüklendi: {yol.name}")
     return redirect("yedekleme:yedek_listesi")
 
 
@@ -70,7 +91,16 @@ def yedek_sil(request, dosya_adi):
 def yedek_geri_yukle_onay(request, dosya_adi):
     yol = _guvenli_yol_veya_404(dosya_adi)
     form = GeriYuklemeOnayForm(initial={"dosya_adi": dosya_adi})
-    return render(request, "yedekleme/geri_yukle_onay.html", {"yedek": yol, "form": form})
+
+    try:
+        rapor = yedek_servisi.yedek_raporu(yol)
+    except yedek_servisi.YedekHatasi as exc:
+        rapor = None
+        messages.warning(request, f"Yedek raporu oluşturulamadı, yine de geri yükleyebilirsiniz: {exc}")
+
+    return render(
+        request, "yedekleme/geri_yukle_onay.html", {"yedek": yol, "form": form, "rapor": rapor}
+    )
 
 
 @mudur_yardimcisi_required

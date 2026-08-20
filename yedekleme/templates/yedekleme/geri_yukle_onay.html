@@ -10,10 +10,67 @@
 <div class="container">
   <a class="ay-ust-link" href="{% url 'yedekleme:yedek_listesi' %}">← Veritabanı Yedekleri</a>
 
+  {% include "okul/yonetim/_mesajlar.html" %}
+
+  {% if rapor %}
+  <div class="ay-kart ay-kart-full">
+    <div class="ay-baslik">Yedek Raporu — {{ yedek.name }}</div>
+
+    <table class="ay-tablo" style="margin-bottom:1rem;">
+      <tr><th style="width:220px;">Yedeğin alındığı tarih</th><td>{{ rapor.olusturma_tarihi }}</td></tr>
+      <tr>
+        <th>Kaynak veritabanı</th>
+        <td>
+          {{ rapor.kaynak_db }}
+          {% if not rapor.kaynak_db_eslesiyor %}
+            <span style="color:#b91c1c;font-weight:600;"> — mevcut veritabanının adıyla (bkz. .env DB_NAME) uyuşmuyor, farklı bir ortamdan alınmış olabilir!</span>
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <th>Okul Adı</th>
+        <td>{{ rapor.okul_adi|default:"—" }}</td>
+      </tr>
+      <tr>
+        <th>Aktif Eğitim-Öğretim Yılı</th>
+        <td>{{ rapor.aktif_egitim_yili|default:"—" }}</td>
+      </tr>
+      <tr>
+        <th>Tablo karşılaştırması</th>
+        <td>
+          {{ rapor.toplam_tablo }} tablodan {{ rapor.ayni_tablo_sayisi }} tanesi mevcut veritabanıyla
+          birebir aynı{% if rapor.farkli_tablolar %}, {{ rapor.farkli_tablolar|length }} tanesinde satır sayısı farklı{% endif %}.
+        </td>
+      </tr>
+    </table>
+
+    {% if rapor.farkli_tablolar %}
+    <p style="font-weight:600;margin:0 0 .5rem;">Mevcut veritabanından farklı olan tablolar (geri yükleme sonrası "Yedekte" sütunundaki değer geçerli olacak):</p>
+    <div style="overflow-x:auto;">
+    <table class="ay-tablo">
+      <thead>
+        <tr><th>Tablo</th><th>Şu an DB'de</th><th>Yedekte</th><th>Fark</th></tr>
+      </thead>
+      <tbody>
+        {% for t in rapor.farkli_tablolar %}
+        <tr>
+          <td>{{ t.tablo }}</td>
+          <td>{{ t.canli }}</td>
+          <td>{{ t.yedek }}</td>
+          <td style="{% if t.fark > 0 %}color:#15803d;{% else %}color:#b91c1c;{% endif %}font-weight:600;">{{ t.fark|stringformat:"+d" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p style="color:#15803d;">Mevcut veritabanıyla tüm tablolarda satır sayıları birebir aynı — bu yedeğin geri yüklenmesi verilerde bir değişiklik yapmayacak.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="ay-kart ay-kart-half" style="max-width:560px;">
     <div class="ay-baslik">Yedeği Geri Yükle</div>
-
-    {% include "okul/yonetim/_mesajlar.html" %}
 
     <ul class="ay-mesajlar">
       <li class="ay-mesaj-error">
@@ -29,6 +86,9 @@
 
       <div class="ay-form-group" style="margin-bottom:1rem;">
         <label for="{{ form.dogrulama.id_for_label }}">{{ form.dogrulama.label }}</label>
+        <p style="font-size:.85rem;margin:0 0 .35rem;">
+          Aşağıya tam olarak şunu yazın: <code>{{ yedek.name }}</code>
+        </p>
         {{ form.dogrulama }}
         {% if form.dogrulama.errors %}<div class="ay-error">{{ form.dogrulama.errors.0 }}</div>{% endif %}
         <p style="font-size:.78rem;color:#6b7280;margin:0;">{{ form.dogrulama.help_text }}</p>
