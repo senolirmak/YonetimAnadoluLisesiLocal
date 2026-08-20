@@ -127,7 +127,7 @@ def _compose_icerik(ayar: DBAyarlari, konteyner_adi: str, volume_adi: str, imaj:
     # gömülüyor; YAML'da özel anlam taşıyan karakterler içerebileceğinden
     # json.dumps ile güvenli şekilde kaçışlanıyor (YAML çift tırnaklı skaler
     # sözdizimi JSON'ın üst kümesidir).
-    saglik_komutu = json.dumps(f"pg_isready -U {ayar.kullanici}")
+    saglik_komutu = json.dumps(f"pg_isready -U {ayar.kullanici} -d {ayar.ad}")
     return f"""services:
   {konteyner_adi}:
     image: {imaj}
