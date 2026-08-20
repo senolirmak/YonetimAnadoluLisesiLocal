@@ -189,6 +189,23 @@ def _linger_etkinlestir() -> None:
     y.basari("Linger etkinleştirildi.")
 
 
+def _podman_restart_servisini_etkinlestir() -> None:
+    """`restart: always` politikasının kendisi yeterli değildir: rootless Podman'da
+    reboot sonrası bu politikaya sahip konteynerleri fiilen yeniden başlatan
+    `podman-restart.service` adlı systemd **user** servisi ayrıca etkinleştirilmelidir
+    (linger yalnızca kullanıcı oturumunun boot'ta ayağa kalkmasını sağlar, konteyneri
+    kendisi başlatmaz — ikisi birlikte gerekir). `sudo=True` olmadan, mevcut kullanıcının
+    kendi systemd user session'ı üzerinden çalıştırılır. Zaten etkinse dokunmaz."""
+    if y.basarili_mi(["systemctl", "--user", "is-enabled", "podman-restart.service"]):
+        return
+    y.bilgi(
+        "Reboot sonrası restart:always konteynerlerini geri başlatan "
+        "podman-restart.service etkinleştiriliyor."
+    )
+    y.calistir(["systemctl", "--user", "enable", "--now", "podman-restart.service"])
+    y.basari("podman-restart.service etkinleştirildi.")
+
+
 def _mevcut_konteyneri_compose_icin_hazirla(arac: str, konteyner_adi: str) -> None:
     """`konteyner_adi` daha önce düz `<arac> run` ile (compose dışında)
     oluşturulmuşsa, compose'un devralabilmesi için kaldırır — veri adlı
@@ -266,6 +283,7 @@ def konteyner_ile_kur(
     )
     if arac == "podman":
         _linger_etkinlestir()
+        _podman_restart_servisini_etkinlestir()
 
     return konteyner_adi
 
