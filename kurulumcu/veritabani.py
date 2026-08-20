@@ -8,7 +8,12 @@ from dataclasses import dataclass
 
 from . import yardimci as y
 
-VARSAYILAN_IMAJ = "postgres:18-alpine"
+# Tam nitelikli (registry önekli) imaj adı kullanılıyor — kısa isimler
+# (örn. yalnızca "postgres:18-alpine"), bazı sunucularda /etc/containers/registries.conf
+# içinde unqualified-search-registries tanımlı olmadığında podman tarafından
+# reddedilir ("short-name did not resolve to an alias" hatası). Tam nitelikli
+# ad bu duruma bağlı olmadan her zaman çalışır.
+VARSAYILAN_IMAJ = "docker.io/library/postgres:18-alpine"
 
 
 @dataclass

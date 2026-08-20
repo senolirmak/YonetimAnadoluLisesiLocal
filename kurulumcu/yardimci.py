@@ -55,18 +55,30 @@ def calistir(
     ortam: dict[str, str] | None = None,
     girdi: str | None = None,
 ) -> subprocess.CompletedProcess:
-    """Bir komutu çalıştırır. sudo=True ise başına 'sudo' eklenir, girdi verilirse stdin'e yazılır."""
+    """Bir komutu çalıştırır. sudo=True ise başına 'sudo' eklenir, girdi verilirse stdin'e yazılır.
+
+    sessiz=True stdout'u bastırır ama stderr'i her zaman yakalar: komut
+    kontrol=True (varsayılan) ile başarısız olursa, yakalanan stderr `hata()`
+    ile ekrana basılıp çıkılır — aksi halde sebep hiç görünmeden yalnızca bir
+    CalledProcessError traceback'i kalırdı. kontrol=False ile çağrılan (hatası
+    beklenen/önemsiz) komutlar bu davranışa girmez, sessizce devam eder.
+    """
     if sudo:
         komut = ["sudo", *komut]
-    return subprocess.run(
+    sonuc = subprocess.run(
         komut,
         text=True,
         input=girdi,
         stdout=subprocess.DEVNULL if sessiz else None,
-        stderr=subprocess.DEVNULL if sessiz else None,
-        check=kontrol,
+        stderr=subprocess.PIPE if sessiz else None,
         env=ortam,
     )
+    if kontrol and sonuc.returncode != 0:
+        if sessiz:
+            detay = sonuc.stderr.strip() if sonuc.stderr else "(stderr boş)"
+            hata(f"Komut başarısız oldu: {' '.join(komut)}\n{detay}")
+        sonuc.check_returncode()
+    return sonuc
 
 
 def cikti(komut: list[str], *, sudo: bool = False, ortam: dict[str, str] | None = None) -> str:
