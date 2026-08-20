@@ -15,6 +15,7 @@ Tekrar çalıştırmak güvenlidir: zaten tamamlanmış adımlar atlanır.
 
 from __future__ import annotations
 
+import datetime
 import getpass
 import grp
 import os
@@ -34,6 +35,19 @@ SUPERUSER_KONTROL_KODU = (
     "from django.contrib.auth.models import User; import sys; "
     "sys.exit(0 if User.objects.filter(is_superuser=True).exists() else 1)"
 )
+OKUL_BILGISI_KONTROL_KODU = (
+    "from okul.models import OkulBilgi; import sys; "
+    "sys.exit(0 if OkulBilgi.get().okul_adi else 1)"
+)
+
+
+def _varsayilan_egitim_yili() -> str:
+    """Bugünün tarihine göre mantıklı bir eğitim-öğretim yılı önerisi üretir
+    (Ağustos-Aralık: içinde bulunulan yıl başlar; Ocak-Temmuz: bir önceki yıl)."""
+    bugun = datetime.date.today()
+    if bugun.month >= 8:
+        return f"{bugun.year}-{bugun.year + 1}"
+    return f"{bugun.year - 1}-{bugun.year}"
 
 
 def _rastgele_secret_key() -> str:
@@ -209,6 +223,44 @@ def main() -> None:
     _manage_py_sessiz("collectstatic", "--noinput", *django_ayar_bayragi)
     y.basari("Statik dosyalar toplandı.")
 
+    # ── 5.5 Okul Bilgisi, Eğitim-Öğretim Yılı ve varsayılan ders verileri ──
+    # Seçmeli dersler, ders programı ve dönem bazlı raporlama gibi birçok modül
+    # OkulBilgi'deki aktif eğitim-öğretim yılına bağlıdır (bkz. CLAUDE.md).
+    okul_bilgisi_hazir = _manage_py_basarili_mi("shell", *django_ayar_bayragi, "-c", OKUL_BILGISI_KONTROL_KODU)
+    if okul_bilgisi_hazir:
+        y.uyari("Okul Bilgisi zaten yapılandırılmış, bu adım atlanıyor.")
+    else:
+        print()
+        print("Okul Bilgisi ve Eğitim-Öğretim Yılı henüz tanımlı değil — seçmeli dersler,")
+        print("ders programı ve dönem bazlı raporlama gibi modüller bu olmadan boş görünür.")
+        if y.sor("Şimdi oluşturulsun mu?", "E").lower().startswith("e"):
+            okul_adi = y.sor("Okul adı")
+            egitim_yili = y.sor("Eğitim-Öğretim Yılı", _varsayilan_egitim_yili())
+            okul_kodu = y.sor("Okul kodu (boş bırakılabilir)")
+            okul_muduru = y.sor("Okul müdürü (boş bırakılabilir)")
+
+            komut = ["okul_bilgisi_olustur", "--okul-adi", okul_adi, "--egitim-yili", egitim_yili]
+            if okul_kodu:
+                komut += ["--okul-kodu", okul_kodu]
+            if okul_muduru:
+                komut += ["--okul-muduru", okul_muduru]
+            _manage_py(*komut, *django_ayar_bayragi)
+            y.basari("Okul Bilgisi oluşturuldu.")
+            okul_bilgisi_hazir = True
+
+            print()
+            print("Proje, her Anadolu Lisesi için genel olarak geçerli varsayılan ders")
+            print("verilerini (Ortak/Seçmeli Ders Havuzu, Zorunlu Dersler, Seçmeli Ders")
+            print("Grupları) içeriyor — okulunuz farklı bir müfredat kullanıyorsa atlayın.")
+            if y.sor("Varsayılan ders verileri yüklensin mi?", "E").lower().startswith("e"):
+                _manage_py("varsayilan_ders_verilerini_yukle", *django_ayar_bayragi)
+                y.basari("Varsayılan ders verileri yüklendi.")
+        else:
+            y.uyari(
+                "Atlandı — daha sonra admin panelinden ya da "
+                "'python manage.py okul_bilgisi_olustur' ile oluşturabilirsiniz."
+            )
+
     # ── 6. Sunucu servisleri (Gunicorn + Nginx + systemd) ────────
     servis: str | None = None
     if sunucu_modu:
@@ -223,11 +275,12 @@ def main() -> None:
     # ── 7. Bitiş ──────────────────────────────────────────────────
     _banner("Kurulum tamamlandı!", y.YESIL)
 
-    print("Kalan tek manuel adım:")
-    print("  Admin panelinden (/admin/) 'Okul → Okul Bilgisi' ve 'Eğitim-Öğretim Yılı'")
-    print("  kaydını oluşturun; bu olmadan seçmeli dersler, ders programı ve dönem")
-    print("  bazlı raporlama gibi modüller aktif yılı bulamadığı için boş görünür.")
-    print()
+    if not okul_bilgisi_hazir:
+        print("Kalan tek manuel adım:")
+        print("  Admin panelinden (/admin/) 'Okul → Okul Bilgisi' ve 'Eğitim-Öğretim Yılı'")
+        print("  kaydını oluşturun; bu olmadan seçmeli dersler, ders programı ve dönem")
+        print("  bazlı raporlama gibi modüller aktif yılı bulamadığı için boş görünür.")
+        print()
 
     if konteyner_adi:
         print(f"PostgreSQL konteyneri '{konteyner_adi}' olarak {konteyner_araci} ile çalışıyor.")

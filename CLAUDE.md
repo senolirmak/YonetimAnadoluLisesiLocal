@@ -79,7 +79,17 @@ uygun yardımcı olup olmadığını kontrol edin, tekrar tekrar grup kontrolü 
 
 Birçok modül (seçmeli dersler, ders programı, dönemsel raporlama) `OkulBilgi` singleton kaydındaki
 **aktif eğitim-öğretim yılına** bağlıdır; bu kayıt admin panelinden (`Okul → Okul Bilgisi`) elle
-oluşturulur ve yoksa ilgili modüller boş görünür (kurulum sonrası atlanabilecek bir adım değildir).
+oluşturulabilir ya da `python manage.py okul_bilgisi_olustur --okul-adi ... --egitim-yili YYYY-YYYY`
+ile (kurulumcu sihirbazı ilk kurulumda bunu otomatik sorar) oluşturulur; yoksa ilgili modüller boş
+görünür (kurulum sonrası atlanabilecek bir adım değildir). Okul Bilgisi zaten yapılandırılmışsa bu
+komut hiçbir şeyi değiştirmez.
+
+Her Anadolu Lisesi için genel olarak geçerli varsayılan ders verileri (branşlar, Ortak Ders Havuzu,
+Seçmeli Ders Havuzu, Zorunlu (Ortak) Dersler, Seçmeli Ders Grupları) projeyle birlikte gelir
+(`secmelidersler/fixtures/varsayilan_ders_verileri.json`) ve `python manage.py
+varsayilan_ders_verilerini_yukle` ile yüklenir (havuz tabloları eğitim yılından bağımsızdır; Zorunlu
+Dersler/Seçmeli Ders Grupları aktif eğitim yılına ya da `--egitim-yili` ile verilen yıla bağlanır).
+İdempotenttir, farklı bir müfredat kullanan okullarda atlanabilir.
 
 Ayrıca `okul.models.AktifVeriKonfigurasyonu` tablosu, veri türü başına (`ders_programi`,
 `personel_listesi`, `nobet_listesi`) hangi `uygulama_tarihi`'nin geçerli olduğunu tutar; `okul/utils.py`
