@@ -218,7 +218,7 @@ def main() -> None:
         if db_mod == "2" and (konteyner_araci or paket_yon):
             if not konteyner_araci:
                 konteyner_araci = paket_yoneticisi.konteyner_araci_kur(paket_yon)
-            konteyner_adi = veritabani.konteyner_ile_kur(konteyner_araci, ayar)
+            konteyner_adi = veritabani.konteyner_ile_kur(konteyner_araci, ayar, PROJE_DIZIN, paket_yon)
         else:
             veritabani.native_ile_kur(ayar, paket_yon, sunucu_modu)
 
@@ -301,10 +301,12 @@ def main() -> None:
         print()
 
     if konteyner_adi:
-        print(f"PostgreSQL konteyneri '{konteyner_adi}' olarak {konteyner_araci} ile çalışıyor.")
-        print(f"  Durum   : {konteyner_araci} ps --filter name={konteyner_adi}")
-        print(f"  Durdur  : {konteyner_araci} stop {konteyner_adi}")
-        print(f"  Başlat  : {konteyner_araci} start {konteyner_adi}")
+        print(f"PostgreSQL konteyneri '{konteyner_adi}' olarak {konteyner_araci} compose ile çalışıyor.")
+        print(f"  Yapılandırma : {PROJE_DIZIN}/docker-compose.yaml")
+        print(f"  Durum        : {konteyner_araci} ps --filter name={konteyner_adi}")
+        print(f"  Durdur       : {konteyner_araci} compose -f docker-compose.yaml stop")
+        print(f"  Başlat       : {konteyner_araci} compose -f docker-compose.yaml up -d")
+        print(f"  Loglar       : {konteyner_araci} logs {konteyner_adi}")
         print()
 
     if sunucu_modu:

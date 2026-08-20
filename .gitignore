@@ -29,6 +29,9 @@ media/
 .env.*
 !.env.example
 
+# kurulumcu tarafından üretilen, DB şifresini düz metin taşıyan compose dosyası (GİZLİ)
+docker-compose.yaml
+
 # Tahta kurulum gizli yapılandırması (şablon: config.default)
 bildirim_gonderici/board_agent/config.txt
 SunucuTarifi.md
