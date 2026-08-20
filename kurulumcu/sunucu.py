@@ -51,13 +51,31 @@ WantedBy=multi-user.target
     return servis
 
 
+def _varsayilan_siteyi_devre_disi_birak() -> None:
+    """Nginx paketiyle birlikte gelen varsayılan site tanımını devre dışı bırakır.
+
+    Bizim conf.d dosyamız `default_server` bayrağını almadıkça, dağıtımın kendi
+    varsayılan sitesi (Debian/Ubuntu'da sites-enabled/default, resmi nginx.org
+    RPM paketinde conf.d/default.conf) `listen 80 default_server;` ile önceliği
+    elinde tutmaya devam eder — bu durumda server_name eşleşmeyen/bare-IP
+    istekler (örn. `saglik_kontrolu()`'nun kendi 127.0.0.1 isteği) sessizce
+    nginx'in "Welcome to nginx" sayfasına düşer, bizim uygulamamıza değil.
+    Dosya yoksa mv sessizce başarısız olur (kontrol=False) — tekrar çalıştırmak
+    güvenlidir.
+    """
+    for yol in ("/etc/nginx/sites-enabled/default", "/etc/nginx/conf.d/default.conf"):
+        y.calistir(["mv", yol, f"{yol}.devre-disi"], sudo=True, sessiz=True, kontrol=False)
+
+
 def nginx_yapilandir(proje_dizin: Path, servis_adi: str, allowed_hosts: str) -> None:
     server_name = allowed_hosts.replace(",", " ").strip() or "_"
     dosya = f"/etc/nginx/conf.d/{servis_adi}.conf"
     y.bilgi(f"Nginx yapılandırması yazılıyor: {dosya}")
 
+    _varsayilan_siteyi_devre_disi_birak()
+
     icerik = f"""server {{
-    listen 80;
+    listen 80 default_server;
     server_name {server_name};
 
     client_max_body_size 20M;
