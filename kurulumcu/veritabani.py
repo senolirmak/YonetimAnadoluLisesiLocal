@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import getpass
 import json
 import os
 import time
@@ -166,6 +167,28 @@ volumes:
 """
 
 
+def _linger_etkinlestir() -> None:
+    """Rootless Podman'da, konteyneri çalıştıran işletim sistemi kullanıcısının oturumu
+    kapansa bile (örn. sunucuya SSH ile bağlanılıp çıkıldığında) systemd user session'ının
+    ve dolayısıyla konteynerin ayakta kalabilmesi için 'linger' özelliğini etkinleştirir.
+
+    Bu, DB kullanıcısından (`DBAyarlari.kullanici`, bir PostgreSQL rolü) tamamen ayrı bir
+    kavramdır — burada konteyneri fiilen çalıştıran OS kullanıcısı hedeflenir. Zaten
+    etkinse dokunmaz (her çalıştırmada gereksiz sudo şifresi istenmesin diye önce durum
+    kontrol edilir). `sudo` altında çalışıyorsa (`SUDO_USER` set) linger yine gerçek/hedef
+    kullanıcı için etkinleştirilmelidir, `root` için değil."""
+    kullanici = os.environ.get("SUDO_USER") or getpass.getuser()
+    durum = y.cikti(["loginctl", "show-user", kullanici, "-p", "Linger"])
+    if durum == "Linger=yes":
+        return
+    y.bilgi(
+        f"Rootless Podman'da konteynerin oturum kapansa da ayakta kalabilmesi için "
+        f"linger etkinleştiriliyor: {kullanici}"
+    )
+    y.calistir(["loginctl", "enable-linger", kullanici], sudo=True)
+    y.basari("Linger etkinleştirildi.")
+
+
 def _mevcut_konteyneri_compose_icin_hazirla(arac: str, konteyner_adi: str) -> None:
     """`konteyner_adi` daha önce düz `<arac> run` ile (compose dışında)
     oluşturulmuşsa, compose'un devralabilmesi için kaldırır — veri adlı
@@ -242,7 +265,7 @@ def konteyner_ile_kur(
         "reboot sonrası konteyneri yeniden başlatır."
     )
     if arac == "podman":
-        y.uyari("  Rootless Podman'da oturum kapatıldığında da ayakta kalması için: 'loginctl enable-linger $USER'")
+        _linger_etkinlestir()
 
     return konteyner_adi
 
