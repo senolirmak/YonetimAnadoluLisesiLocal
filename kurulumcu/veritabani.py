@@ -158,6 +158,11 @@ def _compose_icerik(ayar: DBAyarlari, konteyner_adi: str, volume_adi: str, imaj:
 volumes:
   {volume_adi}:
     driver: local
+    # 'name:' olmadan compose (özellikle podman-compose), gerçek volume adının
+    # başına proje adını (dizin adı) otomatik ekler — örn. "{volume_adi}" yerine
+    # "akalyonetim_{volume_adi}" gibi. container_name: konteyner için bunu zaten
+    # önlüyordu; aynı sabitlemeyi volume için de burada açıkça yapıyoruz.
+    name: {volume_adi}
 """
 
 
