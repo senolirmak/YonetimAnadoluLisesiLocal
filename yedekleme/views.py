@@ -16,7 +16,7 @@ from django.views.decorators.http import require_POST
 
 from okul.auth import mudur_yardimcisi_required
 from yedekleme.forms import GeriYuklemeOnayForm, YedekYuklemeForm
-from yedekleme.services import yedek_servisi
+from yedekleme.services import gdrive_servisi, yedek_servisi
 
 
 def _guvenli_yol_veya_404(dosya_adi: str):
@@ -29,7 +29,11 @@ def _guvenli_yol_veya_404(dosya_adi: str):
 @mudur_yardimcisi_required
 def yedek_listesi(request):
     yedekler = yedek_servisi.yedekleri_listele()
-    return render(request, "yedekleme/yedek_listesi.html", {"yedekler": yedekler})
+    return render(
+        request,
+        "yedekleme/yedek_listesi.html",
+        {"yedekler": yedekler, "gdrive_aktif": gdrive_servisi.aktif_mi()},
+    )
 
 
 @mudur_yardimcisi_required
@@ -39,8 +43,35 @@ def yedek_olustur(request):
         yol = yedek_servisi.yedek_olustur(etiket="web")
     except yedek_servisi.YedekHatasi as exc:
         messages.error(request, str(exc))
+        return redirect("yedekleme:yedek_listesi")
+
+    messages.success(request, f"Yedek oluşturuldu: {yol.name}")
+
+    # Google Drive yapılandırılmışsa (bkz. gdrive_servisi) her yeni yedeği
+    # otomatik olarak da oraya yükle — site-dışı bir kopya, felaket kurtarma
+    # amaçlı. Yükleme başarısız olsa bile yerel yedek zaten alınmış olduğu
+    # için bu işlemi geri almıyoruz, sadece uyarı gösteriyoruz.
+    if gdrive_servisi.aktif_mi():
+        try:
+            gdrive_servisi.yedek_yukle(yol)
+        except yedek_servisi.YedekHatasi as exc:
+            messages.warning(request, f"Yedek Google Drive'a yüklenemedi: {exc}")
+        else:
+            messages.success(request, "Google Drive'a da yüklendi.")
+
+    return redirect("yedekleme:yedek_listesi")
+
+
+@mudur_yardimcisi_required
+@require_POST
+def yedek_drive_yukle(request, dosya_adi):
+    yol = _guvenli_yol_veya_404(dosya_adi)
+    try:
+        gdrive_servisi.yedek_yukle(yol)
+    except yedek_servisi.YedekHatasi as exc:
+        messages.error(request, str(exc))
     else:
-        messages.success(request, f"Yedek oluşturuldu: {yol.name}")
+        messages.success(request, f"'{dosya_adi}' Google Drive'a yüklendi.")
     return redirect("yedekleme:yedek_listesi")
 
 
