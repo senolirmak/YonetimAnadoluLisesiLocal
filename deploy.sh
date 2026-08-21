@@ -5,6 +5,8 @@
 # Sunucuda : bash /srv/akalyonetim/deploy.sh
 # Uzaktan  : ssh kullanici@sunucu "bash /srv/akalyonetim/deploy.sh"
 # =============================================================================
+# git pull doğrulama notu: bu satır yalnızca sunucuda 'git pull'un yeni commit'i
+# çektiğini teyit etmek için eklendi (2026-08-21).
 
 set -euo pipefail
 
