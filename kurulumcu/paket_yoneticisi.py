@@ -55,19 +55,51 @@ def podman_compose_kur(paket_yoneticisi: str) -> None:
     y.basari("podman-compose kuruldu.")
 
 
-def postgresql_istemci_kur(paket_yoneticisi: str) -> None:
+def postgresql_istemci_kur(paket_yoneticisi: str, hedef_surum: str | None = None) -> None:
     """Yalnızca PostgreSQL istemci araçlarını (`psql`, `pg_dump`, `pg_restore`) kurar
     — sunucu bileşeni YOK. PostgreSQL konteyner modunda çalıştırıldığında (bkz.
     `veritabani.konteyner_ile_kur`) `yedekleme` app'inin bu araçları host'ta, TCP
     üzerinden (podman/docker exec'e hiç ihtiyaç duymadan) kullanabilmesi içindir —
-    bkz. `yedekleme/services/yedek_servisi.py` modül docstring'i."""
+    bkz. `yedekleme/services/yedek_servisi.py` modül docstring'i.
+
+    `hedef_surum` (örn. "18") verilirse TAM o majör sürüme özel istemci paketi
+    kurulmaya çalışılır — pg_dump kendisinden daha yeni bir sunucuyu yedekleyemez
+    ("sunucu sürümü uyuşmazlığı" hatasıyla iptal eder), bu yüzden konteynerdeki
+    (bkz. `VARSAYILAN_IMAJ`) PostgreSQL sürümüyle eşleşmesi gerekir. Debian/Ubuntu'nun
+    kendi deposu tek, dondurulmuş bir sürüm taşır (örn. Debian 13 → 17) ve bu genelde
+    konteynerden eskidir; eşleşen paket depoda yoksa resmi PostgreSQL deposu
+    (apt.postgresql.org / PGDG) `postgresql-common` paketinin getirdiği resmi betikle
+    otomatik eklenir."""
     y.bilgi("PostgreSQL istemci araçları kuruluyor (psql, pg_dump, pg_restore)...")
     if paket_yoneticisi == "apt":
         y.calistir(["apt-get", "update", "-qq"], sudo=True)
-        y.calistir(["apt-get", "install", "-y", "postgresql-client"], sudo=True, sessiz=True)
+        if hedef_surum:
+            paket = f"postgresql-client-{hedef_surum}"
+            if not y.basarili_mi(["apt-cache", "show", paket]):
+                y.bilgi(
+                    f"'{paket}' Debian/Ubuntu'nun kendi deposunda yok; resmi PostgreSQL "
+                    "deposu (PGDG) ekleniyor..."
+                )
+                y.calistir(["apt-get", "install", "-y", "postgresql-common"], sudo=True, sessiz=True)
+                # '-y' onay istemini atlar; stdin'i de kapalı (boş girdi) geçiyoruz ki
+                # eski bir postgresql-common sürümünde '-y' desteklenmese bile betik
+                # interaktif bir yanıt bekleyip komutu sonsuza dek askıda bırakmasın.
+                y.calistir(
+                    ["/usr/share/postgresql-common/pgdg/apt.postgresql.org.sh", "-y"],
+                    sudo=True,
+                    sessiz=True,
+                    girdi="",
+                )
+                y.calistir(["apt-get", "update", "-qq"], sudo=True)
+            y.calistir(["apt-get", "install", "-y", paket], sudo=True, sessiz=True)
+        else:
+            y.calistir(["apt-get", "install", "-y", "postgresql-client"], sudo=True, sessiz=True)
     else:
         # Fedora/RHEL'de 'postgresql' paketi yalnızca istemci araçlarını taşır;
-        # sunucu ayrı bir paket olan 'postgresql-server'dadır.
+        # sunucu ayrı bir paket olan 'postgresql-server'dadır. Sürüme özel paketler
+        # (PGDG'nin yum deposu) burada denenmiyor — Debian/Ubuntu'nun aksine dağıtım
+        # sürümüne göre değişen ayrı bir repo-rpm kurulumu gerektirir; eşleşmezse
+        # `veritabani.istemci_araclarini_dogrula` kurulum sonrası ayrıca uyarır.
         y.calistir(["dnf", "install", "-y", "postgresql"], sudo=True, sessiz=True)
     y.basari("PostgreSQL istemci araçları hazır.")
 

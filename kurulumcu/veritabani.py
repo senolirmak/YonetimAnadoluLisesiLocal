@@ -5,6 +5,7 @@ from __future__ import annotations
 import getpass
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -341,3 +342,68 @@ def native_ile_kur(ayar: DBAyarlari, paket_yon: str | None, sunucu_modu: bool) -
         psql_calistir(f"GRANT ALL PRIVILEGES ON DATABASE {ayar.ad} TO {ayar.kullanici};")
         psql_calistir(f"ALTER DATABASE {ayar.ad} OWNER TO {ayar.kullanici};")
         y.basari("Veritabanı oluşturuldu ve yetkilendirildi.")
+
+
+def _pg_dump_majör_surumu() -> int | None:
+    """Host'ta kurulu pg_dump'ın majör sürüm numarasını döner; pg_dump yoksa None."""
+    if not y.komut_var_mi("pg_dump"):
+        return None
+    cikti = y.cikti(["pg_dump", "--version"])
+    eslesme = re.search(r"\)\s*(\d+)", cikti) or re.search(r"(\d+)\.\d+", cikti)
+    return int(eslesme.group(1)) if eslesme else None
+
+
+def _sunucu_majör_surumu(ayar: DBAyarlari) -> int | None:
+    metin = sunucu_surumu(ayar)  # örn. "PostgreSQL 18.6"
+    if not metin:
+        return None
+    eslesme = re.search(r"PostgreSQL (\d+)", metin)
+    return int(eslesme.group(1)) if eslesme else None
+
+
+def istemci_araclarini_dogrula(ayar: DBAyarlari, paket_yon: str | None) -> None:
+    """`yedekleme` app'inin (bkz. `yedekleme/services/yedek_servisi.py`) kullandığı
+    pg_dump/pg_restore'un host'ta kurulu VE sunucudan eski olmadığını garanti eder.
+
+    pg_dump, kendisinden daha yeni bir sunucuyu yedekleyemez ("sunucu sürümü
+    uyuşmazlığı" hatasıyla iptal eder) — bu tipik olarak konteyner modunda (bkz.
+    `VARSAYILAN_IMAJ`, güncel bir majör sürüm izler) dağıtımın kendi apt/dnf
+    deposundaki (genelde daha eski, dondurulmuş) istemci paketiyle karşılaşılır.
+    Debian/Ubuntu'da eşleşen paket depoda yoksa resmi PostgreSQL deposu (PGDG)
+    otomatik eklenir — bkz. `paket_yoneticisi.postgresql_istemci_kur`.
+    """
+    sunucu_surum = _sunucu_majör_surumu(ayar) if baglanabiliyor_mu(ayar) else None
+    istemci_surum = _pg_dump_majör_surumu()
+
+    if istemci_surum and (not sunucu_surum or istemci_surum >= sunucu_surum):
+        return  # kurulu ve sunucudan eski değil
+
+    if not paket_yon:
+        y.uyari(
+            "'pg_dump' host'ta yok ya da sunucudan eski (web üzerinden yedek alma/geri "
+            "yükleme çalışmayabilir) ve otomatik kurulum için bir paket yöneticisi yok. "
+            "Elle kurun: 'sudo apt install postgresql-client' ya da 'sudo dnf install postgresql'."
+        )
+        return
+
+    from . import paket_yoneticisi
+
+    if istemci_surum:
+        y.uyari(
+            f"Host'taki pg_dump sürümü ({istemci_surum}) PostgreSQL sunucusundan "
+            f"({sunucu_surum}) eski — bu haliyle yedekleme 'sunucu sürümü uyuşmazlığı' "
+            "hatasıyla başarısız olur. Eşleşen sürüm kuruluyor..."
+        )
+    paket_yoneticisi.postgresql_istemci_kur(
+        paket_yon, hedef_surum=str(sunucu_surum) if sunucu_surum else None
+    )
+
+    # Kurulumdan sonra tekrar kontrol et; hâlâ eşleşmiyorsa sessizce yarım
+    # bırakmak yerine açıkça uyar.
+    yeni_istemci_surum = _pg_dump_majör_surumu()
+    if sunucu_surum and (not yeni_istemci_surum or yeni_istemci_surum < sunucu_surum):
+        y.uyari(
+            f"pg_dump kurulduktan sonra hâlâ PostgreSQL {sunucu_surum} ile eşleşmiyor "
+            f"(kurulu sürüm: {yeni_istemci_surum or 'bulunamadı'}). Web üzerinden yedek "
+            "alma/geri yükleme çalışmayabilir; elle kontrol edin."
+        )

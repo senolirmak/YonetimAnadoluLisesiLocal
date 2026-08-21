@@ -233,16 +233,9 @@ def main() -> None:
     # `yedekleme` app'i pg_dump/pg_restore'u DAİMA host'ta kurulu ikili dosyalarla
     # çalıştırır (bkz. yedekleme/services/yedek_servisi.py) — DB bu adımda yeni
     # kurulmuş olsun ya da (yukarıdaki "zaten bağlanılabiliyor" dalında olduğu gibi)
-    # zaten çalışıyor olsun fark etmez, her durumda burada kontrol edilir.
-    if not y.komut_var_mi("pg_dump"):
-        if paket_yon:
-            paket_yoneticisi.postgresql_istemci_kur(paket_yon)
-        else:
-            y.uyari(
-                "'pg_dump' host'ta bulunamadı ve otomatik kurulum için bir paket yöneticisi "
-                "yok — web üzerinden yedek alma/geri yükleme çalışmayacaktır. Elle kurun: "
-                "'sudo apt install postgresql-client' ya da 'sudo dnf install postgresql'."
-            )
+    # zaten çalışıyor olsun fark etmez, her durumda burada kontrol edilir; ayrıca
+    # sürümün sunucudan eski olmadığı da doğrulanır (bkz. istemci_araclarini_dogrula).
+    veritabani.istemci_araclarini_dogrula(ayar, paket_yon)
 
     # ── 5. Django: migrate, gruplar, superuser, statik dosyalar ──
     y.bilgi("Migration'lar uygulanıyor...")
