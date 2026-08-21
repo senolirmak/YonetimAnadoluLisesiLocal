@@ -32,14 +32,6 @@
       Bu sayfa <code>backups/</code> dizinindeki tüm <code>.dump</code> dosyalarını listeler —
       manuel alınan yedekler, <code>deploy.sh</code>'in her güncelleme öncesi otomatik
       aldığı yedekler ve başka bir ortamdan yüklenen dosyalar dahil.
-      {% if gdrive_aktif %}
-        Google Drive yüklemesi etkin — yeni alınan her yedek otomatik olarak da oraya yüklenir.
-      {% else %}
-        Google Drive yüklemesi devre dışı — etkinleştirmek için <code>.env</code> dosyasına
-        <code>YEDEKLEME_GDRIVE_OAUTH_ISTEMCI</code>, <code>YEDEKLEME_GDRIVE_TOKEN</code> ve
-        <code>YEDEKLEME_GDRIVE_KLASOR_ID</code> ekleyip
-        <code>python manage.py gdrive_yetkilendir</code> çalıştırın.
-      {% endif %}
     </p>
 
     <div style="overflow-x:auto;">
@@ -61,12 +53,6 @@
           <td class="ay-satir-eylem">
             <a href="{% url 'yedekleme:yedek_indir' dosya_adi=yedek.ad %}">İndir</a>
             <a href="{% url 'yedekleme:yedek_geri_yukle_onay' dosya_adi=yedek.ad %}" style="color:#b45309;">Geri Yükle</a>
-            {% if gdrive_aktif %}
-            <form method="post" action="{% url 'yedekleme:yedek_drive_yukle' dosya_adi=yedek.ad %}" style="display:inline;">
-              {% csrf_token %}
-              <button type="submit" style="background:none;border:none;padding:0;font:inherit;color:#1a73e8;text-decoration:underline;cursor:pointer;">Drive'a Yükle</button>
-            </form>
-            {% endif %}
             <a class="ay-sil-link" href="{% url 'yedekleme:yedek_sil_onay' dosya_adi=yedek.ad %}">Sil</a>
           </td>
         </tr>

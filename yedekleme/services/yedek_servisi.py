@@ -16,9 +16,6 @@ konteyner modu, ya da `deploy.sh`'in `podman exec` kullanımı) — `.env` dosya
 `YEDEKLEME_POSTGRES_KONTEYNER=<konteyner-adı>` eklenerek işlemler doğrudan konteyner
 içinde çalıştırılabilir (host'ta pg_dump/pg_restore kurulu olması gerekmez).
 
-Yedeklerin site-dışı (Google Drive) bir kopyası için bkz. `gdrive_servisi.py` —
-ayrı, isteğe bağlı bir modül; buradaki fonksiyonlardan bağımsızdır.
-
 Tüm view'lar bu modülü çağırmadan önce yetki kontrolünü (mudur_yardimcisi_required)
 yapmış olmalıdır — burada ek bir yetki kontrolü yoktur.
 """

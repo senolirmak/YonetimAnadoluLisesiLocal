@@ -10,7 +10,6 @@ urlpatterns = [
     path("yukle/", views.yedek_yukle, name="yedek_yukle"),
     path("geri-yukle/", views.yedek_geri_yukle, name="yedek_geri_yukle"),
     path("<str:dosya_adi>/indir/", views.yedek_indir, name="yedek_indir"),
-    path("<str:dosya_adi>/drive-yukle/", views.yedek_drive_yukle, name="yedek_drive_yukle"),
     path("<str:dosya_adi>/sil/", views.yedek_sil_onay, name="yedek_sil_onay"),
     path("<str:dosya_adi>/sil/onayla/", views.yedek_sil, name="yedek_sil"),
     path("<str:dosya_adi>/geri-yukle/onay/", views.yedek_geri_yukle_onay, name="yedek_geri_yukle_onay"),
