@@ -277,6 +277,23 @@ def konteyner_ile_kur(
         )
     y.basari("PostgreSQL konteyneri hazır.")
 
+    # `yedekleme` app'i (web üzerinden yedek al/geri yükle) pg_dump/pg_restore'u
+    # DAİMA host'ta kurulu ikili dosyalarla, TCP üzerinden çalıştırır — konteynere
+    # `exec` ile hiç girmez (bkz. yedekleme/services/yedek_servisi.py modül
+    # docstring'i: servis kullanıcısına — akalsite — kasıtlı olarak podman/docker
+    # erişimi verilmez). Bu yüzden konteyner modunda da host'ta bu araçlar gerekir.
+    if not y.komut_var_mi("pg_dump"):
+        if paket_yon:
+            from . import paket_yoneticisi
+
+            paket_yoneticisi.postgresql_istemci_kur(paket_yon)
+        else:
+            y.uyari(
+                "'pg_dump' host'ta bulunamadı ve otomatik kurulum için bir paket yöneticisi "
+                "yok — web üzerinden yedek alma/geri yükleme çalışmayacaktır. Elle kurun: "
+                "'sudo apt install postgresql-client' ya da 'sudo dnf install postgresql'."
+            )
+
     y.uyari(
         f"Kalıcılık notu: restart: always, {arac} servisi açık olduğu sürece "
         "reboot sonrası konteyneri yeniden başlatır."

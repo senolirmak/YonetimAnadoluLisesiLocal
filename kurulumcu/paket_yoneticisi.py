@@ -55,6 +55,23 @@ def podman_compose_kur(paket_yoneticisi: str) -> None:
     y.basari("podman-compose kuruldu.")
 
 
+def postgresql_istemci_kur(paket_yoneticisi: str) -> None:
+    """Yalnızca PostgreSQL istemci araçlarını (`psql`, `pg_dump`, `pg_restore`) kurar
+    — sunucu bileşeni YOK. PostgreSQL konteyner modunda çalıştırıldığında (bkz.
+    `veritabani.konteyner_ile_kur`) `yedekleme` app'inin bu araçları host'ta, TCP
+    üzerinden (podman/docker exec'e hiç ihtiyaç duymadan) kullanabilmesi içindir —
+    bkz. `yedekleme/services/yedek_servisi.py` modül docstring'i."""
+    y.bilgi("PostgreSQL istemci araçları kuruluyor (psql, pg_dump, pg_restore)...")
+    if paket_yoneticisi == "apt":
+        y.calistir(["apt-get", "update", "-qq"], sudo=True)
+        y.calistir(["apt-get", "install", "-y", "postgresql-client"], sudo=True, sessiz=True)
+    else:
+        # Fedora/RHEL'de 'postgresql' paketi yalnızca istemci araçlarını taşır;
+        # sunucu ayrı bir paket olan 'postgresql-server'dadır.
+        y.calistir(["dnf", "install", "-y", "postgresql"], sudo=True, sessiz=True)
+    y.basari("PostgreSQL istemci araçları hazır.")
+
+
 def postgresql_kur(paket_yoneticisi: str) -> None:
     y.bilgi("PostgreSQL sunucusu kuruluyor...")
     if paket_yoneticisi == "apt":

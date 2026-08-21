@@ -10,11 +10,16 @@ dosyası, web arayüzündeki "Yedek Yükle" formuyla `backups/` dizinine kopyala
 mevcut geri yükleme akışına (`yedek_geri_yukle_onay` → `yedek_geri_yukle`) dahil
 edilebilir — bkz. `yedek_yukle()`.
 
-PostgreSQL istemci araçları (pg_dump/pg_restore) host'ta kurulu değilse — örn.
-PostgreSQL bir Podman/Docker konteynerinde çalışıyorsa (bkz. `kurulumcu/veritabani.py`
-konteyner modu, ya da `deploy.sh`'in `podman exec` kullanımı) — `.env` dosyasına
-`YEDEKLEME_POSTGRES_KONTEYNER=<konteyner-adı>` eklenerek işlemler doğrudan konteyner
-içinde çalıştırılabilir (host'ta pg_dump/pg_restore kurulu olması gerekmez).
+Bu modül `pg_dump`/`pg_restore`'u DAİMA host'ta kurulu ikili dosyalarla, TCP
+üzerinden (`.env`'deki DB_HOST/DB_PORT) çalıştırır — PostgreSQL bir Podman/Docker
+konteynerinde çalışıyor olsa bile: konteyner `127.0.0.1:<port>`'a açık olduğundan
+(bkz. `kurulumcu/veritabani.py`) bu her zaman yeterlidir. Bilinçli bir tercihtir:
+bu servis web isteği içinden, sunucunun servis kullanıcısı olarak (bkz.
+`kurulumcu/servis_kullanicisi.py`) çalışır ve bu kullanıcıya kesinlikle podman/docker
+erişimi VERİLMEZ — konteyner içine `exec` ile girme (rootless Podman'da zaten yalnızca
+konteyneri oluşturan OS kullanıcısı için mümkündür) burada hiç kullanılmaz. Sunucunun
+kendi `podman exec` tabanlı yedeği (`deploy.sh`, `senolirmak` olarak çalışır) bundan
+tamamen ayrı ve etkilenmeyen bir mekanizmadır.
 
 Tüm view'lar bu modülü çağırmadan önce yetki kontrolünü (mudur_yardimcisi_required)
 yapmış olmalıdır — burada ek bir yetki kontrolü yoktur.
@@ -25,7 +30,6 @@ from __future__ import annotations
 import os
 import re
 import shlex
-import shutil
 import subprocess
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -86,65 +90,34 @@ def _db_ayarlari() -> dict[str, str]:
     }
 
 
-def _konteyner_adi() -> str | None:
-    return os.getenv("YEDEKLEME_POSTGRES_KONTEYNER") or None
-
-
-def _konteyner_araci() -> str | None:
-    zorla = os.getenv("YEDEKLEME_KONTEYNER_ARACI")
-    if zorla:
-        return zorla
-    if shutil.which("podman"):
-        return "podman"
-    if shutil.which("docker"):
-        return "docker"
-    # YEDEKLEME_KOMUT_ONEKI tanımlıysa (örn. sandbox'tan host'a çıkmak için
-    # 'flatpak-spawn --host'), gerçek podman/docker sandbox'ın PATH'inde hiç
-    # görünmeyebilir; bu durumda en yaygın araç olan podman'ı varsayıyoruz —
-    # farklıysa YEDEKLEME_KONTEYNER_ARACI ile açıkça belirtilebilir.
-    if os.getenv("YEDEKLEME_KOMUT_ONEKI"):
-        return "podman"
-    return None
-
-
 def _komut_hazirla(temel_komut: list[str]) -> list[str]:
     """Sandbox'lanmış geliştirme ortamlarında host'a çıkmak için gerekebilecek bir
-    komut önekini (örn. 'flatpak-spawn --host') .env'den okuyup öne ekler."""
+    komut önekini (örn. 'flatpak-spawn --host') .env'den okuyup öne ekler. Podman/docker
+    ile ilgisizdir — yalnızca pg_dump/pg_restore ikili dosyalarının sandbox dışına
+    çıkılmadan görünmediği geliştirme ortamları içindir."""
     onek = os.getenv("YEDEKLEME_KOMUT_ONEKI", "").strip()
     if not onek:
         return temel_komut
     return [*shlex.split(onek), *temel_komut]
 
 
-def _arac_bulunamadi_mesaji(konteyner: str | None) -> str:
-    if konteyner:
-        return (
-            f"YEDEKLEME_POSTGRES_KONTEYNER='{konteyner}' ayarlanmış ama podman/docker "
-            "bulunamadı ya da konteynere erişilemedi. Konteynerin çalıştığından ve "
-            "adının doğru olduğundan emin olun."
-        )
+def _arac_bulunamadi_mesaji() -> str:
     return (
-        "'pg_dump'/'pg_restore' bulunamadı. PostgreSQL istemci araçlarının kurulu olduğundan "
-        "emin olun; PostgreSQL bir konteynerde çalışıyorsa .env dosyasına "
-        "YEDEKLEME_POSTGRES_KONTEYNER=<konteyner-adı> ekleyerek doğrudan konteyner içinde "
-        "çalıştırılmasını sağlayabilirsiniz."
+        "'pg_dump'/'pg_restore' bulunamadı. PostgreSQL istemci araçlarının host'ta kurulu "
+        "olduğundan emin olun (örn. 'sudo apt install postgresql-client' ya da "
+        "'sudo dnf install postgresql') — PostgreSQL bir konteynerde çalışıyor olsa bile bu "
+        "araçlar TCP üzerinden (127.0.0.1) bağlanır, konteyner içine girmez."
     )
 
 
 def _pg_restore_arac_komutu() -> list[str]:
-    """pg_restore'u konteyner modundaysa `exec -i <konteyner>` ile, değilse doğrudan
-    çalıştıracak komut önekini hazırlar.
+    """`pg_restore`'u doğrudan (host'ta kurulu ikili dosyayla) çalıştıracak komutu
+    hazırlar.
 
     Yalnızca arşiv dosyasını okuyan çağrılar (`-l`, `--data-only -f -`) için
     yeterlidir — bu çağrılar hiçbir veritabanına bağlanmaz, dolayısıyla
     `yedek_geri_yukle()`'in aksine -U/-h/-d veya PGPASSWORD gerekmez.
     """
-    konteyner = _konteyner_adi()
-    if konteyner:
-        arac = _konteyner_araci()
-        if not arac:
-            raise YedekHatasi(_arac_bulunamadi_mesaji(konteyner))
-        return _komut_hazirla([arac, "exec", "-i", konteyner, "pg_restore"])
     return _komut_hazirla(["pg_restore"])
 
 
@@ -176,27 +149,16 @@ def yedekleri_listele() -> list[YedekDosyasi]:
 
 
 def _pg_dump_calistir(hedef: Path, ayar: dict[str, str]) -> None:
-    """pg_dump'ı çalıştırıp çıktısını (stdout) hedef dosyaya yazar.
-
-    Konteyner modunda `podman/docker exec` ile konteyner içindeki yerel unix socket
-    üzerinden bağlanılır (host/port/şifre gerekmez — deploy.sh'teki çalışan
-    yöntemle aynı); native modda TCP + PGPASSWORD kullanılır.
-    """
-    konteyner = _konteyner_adi()
-    if konteyner:
-        arac = _konteyner_araci()
-        if not arac:
-            raise YedekHatasi(_arac_bulunamadi_mesaji(konteyner))
-        komut = [arac, "exec", konteyner, "pg_dump", "-U", ayar["kullanici"], "-d", ayar["ad"], "-Fc"]
-        ortam = None
-    else:
-        komut = [
+    """pg_dump'ı host'ta kurulu ikili dosyayla, TCP + PGPASSWORD üzerinden çalıştırıp
+    çıktısını (stdout) hedef dosyaya yazar (bkz. modül docstring'i — podman/docker
+    exec kasıtlı olarak kullanılmaz)."""
+    komut = _komut_hazirla(
+        [
             "pg_dump", "-h", ayar["host"], "-p", ayar["port"],
             "-U", ayar["kullanici"], "-d", ayar["ad"], "-Fc",
         ]
-        ortam = {**os.environ, "PGPASSWORD": ayar["sifre"]}
-
-    komut = _komut_hazirla(komut)
+    )
+    ortam = {**os.environ, "PGPASSWORD": ayar["sifre"]}
 
     try:
         with open(hedef, "wb") as f:
@@ -208,7 +170,7 @@ def _pg_dump_calistir(hedef: Path, ayar: dict[str, str]) -> None:
             f"Yedekleme {ZAMAN_ASIMI_SANIYE} saniyede tamamlanamadı (zaman aşımı)."
         ) from exc
     except FileNotFoundError as exc:
-        raise YedekHatasi(_arac_bulunamadi_mesaji(konteyner)) from exc
+        raise YedekHatasi(_arac_bulunamadi_mesaji()) from exc
 
     if sonuc.returncode != 0:
         hata_metni = sonuc.stderr.decode(errors="replace").strip()
@@ -285,7 +247,7 @@ def yedek_bilgisi(yol: Path) -> dict[str, str]:
     except subprocess.TimeoutExpired as exc:
         raise YedekHatasi("Yedek başlığı okunamadı (zaman aşımı).") from exc
     except FileNotFoundError as exc:
-        raise YedekHatasi(_arac_bulunamadi_mesaji(_konteyner_adi())) from exc
+        raise YedekHatasi(_arac_bulunamadi_mesaji()) from exc
 
     if sonuc.returncode != 0:
         hata_metni = sonuc.stderr.decode(errors="replace").strip()
@@ -326,7 +288,7 @@ def _pg_restore_veri_metni(yol: Path) -> str:
     except subprocess.TimeoutExpired as exc:
         raise YedekHatasi("Yedek verisi okunamadı (zaman aşımı).") from exc
     except FileNotFoundError as exc:
-        raise YedekHatasi(_arac_bulunamadi_mesaji(_konteyner_adi())) from exc
+        raise YedekHatasi(_arac_bulunamadi_mesaji()) from exc
 
     if sonuc.returncode != 0:
         hata_metni = sonuc.stderr.decode(errors="replace").strip()
@@ -495,24 +457,13 @@ def yedek_geri_yukle(dosya_adi: str) -> None:
     yol = guvenli_yol(dosya_adi)
     ayar = _db_ayarlari()
 
-    konteyner = _konteyner_adi()
-    if konteyner:
-        arac = _konteyner_araci()
-        if not arac:
-            raise YedekHatasi(_arac_bulunamadi_mesaji(konteyner))
-        komut = [
-            arac, "exec", "-i", konteyner, "pg_restore",
-            "-U", ayar["kullanici"], "-d", ayar["ad"], "--clean", "--if-exists",
-        ]
-        ortam = None
-    else:
-        komut = [
+    komut = _komut_hazirla(
+        [
             "pg_restore", "-h", ayar["host"], "-p", ayar["port"],
             "-U", ayar["kullanici"], "-d", ayar["ad"], "--clean", "--if-exists",
         ]
-        ortam = {**os.environ, "PGPASSWORD": ayar["sifre"]}
-
-    komut = _komut_hazirla(komut)
+    )
+    ortam = {**os.environ, "PGPASSWORD": ayar["sifre"]}
 
     try:
         with open(yol, "rb") as f:
@@ -524,7 +475,7 @@ def yedek_geri_yukle(dosya_adi: str) -> None:
             f"Geri yükleme {ZAMAN_ASIMI_SANIYE} saniyede tamamlanamadı (zaman aşımı)."
         ) from exc
     except FileNotFoundError as exc:
-        raise YedekHatasi(_arac_bulunamadi_mesaji(konteyner)) from exc
+        raise YedekHatasi(_arac_bulunamadi_mesaji()) from exc
 
     # pg_restore, --clean ile var olmayan nesneler için zararsız uyarılar da
     # basabilir; yine de dönüş kodu != 0 olduğunda işlemi başarısız kabul ediyoruz.

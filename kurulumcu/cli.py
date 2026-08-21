@@ -218,10 +218,13 @@ def main() -> None:
             if not konteyner_araci:
                 konteyner_araci = paket_yoneticisi.konteyner_araci_kur(paket_yon)
             konteyner_adi = veritabani.konteyner_ile_kur(konteyner_araci, ayar, PROJE_DIZIN, paket_yon)
-            # yedekleme/ app'i pg_dump/pg_restore'u konteyner içinde çalıştırabilsin
-            # diye — konteyner modunda host'a bu istemci araçları hiç kurulmuyor,
-            # bu satır olmadan yedekleme tamamen çalışmaz (bkz.
-            # yedekleme/services/yedek_servisi.py).
+            # deploy.sh kendi pre-deploy güvenlik yedeğini bu adla doğrudan
+            # `podman exec` ile alır (senolirmak olarak, gerçek podman erişimiyle
+            # çalışır) — bkz. deploy.sh. Web üzerindeki yedekleme app'i (akalsite
+            # olarak çalışır, podman erişimi YOK) bunu kullanmaz; o her zaman
+            # host'taki pg_dump/pg_restore'u TCP ile çalıştırır (bkz.
+            # veritabani.konteyner_ile_kur'daki istemci araçları kurulumu ve
+            # yedekleme/services/yedek_servisi.py modül docstring'i).
             env_dosyasi.anahtar_ayarla(env_yolu, "YEDEKLEME_POSTGRES_KONTEYNER", konteyner_adi)
             y.basari(f"'.env' güncellendi: YEDEKLEME_POSTGRES_KONTEYNER={konteyner_adi}")
         else:

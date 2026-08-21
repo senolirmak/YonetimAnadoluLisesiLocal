@@ -264,16 +264,21 @@ adını yazarak doğrulanan, öncesinde otomatik güvenlik yedeği alan bir akı
 yükleyebilir — bkz. `yedekleme` app'i. `backups/` dizinindeki tüm `.dump` dosyaları
 (manuel, web üzerinden ve `deploy.sh`'in otomatik aldıkları dahil) bu ekranda listelenir.
 
-`yedekleme` varsayılan olarak host'ta kurulu `pg_dump`/`pg_restore` ikili dosyalarını
-TCP üzerinden kullanır. PostgreSQL bir Podman/Docker konteynerinde çalışıyorsa (host'ta
-istemci araçları kurulu olmayabilir), `.env`'e aşağıdaki isteğe bağlı değişkenler
-eklenerek işlemler doğrudan konteyner içinde (`podman/docker exec`) çalıştırılabilir —
-bkz. `.env.example`:
+`yedekleme` `pg_dump`/`pg_restore`'u DAİMA host'ta kurulu ikili dosyalarla, TCP
+üzerinden çalıştırır — PostgreSQL bir Podman/Docker konteynerinde çalışıyor olsa
+bile: konteyner `127.0.0.1:<port>`'a açık olduğundan bu her zaman yeterlidir ve
+konteyner içine `exec` ile hiç girilmez. Bu bilinçli bir tercihtir: bu servis web
+isteği içinden, sunucunun servis kullanıcısı (`akalsite`) olarak çalışır ve bu
+kullanıcıya kesinlikle podman/docker erişimi verilmez (bkz. yukarıdaki "Sunucu /
+üretim" modu notu ve `kurulumcu/servis_kullanicisi.py`). `kurulumcu`, konteyner
+modu seçildiğinde host'a istemci araçlarını (`postgresql-client`/`postgresql`)
+otomatik kurar.
+
+Sandbox'lanmış bir geliştirme ortamındaysanız (örn. Flatpak) ve `pg_dump`/`pg_restore`
+host'a çıkmadan görünmüyorsa, `.env`'e bir komut öneki eklenebilir — bkz. `.env.example`:
 
 ```env
-YEDEKLEME_POSTGRES_KONTEYNER=postgres      # konteyner adı
-YEDEKLEME_KOMUT_ONEKI=flatpak-spawn --host # sandbox'tan host'a çıkmak gerekiyorsa
-YEDEKLEME_KONTEYNER_ARACI=docker           # podman yerine docker kullanılacaksa
+YEDEKLEME_KOMUT_ONEKI=flatpak-spawn --host
 ```
 
 Komut satırından manuel olarak da alınabilir/geri yüklenebilir:
