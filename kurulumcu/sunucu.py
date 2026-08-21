@@ -21,13 +21,17 @@ After=network.target
 [Service]
 User={kullanici}
 Group={grup}
+# Soket ve olası gelecekteki dosya yazımları grup üyesine (nginx) rwx, diğerlerine
+# hiç erişim bırakmasın diye: varsayılan izinden 0007 çıkarılır (rwxrwx--- kalır).
+UMask=0007
 WorkingDirectory={proje_dizin}
 EnvironmentFile={proje_dizin}/.env
 
 # systemd her başlatmada /run/{servis_adi}/ dizinini otomatik oluşturur.
 # /run tmpfs olduğundan reboot sonrası dizin kaybolur — RuntimeDirectory bunu çözer.
+# 0750: yalnızca {kullanici} ve {grup} (nginx) girebilir, diğerleri giremez.
 RuntimeDirectory={servis_adi}
-RuntimeDirectoryMode=0755
+RuntimeDirectoryMode=0750
 
 ExecStart={venv}/bin/gunicorn \\
     --workers 3 \\

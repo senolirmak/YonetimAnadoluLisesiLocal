@@ -30,14 +30,19 @@ cd "$PROJE_DIZIN"
 # ─────────────────────────────────────────────────────────────
 # .env'den DB bilgilerini oku
 # ─────────────────────────────────────────────────────────────
+# .env, servis kullanıcısına (akalsite, mod 640) sahiptir — bu betiği çalıştıran
+# kullanıcı (senolirmak) akalsite grubunun üyesi olsa da, aşağıdaki tek satırlık
+# alt-kabuk çağrılarında grup üyeliğinin oturuma yansımış olduğuna güvenmemek
+# için burada da sudo kullanılıyor — bkz.
+# kurulumcu/servis_kullanicisi.py: calisma_zamani_dosyalarini_devret().
 
-DB_NAME=$(grep "^DB_NAME=" .env | cut -d= -f2- | xargs)
-DB_USER=$(grep "^DB_USER=" .env | cut -d= -f2- | xargs)
+DB_NAME=$(sudo grep "^DB_NAME=" .env | cut -d= -f2- | xargs)
+DB_USER=$(sudo grep "^DB_USER=" .env | cut -d= -f2- | xargs)
 
 # kurulumcu, PostgreSQL konteynerini "<DB_NAME>_pg" adıyla oluşturur (bkz.
 # kurulumcu/veritabani.py). .env'de YEDEKLEME_POSTGRES_KONTEYNER tanımlıysa
 # (yedekleme app'inin de kullandığı aynı override) o değer önceliklidir.
-POSTGRES_CONTAINER=$(grep "^YEDEKLEME_POSTGRES_KONTEYNER=" .env 2>/dev/null | cut -d= -f2- | xargs || true)
+POSTGRES_CONTAINER=$(sudo grep "^YEDEKLEME_POSTGRES_KONTEYNER=" .env 2>/dev/null | cut -d= -f2- | xargs || true)
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-${DB_NAME}_pg}"
 
 echo ""
@@ -149,13 +154,19 @@ basari "Nginx yeniden yüklendi."
 
 bilgi "Dosya izinleri düzenleniyor..."
 
-# .env yalnızca uygulama kullanıcısı tarafından okunabilsin
-sudo chmod 600 "$PROJE_DIZIN/.env"
-sudo chown senolirmak:senolirmak "$PROJE_DIZIN/.env"
+# .env yalnızca servis kullanıcısı (akalsite) ve onun grubu tarafından
+# okunabilsin — deploy'u çalıştıran kullanıcı (senolirmak) bu grubun üyesidir,
+# bkz. kurulumcu/servis_kullanicisi.py: servis_kullanicisini_hazirla/
+# calisma_zamani_dosyalarini_devret.
+sudo chmod 640 "$PROJE_DIZIN/.env"
+sudo chown akalsite:akalsite "$PROJE_DIZIN/.env"
 
-# Static ve media dosyalarının sahibi uygulama kullanıcısı
+# staticfiles bu betiği (senolirmak) çalıştıran kullanıcı tarafından üretiliyor
+# (adım 8, collectstatic); media/ ise çalışma zamanında Gunicorn'un altında
+# çalıştığı servis kullanıcısı (akalsite) tarafından yazılıyor.
 sudo chown -R senolirmak:senolirmak "$PROJE_DIZIN/staticfiles" 2>/dev/null || true
-sudo chown -R senolirmak:senolirmak "$PROJE_DIZIN/media" 2>/dev/null || true
+sudo chown -R akalsite:www-data "$PROJE_DIZIN/media" 2>/dev/null || true
+sudo chmod g+s "$PROJE_DIZIN/media" 2>/dev/null || true
 
 # Nginx'in okuyabilmesi için dizinleri erişilebilir yap
 sudo find "$PROJE_DIZIN/staticfiles" -type d -exec chmod 755 {} \; 2>/dev/null || true

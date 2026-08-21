@@ -9,6 +9,8 @@ modülün main() fonksiyonuna devreder.
   1) Yerel geliştirme — runserver ile çalıştırılır.
   2) Sunucu / üretim  — Gunicorn + Nginx + systemd ile site ayağa kaldırılır
      (yalnızca /srv/akalyonetim dizininden çalıştırılmalıdır, bkz. deploy.sh).
+     Bu sihirbazı çalıştıran (sudo yetkili) kullanıcı ile Gunicorn'un fiilen
+     altında çalıştığı kullanıcı kasıtlı olarak ayrıdır — bkz. servis_kullanicisi.py.
 
 Tekrar çalıştırmak güvenlidir: zaten tamamlanmış adımlar atlanır.
 """
@@ -16,15 +18,12 @@ Tekrar çalıştırmak güvenlidir: zaten tamamlanmış adımlar atlanır.
 from __future__ import annotations
 
 import datetime
-import getpass
-import grp
-import os
 import secrets
 import subprocess
 import sys
 from pathlib import Path
 
-from . import env_dosyasi, paket_yoneticisi, sunucu, veritabani
+from . import env_dosyasi, paket_yoneticisi, servis_kullanicisi, sunucu, veritabani
 from . import yardimci as y
 
 PROJE_DIZIN = Path(__file__).resolve().parent.parent
@@ -288,11 +287,20 @@ def main() -> None:
     # ── 6. Sunucu servisleri (Gunicorn + Nginx + systemd) ────────
     servis: str | None = None
     if sunucu_modu:
-        kullanici = getpass.getuser()
-        grup = grp.getgrgid(os.getgid()).gr_name
-        servis_adi = PROJE_DIZIN.name
+        # Servis, kurulumu çalıştıran (sudo yetkili) kullanıcıdan kasıtlı olarak
+        # ayrı, sudo yetkisiz bir sistem kullanıcısı (akalsite) altında çalışır —
+        # bkz. kurulumcu/servis_kullanicisi.py.
+        servis_kullanicisi.servis_kullanicisini_hazirla(PROJE_DIZIN)
+        servis_kullanicisi.calisma_zamani_dosyalarini_devret(PROJE_DIZIN, env_yolu)
 
-        servis = sunucu.gunicorn_servisi_kur(PROJE_DIZIN, VENV, servis_adi, kullanici, grup)
+        servis_adi = PROJE_DIZIN.name
+        servis = sunucu.gunicorn_servisi_kur(
+            PROJE_DIZIN,
+            VENV,
+            servis_adi,
+            servis_kullanicisi.SERVIS_KULLANICISI,
+            servis_kullanicisi.SERVIS_GRUBU,
+        )
         sunucu.nginx_yapilandir(PROJE_DIZIN, servis_adi, degerler.get("ALLOWED_HOSTS", ""))
         sunucu.saglik_kontrolu(servis)
 

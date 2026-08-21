@@ -60,6 +60,8 @@ Okul personelinin haftalık nöbet görevlerini, ders doldurma listelerini, deva
 >   sunucusu) kurulur, `DEBUG=False`/`ALLOWED_HOSTS` ile `.env` yazılır, systemd servis dosyası ve
 >   Nginx reverse proxy yapılandırması oluşturulup başlatılır. **Bu mod yalnızca `/srv/akalyonetim`
 >   dizininden çalıştırılmalıdır** (bkz. `deploy.sh` — sonraki güncellemeler o script ile yapılır).
+>   Gunicorn, kurulumu çalıştıran (sudo yetkili) kullanıcıdan kasıtlı olarak ayrı, sudo yetkisiz
+>   bir sistem kullanıcısı (`akalsite`) altında çalışır — bkz. `kurulumcu/servis_kullanicisi.py`.
 >
 > Her iki modda da PostgreSQL için iki seçenek sunulur:
 > - **Native**: zaten kurulu/çalışan bir PostgreSQL sunucusuna bağlanır (superuser bilgisi ister;
