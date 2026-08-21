@@ -146,6 +146,31 @@ def servis_kullanicisini_hazirla(proje_dizin: Path) -> None:
         y.basari(f"'{nginx_kullanici}' artık '{SERVIS_GRUBU}' grubunun üyesi (etkinleşmesi için nginx yeniden başlatılmalı).")
 
 
+def proje_dizini_sahipligini_garanti_et(proje_dizin: Path) -> None:
+    """Proje dizininin (`proje_dizin`'in KENDİSİ — içindeki `.env`/`media/`/`backups/`
+    değil) sahibinin kurulumu/deploy'u çalıştıran kullanıcıda kalmasını garanti eder.
+
+    Bir önceki adımda (`servis_kullanicisini_hazirla`) `adduser --home`/`useradd
+    --home-dir` çağrısına `proje_dizin` (zaten var olan git checkout'u) veriliyor;
+    bazı dağıtımlarda bu, dizin daha önceden var olsa bile yeni kullanıcının
+    (`SERVIS_KULLANICISI`) `--home` dizini olarak sahiplenilmesine yol açabiliyor.
+    Böyle bir kaymayı fark etmeden bırakırsak `deploy.sh`'ın `git pull` adımı,
+    kurulumu çalıştıran kullanıcının dizine artık yazma izni olmadığı için "unable
+    to unlink" hatasıyla başarısız olur (üst dizinde yazma izni olmadan içindeki
+    bir dosyayı silmek/değiştirmek POSIX'te mümkün değildir — dosyanın kendi izni
+    yeterli olmaz).
+
+    Grup yine de `SERVIS_KULLANICISI` olarak bırakılır ki Gunicorn (o kullanıcı
+    altında çalışır) dizine girip (`r-x`) uygulama dosyalarını okuyabilsin; yazma
+    izni gerekmiyor — çalışma zamanı yazma ihtiyacı olan alt dizinler (`media/`,
+    `backups/`) zaten ayrı ayrı devrediliyor/paylaşılıyor.
+
+    Tekrar çalıştırmak güvenlidir; sahiplik zaten doğruysa hiçbir şey değişmez."""
+    kurulum_kullanicisi = _kurulumu_calistiran_kullanici()
+    y.calistir(["chown", f"{kurulum_kullanicisi}:{SERVIS_KULLANICISI}", str(proje_dizin)], sudo=True)
+    y.basari(f"Proje dizininin sahipliği garanti edildi: {kurulum_kullanicisi}:{SERVIS_KULLANICISI}.")
+
+
 def calisma_zamani_dosyalarini_devret(proje_dizin: Path, env_yolu: Path) -> None:
     """`.env` ve `media/`'yi `SERVIS_KULLANICISI`'na devreder.
 
