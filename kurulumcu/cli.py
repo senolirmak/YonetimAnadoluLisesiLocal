@@ -218,13 +218,13 @@ def main() -> None:
             if not konteyner_araci:
                 konteyner_araci = paket_yoneticisi.konteyner_araci_kur(paket_yon)
             konteyner_adi = veritabani.konteyner_ile_kur(konteyner_araci, ayar, PROJE_DIZIN, paket_yon)
-            # deploy.sh kendi pre-deploy güvenlik yedeğini bu adla doğrudan
-            # `podman exec` ile alır (senolirmak olarak, gerçek podman erişimiyle
-            # çalışır) — bkz. deploy.sh. Web üzerindeki yedekleme app'i (akalsite
-            # olarak çalışır, podman erişimi YOK) bunu kullanmaz; o her zaman
-            # host'taki pg_dump/pg_restore'u TCP ile çalıştırır (bkz. az aşağıdaki
-            # istemci araçları kontrolü ve yedekleme/services/yedek_servisi.py
-            # modül docstring'i).
+            # deploy.sh bu adı yalnızca ön kontrolde (konteynerin gerçekten çalıştığını
+            # doğrulamak için `podman ps`/`podman container exists`) kullanır — bkz.
+            # deploy.sh. Hem deploy.sh'in kendi pre-deploy güvenlik yedeği hem de web
+            # üzerindeki yedekleme app'i (akalsite olarak çalışır, podman erişimi YOK)
+            # pg_dump/pg_restore'u konteynere `exec` ile girmeden, host'taki ikili
+            # dosyalarla TCP üzerinden çalıştırır (bkz. az aşağıdaki istemci araçları
+            # kontrolü ve yedekleme/services/yedek_servisi.py modül docstring'i).
             env_dosyasi.anahtar_ayarla(env_yolu, "YEDEKLEME_POSTGRES_KONTEYNER", konteyner_adi)
             y.basari(f"'.env' güncellendi: YEDEKLEME_POSTGRES_KONTEYNER={konteyner_adi}")
         else:
@@ -302,6 +302,7 @@ def main() -> None:
         # bkz. kurulumcu/servis_kullanicisi.py.
         servis_kullanicisi.servis_kullanicisini_hazirla(PROJE_DIZIN)
         servis_kullanicisi.calisma_zamani_dosyalarini_devret(PROJE_DIZIN, env_yolu)
+        servis_kullanicisi.paylasilan_yedek_dizinini_hazirla(PROJE_DIZIN)
 
         servis_adi = PROJE_DIZIN.name
         servis = sunucu.gunicorn_servisi_kur(

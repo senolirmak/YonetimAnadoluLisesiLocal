@@ -38,6 +38,9 @@ cd "$PROJE_DIZIN"
 
 DB_NAME=$(sudo grep "^DB_NAME=" .env | cut -d= -f2- | xargs)
 DB_USER=$(sudo grep "^DB_USER=" .env | cut -d= -f2- | xargs)
+DB_PASSWORD=$(sudo grep "^DB_PASSWORD=" .env | cut -d= -f2- | xargs)
+DB_HOST=$(sudo grep "^DB_HOST=" .env | cut -d= -f2- | xargs)
+DB_PORT=$(sudo grep "^DB_PORT=" .env | cut -d= -f2- | xargs)
 
 # kurulumcu, PostgreSQL konteynerini "<DB_NAME>_pg" adıyla oluşturur (bkz.
 # kurulumcu/veritabani.py). .env'de YEDEKLEME_POSTGRES_KONTEYNER tanımlıysa
@@ -78,16 +81,38 @@ basari "Ön kontroller tamamlandı."
 
 bilgi "Veritabanı yedeği alınıyor..."
 
-mkdir -p "$YEDEK_DIZIN"
+# backups/, bu betiği çalıştıran kullanıcı (senolirmak) İLE servis kullanıcısının
+# (akalsite, web üzerinden yedek al/geri yükle) İKİSİNİN de yazması gereken
+# PAYLAŞILAN bir dizindir. Hangi taraf önce oluşturursa oluştursun diğeri de
+# yazabilsin diye setgid + ortak grup (akalsite) burada garanti ediliyor — bkz.
+# kurulumcu/servis_kullanicisi.py: paylasilan_yedek_dizinini_hazirla() (kurulumcu
+# normalde bunu zaten yapar; burada tekrarlanması yalnızca eski bir kurulumdan
+# kalan yanlış izinlere karşı savunma amaçlıdır).
+sudo mkdir -p "$YEDEK_DIZIN"
+sudo chgrp akalsite "$YEDEK_DIZIN"
+sudo chmod 2770 "$YEDEK_DIZIN"
 
 YEDEK_DOSYA="$YEDEK_DIZIN/${DB_NAME}_deploy_$(date +%Y%m%d_%H%M%S).dump"
 
-podman exec "$POSTGRES_CONTAINER" \
-    pg_dump \
+# pg_dump'ı konteynere 'exec' ile girmeden, host'a açık TCP portu üzerinden
+# çalıştırıyoruz — yedekleme/services/yedek_servisi.py'deki (akalsite için
+# podman erişimi hiç verilmeyen) aynı yaklaşım; host'ta pg_dump'ın kurulu ve
+# sunucuyla aynı/daha yeni sürümde olması kurulumcu tarafından garanti edilir
+# (bkz. kurulumcu/veritabani.py: istemci_araclarini_dogrula).
+#
+# Çıktı düz '>' yerine 'sudo tee' ile yazılıyor: yukarıdaki chgrp/chmod doğru
+# olsa bile, senolirmak'ın akalsite grubuna üyeliği yalnızca YENİ bir oturumda
+# (yeniden SSH bağlantısında) etkinleşir — bu betik eski bir oturumda
+# çalıştırılıyorsa düz '>' yine "Erişim engellendi" verebilirdi; sudo bu
+# belirsizliğe hiç bağımlı değildir.
+PGPASSWORD="$DB_PASSWORD" pg_dump \
+    -h "${DB_HOST:-127.0.0.1}" \
+    -p "${DB_PORT:-5432}" \
     -U "$DB_USER" \
     -d "$DB_NAME" \
     -Fc \
-    > "$YEDEK_DOSYA"
+    | sudo tee "$YEDEK_DOSYA" > /dev/null
+sudo chown senolirmak:akalsite "$YEDEK_DOSYA"
 
 if [[ ! -s "$YEDEK_DOSYA" ]]; then
     rm -f "$YEDEK_DOSYA"

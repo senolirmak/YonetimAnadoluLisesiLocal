@@ -17,9 +17,11 @@ konteynerinde çalışıyor olsa bile: konteyner `127.0.0.1:<port>`'a açık old
 bu servis web isteği içinden, sunucunun servis kullanıcısı olarak (bkz.
 `kurulumcu/servis_kullanicisi.py`) çalışır ve bu kullanıcıya kesinlikle podman/docker
 erişimi VERİLMEZ — konteyner içine `exec` ile girme (rootless Podman'da zaten yalnızca
-konteyneri oluşturan OS kullanıcısı için mümkündür) burada hiç kullanılmaz. Sunucunun
-kendi `podman exec` tabanlı yedeği (`deploy.sh`, `senolirmak` olarak çalışır) bundan
-tamamen ayrı ve etkilenmeyen bir mekanizmadır.
+konteyneri oluşturan OS kullanıcısı için mümkündür) burada hiç kullanılmaz. `deploy.sh`
+(`senolirmak` olarak çalışır) kendi pre-deploy güvenlik yedeği için de aynı yaklaşımı
+(host'taki pg_dump, TCP) kullanır — ikisi ayrı süreçlerdir ama artık ikisi de
+`backups/`'a (paylaşılan, setgid'li dizin — bkz. `kurulumcu/servis_kullanicisi.py:
+paylasilan_yedek_dizinini_hazirla`) aynı şekilde yazar.
 
 Tüm view'lar bu modülü çağırmadan önce yetki kontrolünü (mudur_yardimcisi_required)
 yapmış olmalıdır — burada ek bir yetki kontrolü yoktur.

@@ -171,3 +171,30 @@ def calisma_zamani_dosyalarini_devret(proje_dizin: Path, env_yolu: Path) -> None
     y.calistir(["chown", "-R", f"{SERVIS_KULLANICISI}:{SERVIS_GRUBU}", str(media_dizin)], sudo=True)
     y.calistir(["chmod", "g+s", str(media_dizin)], sudo=True)
     y.basari("'.env' ve 'media/' servis kullanıcısına devredildi.")
+
+
+def paylasilan_yedek_dizinini_hazirla(proje_dizin: Path) -> None:
+    """`backups/`, kurulumu/deploy'u çalıştıran kullanıcı (`deploy.sh`) İLE servis
+    kullanıcısının (`akalsite`, web üzerinden yedek al/geri yükle — bkz.
+    `yedekleme/services/yedek_servisi.py`) İKİSİNİN de yazması gereken PAYLAŞILAN
+    tek dizindir; `.env`/`media/`'nin aksine tek bir tarafa devredilemez.
+
+    Hangi taraf önce oluşturursa oluştursun (`mkdir(exist_ok=True)`), diğer tarafın
+    da yazabilmesi gerekir — aksi halde biri diğerini kilitler (örn. web'den ilk
+    yedek `akalsite:www-data` mod 0770 ile oluşturursa, `deploy.sh`'in kendi yedeğini
+    yazması "Erişim engellendi" ile başarısız olur).
+
+    Çözüm: setgid biti + ortak grup (`SERVIS_KULLANICISI`'nin kendi birincil grubu
+    — kurulumu çalıştıran kullanıcı zaten bu grubun üyesi, bkz.
+    `servis_kullanicisini_hazirla`'daki `usermod -aG`). setgid sayesinde içinde
+    oluşturulan her dosya/dizin, onu oluşturan sürecin KENDİ birincil grubundan
+    bağımsız olarak bu ortak grubu miras alır (POSIX setgid semantiği) — akalsite
+    süreci de (Gunicorn birimindeki `Group=www-data`'ya rağmen, işletim sistemi
+    kullanıcısı olarak) `SERVIS_KULLANICISI`'nin kendi grubunun üyesi olduğundan bu
+    miras işler. "other" erişimi kapalı tutulur — yedekler ham veritabanı içeriği
+    taşır."""
+    yedek_dizin = proje_dizin / "backups"
+    yedek_dizin.mkdir(exist_ok=True)
+    y.calistir(["chgrp", SERVIS_KULLANICISI, str(yedek_dizin)], sudo=True)
+    y.calistir(["chmod", "2770", str(yedek_dizin)], sudo=True)
+    y.basari(f"'backups/' paylaşılan dizin olarak hazırlandı (grup: {SERVIS_KULLANICISI}, setgid).")
