@@ -166,6 +166,14 @@ python manage.py kullanici_gruplari_olustur --settings=config.settings.productio
 basari "Kullanıcı grupları güncellendi."
 
 # ── 8. Static dosyalar ────────────────────────────────────────
+# collectstatic --clear önce staticfiles/ içindeki ESKİ dosyaları siler — bu
+# betiği çalıştıran kullanıcının (senolirmak) o an dizine yazma izni olduğundan
+# emin olunmalı; aşağıdaki adım 10'daki chown bunu yalnızca collectstatic'ten
+# SONRA garanti eder, bu yüzden aynısı burada da (işlemden önce) tekrarlanıyor
+# (bkz. backups/ için adım 2'deki aynı desen).
+sudo mkdir -p "$PROJE_DIZIN/staticfiles"
+sudo chown -R senolirmak:senolirmak "$PROJE_DIZIN/staticfiles"
+
 bilgi "Static dosyalar toplanıyor..."
 python manage.py collectstatic --noinput --clear -v 0 --settings=config.settings.production
 basari "Static dosyalar güncellendi."
