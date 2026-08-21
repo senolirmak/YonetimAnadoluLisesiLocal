@@ -222,13 +222,27 @@ def main() -> None:
             # `podman exec` ile alır (senolirmak olarak, gerçek podman erişimiyle
             # çalışır) — bkz. deploy.sh. Web üzerindeki yedekleme app'i (akalsite
             # olarak çalışır, podman erişimi YOK) bunu kullanmaz; o her zaman
-            # host'taki pg_dump/pg_restore'u TCP ile çalıştırır (bkz.
-            # veritabani.konteyner_ile_kur'daki istemci araçları kurulumu ve
-            # yedekleme/services/yedek_servisi.py modül docstring'i).
+            # host'taki pg_dump/pg_restore'u TCP ile çalıştırır (bkz. az aşağıdaki
+            # istemci araçları kontrolü ve yedekleme/services/yedek_servisi.py
+            # modül docstring'i).
             env_dosyasi.anahtar_ayarla(env_yolu, "YEDEKLEME_POSTGRES_KONTEYNER", konteyner_adi)
             y.basari(f"'.env' güncellendi: YEDEKLEME_POSTGRES_KONTEYNER={konteyner_adi}")
         else:
             veritabani.native_ile_kur(ayar, paket_yon, sunucu_modu)
+
+    # `yedekleme` app'i pg_dump/pg_restore'u DAİMA host'ta kurulu ikili dosyalarla
+    # çalıştırır (bkz. yedekleme/services/yedek_servisi.py) — DB bu adımda yeni
+    # kurulmuş olsun ya da (yukarıdaki "zaten bağlanılabiliyor" dalında olduğu gibi)
+    # zaten çalışıyor olsun fark etmez, her durumda burada kontrol edilir.
+    if not y.komut_var_mi("pg_dump"):
+        if paket_yon:
+            paket_yoneticisi.postgresql_istemci_kur(paket_yon)
+        else:
+            y.uyari(
+                "'pg_dump' host'ta bulunamadı ve otomatik kurulum için bir paket yöneticisi "
+                "yok — web üzerinden yedek alma/geri yükleme çalışmayacaktır. Elle kurun: "
+                "'sudo apt install postgresql-client' ya da 'sudo dnf install postgresql'."
+            )
 
     # ── 5. Django: migrate, gruplar, superuser, statik dosyalar ──
     y.bilgi("Migration'lar uygulanıyor...")
