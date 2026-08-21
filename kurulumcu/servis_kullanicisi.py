@@ -31,6 +31,18 @@ def _kurulumu_calistiran_kullanici() -> str:
     return os.environ.get("SUDO_USER") or getpass.getuser()
 
 
+def _sbin_komut_var_mi(ad: str) -> bool:
+    """`shutil.which` (`y.komut_var_mi`), kurulumu çalıştıran kullanıcının PATH'ini
+    kullanır — bu genelde `/usr/sbin`'i İÇERMEZ (birçok dağıtımda yalnızca root'un
+    PATH'inde bulunur), oysa bu fonksiyonla kontrol edilen komutlar (adduser,
+    groupadd, usermod) hep `sudo` ile çalıştırılır ve sudo kendi `secure_path`'ini
+    kullanır (genelde /usr/sbin dahildir) — yani asıl çalıştırma başarılı olurdu.
+    Bu yüzden PATH'e değil, doğrudan standart sbin konumlarına bakılır."""
+    if y.komut_var_mi(ad):
+        return True
+    return any((Path(dizin) / ad).is_file() for dizin in ("/usr/sbin", "/sbin", "/usr/local/sbin"))
+
+
 def _kullanici_var_mi(ad: str) -> bool:
     return y.basarili_mi(["id", "-u", ad])
 
@@ -71,35 +83,52 @@ def servis_kullanicisini_hazirla(proje_dizin: Path) -> None:
     if _kullanici_var_mi(SERVIS_KULLANICISI):
         y.uyari(f"Servis kullanıcısı '{SERVIS_KULLANICISI}' zaten var, atlanıyor.")
     else:
-        # 'adduser' burada Debian/Ubuntu'nun (adduser paketi) Perl betiğidir — dnf tabanlı
-        # sistemlerde 'adduser' genelde 'useradd'a symlink'tir ve '--group'/'--system'
-        # sözdizimini aynı şekilde desteklemez. Bu projede sunucu modu şu an yalnızca
-        # Debian/Ubuntu'da test edilmiştir; başka bir dağıtımda elle oluşturun.
-        if not y.komut_var_mi("adduser"):
-            y.hata(
-                f"'adduser' bulunamadı. '{SERVIS_KULLANICISI}' sistem kullanıcısını elle oluşturun, "
-                f"örn.: sudo useradd --system --home-dir {proje_dizin} --shell /usr/sbin/nologin "
-                f"--user-group {SERVIS_KULLANICISI}"
-            )
         y.bilgi(f"Servis kullanıcısı oluşturuluyor: {SERVIS_KULLANICISI} (sudo yetkisiz, kabuksuz)")
-        y.calistir(
-            [
-                "adduser",
-                "--system",
-                "--group",
-                "--home",
-                str(proje_dizin),
-                "--shell",
-                "/usr/sbin/nologin",
-                SERVIS_KULLANICISI,
-            ],
-            sudo=True,
-        )
+        if _sbin_komut_var_mi("adduser"):
+            # Debian/Ubuntu'nun (adduser paketi) Perl betiği.
+            y.calistir(
+                [
+                    "adduser",
+                    "--system",
+                    "--group",
+                    "--home",
+                    str(proje_dizin),
+                    "--shell",
+                    "/usr/sbin/nologin",
+                    SERVIS_KULLANICISI,
+                ],
+                sudo=True,
+            )
+        elif _sbin_komut_var_mi("useradd"):
+            # Fedora/RHEL gibi dnf tabanlı dağıtımlarda 'adduser' ayrı bir komut
+            # değildir — shadow-utils'in 'useradd'ı kullanılır. --user-group,
+            # adduser'ın --group'una denk düşer (kullanıcıyla aynı adda birincil
+            # grup); --home-dir zaten var olan proje dizinini oluşturmaya/sahiplenmeye
+            # çalışmaz (-m verilmediği sürece), tıpkı adduser'daki --home gibi.
+            y.calistir(
+                [
+                    "useradd",
+                    "--system",
+                    "--user-group",
+                    "--home-dir",
+                    str(proje_dizin),
+                    "--shell",
+                    "/usr/sbin/nologin",
+                    SERVIS_KULLANICISI,
+                ],
+                sudo=True,
+            )
+        else:
+            y.hata(
+                f"Ne 'adduser' ne 'useradd' bulundu. '{SERVIS_KULLANICISI}' sistem kullanıcısını "
+                f"elle oluşturun, örn.: sudo useradd --system --home-dir {proje_dizin} "
+                f"--shell /usr/sbin/nologin --user-group {SERVIS_KULLANICISI}"
+            )
         y.basari(f"Servis kullanıcısı oluşturuldu: {SERVIS_KULLANICISI}")
 
-    # `adduser --system --group` yukarıda SERVIS_KULLANICISI ile aynı adda bir
-    # birincil grup oluşturur (Debian/Ubuntu kuralı) — '.env'i bu gruba
-    # (aşağıda calisma_zamani_dosyalarini_devret'te) grup-okunabilir yapacağız;
+    # Yukarıdaki adduser --group / useradd --user-group, SERVIS_KULLANICISI ile
+    # aynı adda bir birincil grup oluşturur — '.env'i bu gruba (aşağıda
+    # calisma_zamani_dosyalarini_devret'te) grup-okunabilir yapacağız;
     # kurulumu/deploy'u çalıştıran kullanıcı da bu grubun üyesi olmalı ki
     # 'python manage.py migrate' gibi sudo'suz komutlar '.env'i okuyabilsin.
     kurulum_kullanicisi = _kurulumu_calistiran_kullanici()
