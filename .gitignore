@@ -46,6 +46,10 @@ akalyonetimyedek-*.json
 bildirim_gonderici/board_agent/config.txt
 SunucuTarifi.md
 config.txt
+
+# Oturumlar arası kaldığımız yeri hatırlamak için yerel TODO (gizli bilgi
+# içermeyebilir ama operasyonel bir çalışma notu, ürün deposunda gezmemeli)
+TODO.md
 # Veritabanı yedekleri
 backups/
 yedekler/
