@@ -21,6 +21,14 @@ After=network.target
 [Service]
 User={kullanici}
 Group={grup}
+# Group={grup} (www-data) yalnızca soketin nginx tarafından okunabilmesi için;
+# systemd bunu ayarlayınca süreç OTOMATİK olarak {kullanici}'nın kendi birincil
+# grubunun (aynı adı taşır — bkz. servis_kullanicisini_hazirla'daki --user-group)
+# üyesi SAYILMAZ. SupplementaryGroups= olmadan backups/'ı (grup: {kullanici},
+# bkz. servis_kullanicisi.paylasilan_yedek_dizinini_hazirla) okuma/yazma
+# denemeleri "Permission denied" ile başarısız olur (yedekleme/services/
+# yedek_servisi.py'de Server Error 500 olarak görünür).
+SupplementaryGroups={kullanici}
 # Soket ve olası gelecekteki dosya yazımları grup üyesine (nginx) rwx, diğerlerine
 # hiç erişim bırakmasın diye: varsayılan izinden 0007 çıkarılır (rwxrwx--- kalır).
 UMask=0007
@@ -66,9 +74,18 @@ def _varsayilan_siteyi_devre_disi_birak() -> None:
     nginx'in "Welcome to nginx" sayfasına düşer, bizim uygulamamıza değil.
     Dosya yoksa mv sessizce başarısız olur (kontrol=False) — tekrar çalıştırmak
     güvenlidir.
+
+    Not: Dosyayı sadece aynı dizin içinde `.devre-disi` uzantısıyla yeniden
+    adlandırmak yetmez. `conf.d/*.conf` include deseni uzantıya duyarlı olduğu
+    için orada işe yarar, ama Debian/Ubuntu'nun `sites-enabled/*` include
+    deseni uzantıdan bağımsızdır — dizindeki her dosyayı (adı ne olursa olsun)
+    dahil eder. Bu yüzden dosyayı kendi dizininden tamamen çıkarıp
+    `/etc/nginx/` köküne taşıyoruz.
     """
     for yol in ("/etc/nginx/sites-enabled/default", "/etc/nginx/conf.d/default.conf"):
-        y.calistir(["mv", yol, f"{yol}.devre-disi"], sudo=True, sessiz=True, kontrol=False)
+        kaynak = Path(yol)
+        hedef = f"/etc/nginx/{kaynak.parent.name}-{kaynak.name}.devre-disi"
+        y.calistir(["mv", yol, hedef], sudo=True, sessiz=True, kontrol=False)
 
 
 def nginx_yapilandir(proje_dizin: Path, servis_adi: str, allowed_hosts: str) -> None:

@@ -105,6 +105,14 @@ YEDEK_DOSYA="$YEDEK_DIZIN/${DB_NAME}_deploy_$(date +%Y%m%d_%H%M%S).dump"
 # (yeniden SSH bağlantısında) etkinleşir — bu betik eski bir oturumda
 # çalıştırılıyorsa düz '>' yine "Erişim engellendi" verebilirdi; sudo bu
 # belirsizliğe hiç bağımlı değildir.
+#
+# 'sudo tee' dosyayı ROOT olarak, root'un o anki umask'ıyla oluşturur — bu
+# umask varsayılandan (022) daha kısıtlayıcıysa (örn. sudoers'da
+# 'Defaults umask=077') dosya 600 modunda oluşur ve altındaki chown grup
+# sahipliğini akalsite'a çevirse bile mod bitlerine dokunmaz; sonuç olarak
+# akalsite (web üzerinden geri yükleme, bkz. yedekleme/services/yedek_servisi.py)
+# bu dosyayı hiç okuyamaz. Bu yüzden umask'tan bağımsız olarak grup okuma/yazma
+# iznini burada açıkça garanti ediyoruz.
 PGPASSWORD="$DB_PASSWORD" pg_dump \
     -h "${DB_HOST:-127.0.0.1}" \
     -p "${DB_PORT:-5432}" \
@@ -113,6 +121,7 @@ PGPASSWORD="$DB_PASSWORD" pg_dump \
     -Fc \
     | sudo tee "$YEDEK_DOSYA" > /dev/null
 sudo chown senolirmak:akalsite "$YEDEK_DOSYA"
+sudo chmod 660 "$YEDEK_DOSYA"
 
 if [[ ! -s "$YEDEK_DOSYA" ]]; then
     rm -f "$YEDEK_DOSYA"

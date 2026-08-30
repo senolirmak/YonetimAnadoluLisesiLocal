@@ -173,6 +173,8 @@ def _pg_dump_calistir(hedef: Path, ayar: dict[str, str]) -> None:
         ) from exc
     except FileNotFoundError as exc:
         raise YedekHatasi(_arac_bulunamadi_mesaji()) from exc
+    except PermissionError as exc:
+        raise YedekHatasi(f"'{hedef}' dosyasına yazma izni yok (dosya/dizin izinlerini kontrol edin).") from exc
 
     if sonuc.returncode != 0:
         hata_metni = sonuc.stderr.decode(errors="replace").strip()
@@ -250,6 +252,8 @@ def yedek_bilgisi(yol: Path) -> dict[str, str]:
         raise YedekHatasi("Yedek başlığı okunamadı (zaman aşımı).") from exc
     except FileNotFoundError as exc:
         raise YedekHatasi(_arac_bulunamadi_mesaji()) from exc
+    except PermissionError as exc:
+        raise YedekHatasi(f"'{yol.name}' dosyasına okuma izni yok (dosya izinlerini kontrol edin).") from exc
 
     if sonuc.returncode != 0:
         hata_metni = sonuc.stderr.decode(errors="replace").strip()
@@ -291,6 +295,8 @@ def _pg_restore_veri_metni(yol: Path) -> str:
         raise YedekHatasi("Yedek verisi okunamadı (zaman aşımı).") from exc
     except FileNotFoundError as exc:
         raise YedekHatasi(_arac_bulunamadi_mesaji()) from exc
+    except PermissionError as exc:
+        raise YedekHatasi(f"'{yol.name}' dosyasına okuma izni yok (dosya izinlerini kontrol edin).") from exc
 
     if sonuc.returncode != 0:
         hata_metni = sonuc.stderr.decode(errors="replace").strip()
@@ -478,6 +484,8 @@ def yedek_geri_yukle(dosya_adi: str) -> None:
         ) from exc
     except FileNotFoundError as exc:
         raise YedekHatasi(_arac_bulunamadi_mesaji()) from exc
+    except PermissionError as exc:
+        raise YedekHatasi(f"'{yol.name}' dosyasına okuma izni yok (dosya izinlerini kontrol edin).") from exc
 
     # pg_restore, --clean ile var olmayan nesneler için zararsız uyarılar da
     # basabilir; yine de dönüş kodu != 0 olduğunda işlemi başarısız kabul ediyoruz.

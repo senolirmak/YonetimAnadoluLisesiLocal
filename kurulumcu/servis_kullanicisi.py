@@ -212,12 +212,17 @@ def paylasilan_yedek_dizinini_hazirla(proje_dizin: Path) -> None:
     Çözüm: setgid biti + ortak grup (`SERVIS_KULLANICISI`'nin kendi birincil grubu
     — kurulumu çalıştıran kullanıcı zaten bu grubun üyesi, bkz.
     `servis_kullanicisini_hazirla`'daki `usermod -aG`). setgid sayesinde içinde
-    oluşturulan her dosya/dizin, onu oluşturan sürecin KENDİ birincil grubundan
-    bağımsız olarak bu ortak grubu miras alır (POSIX setgid semantiği) — akalsite
-    süreci de (Gunicorn birimindeki `Group=www-data`'ya rağmen, işletim sistemi
-    kullanıcısı olarak) `SERVIS_KULLANICISI`'nin kendi grubunun üyesi olduğundan bu
-    miras işler. "other" erişimi kapalı tutulur — yedekler ham veritabanı içeriği
-    taşır."""
+    oluşturulan her dosya/dizin, onu oluşturan sürecin KENDİ birincil/etkin
+    grubundan bağımsız olarak bu ortak grubu miras alır (POSIX setgid semantiği).
+
+    Bu mirasın Gunicorn tarafında da işlemesi için `SupplementaryGroups=` (değeri
+    `SERVIS_KULLANICISI`) şart (bkz. `sunucu.gunicorn_servisi_kur`): `Group=www-data`
+    yalnızca soket için ayarlandığından, bu olmadan systemd süreci `SERVIS_KULLANICISI`
+    grubunun üyesi SAYMAZ — web tarafından oluşturulan yedekler kendi payına sorun
+    çıkarmaz (dosyanın sahibi zaten kendisidir) ama `deploy.sh`'in (mod 0660, grup
+    `SERVIS_KULLANICISI` ile) yazdığı yedekleri Gunicorn süreci okuyamaz — yedeği
+    geri yüklerken/raporlarken `PermissionError` ile Server Error (500) verir.
+    "other" erişimi kapalı tutulur — yedekler ham veritabanı içeriği taşır."""
     yedek_dizin = proje_dizin / "backups"
     yedek_dizin.mkdir(exist_ok=True)
     y.calistir(["chgrp", SERVIS_KULLANICISI, str(yedek_dizin)], sudo=True)
