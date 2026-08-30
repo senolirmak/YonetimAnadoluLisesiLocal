@@ -192,6 +192,13 @@ def main() -> None:
         port=degerler["DB_PORT"],
     )
 
+    # DB adı artık biliniyor — hem podman hem docker kuruluysa ve ikisinden
+    # yalnızca biri bu DB için hâlihazırda çalışıyorsa (örn. elle podman'dan
+    # docker'a geçilmişse) tespiti buna göre tazele; yukarıdaki ön kontrol
+    # aşamasındaki ilk tahmin (.env henüz yokken, DB adı bilinmeden yapılmıştı)
+    # yalnızca bilgilendirme amaçlıydı.
+    konteyner_araci = veritabani.konteyner_araci_tespit_et(ayar) or konteyner_araci
+
     konteyner_adi: str | None = None
     if veritabani.baglanabiliyor_mu(ayar):
         detaylar = [f"{ayar.kullanici}@{ayar.host}:{ayar.port}/{ayar.ad}"]

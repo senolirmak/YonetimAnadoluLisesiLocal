@@ -51,10 +51,27 @@ def baglanabiliyor_mu(ayar: DBAyarlari) -> bool:
         return False
 
 
-def konteyner_araci_tespit_et() -> str | None:
-    if y.komut_var_mi("podman"):
+def konteyner_araci_tespit_et(ayar: DBAyarlari | None = None) -> str | None:
+    """Kurulu konteyner aracını tespit eder.
+
+    `ayar` verilmişse (DB adı biliniyorsa) ve hem podman hem docker kuruluysa,
+    önce `<db_adı>_pg` adında hâlihazırda ÇALIŞAN bir container hangi araçla
+    yönetiliyorsa onu döner — örn. kullanıcı elle podman'dan docker'a (ya da
+    tersi) geçmişse, kurulumcu'nun bir sonraki çalıştırmasında bunu sessizce
+    geri almaması için. Çalışan bir container yoksa (ya da `ayar` verilmemişse,
+    örn. .env henüz oluşmadan önceki ön kontrol aşamasında) varsayılan sıralamaya
+    (podman, sonra docker) döner."""
+    podman_var = y.komut_var_mi("podman")
+    docker_var = y.komut_var_mi("docker")
+
+    if ayar and podman_var and docker_var:
+        for arac in ("docker", "podman"):
+            if konteyner_calisiyor_mu(arac, ayar):
+                return arac
+
+    if podman_var:
         return "podman"
-    if y.komut_var_mi("docker"):
+    if docker_var:
         return "docker"
     return None
 
