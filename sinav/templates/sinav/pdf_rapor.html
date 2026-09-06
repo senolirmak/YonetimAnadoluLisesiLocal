@@ -120,6 +120,20 @@
     </div>
   </div>
 
+  {% if secili_uretim.pk %}
+  <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-bottom:1rem;
+              padding:.6rem .9rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px;">
+    <span style="font-size:.82rem; font-weight:600; color:#166534;">Tümünü İndir / Yazdır:</span>
+    <a href="{% url 'sinav:oturma_plani_toplu_pdf_view' %}?uretim_pk={{ secili_uretim.pk }}"
+       class="btn btn-success btn-sm" target="_blank">📄 Tüm Kelebek Planları (PDF)</a>
+    <a href="{% url 'sinav:sinif_listesi_toplu_pdf_view' %}?uretim_pk={{ secili_uretim.pk }}"
+       class="btn btn-success btn-sm" target="_blank">📄 Tüm Sınıf Listeleri (PDF)</a>
+    <span style="font-size:.78rem; color:#6b7280;">
+      — oturma planı üretilmiş tüm oturumları tek dosyada birleştirir; oturum sayısına göre biraz sürebilir.
+    </span>
+  </div>
+  {% endif %}
+
   <!-- Oturum seçim listesi -->
   <div class="oturum-secim-liste">
     {% for gun in gunler %}

@@ -45,7 +45,12 @@ from sinav.services.mazeret_yoklama import (
     yoklama_simulasyonu_calistir,
 )
 from sinav.services.ogrenci_sorgu import en_yakin_sinav_sonucu
-from sinav.services.oturma_pdf import build_salon_grids, resolve_aktif_uretim
+from sinav.services.oturma_pdf import (
+    build_salon_grids,
+    pdfleri_birlestir,
+    resolve_aktif_uretim,
+    uretimin_oturumlari,
+)
 from sinav.services.sinav_ozet import db_ozeti, gozetmen_ozeti_hesapla, sinav_takvim_araliklari
 from sinav.services.takvim_duzenleme import (
     onizleme_oturumlarini_yeniden_numarala,
@@ -103,6 +108,18 @@ def _finish(task_id: str, error: bool = False):
 # ---------------------------------------------------------------
 def _aktif_sinav():
     return SinavBilgisi.objects.filter(aktif=True).first()
+
+
+def _toplu_pdf_icin_uretim_coz(uretim_pk):
+    """"Tümünü indir" PDF view'ları için TakvimUretim çözer — `pdf_rapor()`'daki
+    ile aynı öncelik: `uretim_pk` verilmişse o üretim, verilmemişse aktif
+    sınavın aktif üretimi."""
+    from sinav.models import TakvimUretim
+
+    if uretim_pk:
+        return TakvimUretim.objects.select_related("sinav").filter(pk=uretim_pk).first()
+    aktif = _aktif_sinav()
+    return TakvimUretim.objects.filter(sinav=aktif, aktif=True).first() if aktif else None
 
 
 def _kurulum_durumu():
@@ -956,6 +973,76 @@ def sinif_listesi_pdf_view(request):
     fname = f"Sinif_Listesi_{tarih_str}_{saat.replace(':', '')}.pdf"
     return HttpResponse(buf.read(), content_type="application/pdf",
                         headers={"Content-Disposition": f'inline; filename="{fname}"'})
+
+
+@login_required
+def oturma_plani_toplu_pdf_view(request):
+    """Bir üretime ait TÜM oturumların Oturma Planı (kelebek) PDF'lerini tek bir
+    PDF'te birleştirip indirilebilir olarak döner — oturum oturum tek tek
+    açıp yazdırmanın takip edilemez olmasına karşı (bkz. görüşme notları)."""
+    import io
+
+    from ortaksinav_engine.services.pdf_rapor import oturum_plani_pdf
+    from sinav.models import OturmaPlani
+
+    uretim = _toplu_pdf_icin_uretim_coz(request.GET.get("uretim_pk"))
+    if uretim is None:
+        raise Http404
+
+    okul = OkulBilgi.get()
+    buffers = []
+    for tarih, saat, oturum in uretimin_oturumlari(uretim):
+        qs = OturmaPlani.objects.filter(
+            tarih=tarih, saat=saat, oturum=oturum, uretim=uretim
+        ).order_by("salon", "sira_no")
+        if not qs.exists():
+            continue
+        salon_grids = build_salon_grids(qs)
+        baslik = f"{tarih:%Y-%m-%d} {saat} (Oturum {oturum})"
+        buf = io.BytesIO()
+        oturum_plani_pdf(salon_grids, buf, baslik, okul, uretim, tarih=tarih, saat=saat)
+        buffers.append(buf)
+
+    if not buffers:
+        raise Http404
+
+    birlesik = pdfleri_birlestir(buffers)
+    fname = f"Kelebek_Tumu_{uretim.sinav.egitim_ogretim_yili}_{uretim.pk}.pdf".replace(" ", "_")
+    return HttpResponse(birlesik.read(), content_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@login_required
+def sinif_listesi_toplu_pdf_view(request):
+    """Bir üretime ait TÜM oturumların Sınıf Listesi PDF'lerini tek bir PDF'te
+    birleştirip indirilebilir olarak döner (bkz. `oturma_plani_toplu_pdf_view`)."""
+    import io
+
+    from ortaksinav_engine.services.pdf_rapor import sinif_raporu_pdf
+    from sinav.models import OturmaPlani
+
+    uretim = _toplu_pdf_icin_uretim_coz(request.GET.get("uretim_pk"))
+    if uretim is None:
+        raise Http404
+
+    okul = OkulBilgi.get()
+    buffers = []
+    for tarih, saat, oturum in uretimin_oturumlari(uretim):
+        if not OturmaPlani.objects.filter(
+            tarih=tarih, saat=saat, oturum=oturum, uretim=uretim
+        ).exists():
+            continue
+        buf = io.BytesIO()
+        sinif_raporu_pdf(tarih, saat, oturum, buf, okul, uretim)
+        buffers.append(buf)
+
+    if not buffers:
+        raise Http404
+
+    birlesik = pdfleri_birlestir(buffers)
+    fname = f"Sinif_Listesi_Tumu_{uretim.sinav.egitim_ogretim_yili}_{uretim.pk}.pdf".replace(" ", "_")
+    return HttpResponse(birlesik.read(), content_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
 @require_POST
