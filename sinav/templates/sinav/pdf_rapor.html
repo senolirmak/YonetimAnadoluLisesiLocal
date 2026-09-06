@@ -128,6 +128,11 @@
        class="btn btn-success btn-sm" target="_blank">📄 Tüm Kelebek Planları (PDF)</a>
     <a href="{% url 'sinav:sinif_listesi_toplu_pdf_view' %}?uretim_pk={{ secili_uretim.pk }}"
        class="btn btn-success btn-sm" target="_blank">📄 Tüm Sınıf Listeleri (PDF)</a>
+    <a href="{% url 'sinav:oturum_bazli_toplu_pdf_view' %}?uretim_pk={{ secili_uretim.pk }}"
+       class="btn btn-success btn-sm" target="_blank"
+       title="Her oturumun Kelebek Planı'nın hemen ardından o oturumun Sınıf Listesi'ni ekler">
+      📄 Oturum Oturum: Kelebek + Sınıf Listesi
+    </a>
     <span style="font-size:.78rem; color:#6b7280;">
       — oturma planı üretilmiş tüm oturumları tek dosyada birleştirir; oturum sayısına göre biraz sürebilir.
     </span>

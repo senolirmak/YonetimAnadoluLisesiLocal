@@ -21,6 +21,7 @@ urlpatterns = [
     path("pdf/sinif-listesi/",  views.sinif_listesi_pdf_view,  name="sinif_listesi_pdf_view"),
     path("pdf/oturma-plani/tumu/",  views.oturma_plani_toplu_pdf_view,  name="oturma_plani_toplu_pdf_view"),
     path("pdf/sinif-listesi/tumu/", views.sinif_listesi_toplu_pdf_view, name="sinif_listesi_toplu_pdf_view"),
+    path("pdf/oturum-bazli/tumu/",  views.oturum_bazli_toplu_pdf_view,  name="oturum_bazli_toplu_pdf_view"),
     path("pdf/sinav-takvimi/",         views.sinav_takvimi_pdf_view,         name="sinav_takvimi_pdf_view"),
     path("pdf-rapor/sinav-takvimi-subesiz/", views.sinav_takvimi_subesiz_pdf_view, name="sinav_takvimi_subesiz_pdf_view"),
 
