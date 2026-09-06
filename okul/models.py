@@ -246,6 +246,10 @@ class DersSaatleri(models.Model):
 # ---------------------------------------------------------------------------
 
 class Brans(models.Model):
+    # Django'nun otomatik eklediği örtük (implicit) alanın açık hâli — DB şemasını
+    # değiştirmez (bkz. 0013_brans_and_personel_fk.py), yalnızca personel/crud.py
+    # gibi yerlerde brans_id ile gruplama yapılırken alanın niyetini netleştirir.
+    id = models.BigAutoField(primary_key=True, verbose_name="ID")
     ad = models.CharField(max_length=50, unique=True, verbose_name="Branş Adı")
 
     class Meta:
@@ -273,8 +277,25 @@ class PersonelQuerySet(models.QuerySet):
         çekmek, geçmiş rapor/filtre dropdown'ları ve personelin kendi genel yönetim
         sayfaları (personel/ app, okul/yonetim/personel) — bunlar ayrılmış/emekli
         personeli de görebilmeli.
+
+        NOT: bu, `arsivde()`'den daha katıdır — "Dış Görevde"/"Aylıksız İzinli"/
+        "Analık İzinli" gibi geçici olarak görevde olmayan ama okuldan kalıcı olarak
+        ayrılmamış personeli de dışlar (yeni görev ataması için onlar da uygun değildir).
         """
         return self.filter(durum="Görevde")
+
+    def arsivde(self):
+        """Okuldan kalıcı olarak ayrılmış personeli döner (bkz. `Personel.ARSIV_DURUMLARI`).
+
+        `gorevde()`'nin aksine yalnızca kalıcı ayrılış durumlarını (emeklilik, tayin,
+        görevlendirme bitişi, açığa alınma) kapsar — geçici olarak görevde olmayan
+        personel (izinli/dış görevde) bu kapsamda değildir.
+        """
+        return self.filter(durum__in=Personel.ARSIV_DURUMLARI)
+
+    def aktif(self):
+        """`arsivde()`'nin tersi — okuldan kalıcı olarak ayrılmamış personel."""
+        return self.exclude(durum__in=Personel.ARSIV_DURUMLARI)
 
 
 class Personel(models.Model):
@@ -335,6 +356,16 @@ class Personel(models.Model):
     durum = models.CharField(
         max_length=30, choices=DURUM_CHOICES, default="Görevde", verbose_name="Durum",
     )
+    # Bu durumlardaki personel okuldan kalıcı olarak ayrılmış sayılır (arşiv) — bkz.
+    # `PersonelQuerySet.arsivde()`/`aktif()` ve okul/yonetim/personel sayfasındaki
+    # ayrı "Arşiv" grubu. "Dış Görevde"/"Aylıksız İzinli"/"Analık İzinli" kalıcı
+    # ayrılış olmadığından bu listede yer almaz.
+    ARSIV_DURUMLARI = (
+        "Ayrıldı-Tayin",
+        "Görevlendirme Sona Erdi",
+        "Açığa Alındı",
+        "Emekli",
+    )
     sabit_nobet = models.BooleanField(default=False)
     ogretmenlik_alani = models.ForeignKey(
         "OgretmenlikAlanCizelgesi",
@@ -358,6 +389,11 @@ class Personel(models.Model):
 
     def __str__(self):
         return self.adi_soyadi
+
+    @property
+    def arsivde_mi(self) -> bool:
+        """Bu personel okuldan kalıcı olarak ayrılmış mı? (bkz. `ARSIV_DURUMLARI`)"""
+        return self.durum in self.ARSIV_DURUMLARI
 
     @property
     def okuttugudersler(self) -> str:
