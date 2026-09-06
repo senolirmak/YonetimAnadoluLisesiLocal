@@ -975,52 +975,92 @@ def sinif_listesi_pdf_view(request):
                         headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 
+def _oturum_pdf_buf(tarih, saat, oturum, uretim, okul, tur):
+    """Bir oturum için istenen türde ('kelebek' ya da 'sinif') PDF'i BytesIO
+    olarak üretir; o oturumda veri yoksa None döner. "Tümünü indir"
+    view'larının (oturma_plani_toplu_pdf_view, sinif_listesi_toplu_pdf_view,
+    oturum_bazli_toplu_pdf_view) ortak yapı taşıdır — her biri aynı üretimi
+    farklı SIRALAMADA (yalnızca kelebekler, yalnızca sınıf listeleri, ya da
+    oturum oturum ikisi art arda) birleştirir."""
+    import io
+
+    from sinav.models import OturmaPlani
+
+    if tur == "kelebek":
+        from ortaksinav_engine.services.pdf_rapor import oturum_plani_pdf
+
+        qs = OturmaPlani.objects.filter(
+            tarih=tarih, saat=saat, oturum=oturum, uretim=uretim
+        ).order_by("salon", "sira_no")
+        if not qs.exists():
+            return None
+        salon_grids = build_salon_grids(qs)
+        baslik = f"{tarih:%Y-%m-%d} {saat} (Oturum {oturum})"
+        buf = io.BytesIO()
+        oturum_plani_pdf(salon_grids, buf, baslik, okul, uretim, tarih=tarih, saat=saat)
+        return buf
+
+    from ortaksinav_engine.services.pdf_rapor import sinif_raporu_pdf
+
+    if not OturmaPlani.objects.filter(
+        tarih=tarih, saat=saat, oturum=oturum, uretim=uretim
+    ).exists():
+        return None
+    buf = io.BytesIO()
+    sinif_raporu_pdf(tarih, saat, oturum, buf, okul, uretim)
+    return buf
+
+
+def _toplu_pdf_yanit(uretim, buffers, dosya_oneki):
+    if not buffers:
+        raise Http404
+    birlesik = pdfleri_birlestir(buffers)
+    fname = f"{dosya_oneki}_{uretim.sinav.egitim_ogretim_yili}_{uretim.pk}.pdf".replace(" ", "_")
+    return HttpResponse(birlesik.read(), content_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
 @login_required
 def oturma_plani_toplu_pdf_view(request):
     """Bir üretime ait TÜM oturumların Oturma Planı (kelebek) PDF'lerini tek bir
     PDF'te birleştirip indirilebilir olarak döner — oturum oturum tek tek
     açıp yazdırmanın takip edilemez olmasına karşı (bkz. görüşme notları)."""
-    import io
-
-    from ortaksinav_engine.services.pdf_rapor import oturum_plani_pdf
-    from sinav.models import OturmaPlani
-
     uretim = _toplu_pdf_icin_uretim_coz(request.GET.get("uretim_pk"))
     if uretim is None:
         raise Http404
 
     okul = OkulBilgi.get()
-    buffers = []
-    for tarih, saat, oturum in uretimin_oturumlari(uretim):
-        qs = OturmaPlani.objects.filter(
-            tarih=tarih, saat=saat, oturum=oturum, uretim=uretim
-        ).order_by("salon", "sira_no")
-        if not qs.exists():
-            continue
-        salon_grids = build_salon_grids(qs)
-        baslik = f"{tarih:%Y-%m-%d} {saat} (Oturum {oturum})"
-        buf = io.BytesIO()
-        oturum_plani_pdf(salon_grids, buf, baslik, okul, uretim, tarih=tarih, saat=saat)
-        buffers.append(buf)
-
-    if not buffers:
-        raise Http404
-
-    birlesik = pdfleri_birlestir(buffers)
-    fname = f"Kelebek_Tumu_{uretim.sinav.egitim_ogretim_yili}_{uretim.pk}.pdf".replace(" ", "_")
-    return HttpResponse(birlesik.read(), content_type="application/pdf",
-                        headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+    buffers = [
+        buf for (tarih, saat, oturum) in uretimin_oturumlari(uretim)
+        if (buf := _oturum_pdf_buf(tarih, saat, oturum, uretim, okul, "kelebek"))
+    ]
+    return _toplu_pdf_yanit(uretim, buffers, "Kelebek_Tumu")
 
 
 @login_required
 def sinif_listesi_toplu_pdf_view(request):
     """Bir üretime ait TÜM oturumların Sınıf Listesi PDF'lerini tek bir PDF'te
     birleştirip indirilebilir olarak döner (bkz. `oturma_plani_toplu_pdf_view`)."""
-    import io
+    uretim = _toplu_pdf_icin_uretim_coz(request.GET.get("uretim_pk"))
+    if uretim is None:
+        raise Http404
 
-    from ortaksinav_engine.services.pdf_rapor import sinif_raporu_pdf
-    from sinav.models import OturmaPlani
+    okul = OkulBilgi.get()
+    buffers = [
+        buf for (tarih, saat, oturum) in uretimin_oturumlari(uretim)
+        if (buf := _oturum_pdf_buf(tarih, saat, oturum, uretim, okul, "sinif"))
+    ]
+    return _toplu_pdf_yanit(uretim, buffers, "Sinif_Listesi_Tumu")
 
+
+@login_required
+def oturum_bazli_toplu_pdf_view(request):
+    """Bir üretime ait TÜM oturumlar için, her oturumun Kelebek Planı'nın hemen
+    ardından o oturumun Sınıf Listesi'ni ekleyerek TEK bir PDF'te birleştirir
+    — ikisi aynı oturuma ait ilişkili çıktılar olduğundan, salonlara asılacak
+    kelebek ile sınıflara dağıtılacak listeyi oturum oturum bir arada, tek
+    dosyada tutmak isteyenler içindir (bkz. `oturma_plani_toplu_pdf_view` /
+    `sinif_listesi_toplu_pdf_view`: onlar türe göre, bu ise oturuma göre gruplar)."""
     uretim = _toplu_pdf_icin_uretim_coz(request.GET.get("uretim_pk"))
     if uretim is None:
         raise Http404
@@ -1028,21 +1068,11 @@ def sinif_listesi_toplu_pdf_view(request):
     okul = OkulBilgi.get()
     buffers = []
     for tarih, saat, oturum in uretimin_oturumlari(uretim):
-        if not OturmaPlani.objects.filter(
-            tarih=tarih, saat=saat, oturum=oturum, uretim=uretim
-        ).exists():
-            continue
-        buf = io.BytesIO()
-        sinif_raporu_pdf(tarih, saat, oturum, buf, okul, uretim)
-        buffers.append(buf)
-
-    if not buffers:
-        raise Http404
-
-    birlesik = pdfleri_birlestir(buffers)
-    fname = f"Sinif_Listesi_Tumu_{uretim.sinav.egitim_ogretim_yili}_{uretim.pk}.pdf".replace(" ", "_")
-    return HttpResponse(birlesik.read(), content_type="application/pdf",
-                        headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+        for tur in ("kelebek", "sinif"):
+            buf = _oturum_pdf_buf(tarih, saat, oturum, uretim, okul, tur)
+            if buf:
+                buffers.append(buf)
+    return _toplu_pdf_yanit(uretim, buffers, "Kelebek_ve_Sinif_Listesi_Oturum_Oturum")
 
 
 @require_POST
