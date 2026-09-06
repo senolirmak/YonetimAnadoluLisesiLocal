@@ -104,6 +104,9 @@ REGISTRY = {
         "group_order": ["adi_soyadi"],
         "group_label": "",
         "group_collapse": True,
+        # okul/yonetim/ özet kartındaki sayı arşivlenmiş (bkz. Personel.ARSIV_DURUMLARI)
+        # personeli hariç tutar; branş grupları/Arşiv sayfasındaki mantıkla tutarlıdır.
+        "count_queryset": lambda: Personel.objects.aktif(),
     },
     "brans": {
         "model": Brans,
@@ -127,7 +130,14 @@ def _entry(slug):
 @mudur_yardimcisi_required
 def yonetim_index(request):
     kartlar = [
-        {"slug": slug, "title": entry["title"], "count": entry["model"].objects.count()}
+        {
+            "slug": slug,
+            "title": entry["title"],
+            # Bazı kayıtlar (ör. personel → arşivlenmişler) özet sayıya dahil
+            # edilmemeli — bkz. REGISTRY["personel"]["count_queryset"].
+            "count": entry["count_queryset"]().count() if "count_queryset" in entry
+            else entry["model"].objects.count(),
+        }
         for slug, entry in REGISTRY.items()
     ]
     return render(request, "okul/yonetim/index.html", {"kartlar": kartlar})
@@ -156,6 +166,11 @@ def yonetim_list(request, slug):
 
     if group_by and entry.get("group_collapse") and grup_deger is None:
         taban = model.objects.aktif() if personel_arsivi else model.objects.all()
+        if personel_arsivi:
+            # Yöneticiler (bkz. Personel.YONETICI_GOREVLERI) branş gruplarında
+            # görünmez, ayrı kartları vardır (aşağıda) — sayısal değerler de
+            # onlar hariç hesaplanır.
+            taban = taban.exclude(gorev_tipi__in=Personel.YONETICI_GOREVLERI)
         gruplar = list(
             taban.values(group_by, group_display)
             .annotate(sayi=Count("id"))
@@ -165,8 +180,26 @@ def yonetim_list(request, slug):
             g["anahtar"] = g[group_by]
             g["deger"] = g[group_display]
         if personel_arsivi:
+            # Her yönetici için ayrı bir kart: "Görevi - Branşı" (bkz. görüşme
+            # notları). Bir okulda birkaç yönetici olduğundan kişi bazında kart
+            # yeterlidir; branş/görev aynı olsa bile pk ile ayrı ayrı erişilirler.
+            yoneticiler = (
+                model.objects.aktif().yonetici()
+                .select_related("brans")
+                .order_by("gorev_tipi", "adi_soyadi")
+            )
+            for p in yoneticiler:
+                brans_adi = p.brans.ad if p.brans_id else "Branşsız"
+                gruplar.append({
+                    "anahtar": f"yonetici:{p.pk}",
+                    "deger": f"{p.gorev_tipi} - {brans_adi}",
+                    "sayi": None,
+                    "ozel": "yonetici",
+                })
             arsiv_sayi = model.objects.arsivde().count()
-            gruplar.append({"anahtar": "arsiv", "deger": "Arşiv", "sayi": arsiv_sayi})
+            gruplar.append({
+                "anahtar": "arsiv", "deger": "Arşiv", "sayi": arsiv_sayi, "ozel": "arsiv",
+            })
         return render(request, "okul/yonetim/liste.html", {
             "entry": entry, "slug": slug, "gruplar": gruplar,
         })
@@ -178,6 +211,17 @@ def yonetim_list(request, slug):
             return render(request, "okul/yonetim/liste.html", {
                 "entry": entry, "slug": slug, "objects": object_list, "grup_deger": "Arşiv",
             })
+        if personel_arsivi and grup_deger.startswith("yonetici:"):
+            try:
+                pk_val = int(grup_deger.split(":", 1)[1])
+            except ValueError:
+                messages.error(request, "Geçersiz grup bağlantısı, lütfen listeden yeniden seçin.")
+                return redirect("okul:yonetim_list", slug=slug)
+            p = get_object_or_404(model, pk=pk_val)
+            baslik = f"{p.gorev_tipi} - {p.brans.ad if p.brans_id else 'Branşsız'}"
+            return render(request, "okul/yonetim/liste.html", {
+                "entry": entry, "slug": slug, "objects": [p], "grup_deger": baslik,
+            })
         try:
             # grup_by sayısal bir alansa (ör. "brans_id"), eski/bozuk bir link ile
             # metin (örn. eski format branş adı) gelirse Django bunu filter()
@@ -185,9 +229,9 @@ def yonetim_list(request, slug):
             # dönüyoruz, aksi halde kullanıcı 500 hatasıyla karşılaşır.
             filtered = objects.filter(**{group_by: grup_deger})
             if personel_arsivi:
-                # Arşivdeki personel branş grubunda tekrar görünmesin, yalnızca
-                # "Arşiv" grubundan erişilebilsin.
-                filtered = filtered.aktif()
+                # Arşivdeki ve yönetici olan personel branş grubunda tekrar
+                # görünmesin — kendi ayrı kartlarından erişilebilirler.
+                filtered = filtered.aktif().exclude(gorev_tipi__in=Personel.YONETICI_GOREVLERI)
             grup_baslik = grup_deger
             if group_display != group_by:
                 # Başlıkta ID değil, o gruba ait okunabilir değeri (örn. branş adı) göster.

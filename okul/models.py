@@ -297,6 +297,11 @@ class PersonelQuerySet(models.QuerySet):
         """`arsivde()`'nin tersi — okuldan kalıcı olarak ayrılmamış personel."""
         return self.exclude(durum__in=Personel.ARSIV_DURUMLARI)
 
+    def yonetici(self):
+        """Yönetici (Müdür/Okul Müdürü/Müdür Yardımcısı) personeli döner
+        (bkz. `Personel.YONETICI_GOREVLERI`)."""
+        return self.filter(gorev_tipi__in=Personel.YONETICI_GOREVLERI)
+
 
 class Personel(models.Model):
     objects = PersonelQuerySet.as_manager()
@@ -343,6 +348,10 @@ class Personel(models.Model):
     gorev_tipi = models.CharField(
         max_length=50, choices=GOREVI_CHOICES, blank=True, null=True, verbose_name="Görevi",
     )
+    # Bu görevlerdeki personel "yönetici" sayılır — okul/yonetim/personel sayfasında
+    # branş gruplarına değil, kendi görevine göre ayrı kartlarda gösterilir (bkz.
+    # PersonelQuerySet.yonetici()/aktif_ogretmen()).
+    YONETICI_GOREVLERI = ("Müdür", "Okul Müdürü", "Müdür Yardımcısı")
     DURUM_CHOICES = (
         ("Görevde", "Görevde"),
         ("Dış Görevde", "Dış Görevde"),

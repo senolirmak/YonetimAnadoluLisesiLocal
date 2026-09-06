@@ -29,9 +29,9 @@
     {% if gruplar %}
     <div class="ay-grup-buton-grid">
       {% for g in gruplar %}
-      <a class="ay-grup-buton{% if g.anahtar == 'arsiv' %} ay-grup-buton-arsiv{% endif %}" href="{% url 'okul:yonetim_list' slug=slug %}?grup={{ g.anahtar|urlencode }}">
+      <a class="ay-grup-buton{% if g.ozel %} ay-grup-buton-{{ g.ozel }}{% endif %}" href="{% url 'okul:yonetim_list' slug=slug %}?grup={{ g.anahtar|urlencode }}">
         <span>{% if entry.group_label %}{{ entry.group_label }} {% endif %}{{ g.deger }}</span>
-        <span class="ay-grup-sayi">{{ g.sayi }}</span>
+        {% if g.sayi != None %}<span class="ay-grup-sayi">{{ g.sayi }}</span>{% endif %}
       </a>
       {% empty %}
       <p class="ay-bos">Henüz kayıt eklenmemiş.</p>
