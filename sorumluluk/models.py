@@ -1,13 +1,61 @@
 from django.db import models
 
 
-SALON_CHOICES = [
-    ("Sorumluluk1", "Mazeret 1"),
-    ("Sorumluluk2", "Mazeret 2"),
-    ("Sorumluluk3", "Mazeret 3"),
-]
-SALON_SAYISI     = 3
 SALON_KAPASITESI = 30
+
+
+class SorumlulukSalon(models.Model):
+    """Sorumluluk sınavlarında görevlendirme ve oturma planında kullanılacak salon
+    tanımı — okul/yonetim/personel sayfasındaki gibi ayrı bir CRUD'dan yönetilir.
+
+    `sira`, ekranlarda/PDF'lerde görünen sabit "Salon 1", "Salon 2", ... etiketini ve
+    iç kodu (`kod`, bkz. aşağı) belirler; `ad` ise idarecinin o pozisyona verdiği
+    okunabilir isimdir — jenerik bir salon adı ("Mazeret 1") ya da gerçek bir sınıf
+    adı ("10/A Sınıfı") olabilir, istenildiği zaman değiştirilebilir.
+
+    Tüm sorumluluk sınavları için ortaktır (SorumluGorevMuafPersonel ile aynı ilke —
+    sınava özgü değildir). Bir salon geçici olarak kullanım dışı bırakılacaksa
+    silinmez, `aktif=False` yapılır: yeni takvim/oturma planı üretiminde bu salon
+    kullanılmaz, ama `kod`'u geçmiş SorumluGozetmen/SorumluOturmaPlani kayıtlarında
+    serbest metin olarak durmaya devam ettiğinden geçmiş sınavların verisi bozulmaz.
+
+    Kapasite kasıtlı olarak salon başına değil, tüm salonlar için ortak/sabit
+    `SALON_KAPASITESI` üzerinden tutulur (basit tutmak için bilinçli tercih).
+    """
+    sira = models.PositiveSmallIntegerField(unique=True, verbose_name="Sıra (Salon No)")
+    ad = models.CharField(max_length=50, verbose_name="Salon Adı")
+    aktif = models.BooleanField(default=True, verbose_name="Aktif")
+
+    class Meta:
+        ordering = ["sira"]
+        verbose_name = "Salon"
+        verbose_name_plural = "Salonlar"
+
+    def __str__(self):
+        return f"Salon {self.sira} ({self.ad})"
+
+    @property
+    def kod(self):
+        """SorumluGozetmen/SorumluOturmaPlani.salon alanında saklanan iç değer."""
+        return f"Sorumluluk{self.sira}"
+
+
+def salon_choices():
+    """SorumluGozetmen/SorumluOturmaPlani.salon alanında saklanan (kod, ad) çiftleri.
+
+    NOT: bu alan kasıtlı olarak `choices=` almaz — Django, bir CharField'ın
+    `choices` değeri callable olsa bile bunu `manage.py check`/migration
+    doğrulaması sırasında hemen değerlendirir; bu da SorumlulukSalon tablosu
+    henüz yokken (ör. ilk migrate öncesi) DB hatasına yol açar. Bunun yerine
+    salon adı görüntülenmesi gereken her yerde (rapor/pdf servisleri) bu
+    fonksiyon doğrudan çağrılır — bkz. `_salon_label` yardımcıları.
+
+    Aktif olmayan salonlar da dahil edilir: aksi halde eskiden kullanılmış ama
+    artık pasif bir salona ait geçmiş kayıtlarda adı bulunamaz. Yeni atama
+    üretimi (takvim_service.py) ayrıca `aktif=True` filtresi uygular.
+    """
+    return [(s.kod, s.ad) for s in SorumlulukSalon.objects.order_by("sira")]
+
 
 DONEM_TURU_CHOICES = [
     ("EYLUL",   "Eylül Dönemi"),
@@ -377,7 +425,7 @@ class SorumluGozetmen(models.Model):
     )
     tarih = models.DateField(verbose_name="Tarih")
     oturum_no = models.PositiveSmallIntegerField(verbose_name="Oturum No")
-    salon = models.CharField(max_length=20, choices=SALON_CHOICES, verbose_name="Salon")
+    salon = models.CharField(max_length=20, verbose_name="Salon")
     gozetmen = models.ForeignKey(
         "okul.Personel", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="+", verbose_name="Gözetmen",
@@ -406,7 +454,7 @@ class SorumluOturmaPlani(models.Model):
     oturum_no      = models.PositiveSmallIntegerField(verbose_name="Oturum No")
     saat_baslangic = models.TimeField(verbose_name="Başlangıç")
     saat_bitis     = models.TimeField(verbose_name="Bitiş")
-    salon          = models.CharField(max_length=20, choices=SALON_CHOICES, verbose_name="Salon")
+    salon          = models.CharField(max_length=20, verbose_name="Salon")
     sira_no        = models.PositiveSmallIntegerField(verbose_name="Sıra No")
     okulno         = models.CharField(max_length=20, verbose_name="Okul No")
     adi_soyadi     = models.CharField(max_length=200, verbose_name="Adı Soyadı")

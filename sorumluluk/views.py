@@ -16,6 +16,8 @@ from sorumluluk.forms import (
     SorumluDersKatalogForm,
     SorumluGorevMuafForm,
     SorumluOgrenciForm,
+    SorumlulukSalonDuzenleForm,
+    SorumlulukSalonForm,
     SorumluSinavForm,
     TakvimAyarForm,
     XlsAktarForm,
@@ -31,6 +33,7 @@ from sorumluluk.models import (
     SorumluKomisyonUyesi,
     SorumluOgrenci,
     SorumluOturmaPlani,
+    SorumlulukSalon,
     SorumluSinav,
     SorumluSinavParametre,
     SorumluTakvim,
@@ -715,6 +718,60 @@ def gorev_muaf_sil(request, pk):
     kayit.delete()
     messages.success(request, "Muafiyet kaldırıldı.")
     return redirect("sorumluluk:gorev_muaf_liste")
+
+
+# ─── Salonlar ──────────────────────────────────────────────────────────────────
+
+@ust_yonetici_required
+def salon_liste(request):
+    salonlar = SorumlulukSalon.objects.all()
+    form = SorumlulukSalonForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        from django.db.models import Max
+
+        sonraki_sira = (salonlar.aggregate(Max("sira"))["sira__max"] or 0) + 1
+        yeni = form.save(commit=False)
+        yeni.sira = sonraki_sira
+        yeni.save()
+        messages.success(request, f"Salon {sonraki_sira} ({yeni.ad}) eklendi.")
+        return redirect("sorumluluk:salon_liste")
+    return render(request, "sorumluluk/salon_liste.html", {
+        "salonlar": salonlar, "form": form,
+    })
+
+
+@ust_yonetici_required
+@require_POST
+def salon_duzenle(request, pk):
+    salon = get_object_or_404(SorumlulukSalon, pk=pk)
+    form = SorumlulukSalonDuzenleForm(request.POST, instance=salon)
+    if form.is_valid():
+        form.save()
+        messages.success(request, f"Salon {salon.sira} güncellendi.")
+    else:
+        messages.error(request, "Salon güncellenemedi: " + "; ".join(form.errors))
+    return redirect("sorumluluk:salon_liste")
+
+
+@ust_yonetici_required
+@require_POST
+def salon_sil(request, pk):
+    salon = get_object_or_404(SorumlulukSalon, pk=pk)
+    kod = salon.kod
+    kullanildi = (
+        SorumluGozetmen.objects.filter(salon=kod).exists()
+        or SorumluOturmaPlani.objects.filter(salon=kod).exists()
+    )
+    if kullanildi:
+        messages.error(
+            request,
+            f"'{salon.ad}' silinemedi: geçmiş bir sınavda kullanılmış. "
+            "Bunun yerine 'Aktif' işaretini kaldırarak kullanım dışı bırakabilirsiniz.",
+        )
+    else:
+        salon.delete()
+        messages.success(request, f"'{salon.ad}' silindi.")
+    return redirect("sorumluluk:salon_liste")
 
 
 @ust_yonetici_required

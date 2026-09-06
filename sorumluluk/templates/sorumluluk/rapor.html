@@ -62,63 +62,37 @@
     </div>
   </div>
 
-  {% if ot_veri.salon1 %}
-  <div class="salon-label">Mazeret 1</div>
-  <table class="salon-tablo">
-    <thead>
-      <tr>
-        <th style="width:2.5rem;">#</th>
-        <th style="width:5rem;">Okul No</th>
-        <th>Adı Soyadı</th>
-        <th style="width:4rem;">Şube</th>
-        <th>Ders</th>
-        <th style="width:6rem; text-align:center;">İmza</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for k in ot_veri.salon1 %}
-      <tr>
-        <td>{{ k.sira_no }}</td>
-        <td>{{ k.okulno }}</td>
-        <td>{{ k.adi_soyadi }}</td>
-        <td>{{ k.sinifsube }}</td>
-        <td style="font-size:.75rem;">{{ k.ders_adi }}</td>
-        <td style="text-align:center; color:#ccc;">__________</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
+  {% for s in ot_veri.salonlar %}
+    {% if s.kayitlar %}
+    <div class="salon-label{% cycle '' ' s2' %}" style="margin-top:.7rem;">{{ s.ad }}</div>
+    <table class="salon-tablo">
+      <thead>
+        <tr>
+          <th style="width:2.5rem;">#</th>
+          <th style="width:5rem;">Okul No</th>
+          <th>Adı Soyadı</th>
+          <th style="width:4rem;">Şube</th>
+          <th>Ders</th>
+          <th style="width:6rem; text-align:center;">İmza</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in s.kayitlar %}
+        <tr>
+          <td>{{ k.sira_no }}</td>
+          <td>{{ k.okulno }}</td>
+          <td>{{ k.adi_soyadi }}</td>
+          <td>{{ k.sinifsube }}</td>
+          <td style="font-size:.75rem;">{{ k.ders_adi }}</td>
+          <td style="text-align:center; color:#ccc;">__________</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  {% endfor %}
 
-  {% if ot_veri.salon2 %}
-  <div class="salon-label s2" style="margin-top:.7rem;">Mazeret 2</div>
-  <table class="salon-tablo">
-    <thead>
-      <tr>
-        <th style="width:2.5rem;">#</th>
-        <th style="width:5rem;">Okul No</th>
-        <th>Adı Soyadı</th>
-        <th style="width:4rem;">Şube</th>
-        <th>Ders</th>
-        <th style="width:6rem; text-align:center;">İmza</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for k in ot_veri.salon2 %}
-      <tr>
-        <td>{{ k.sira_no }}</td>
-        <td>{{ k.okulno }}</td>
-        <td>{{ k.adi_soyadi }}</td>
-        <td>{{ k.sinifsube }}</td>
-        <td style="font-size:.75rem;">{{ k.ders_adi }}</td>
-        <td style="text-align:center; color:#ccc;">__________</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-
-  {% if not ot_veri.salon1 and not ot_veri.salon2 %}
+  {% if not ot_veri.dolu_salon_var %}
   <p style="padding:.5rem .9rem; font-size:.8rem; color:#aaa; border:1px solid #e2e8f0; border-top:none; margin:0;">
     Bu oturumda öğrenci yok.
   </p>

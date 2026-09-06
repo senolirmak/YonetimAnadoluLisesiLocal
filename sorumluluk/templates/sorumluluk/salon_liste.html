@@ -1,0 +1,73 @@
+{% extends "sorumluluk/base.html" %}
+{% block sor_title %}Salonlar{% endblock %}
+
+{% block sor_content %}
+<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+  <h1 style="font-size:1.3rem; font-weight:700; color:#1a1a2e; margin:0;">Salonlar</h1>
+  <span class="badge badge-secondary" style="font-size:.85rem;">{{ salonlar|length }} salon</span>
+</div>
+<p style="color:#64748b; font-size:.85rem; margin-top:-.5rem; margin-bottom:1.25rem;">
+  Sorumluluk sınavı görevlendirmesinde ve oturma planında kullanılacak salonların listesi.
+  Her satırın adı (jenerik bir salon adı — "Mazeret 1" — ya da gerçek bir sınıf adı —
+  "10/A Sınıfı" — olabilir) ve aktifliği buradan değiştirilebilir. "Sıra" sabittir ve
+  değiştirilemez: geçmiş sınavların salon ataması bu sıraya bağlıdır. Bir salonu geçici
+  olarak kullanım dışı bırakmak için silmek yerine "Aktif" işaretini kaldırın — yeni
+  takvim/oturma planı üretiminde bu salon kullanılmaz, ama geçmiş sınavlardaki kaydı bozulmaz.
+</p>
+
+<div class="card" style="padding:1.25rem; margin-bottom:1.25rem;">
+  <form method="post" style="display:flex; align-items:flex-start; gap:.75rem; flex-wrap:wrap;">
+    {% csrf_token %}
+    <div style="flex:1; min-width:220px;">
+      {{ form.ad }}
+      {% if form.ad.errors %}<div style="color:#dc2626; font-size:.78rem;">{{ form.ad.errors|join:", " }}</div>{% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">+ Salon Ekle</button>
+  </form>
+</div>
+
+{% if not salonlar %}
+<div class="card">
+  <p style="color:#888; text-align:center;">Henüz salon tanımlanmamış.</p>
+</div>
+{% else %}
+<div class="card" style="overflow-x:auto; padding:0;">
+  <table style="width:100%; border-collapse:collapse; font-size:.85rem;">
+    <thead style="background:#f1f5f9;">
+      <tr>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0; width:6rem;">Sıra</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0;">Salon Adı</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0; width:8rem;">Durum</th>
+        <th style="padding:.6rem .9rem; text-align:left; border-bottom:2px solid #e2e8f0; width:9rem;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in salonlar %}
+      <tr style="border-bottom:1px solid #f0f0f0;{% if not s.aktif %} opacity:.6;{% endif %}">
+        <td style="padding:.45rem .9rem; font-weight:600; color:#64748b;">Salon {{ s.sira }}</td>
+        <td style="padding:.45rem .9rem;">
+          <input type="text" name="ad" form="salon-duzenle-{{ s.pk }}" value="{{ s.ad }}" class="form-control" style="max-width:260px;">
+        </td>
+        <td style="padding:.45rem .9rem;">
+          <label style="display:flex; align-items:center; gap:.35rem; font-weight:600; cursor:pointer;">
+            <input type="checkbox" name="aktif" form="salon-duzenle-{{ s.pk }}" {% if s.aktif %}checked{% endif %}>
+            {% if s.aktif %}Aktif{% else %}Pasif{% endif %}
+          </label>
+        </td>
+        <td style="padding:.45rem .9rem; text-align:right; white-space:nowrap;">
+          <button type="submit" form="salon-duzenle-{{ s.pk }}" class="btn btn-sm btn-primary">Kaydet</button>
+          <button type="submit" form="salon-sil-{{ s.pk }}" class="btn btn-sm"
+                  style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;"
+                  onclick="return confirm('{{ s.ad }} silinsin mi? Geçmişte kullanılmışsa silme engellenecektir.');">Sil</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% for s in salonlar %}
+<form id="salon-duzenle-{{ s.pk }}" method="post" action="{% url 'sorumluluk:salon_duzenle' s.pk %}" hidden>{% csrf_token %}</form>
+<form id="salon-sil-{{ s.pk }}" method="post" action="{% url 'sorumluluk:salon_sil' s.pk %}" hidden>{% csrf_token %}</form>
+{% endfor %}
+{% endif %}
+{% endblock %}

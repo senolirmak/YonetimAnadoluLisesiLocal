@@ -41,6 +41,11 @@ urlpatterns = [
     path("gorev-muafiyeti/",              views.gorev_muaf_liste, name="gorev_muaf_liste"),
     path("gorev-muafiyeti/<int:pk>/sil/", views.gorev_muaf_sil,   name="gorev_muaf_sil"),
 
+    # Salonlar (görevlendirme/oturma planında kullanılacak salon listesi)
+    path("salonlar/",                  views.salon_liste,   name="salon_liste"),
+    path("salonlar/<int:pk>/duzenle/", views.salon_duzenle, name="salon_duzenle"),
+    path("salonlar/<int:pk>/sil/",     views.salon_sil,     name="salon_sil"),
+
 
     # Takvim tarih güncelleme
     path("<int:sinav_pk>/takvim/tarih-guncelle/", views.takvim_oturum_tarihi_guncelle, name="takvim_oturum_tarihi_guncelle"),

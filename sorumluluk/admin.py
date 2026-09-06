@@ -7,6 +7,7 @@ from sorumluluk.models import (
     SorumluDersHavuzu,
     SorumluOgrenci,
     SorumluOturmaPlani,
+    SorumlulukSalon,
     SorumluSinav,
     SorumluSinavParametre,
     SorumluTakvim,
@@ -36,6 +37,13 @@ class SorumluTakvimAdmin(admin.ModelAdmin):
     list_display  = ["sinav", "tarih", "oturum_no", "saat_baslangic", "sinav_turu", "ders_adi"]
     list_filter   = ["sinav", "tarih", "sinav_turu"]
     search_fields = ["ders_adi"]
+
+
+@admin.register(SorumlulukSalon)
+class SorumlulukSalonAdmin(admin.ModelAdmin):
+    list_display = ["sira", "ad", "aktif"]
+    list_editable = ["ad", "aktif"]
+    ordering = ["sira"]
 
 
 admin.site.register(SorumluSinavParametre)

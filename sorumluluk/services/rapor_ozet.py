@@ -5,16 +5,20 @@ Bu modül yalnızca okuma yapar (rapor amaçlı); veritabanına yazmaz.
 from itertools import groupby
 
 from sorumluluk.models import (
-    SALON_CHOICES,
     OncekiDonem,
     OncekiDonemGorev,
     SorumluGozetmen,
     SorumluKomisyonUyesi,
     SorumluTakvim,
+    salon_choices,
 )
 from sorumluluk.services.gorevlendirme_oneri import komisyon_gorev_sayisi
 
-_SALON_LABEL = dict(SALON_CHOICES)
+
+def _salon_label(kod):
+    """Salon listesi artık SorumlulukSalon CRUD'undan geldiği için her çağrıda
+    güncel eşleşmeyi okur — modül yüklenirken bir kereye mahsus dondurulmaz."""
+    return dict(salon_choices()).get(kod, kod)
 _AYLAR = [
     "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
     "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
@@ -102,7 +106,7 @@ def ogretmen_gorev_ozeti_hesapla(secili_sinav) -> dict:
                     "saat_baslangic": saatler[0] if saatler else None,
                     "saat_bitis":     saatler[1] if saatler else None,
                     "tur":            "gozetmen",
-                    "detay":          _SALON_LABEL.get(gz.salon, gz.salon),
+                    "detay":          _salon_label(gz.salon),
                 })
 
     # ── Tablo satırlarını oluştur ve branşa göre grupla ───────────────────────
@@ -210,7 +214,7 @@ def personelin_sorumluluk_gorevlerini_hesapla(personel) -> list[dict]:
 
     for g in gozetmenler:
         ot = _oturum_al(g.sinav_id, g.sinav, g.tarih, g.oturum_no)
-        ot["gozetmenler"].append(_SALON_LABEL.get(g.salon, g.salon))
+        ot["gozetmenler"].append(_salon_label(g.salon))
 
     return [
         {

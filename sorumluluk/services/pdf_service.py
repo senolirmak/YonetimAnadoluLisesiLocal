@@ -12,7 +12,9 @@ from reportlab.lib.fonts import addMapping
 
 from django.conf import settings
 
-from sorumluluk.models import SorumluOturmaPlani, SorumluKomisyonUyesi, SorumluGozetmen, SorumluTakvim, SALON_CHOICES
+from sorumluluk.models import (
+    SorumluOturmaPlani, SorumluKomisyonUyesi, SorumluGozetmen, SorumluTakvim, salon_choices,
+)
 
 # --- Times New Roman — <b> etiketleri de normal ağırlıkta çizilir ---
 _FONTS_DIR = settings.BASE_DIR / "static" / "fonts"
@@ -26,9 +28,14 @@ try:
 except Exception:
     _FONT = "Times-Roman"
 
-_SALON_LABEL = dict(SALON_CHOICES)
 _AYLAR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
           "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
+
+
+def _salon_label(kod):
+    """Salon listesi artık SorumlulukSalon CRUD'undan geldiği için her çağrıda
+    güncel eşleşmeyi okur — modül yüklenirken bir kereye mahsus dondurulmaz."""
+    return dict(salon_choices()).get(kod, kod)
 
 _GRAY      = colors.HexColor("#555555")
 _LIGHT     = colors.HexColor("#dddddd")
@@ -146,7 +153,7 @@ def ogrenci_takvim_pdf_uret(buf, sinav, okul):
                 k.tarih.strftime("%d.%m.%Y"),
                 k.saat_baslangic.strftime("%H:%M"),
                 k.ders_adi or "",
-                _SALON_LABEL.get(k.salon, k.salon) or k.salon,
+                _salon_label(k.salon) or k.salon,
                 str(k.sira_no),
             ])
         card.append(Table(data, colWidths=[70, 45, 255, 90, 35], style=tbl_style))
@@ -200,7 +207,7 @@ def genel_takvim_pdf_uret(buf, sinav, okul, oturumlar_veri):
     elements.append(HRFlowable(width="100%", thickness=1, color=_GRAY, spaceAfter=5))
 
     _GUNLER = {0:"Pazartesi",1:"Salı",2:"Çarşamba",3:"Perşembe",4:"Cuma",5:"Cumartesi",6:"Pazar"}
-    salon_keys = [(f"salon{i+1}", sc) for i, (sc, _) in enumerate(SALON_CHOICES)]
+    salon_keys = [(f"salon{i+1}", sc) for i, (sc, _) in enumerate(salon_choices())]
 
     for ot in oturumlar_veri:
         gun       = _GUNLER.get(ot["tarih"].weekday(), "")
@@ -229,7 +236,7 @@ def genel_takvim_pdf_uret(buf, sinav, okul, oturumlar_veri):
                 continue
             salon_found = True
             dersler     = sorted({k.ders_adi for k in kayitlar})
-            salon_label = _SALON_LABEL.get(slot_key, slot_key)
+            salon_label = _salon_label(slot_key)
 
             etiket_tbl = Table(
                 [[
@@ -378,7 +385,7 @@ def rapor_pdf_uret(buf, sinav, okul, oturumlar_veri, imza_sirkusu=False):
         topMargin=TB_MARGIN,  bottomMargin=TB_MARGIN,
     )
 
-    salon_keys = [(f"salon{i+1}", sc) for i, (sc, _) in enumerate(SALON_CHOICES)]
+    salon_keys = [(f"salon{i+1}", sc) for i, (sc, _) in enumerate(salon_choices())]
     elements = []
     first_page = True
 
@@ -388,7 +395,7 @@ def rapor_pdf_uret(buf, sinav, okul, oturumlar_veri, imza_sirkusu=False):
             if not kayitlar:
                 continue
 
-            salon_goster = _SALON_LABEL.get(slot_key, slot_key)
+            salon_goster = _salon_label(slot_key)
             toplam       = len(kayitlar)
 
             if not first_page:
@@ -567,7 +574,7 @@ def gorevlendirme_pdf_uret(buf, sinav, okul):
                 ]
             ]
             for g in gozetmenler:
-                salon_label = _SALON_LABEL.get(g.salon, g.salon)
+                salon_label = _salon_label(g.salon)
                 goz_str     = g.gozetmen.adi_soyadi if g.gozetmen else "—"
                 goz_data.append([
                     Paragraph(salon_label, s_hucre),
@@ -670,7 +677,7 @@ def ogretmen_gorev_raporu_pdf_uret(buf, sinav, okul):
             "saat_baslangic": saatler[0] if saatler else None,
             "saat_bitis":     saatler[1] if saatler else None,
             "tur":            "Gözetmen",
-            "detay":          _SALON_LABEL.get(gz.salon, gz.salon),
+            "detay":          _salon_label(gz.salon),
         })
         personel_bilgi[gz.gozetmen.pk] = (gz.gozetmen.adi_soyadi, gz.gozetmen.brans.ad if gz.gozetmen.brans else "")
 
@@ -854,7 +861,7 @@ def ogretmen_gorev_imza_pdf_uret(buf, sinav, okul):
             "saat_baslangic": saatler[0] if saatler else None,
             "saat_bitis":     saatler[1] if saatler else None,
             "tur":            "Gözetmen",
-            "detay":          _SALON_LABEL.get(gz.salon, gz.salon),
+            "detay":          _salon_label(gz.salon),
             "ogretmen":       gz.gozetmen.adi_soyadi,
         })
 

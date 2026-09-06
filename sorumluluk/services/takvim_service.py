@@ -7,11 +7,11 @@ from django.db.models import Max
 
 from sorumluluk.models import (
     SALON_KAPASITESI,
-    SALON_SAYISI,
     SorumluGozetmen,
     SorumluKomisyonUyesi,
     SorumluOgrenci,
     SorumluOturmaPlani,
+    SorumlulukSalon,
     SorumluSinav,
     SorumluTakvim,
 )
@@ -23,6 +23,14 @@ def oturma_plani_olustur(sinav: SorumluSinav) -> None:
     SorumluTakvim'den oturum/ders bilgisini okur; her oturumda sorumlu
     öğrencileri sınıf/şube + ad soyad sırasına göre salonlara dağıtır.
     """
+    salon_listesi = list(SorumlulukSalon.objects.filter(aktif=True).order_by("sira"))
+    if not salon_listesi:
+        raise ValueError(
+            "Oturma planı oluşturulamadı: en az bir aktif salon tanımlı olmalı "
+            "(bkz. Sorumluluk → Salonlar)."
+        )
+    salon_sayisi = len(salon_listesi)
+
     SorumluOturmaPlani.objects.filter(sinav=sinav).delete()
 
     takvim_rows = list(
@@ -32,7 +40,7 @@ def oturma_plani_olustur(sinav: SorumluSinav) -> None:
     )
 
     yeni_kayitlar = []
-    MAX_KAPASITE = SALON_KAPASITESI * SALON_SAYISI
+    MAX_KAPASITE = SALON_KAPASITESI * salon_sayisi
 
     for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
         rows = list(rows)
@@ -118,7 +126,7 @@ def oturma_plani_olustur(sinav: SorumluSinav) -> None:
             for _, grup in ders_gruplar.items():
                 for i, ogr in enumerate(grup):
                     s_idx   = current_salon_idx + (i // SALON_KAPASITESI)
-                    salon   = f"Sorumluluk{min(s_idx + 1, SALON_SAYISI)}"
+                    salon   = salon_listesi[min(s_idx, salon_sayisi - 1)].kod
                     sira_no = i % SALON_KAPASITESI + 1
                     atamalar.append((salon, sira_no, ogr))
                 # Bu ders kaç salon kapladı?
@@ -127,7 +135,7 @@ def oturma_plani_olustur(sinav: SorumluSinav) -> None:
             atamalar = []
             for i, ogr in enumerate(unique_students):
                 salon_idx = i // SALON_KAPASITESI
-                salon     = f"Sorumluluk{min(salon_idx + 1, SALON_SAYISI)}"
+                salon     = salon_listesi[min(salon_idx, salon_sayisi - 1)].kod
                 atamalar.append((salon, i % SALON_KAPASITESI + 1, ogr))
 
         for salon, sira_no, ogr in atamalar:
@@ -187,21 +195,32 @@ def oturumlar_verisini_hazirla(sinav: SorumluSinav) -> list[dict]:
     for op in SorumluOturmaPlani.objects.filter(sinav=sinav).order_by("salon", "sira_no"):
         oturma_dict.setdefault((op.tarih, op.oturum_no), []).append(op)
 
+    # Tüm salonlar (pasif olanlar dahil) — pdf_service.py'deki salon_keys de aynı
+    # sıralamayla (SorumlulukSalon.sira) üretilir, "salonN" pozisyonları eşleşmeli.
+    # Pasif bir salon daha önce kullanılmışsa geçmiş sınavın verisi kaybolmasın diye
+    # dahil edilir.
+    salonlar = list(SorumlulukSalon.objects.order_by("sira"))
+
     oturumlar_veri = []
     for (tarih, oturum_no), rows in groupby(takvim_rows, key=lambda r: (r.tarih, r.oturum_no)):
         rows = list(rows)
         kayitlar = oturma_dict.get((tarih, oturum_no), [])
-        oturumlar_veri.append({
+        veri = {
             "tarih":          tarih,
             "oturum_no":      oturum_no,
             "saat_baslangic": rows[0].saat_baslangic,
             "saat_bitis":     rows[0].saat_bitis,
             "dersler":        [r.ders_adi for r in rows],
             "ders_sayisi":    len(rows),
-            "salon1":         [k for k in kayitlar if k.salon == "Sorumluluk1"],
-            "salon2":         [k for k in kayitlar if k.salon == "Sorumluluk2"],
-            "salon3":         [k for k in kayitlar if k.salon == "Sorumluluk3"],
-        })
+            # Şablonların salon sayısından bağımsız döngü kurabilmesi için:
+            "salonlar":       [],
+        }
+        for i, salon in enumerate(salonlar, start=1):
+            bu_salon = [k for k in kayitlar if k.salon == salon.kod]
+            veri[f"salon{i}"] = bu_salon  # pdf_service.py: geriye dönük "salonN" erişimi
+            veri["salonlar"].append({"ad": salon.ad, "kayitlar": bu_salon})
+        veri["dolu_salon_var"] = any(s["kayitlar"] for s in veri["salonlar"])
+        oturumlar_veri.append(veri)
     return oturumlar_veri
 
 
@@ -212,7 +231,12 @@ def ayni_dersin_ogrencilerini_grupla(sinav: SorumluSinav) -> None:
         SorumluOturmaPlani.objects.filter(sinav=sinav)
         .order_by("tarih", "oturum_no", "ders_adi", "sinifsube", "adi_soyadi")
     )
-    salon_isimleri = [f"Sorumluluk{i+1}" for i in range(SALON_SAYISI)]
+    salon_isimleri = [s.kod for s in SorumlulukSalon.objects.filter(aktif=True).order_by("sira")]
+    if not salon_isimleri:
+        raise ValueError(
+            "Öğrenciler salonlara göre gruplanamadı: en az bir aktif salon tanımlı olmalı "
+            "(bkz. Sorumluluk → Salonlar)."
+        )
 
     for (tarih, oturum_no), group in groupby(planlar, key=lambda x: (x.tarih, x.oturum_no)):
         oturum_planlari = list(group)
