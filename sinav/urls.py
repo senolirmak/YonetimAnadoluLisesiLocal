@@ -47,6 +47,7 @@ urlpatterns = [
     path("ogrenciler/", views.ogrenci_yonetim, name="ogrenci_yonetim"),
     path("ogrenciler/ekle/", views.ogrenci_ekle, name="ogrenci_ekle"),
     path("ogrenciler/<int:pk>/sil/", views.ogrenci_sil, name="ogrenci_sil"),
+    path("ogrenciler/senkronize-et/", views.sinav_ogrenci_senkronize_et, name="sinav_ogrenci_senkronize_et"),
 
     # Ders Ayarlari
     path("ders-ayarlari/", views.ders_ayarlari, name="ders_ayarlari"),

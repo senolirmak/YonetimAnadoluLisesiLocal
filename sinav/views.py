@@ -1326,13 +1326,33 @@ def ogrenci_yonetim(request):
     if sinif_filtre:
         qs = qs.filter(sinif=sinif_filtre)
     siniflar = OgrenciModel.objects.values_list("sinif", flat=True).distinct().order_by("sinif")
+
+    # Aktif sınavın SinavOgrenci anlık görüntüsü ile canlı Ogrenci listesi
+    # arasındaki fark — "Nakil Öğrenci Senkronize Et" butonunun ne kadar
+    # öğrenciyi ekleyeceğini önceden göstermek için (bkz.
+    # sinav.services.ogrenci_senkron).
+    senkron_bilgisi = None
+    if aktif is not None:
+        from sinav.models import SinavOgrenci
+
+        donmus_okulnolar = set(
+            SinavOgrenci.objects.filter(sinav=aktif).values_list("okulno", flat=True)
+        )
+        if donmus_okulnolar:
+            canli_okulnolar = set(OgrenciModel.objects.values_list("okulno", flat=True))
+            senkron_bilgisi = {
+                "donmus_sayisi": len(donmus_okulnolar),
+                "eksik_sayisi": len(canli_okulnolar - donmus_okulnolar),
+            }
+
     return render(request, "sinav/ogrenci_yonetim.html", {
-        "ogrenciler":   qs[:200],
-        "arama":        arama,
-        "sinif_filtre": sinif_filtre,
-        "siniflar":     siniflar,
-        "toplam":       qs.count(),
-        "aktif_sinav":  aktif,
+        "ogrenciler":      qs[:200],
+        "arama":           arama,
+        "sinif_filtre":    sinif_filtre,
+        "siniflar":        siniflar,
+        "toplam":          qs.count(),
+        "aktif_sinav":     aktif,
+        "senkron_bilgisi": senkron_bilgisi,
     })
 
 
@@ -1340,6 +1360,38 @@ def ogrenci_yonetim(request):
 def ogrenci_ekle(request):
     """Öğrenci yönetimi Veri Aktarım sayfasından yapılmaktadır."""
     messages.info(request, "Öğrenci eklemek için Veri Aktarım sayfasını kullanın.")
+    return redirect("sinav:ogrenci_yonetim")
+
+
+@require_POST
+@login_required
+def sinav_ogrenci_senkronize_et(request):
+    """Aktif sınavın SinavOgrenci anlık görüntüsüne, ilk üretimden sonra canlı
+    Ogrenci'ye eklenmiş (nakil gelen, yeni kayıt olan) öğrencileri ekler —
+    bkz. sinav.services.ogrenci_senkron."""
+    from sinav.services.ogrenci_senkron import SenkronHatasi, nakil_ogrenci_senkronize_et
+
+    aktif = _aktif_sinav()
+    if aktif is None:
+        messages.error(request, "Aktif bir sınav yok.")
+        return redirect("sinav:ogrenci_yonetim")
+
+    try:
+        sonuc = nakil_ogrenci_senkronize_et(aktif)
+    except SenkronHatasi as exc:
+        messages.error(request, str(exc))
+        return redirect("sinav:ogrenci_yonetim")
+
+    if sonuc.eklenen_ogrenci:
+        ozet = ", ".join(sonuc.eklenen_ogrenci[:10])
+        if len(sonuc.eklenen_ogrenci) > 10:
+            ozet += f" ... (+{len(sonuc.eklenen_ogrenci) - 10} kişi daha)"
+        messages.success(
+            request,
+            f"{len(sonuc.eklenen_ogrenci)} yeni öğrenci '{aktif}' sınavına eklendi: {ozet}",
+        )
+    else:
+        messages.info(request, "Eklenecek yeni öğrenci bulunamadı — liste zaten güncel.")
     return redirect("sinav:ogrenci_yonetim")
 
 
