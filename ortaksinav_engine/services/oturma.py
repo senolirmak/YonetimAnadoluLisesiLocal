@@ -16,15 +16,49 @@ Ozel metodlar:
 """
 
 import hashlib
-import re
 import random
+import re
 from datetime import datetime
 
 import pandas as pd
-from django.db.models import F
 
 from ortaksinav_engine.services.base import BaseService
 from ortaksinav_engine.utils import normalize_sube_cell
+
+
+def anlik_goruntu_garanti_et(sinav):
+    """Bu sınav için `SinavOgrenci`/`SinavOgrenciMuaf` anlık görüntüsü daha önce
+    alınmamışsa, o anki CANLI `ogrenci.Ogrenci`/`OgrenciMuaf` verisinden bir kere
+    oluşturur; zaten varsa hiçbir şey yapmaz (idempotent) — bkz.
+    `sinav.models.SinavOgrenci` docstring'i.
+
+    `generate_oturum`'un TEK çağrı noktası: bir sınav için "Oturma Üret" ilk kez
+    ne zaman çalışırsa, öğrenci listesi o an için dondurulur; sınav dönemi geçtikten
+    sonra (yeni eğitim yılına geçilip roster değiştikten sonra) yeniden üretilirse
+    bile aynı donmuş liste kullanılmaya devam eder."""
+    from ogrenci.models import Ogrenci as OgrenciModel
+    from ogrenci.models import OgrenciMuaf
+    from okul.utils import get_aktif_egitim_yili
+    from sinav.models import SinavOgrenci, SinavOgrenciMuaf
+
+    if sinav is None or SinavOgrenci.objects.filter(sinav=sinav).exists():
+        return
+
+    SinavOgrenci.objects.bulk_create([
+        SinavOgrenci(
+            sinav=sinav, okulno=o.okulno, adi=o.adi, soyadi=o.soyadi,
+            cinsiyet=o.cinsiyet, sinif=o.sinif, sube=o.sube,
+            sureksiz_devamsiz=o.sureksiz_devamsiz,
+        )
+        for o in OgrenciModel.objects.all()
+    ], ignore_conflicts=True)
+
+    SinavOgrenciMuaf.objects.bulk_create([
+        SinavOgrenciMuaf(sinav=sinav, okulno=okulno, ders_adi=ders_adi)
+        for okulno, ders_adi in OgrenciMuaf.objects.filter(
+            egitim_yili=get_aktif_egitim_yili()
+        ).values_list("ogrenci__okulno", "ders__ders_adi")
+    ], ignore_conflicts=True)
 
 
 class OturmaPlanService(BaseService):
@@ -35,7 +69,7 @@ class OturmaPlanService(BaseService):
     # ------------------------------------------------------------------
 
     def generate_all(self):
-        from sinav.models import Takvim, SinavBilgisi, TakvimUretim
+        from sinav.models import SinavBilgisi, Takvim, TakvimUretim
 
         self.log("\nAdim 5: Tum oturumlar icin oturma plani olusturuluyor...\n")
         aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
@@ -93,12 +127,19 @@ class OturmaPlanService(BaseService):
         self.log("\nSecili oturumlar tamamlandi.\n")
 
     def generate_oturum(self, tarih: str, saat: str, oturum: int, aktif_sinav=None, aktif_uretim=None):
-        from ogrenci.models import Ogrenci as OgrenciModel, OgrenciMuaf
-        from okul.utils import get_aktif_egitim_yili
-        from sinav.models import Takvim, OturmaPlani
+        from sinav.models import OturmaPlani, SinavOgrenci, SinavOgrenciMuaf, Takvim
 
         self.log(f"\nOturum yerlesimi: {tarih} {saat} (Oturum {oturum})")
         baslik = f"{tarih} {saat} (Oturum {oturum})"
+
+        # Öğrenci listesi CANLI ogrenci.Ogrenci'den değil, bu sınav için dondurulmuş
+        # SinavOgrenci anlık görüntüsünden okunur — bkz. sinav.models.SinavOgrenci
+        # docstring'i (2026-2027'nin yeni 9. sınıf öğrencilerinin 2025-2026'ya ait
+        # bir sınavda görünmesi olayı). Anlık görüntü bu sınav için daha önce hiç
+        # alınmamışsa (ilk üretim), burada o anki canlı veriden bir kere oluşturulur;
+        # sonraki her (yeniden) üretim aynı donmuş listeyi kullanır.
+        sinav_kapsam = aktif_sinav or (aktif_uretim.sinav if aktif_uretim else None)
+        anlik_goruntu_garanti_et(sinav_kapsam)
 
         # Yeniden üretimde eski kayıtları temizle (aynı uretim + tarih + saat + oturum)
         if aktif_uretim is not None:
@@ -129,18 +170,19 @@ class OturmaPlanService(BaseService):
         }
 
         # Özel durum 1: Sürekli devamsız öğrencileri hiçbir sınavda oturma planına alma
+        # (bu sınavın anlık görüntüsündeki, o anda dondurulmuş hâli)
         sureksiz_set = set(
-            OgrenciModel.objects.filter(sureksiz_devamsiz=True)
+            SinavOgrenci.objects.filter(sinav=sinav_kapsam, sureksiz_devamsiz=True)
             .values_list("okulno", flat=True)
         )
 
-        df_o = pd.DataFrame(OgrenciModel.objects.values(
+        df_o = pd.DataFrame(SinavOgrenci.objects.filter(sinav=sinav_kapsam).values(
             "okulno", "adi", "soyadi", "cinsiyet", "sinif", "sube",
         ))
         if not df_o.empty:
             df_o["sinifsube"] = df_o["sinif"].astype(str) + "/" + df_o["sube"].astype(str)
         if df_o.empty:
-            self.log("DB'de ogrenci yok. Adim 1'i calistirin.")
+            self.log("Bu sinav icin ogrenci anlik goruntusu bulunamadi. Adim 1'i calistirin.")
             return
 
         # Sürekli devamsız filtresi
@@ -168,10 +210,9 @@ class OturmaPlanService(BaseService):
 
         oturum_base_ders = {_base_ders(v) for v in sube_to_ders.values()}
         muaf_pairs: set[tuple] = set(
-            OgrenciMuaf.objects.filter(
-                ders__ders_adi__in=oturum_base_ders,
-                egitim_yili=get_aktif_egitim_yili(),
-            ).values_list("ogrenci__okulno", "ders__ders_adi")
+            SinavOgrenciMuaf.objects.filter(
+                sinav=sinav_kapsam, ders_adi__in=oturum_base_ders,
+            ).values_list("okulno", "ders_adi")
         )
         if muaf_pairs:
             df_o["_ders_base"] = df_o["ders"].apply(_base_ders)
