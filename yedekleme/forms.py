@@ -16,6 +16,19 @@ class YedekYuklemeForm(forms.Form):
         return dosya
 
 
+class MedyaYedekYuklemeForm(forms.Form):
+    dosya = forms.FileField(
+        label="Medya yedeği (.tar.gz)",
+        help_text="Bu sistemden alınmış bir medya yedeği (.tar.gz) seçin.",
+    )
+
+    def clean_dosya(self):
+        dosya = self.cleaned_data["dosya"]
+        if not dosya.name.lower().endswith(".tar.gz"):
+            raise forms.ValidationError("Dosya adı '.tar.gz' ile bitmelidir.")
+        return dosya
+
+
 class GeriYuklemeOnayForm(forms.Form):
     dosya_adi = forms.CharField(widget=forms.HiddenInput)
     dogrulama = forms.CharField(

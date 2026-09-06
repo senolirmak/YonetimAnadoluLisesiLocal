@@ -1,14 +1,19 @@
-"""Veritabanı yedeklerini oluşturma, listeleme, indirme, yükleme, silme ve geri
-yükleme servisleri.
+"""Veritabanı VE medya (`media/`) yedeklerini oluşturma, listeleme, indirme,
+yükleme, silme ve geri yükleme servisleri.
 
 `backups/` dizinindeki `*.dump` dosyaları tek kaynak kabul edilir — ayrı bir Django
 modeli tutulmaz; böylece `deploy.sh`'in otomatik aldığı yedekler de bu listede
 görünür. CLAUDE.md'de belirtildiği gibi bu dosyalar gerçek veritabanı yedekleridir.
+Medya yedekleri (`media_*.tar.gz`) de aynı dizinde, adlarındaki `media_` önekiyle
+`.dump` dosyalarından ayrılarak tutulur — sunucu değişimi (yeni bir sunucuya taşıma)
+sırasında veritabanının yanında `media/` içindeki öğrenci/personel dosyalarının da
+kaybolmaması içindir (bkz. görüşme notları).
 
 Başka bir ortamdan (örn. başka bir okul sunucusundan) elle indirilmiş bir `.dump`
 dosyası, web arayüzündeki "Yedek Yükle" formuyla `backups/` dizinine kopyalanıp
 mevcut geri yükleme akışına (`yedek_geri_yukle_onay` → `yedek_geri_yukle`) dahil
-edilebilir — bkz. `yedek_yukle()`.
+edilebilir — bkz. `yedek_yukle()`. Aynısı medya yedekleri için `medya_yedek_yukle()`
+ile geçerlidir.
 
 Bu modül `pg_dump`/`pg_restore`'u DAİMA host'ta kurulu ikili dosyalarla, TCP
 üzerinden (`.env`'deki DB_HOST/DB_PORT) çalıştırır — PostgreSQL bir Podman/Docker
@@ -23,6 +28,11 @@ konteyneri oluşturan OS kullanıcısı için mümkündür) burada hiç kullanı
 `backups/`'a (paylaşılan, setgid'li dizin — bkz. `kurulumcu/servis_kullanicisi.py:
 paylasilan_yedek_dizinini_hazirla`) aynı şekilde yazar.
 
+Medya yedekleme/geri yükleme ise (pg_dump/restore'un aksine) hiçbir harici araca ya
+da ayrıcalığa ihtiyaç duymaz: sunucu kullanıcısı (`akalsite`) zaten `media/`'nin
+sahibidir (bkz. `kurulumcu/servis_kullanicisi.py: calisma_zamani_dosyalarini_devret`),
+bu yüzden saf Python `tarfile`/`shutil` ile çalışır.
+
 Tüm view'lar bu modülü çağırmadan önce yetki kontrolünü (mudur_yardimcisi_required)
 yapmış olmalıdır — burada ek bir yetki kontrolü yoktur.
 """
@@ -32,7 +42,9 @@ from __future__ import annotations
 import os
 import re
 import shlex
+import shutil
 import subprocess
+import tarfile
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -42,9 +54,13 @@ from django.conf import settings
 from django.db import connection
 
 BACKUP_DIR: Path = settings.BASE_DIR / "backups"
+MEDIA_DIR: Path = Path(settings.MEDIA_ROOT)
 ZAMAN_ASIMI_SANIYE = 600  # pg_dump/pg_restore için üst sınır
 RAPOR_ZAMAN_ASIMI_SANIYE = 120  # yalnızca arşiv okuyan (DB'ye bağlanmayan) rapor çağrıları için
 PG_DUMP_IMZASI = b"PGDMP"  # pg_dump -Fc (custom format) dosyalarının baştaki imzası
+GZIP_IMZASI = b"\x1f\x8b"  # gzip (dolayısıyla .tar.gz) dosyalarının baştaki imzası
+MEDYA_YEDEK_ONEKI = "media_"
+MEDYA_YEDEK_UZANTISI = ".tar.gz"
 
 
 class YedekHatasi(Exception):
@@ -56,6 +72,12 @@ class YedekDosyasi:
     ad: str
     boyut_mb: float
     olusturma_tarihi: datetime
+
+
+@dataclass
+class MedyaArsivBilgisi:
+    dosya_sayisi: int
+    toplam_boyut_mb: float
 
 
 @dataclass
@@ -492,3 +514,173 @@ def yedek_geri_yukle(dosya_adi: str) -> None:
     if sonuc.returncode != 0:
         hata_metni = sonuc.stderr.decode(errors="replace").strip()
         raise YedekHatasi(f"Geri yükleme hata(lar)la tamamlandı: {hata_metni[-2000:]}")
+
+
+# ---------------------------------------------------------------------------
+# Medya (`media/`) yedekleri — bkz. modül docstring'i
+# ---------------------------------------------------------------------------
+
+def medya_guvenli_yol(dosya_adi: str) -> Path:
+    """Dosya adını yalnızca backups/ içindeki gerçek bir medya arşivine
+    (`media_*.tar.gz`) çözer; path traversal veya dizin dışına çıkma girişimlerini
+    reddeder. `.dump` dosyalarıyla aynı dizini paylaştığından hem önek hem uzantı
+    kontrol edilir (bkz. `guvenli_yol`)."""
+    ad = Path(dosya_adi).name  # herhangi bir dizin bileşenini at (../ dahil)
+    if not (ad.startswith(MEDYA_YEDEK_ONEKI) and ad.endswith(MEDYA_YEDEK_UZANTISI)):
+        raise YedekHatasi("Geçersiz dosya adı.")
+    yol = (BACKUP_DIR / ad).resolve()
+    if yol.parent != BACKUP_DIR.resolve() or not yol.is_file():
+        raise YedekHatasi("Medya yedeği bulunamadı.")
+    return yol
+
+
+def medya_yedekleri_listele() -> list[YedekDosyasi]:
+    BACKUP_DIR.mkdir(exist_ok=True)
+    sonuc = []
+    for yol in BACKUP_DIR.glob(f"{MEDYA_YEDEK_ONEKI}*{MEDYA_YEDEK_UZANTISI}"):
+        istat = yol.stat()
+        sonuc.append(
+            YedekDosyasi(
+                ad=yol.name,
+                boyut_mb=round(istat.st_size / (1024 * 1024), 2),
+                olusturma_tarihi=datetime.fromtimestamp(istat.st_mtime),
+            )
+        )
+    return sorted(sonuc, key=lambda y: y.olusturma_tarihi, reverse=True)
+
+
+def medya_yedek_olustur(etiket: str = "web") -> Path:
+    """`media/`'nin tamamını `backups/` altına `.tar.gz` olarak arşivler ve dosya
+    yolunu döner.
+
+    pg_dump'ın aksine harici bir araca ya da TCP bağlantısına ihtiyaç duymaz —
+    `akalsite` zaten `media/`'nin sahibi olduğundan saf Python `tarfile` yeterlidir.
+    Arşivdeki yollar `media/` önekini İÇERMEZ (`media/ogrenci/x.pdf` değil
+    `ogrenci/x.pdf`) — böylece geri yüklerken doğrudan `MEDIA_DIR` içine açılabilir.
+
+    Okul ölçeğindeki veri setleri için yeterlidir; çok büyük `media/` dizinlerinde
+    (birkaç GB'ı aşan) bu senkron işlem uzun sürebilir ve web sunucusunun/ters
+    proxy'nin istek zaman aşımına takılabilir."""
+    BACKUP_DIR.mkdir(exist_ok=True)
+    MEDIA_DIR.mkdir(exist_ok=True)
+    zaman = datetime.now().strftime("%Y%m%d_%H%M%S")
+    hedef = BACKUP_DIR / f"{MEDYA_YEDEK_ONEKI}{etiket}_{zaman}{MEDYA_YEDEK_UZANTISI}"
+
+    try:
+        with tarfile.open(hedef, "w:gz") as tf:
+            for oge in MEDIA_DIR.iterdir():
+                tf.add(oge, arcname=oge.name)
+    except OSError as exc:
+        hedef.unlink(missing_ok=True)
+        raise YedekHatasi(f"Medya yedeği oluşturulamadı: {exc}") from exc
+
+    if not hedef.exists() or hedef.stat().st_size == 0:
+        hedef.unlink(missing_ok=True)
+        raise YedekHatasi("Medya yedeği oluşturulamadı: çıktı dosyası boş.")
+
+    return hedef
+
+
+def medya_yedek_yukle(dosya) -> Path:
+    """Kullanıcının web formundan yüklediği bir medya arşivini `backups/` içine
+    kaydeder (bkz. `yedekleme/forms.py: MedyaYedekYuklemeForm`).
+
+    `yedek_yukle()` ile aynı ilke: hedef dosya adı bizim tarafımızdan üretilir,
+    dosyanın gerçekten bir gzip arşivi olduğu baştaki imzayla doğrulanır — uzantı
+    kontrolü tek başına yeterli değildir."""
+    ilk_baytlar = dosya.read(len(GZIP_IMZASI))
+    dosya.seek(0)
+    if ilk_baytlar != GZIP_IMZASI:
+        raise YedekHatasi("Geçersiz dosya: bir gzip (.tar.gz) arşivi değil.")
+
+    BACKUP_DIR.mkdir(exist_ok=True)
+    zaman = datetime.now().strftime("%Y%m%d_%H%M%S")
+    hedef = BACKUP_DIR / f"{MEDYA_YEDEK_ONEKI}disaridan_{zaman}{MEDYA_YEDEK_UZANTISI}"
+
+    try:
+        with open(hedef, "wb") as f:
+            for parca in dosya.chunks():
+                f.write(parca)
+    except OSError as exc:
+        hedef.unlink(missing_ok=True)
+        raise YedekHatasi(f"Dosya kaydedilemedi: {exc}") from exc
+
+    if hedef.stat().st_size == 0:
+        hedef.unlink(missing_ok=True)
+        raise YedekHatasi("Yüklenen dosya boş.")
+
+    return hedef
+
+
+def medya_arsiv_bilgisi(yol: Path) -> MedyaArsivBilgisi:
+    """Bir medya arşivini hiçbir yere açmadan içindeki dosya sayısını ve toplam
+    (sıkıştırılmamış) boyutunu okur — geri yükleme öncesi kullanıcıya özet
+    göstermek içindir."""
+    try:
+        with tarfile.open(yol, "r:gz") as tf:
+            uyeler = [u for u in tf.getmembers() if u.isfile()]
+    except (tarfile.TarError, OSError) as exc:
+        raise YedekHatasi(f"Medya arşivi okunamadı: {exc}") from exc
+
+    return MedyaArsivBilgisi(
+        dosya_sayisi=len(uyeler),
+        toplam_boyut_mb=round(sum(u.size for u in uyeler) / (1024 * 1024), 2),
+    )
+
+
+def medya_yedek_sil(dosya_adi: str) -> None:
+    yol = medya_guvenli_yol(dosya_adi)
+    yol.unlink()
+
+
+def _media_icerigini_temizle() -> None:
+    """`MEDIA_DIR`'in KENDİSİNİ silmeden yalnızca içeriğini boşaltır — dizin nesnesi
+    (dolayısıyla `kurulumcu`'nun üzerine koyduğu sahiplik/setgid biti, bkz.
+    `servis_kullanicisi.calisma_zamani_dosyalarini_devret`) korunur. Yeniden
+    oluşturulsaydı akalsite'ın kendi birincil grubuyla (www-data değil) yaratılır
+    ve nginx bir daha `media/`'yi okuyamazdı."""
+    for oge in MEDIA_DIR.iterdir():
+        if oge.is_dir() and not oge.is_symlink():
+            shutil.rmtree(oge)
+        else:
+            oge.unlink()
+
+
+def _cikarilan_izinleri_duzelt() -> None:
+    """`tarfile.extractall`, arşivdeki mod bitlerini olduğu gibi uygular — bu
+    genelde zaten doğrudur (arşivlenen `media/` de aynı şekilde izinliydi) ama
+    farklı bir ortamdan yüklenmiş bir arşivde umask'a bağlı sürprizlere karşı
+    nginx'in okuyabilmesini burada da açıkça garanti ediyoruz (bkz.
+    `kurulumcu/servis_kullanicisi.py: statik_dosyalari_erisilebilir_yap` ile aynı
+    ilke). Sahiplik zaten `akalsite`'ta olduğundan (bu süreç extract ediyor) sudo
+    gerekmez."""
+    for kok, dizinler, dosyalar in os.walk(MEDIA_DIR):
+        for ad in dizinler:
+            (Path(kok) / ad).chmod(0o755)
+        for ad in dosyalar:
+            (Path(kok) / ad).chmod(0o644)
+
+
+def medya_yedek_geri_yukle(dosya_adi: str) -> None:
+    """Seçilen medya arşivini `media/`'ye geri yükler — `media/` içindeki MEVCUT
+    TÜM içerik önce silinir, ardından arşiv açılır (pg_restore'un `--clean`'iyle
+    aynı "tam değiştirme" ilkesi).
+
+    Çağıran view, geri yükleme öncesi doğrulama metnini kontrol etmiş ve ayrıca bir
+    güvenlik yedeği (`medya_yedek_olustur`) almış olmalıdır — bu fonksiyon yalnızca
+    fiziksel silme+açma işlemini yapar, ek bir onay/güvenlik adımı içermez.
+
+    `filter="data"` (Python 3.12+) mutlak yollara/`../` ile dizin dışına çıkmaya
+    ve cihaz dosyası gibi olağandışı üyelere karşı korur — arşiv yalnızca
+    `mudur_yardimcisi_required` yetkili bir kullanıcı tarafından yüklenebilse de
+    ek bir savunma katmanı olarak burada tutuluyor."""
+    yol = medya_guvenli_yol(dosya_adi)
+    MEDIA_DIR.mkdir(exist_ok=True)
+
+    try:
+        _media_icerigini_temizle()
+        with tarfile.open(yol, "r:gz") as tf:
+            tf.extractall(path=MEDIA_DIR, filter="data")
+        _cikarilan_izinleri_duzelt()
+    except (tarfile.TarError, OSError) as exc:
+        raise YedekHatasi(f"Medya geri yüklenirken hata oluştu: {exc}") from exc

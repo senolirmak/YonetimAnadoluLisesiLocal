@@ -229,7 +229,7 @@ Uygulama `http://127.0.0.1:8000/` adresinde çalışacaktır.
 | `muduriyetcagri` | `/muduriyetcagri/` | Müdüriyet görüşme kayıtları |
 | `ogrencinobet` | `/ogrencinobet/` | Öğrenci nöbet görevleri |
 | `pano` | `/pano/` | Dijital pano / kiosk |
-| `yedekleme` | `/yedekleme/` | Veritabanı yedeği oluşturma/indirme/silme/geri yükleme — yalnızca müdür yardımcısı |
+| `yedekleme` | `/yedekleme/` | Veritabanı ve medya (`media/`) yedeği oluşturma/indirme/silme/geri yükleme — yalnızca müdür yardımcısı |
 | `admin` | `/admin/` | Django yönetim paneli |
 
 **Auth URL'leri:**
@@ -289,6 +289,18 @@ PGPASSWORD=<şifre> pg_dump -U nobet_user -h localhost -F c -f backups/nobet_db_
 # Geri yüklemek için:
 PGPASSWORD=<şifre> pg_restore -U nobet_user -h localhost -d nobet_db backups/<dosya>.dump
 ```
+
+### Medya Yedeği
+
+Aynı `/yedekleme/` sayfasında, veritabanı yedeklerinin altında `media/` dizininin
+(öğrenci/personel dosyaları, sınav belgeleri vb.) tamamını `.tar.gz` olarak
+yedekleyen ayrı bir bölüm de vardır — oluşturma/indirme/yükleme/silme/geri yükleme
+aynı akışla (geri yükleme öncesi otomatik güvenlik yedeği, dosya adını yazarak
+çift onay) çalışır. Bir sunucudan başka bir sunucuya taşırken veritabanı yedeğinin
+yanında bu yedeği de almayı unutmayın — aksi halde `media/` içindeki dosyalar
+kaybolur. Veritabanı yedeklemesinin aksine `pg_dump`/`pg_restore` gibi harici bir
+araca ihtiyaç duymaz (saf Python `tarfile` ile çalışır); geri yükleme, `media/`
+içindeki mevcut tüm dosyaları silip arşivin içeriğiyle değiştirir (tam değiştirme).
 
 ---
 
