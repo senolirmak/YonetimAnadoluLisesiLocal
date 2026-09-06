@@ -99,7 +99,8 @@ REGISTRY = {
             ("brans", "Branş"),
             ("nobeti_var", "Nöbeti Var"),
         ],
-        "group_by": "brans__ad",
+        "group_by": "brans_id",
+        "group_display": "brans__ad",
         "group_order": ["adi_soyadi"],
         "group_label": "",
         "group_collapse": True,
@@ -136,30 +137,69 @@ def yonetim_index(request):
 def yonetim_list(request, slug):
     entry = _entry(slug)
     group_by = entry.get("group_by")
+    # Bazı gruplamalarda (personel → branş) grup anahtarı (group_by) filtreleme/
+    # sıralama için kullanılan alan (örn. "brans_id"), ekranda gösterilen ise ayrı
+    # bir alandır (group_display, örn. "brans__ad"). Belirtilmemişse ikisi aynıdır.
+    group_display = entry.get("group_display", group_by)
     model = entry["model"]
 
-    # Branş gibi değerler "/" içerebildiğinden (ör. "Kimya / Kimya Teknolojisi"),
-    # grup değeri URL path'inde değil query string'te taşınır (?grup=...) —
-    # path converter'ları "/" içeren değerlerle güvenli çalışmaz.
+    # Grup değeri URL path'inde değil query string'te taşınır (?grup=...) — ör.
+    # branş adı gibi "/" içerebilen (örn. "Kimya / Kimya Teknolojisi") değerler
+    # path converter'larıyla güvenli çalışmaz; ID gibi alanlarda da bu tutarlılık korunur.
     grup_deger = request.GET.get("grup") if group_by and entry.get("group_collapse") else None
 
+    # Personel için branş gruplarının yanına, okuldan kalıcı olarak ayrılmış
+    # personeli (bkz. Personel.ARSIV_DURUMLARI) branştan bağımsız topladığı ayrı bir
+    # sözde-grup ("arsiv") eklenir — bu personel branş gruplarının sayısına/listesine
+    # dahil edilmez (bkz. görüşme notları: okul/yonetim/personel arşivleme talebi).
+    personel_arsivi = slug == "personel"
+
     if group_by and entry.get("group_collapse") and grup_deger is None:
+        taban = model.objects.aktif() if personel_arsivi else model.objects.all()
         gruplar = list(
-            model.objects.values(group_by)
+            taban.values(group_by, group_display)
             .annotate(sayi=Count("id"))
             .order_by(group_by)
         )
         for g in gruplar:
-            g["deger"] = g[group_by]
+            g["anahtar"] = g[group_by]
+            g["deger"] = g[group_display]
+        if personel_arsivi:
+            arsiv_sayi = model.objects.arsivde().count()
+            gruplar.append({"anahtar": "arsiv", "deger": "Arşiv", "sayi": arsiv_sayi})
         return render(request, "okul/yonetim/liste.html", {
             "entry": entry, "slug": slug, "gruplar": gruplar,
         })
 
     objects = model.objects.all()
     if grup_deger is not None:
-        objects = objects.filter(**{group_by: grup_deger}).order_by(*entry.get("group_order", []))
+        if personel_arsivi and grup_deger == "arsiv":
+            object_list = list(model.objects.arsivde().order_by(*entry.get("group_order", [])))
+            return render(request, "okul/yonetim/liste.html", {
+                "entry": entry, "slug": slug, "objects": object_list, "grup_deger": "Arşiv",
+            })
+        try:
+            # grup_by sayısal bir alansa (ör. "brans_id"), eski/bozuk bir link ile
+            # metin (örn. eski format branş adı) gelirse Django bunu filter()
+            # sırasında hemen ValueError ile reddeder — burada yakalayıp listeye
+            # dönüyoruz, aksi halde kullanıcı 500 hatasıyla karşılaşır.
+            filtered = objects.filter(**{group_by: grup_deger})
+            if personel_arsivi:
+                # Arşivdeki personel branş grubunda tekrar görünmesin, yalnızca
+                # "Arşiv" grubundan erişilebilsin.
+                filtered = filtered.aktif()
+            grup_baslik = grup_deger
+            if group_display != group_by:
+                # Başlıkta ID değil, o gruba ait okunabilir değeri (örn. branş adı) göster.
+                deger = filtered.values_list(group_display, flat=True).first()
+                if deger is not None:
+                    grup_baslik = deger
+            object_list = list(filtered.order_by(*entry.get("group_order", [])))
+        except ValueError:
+            messages.error(request, "Geçersiz grup bağlantısı, lütfen listeden yeniden seçin.")
+            return redirect("okul:yonetim_list", slug=slug)
         return render(request, "okul/yonetim/liste.html", {
-            "entry": entry, "slug": slug, "objects": objects, "grup_deger": grup_deger,
+            "entry": entry, "slug": slug, "objects": object_list, "grup_deger": grup_baslik,
         })
 
     grouped = None

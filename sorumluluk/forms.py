@@ -8,6 +8,7 @@ from sorumluluk.models import (
     SorumluDersKatalogu,
     SorumluGorevMuafPersonel,
     SorumluOgrenci,
+    SorumlulukSalon,
     SorumluSinav,
 )
 
@@ -131,6 +132,34 @@ class SorumluGorevMuafForm(forms.ModelForm):
             Personel.objects.gorevde().exclude(pk__in=muaf_ids).order_by("adi_soyadi")
         )
         self.fields["personel"].empty_label = "— Personel Seçin —"
+
+
+class SorumlulukSalonForm(forms.ModelForm):
+    """Yeni salon ekleme formu — `sira` elle girilmez, otomatik atanır (bkz.
+    views.salon_liste): mevcut kayıtların sonuna eklenir. Bunun nedeni, `sira`nın
+    aynı zamanda geçmiş sınav kayıtlarındaki iç kodu (`Sorumluluk{sira}`) belirlemesi
+    — sonradan değiştirilirse geçmiş bir sınavın salon ataması sessizce başka bir
+    salona ait görünür."""
+    class Meta:
+        model = SorumlulukSalon
+        fields = ["ad"]
+        widgets = {
+            "ad": forms.TextInput(attrs={
+                "class": _INPUT,
+                "placeholder": "Örn: Mazeret 1, 10/A Sınıfı, Salon 4 ...",
+            }),
+        }
+
+
+class SorumlulukSalonDuzenleForm(forms.ModelForm):
+    """Var olan bir salonu düzenleme formu — yalnızca ad/aktif değişebilir; `sira`
+    (dolayısıyla iç kod) sabittir, bkz. SorumlulukSalonForm."""
+    class Meta:
+        model = SorumlulukSalon
+        fields = ["ad", "aktif"]
+        widgets = {
+            "ad": forms.TextInput(attrs={"class": _INPUT}),
+        }
 
 
 class TakvimAyarForm(forms.Form):

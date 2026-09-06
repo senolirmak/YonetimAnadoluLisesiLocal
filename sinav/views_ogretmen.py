@@ -992,9 +992,9 @@ def ogretmen_ogrenci_sinav_takvimi(request):
 
     sinif_sube_str = str(rehberlik_ders.sinif_sube)
 
-    from sorumluluk.models import SorumluOturmaPlani, SorumluSinav, SALON_CHOICES
+    from sorumluluk.models import SorumluOturmaPlani, SorumluSinav, salon_choices
 
-    _SALON_LABEL = dict(SALON_CHOICES)
+    _SALON_LABEL = dict(salon_choices())
     _AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
               "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
 

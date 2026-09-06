@@ -9,11 +9,11 @@ from django.db import transaction
 
 from sorumluluk.models import (
     SALON_KAPASITESI,
-    SALON_SAYISI,
+    SorumluDersHavuzu,
+    SorumluOgrenci,
+    SorumlulukSalon,
     SorumluSinav,
     SorumluTakvim,
-    SorumluOgrenci,
-    SorumluDersHavuzu,
 )
 
 
@@ -56,7 +56,14 @@ class DjangoSinavTakvimiMotoru:
         return x
 
     def verileri_yukle(self):
-        self.max_kapasite = SALON_KAPASITESI * SALON_SAYISI
+        # Salon sayısı artık koddan sabit değil, SorumlulukSalon CRUD'undan gelir.
+        self.salon_sayisi = SorumlulukSalon.objects.filter(aktif=True).count()
+        if not self.salon_sayisi:
+            raise RuntimeError(
+                "Takvim üretilemedi: en az bir aktif salon tanımlı olmalı "
+                "(bkz. Sorumluluk → Salonlar)."
+            )
+        self.max_kapasite = SALON_KAPASITESI * self.salon_sayisi
         self.ogrenci_ders_dict = defaultdict(list)
         self.ders_ogrenci_dict = defaultdict(list)
         self.ders_bilgileri = {}
@@ -437,7 +444,7 @@ class DjangoSinavTakvimiMotoru:
                             total_salons = 0
                             for count in gercek_ders_students.values():
                                 total_salons += (count + SALON_KAPASITESI - 1) // SALON_KAPASITESI
-                            if total_salons > SALON_SAYISI:
+                            if total_salons > self.salon_sayisi:
                                 continue
                         else:
                             # Normal ve Yazılı sınavlar için global kapasite (Örn: max 60 kişi S1 ve S2'ye dağılır)

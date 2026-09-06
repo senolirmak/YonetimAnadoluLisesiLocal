@@ -6,6 +6,8 @@
   .salon-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
   @media(max-width:700px) { .salon-grid { grid-template-columns:1fr; } }
   .salon-baslik { font-size:.88rem; font-weight:700; color:#1d4ed8; margin-bottom:.4rem; background:#dbeafe; padding:.4rem .7rem; border-radius:4px; }
+  .salon-baslik.sb-1 { background:#fef3c7; color:#92400e; }
+  .salon-baslik.sb-2 { background:#dcfce7; color:#166534; }
   .salon-tablo { width:100%; border-collapse:collapse; font-size:.8rem; }
   .salon-tablo th { background:#1e3a5f; color:#fff; padding:.35rem .6rem; text-align:left; }
   .salon-tablo td { padding:.3rem .6rem; border-bottom:1px solid #f0f0f0; }
@@ -101,7 +103,7 @@
       — {% for d in ot_veri.dersler %}{{ d }}{% if not forloop.last %}, {% endif %}{% endfor %}
     </span>
     <span style="margin-left:auto; font-size:.78rem; color:#94a3b8;">
-      {{ ot_veri.salon1|length }} + {{ ot_veri.salon2|length }} + {{ ot_veri.salon3|length }} öğrenci
+      {% for s in ot_veri.salonlar %}{{ s.kayitlar|length }}{% if not forloop.last %} + {% endif %}{% endfor %} öğrenci
     </span>
   </div>
   <form id="tarih-form-{{ ot_veri.tarih|date:"Ymd" }}-{{ ot_veri.oturum_no }}"
@@ -123,13 +125,14 @@
   </form>
   <div class="salon-grid-kap" style="border:1px solid #e2e8f0; border-top:none; border-radius:0 0 6px 6px;">
   <div class="salon-grid salon-grid-icerik" style="padding:.7rem;">
+    {% for s in ot_veri.salonlar %}
     <div>
-      <div class="salon-baslik">Mazeret 1 ({{ ot_veri.salon1|length }})</div>
-      {% if ot_veri.salon1 %}
+      <div class="salon-baslik{% cycle '' ' sb-1' ' sb-2' %}">{{ s.ad }} ({{ s.kayitlar|length }})</div>
+      {% if s.kayitlar %}
       <table class="salon-tablo">
         <thead><tr><th>#</th><th>Okul No</th><th>Adı Soyadı</th><th>Şube</th><th>Ders</th></tr></thead>
         <tbody>
-          {% for k in ot_veri.salon1 %}
+          {% for k in s.kayitlar %}
           <tr>
             <td>{{ k.sira_no }}</td>
             <td style="color:#94a3b8; font-size:.76rem;">{{ k.okulno }}</td>
@@ -142,44 +145,7 @@
       </table>
       {% else %}<p style="color:#aaa; font-size:.8rem;">Öğrenci yok.</p>{% endif %}
     </div>
-    <div>
-      <div class="salon-baslik" style="background:#fef3c7; color:#92400e;">Mazeret 2 ({{ ot_veri.salon2|length }})</div>
-      {% if ot_veri.salon2 %}
-      <table class="salon-tablo">
-        <thead><tr><th>#</th><th>Okul No</th><th>Adı Soyadı</th><th>Şube</th><th>Ders</th></tr></thead>
-        <tbody>
-          {% for k in ot_veri.salon2 %}
-          <tr>
-            <td>{{ k.sira_no }}</td>
-            <td style="color:#94a3b8; font-size:.76rem;">{{ k.okulno }}</td>
-            <td>{{ k.adi_soyadi }}</td>
-            <td>{{ k.sinifsube }}</td>
-            <td style="font-size:.76rem;">{{ k.ders_adi }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}<p style="color:#aaa; font-size:.8rem;">Öğrenci yok.</p>{% endif %}
-    </div>
-    <div>
-      <div class="salon-baslik" style="background:#dcfce7; color:#166534;">Mazeret 3 ({{ ot_veri.salon3|length }})</div>
-      {% if ot_veri.salon3 %}
-      <table class="salon-tablo">
-        <thead><tr><th>#</th><th>Okul No</th><th>Adı Soyadı</th><th>Şube</th><th>Ders</th></tr></thead>
-        <tbody>
-          {% for k in ot_veri.salon3 %}
-          <tr>
-            <td>{{ k.sira_no }}</td>
-            <td style="color:#94a3b8; font-size:.76rem;">{{ k.okulno }}</td>
-            <td>{{ k.adi_soyadi }}</td>
-            <td>{{ k.sinifsube }}</td>
-            <td style="font-size:.76rem;">{{ k.ders_adi }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}<p style="color:#aaa; font-size:.8rem;">Öğrenci yok.</p>{% endif %}
-    </div>
+    {% endfor %}
   </div>{# /salon-grid-icerik #}
   </div>{# /salon-grid-kap #}
 </div>{# /oturum-blok #}

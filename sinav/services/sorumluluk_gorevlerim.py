@@ -1,7 +1,7 @@
 """Öğretmenin sorumluluk sınavı komisyon üyeliği / gözetmenlik görevlerini hazırlar."""
 from django.db.models import Q
 
-from sorumluluk.models import SALON_CHOICES, SorumluGozetmen, SorumluKomisyonUyesi, SorumluTakvim
+from sorumluluk.models import SorumluGozetmen, SorumluKomisyonUyesi, SorumluTakvim, salon_choices
 
 
 def gorevlerimi_hazirla(personel) -> list[dict]:
@@ -10,7 +10,7 @@ def gorevlerimi_hazirla(personel) -> list[dict]:
     if not personel:
         return []
 
-    salon_label = dict(SALON_CHOICES)
+    salon_label = dict(salon_choices())
 
     takvim_saatler = {
         (t.sinav_id, t.tarih, t.oturum_no): (t.saat_baslangic, t.saat_bitis)

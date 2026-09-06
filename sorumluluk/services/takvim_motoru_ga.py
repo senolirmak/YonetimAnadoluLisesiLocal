@@ -2,7 +2,7 @@ import random
 from collections import defaultdict
 from datetime import timedelta
 
-from sorumluluk.models import SALON_KAPASITESI, SALON_SAYISI
+from sorumluluk.models import SALON_KAPASITESI
 from sorumluluk.services.takvim_motoru import DjangoSinavTakvimiMotoru
 
 
@@ -175,7 +175,7 @@ class DjangoSinavTakvimiMotoruGA(DjangoSinavTakvimiMotoru):
             raise RuntimeError("Öğrencilere atanmış hiçbir ders bulunamadı.")
 
         self._SALON_KAPASITESI = SALON_KAPASITESI
-        self._SALON_SAYISI = SALON_SAYISI
+        self._SALON_SAYISI = self.salon_sayisi  # verileri_yukle() içinde hesaplanır
 
         base_order = sorted(
             courses_all,
