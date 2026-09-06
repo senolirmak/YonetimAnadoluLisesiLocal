@@ -30,16 +30,18 @@
         <div class="kurulum-adim-baslik">e-Okul Verisi</div>
         <div class="kurulum-adim-aciklama">
           {% if veri_tamam %}
-            {{ db_ozeti.ogrenci }} öğrenci · {{ db_ozeti.ders_program }} ders programı kaydı yüklendi.
+            {{ db_ozeti.ogrenci }} öğrenci · {{ db_ozeti.ders_program }} ders programı kaydı — veritabanından okunuyor.
           {% elif okul_tamam %}
-            e-Okul öğrenci listesi ve haftalık ders programı dosyalarını yükleyin.
+            Öğrenci listesi ve haftalık ders programı önce
+            <a href="{% url 'veriaktar_ana' %}">Veri Aktarım</a>'dan yüklenmeli
+            (burada ayrı bir dosya yükleme yoktur, veritabanı doğrudan okunur).
           {% else %}
             Önce Okul Bilgilerini doldurun.
           {% endif %}
         </div>
       </div>
       {% if okul_tamam and not veri_tamam %}
-      <a href="{% url 'sinav:veri_yukle_sayfasi' %}" class="btn btn-primary btn-sm">Veri Yükle</a>
+      <a href="{% url 'sinav:veri_yukle_sayfasi' %}" class="btn btn-primary btn-sm">Veri Eşitle</a>
       {% elif veri_tamam %}
       <a href="{% url 'sinav:veri_yukle_sayfasi' %}" class="btn btn-secondary btn-sm">Güncelle</a>
       {% endif %}
