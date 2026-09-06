@@ -30,6 +30,19 @@ Kurallar:
     herkes tavana ulaşırsa (aksi halde slot boş kalır) tavan o slot için
     geçici olarak yok sayılır ve uyarı üretilir — hiçbir slot önerisiz
     bırakılmaz.
+  - Bir personel, BU sınav döneminde (komisyon + gözetmen toplamı) en fazla
+    `MAKS_GOREV_BU_DONEM` (2) görev alabilir — tek bir dönemde birkaç kişiye
+    yığılmayı önlemek içindir. Bir komisyon biriminin kapladığı GÖREV SAYISI,
+    o birimin kaç farklı tarihe yayıldığıdır: Yazılı+Uygulama ikilisi (ya da
+    aynı slotta birleşen farklı sınıf seviyeleri, bkz. aşağıdaki kural) 2 ayrı
+    tarihte olduğundan TEK BAŞINA 2 görev sayılır — yani bir öğretmen bir
+    dersin yalnızca Yazılı+Uygulama'sını üstlenerek bile dönem sınırına ulaşır,
+    aynı dönemde başka bir derse/sınıf seviyesine komisyon üyesi olamaz. Bu
+    sınır, bir dersin komisyonu için (branş kısıtı nedeniyle) sınırı aşmamış
+    yeterli aday kalmazsa YALNIZCA o ders için esnetilir (branşta az öğretmen
+    olduğunda önerisiz kalan koltuk bırakmamak için) ve uyarı üretilir;
+    gözetmen atamasında da aynı şekilde (dönem-içi gözetmen tavanıyla
+    birlikte) uygulanır.
   - Bir personele aynı gün (tarih) yalnızca bir görev (komisyon veya gözetmen)
     verilebilir. Yazılı/Uygulama ikilisi gibi birden çok tarihe yayılan
     komisyon görevleri, her iki tarihte de bu kısıtı kilitler.
@@ -57,9 +70,15 @@ from sorumluluk.models import (
     SorumluGorevMuafPersonel,
     SorumluGozetmen,
     SorumluKomisyonUyesi,
+    salon_choices,
 )
 
 _SINIF_SUFFIX_RE = re.compile(r" \(\d+\. Sınıf\)$")
+
+# Bir personelin BU sınav döneminde alabileceği toplam (komisyon + gözetmen)
+# görev sayısının üst sınırı — bkz. modül docstring'i. Branşta yeterli aday
+# kalmazsa yalnızca ilgili ders/slot için esnetilir (oner_gorevlendirme).
+MAKS_GOREV_BU_DONEM = 2
 
 
 def gercek_ders_adi(ders_adi: str) -> str:
@@ -217,6 +236,7 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
         return running_komisyon[pid] + running_gozetmen[pid]
 
     used_on_date = defaultdict(set)  # tarih -> {personel_id}
+    bu_donem_toplam = defaultdict(int)  # personel_id -> bu sınavda şu ana kadar atanan görev sayısı
 
     units = []
     for rows in komisyon_birimleri(takvim_rows):
@@ -225,12 +245,19 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
         brans_ids = katalog_brans.get(gercek) or None
         units.append({"rows": rows, "dates": dates, "brans_ids": brans_ids, "gercek": gercek})
 
-    def komisyon_pool(brans_ids, dates):
+    def komisyon_pool(brans_ids, dates, sinirla=True):
+        # Bir birim (`dates`) Yazılı+Uygulama ikilisi gibi birden çok tarihe
+        # yayılıyorsa, o birimden alınacak görev de o kadar (len(dates)) sayılır —
+        # ör. bir dersin hem Yazılı hem Uygulama'sında görev almak, tek bir dönemde
+        # 2 görev almış saymaya yeter. Bu yüzden burada "zaten tavanda mı" değil,
+        # "bu birim eklenince tavanı AŞAR MI" kontrol edilir.
         pool = []
         for p in personel_listesi:
             if brans_ids and p.brans_id not in brans_ids:
                 continue
             if any(p.pk in used_on_date[d] for d in dates):
+                continue
+            if sinirla and bu_donem_toplam[p.pk] + len(dates) > MAKS_GOREV_BU_DONEM:
                 continue
             pool.append(p)
         return pool
@@ -245,9 +272,26 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
                 f"\"{u['gercek']}\" dersi için Ders Kataloğu'nda branş bilgisi bulunamadı; "
                 f"komisyon üyeleri tüm personel arasından seçildi, lütfen kontrol edin."
             )
-        pool = komisyon_pool(u["brans_ids"], u["dates"])
-        secilenler = []
         karma_gerekli = bool(u["brans_ids"]) and len(u["brans_ids"]) >= 2
+        pool = komisyon_pool(u["brans_ids"], u["dates"])
+
+        # Dönem-içi görev sınırı (MAKS_GOREV_BU_DONEM) bu ders için yeterli aday
+        # bırakmıyorsa (branşta az öğretmen olduğunda sık görülür) sınır bu ders
+        # özelinde esnetilir — hiçbir koltuk salt bu sınır yüzünden boş kalmasın.
+        yeterli = (
+            len({p.brans_id for p in pool}) >= 2 if karma_gerekli else len(pool) >= 2
+        )
+        if not yeterli:
+            pool_gevsek = komisyon_pool(u["brans_ids"], u["dates"], sinirla=False)
+            if len(pool_gevsek) > len(pool):
+                uyarilar.append(
+                    f"\"{u['gercek']}\" için dönem içi kişi başı {MAKS_GOREV_BU_DONEM} görev "
+                    f"sınırı, branşta yeterli sayıda uygun aday kalmadığından bu ders için "
+                    f"esnetildi — lütfen kontrol edin."
+                )
+                pool = pool_gevsek
+
+        secilenler = []
 
         if karma_gerekli:
             # Ders birden fazla branşa bağlı (örn. Görsel Sanatlar/Müzik): komisyonun
@@ -282,6 +326,9 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
         uye2 = secilenler[1] if len(secilenler) > 1 else None
         for p in secilenler:
             running_komisyon[p.pk] += 1
+            # Yazılı+Uygulama gibi birden çok tarihe yayılan bir birim, kişi başına
+            # tek değil o kadar (len(dates)) görev sayılır — bkz. komisyon_pool().
+            bu_donem_toplam[p.pk] += len(u["dates"])
             for d in u["dates"]:
                 used_on_date[d].add(p.pk)
         for row in u["rows"]:
@@ -315,18 +362,27 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
                 f"(herkes o gün başka bir görevde) — lütfen elle tamamlayın."
             )
         else:
-            tavan_alti = [p for p in pool if bu_donem_gozetmen[p.pk] < gozetmen_tavani]
+            # Hem gözetmen-özel tavan hem de genel dönem-içi görev sınırı (MAKS_GOREV_BU_DONEM)
+            # aynı anda uygulanır; ikisinden biri havuzu boşaltırsa (aksi halde slot
+            # önerisiz kalır) her iki sınır da bu slot için geçici olarak yok sayılır.
+            tavan_alti = [
+                p for p in pool
+                if bu_donem_gozetmen[p.pk] < gozetmen_tavani
+                and bu_donem_toplam[p.pk] < MAKS_GOREV_BU_DONEM
+            ]
             secim_havuzu = tavan_alti or pool
             if not tavan_alti:
                 uyarilar.append(
                     f"{tarih:%d.%m.%Y} Oturum {oturum_no} – {salon}: uygun personelin tamamı bu "
-                    f"dönem için gözetmen tavanına (kişi başı {gozetmen_tavani}) ulaştığından "
-                    f"tavan bu slot için geçici olarak uygulanmadı — lütfen kontrol edin."
+                    f"dönem için gözetmen tavanına (kişi başı {gozetmen_tavani}) ya da genel "
+                    f"{MAKS_GOREV_BU_DONEM} görev sınırına ulaştığından, sınırlar bu slot için "
+                    f"geçici olarak uygulanmadı — lütfen kontrol edin."
                 )
             secim_havuzu.sort(key=lambda p: (running_total(p.pk), running_gozetmen[p.pk], p.adi_soyadi))
             secilen = secim_havuzu[0]
             running_gozetmen[secilen.pk] += 1
             bu_donem_gozetmen[secilen.pk] += 1
+            bu_donem_toplam[secilen.pk] += 1
             used_on_date[tarih].add(secilen.pk)
         gozetmen_sonuc[(tarih, oturum_no, salon)] = SorumluGozetmen(
             sinav=sinav, tarih=tarih, oturum_no=oturum_no, salon=salon, gozetmen=secilen,
@@ -350,12 +406,11 @@ def gorevlendirme_baglami_olustur(sinav, takvim_rows, active_salons, komisyon_di
             {"takvim": row, "komisyon": komisyon_dict.get((row.tarih, row.oturum_no, row.ders_adi))}
             for row in rows
         ]
+        _salon_label_map = dict(salon_choices())
         salons_data = [
             {
                 "salon": salon,
-                "salon_label": dict(
-                    [("Sorumluluk1", "Mazeret 1"), ("Sorumluluk2", "Mazeret 2"), ("Sorumluluk3", "Mazeret 3")]
-                ).get(salon, salon),
+                "salon_label": _salon_label_map.get(salon, salon),
                 "gozetmen": gozetmen_dict.get((tarih, oturum_no, salon)),
             }
             for salon in sorted(active_salons.get((tarih, oturum_no), []))
