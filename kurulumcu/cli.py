@@ -311,6 +311,7 @@ def main() -> None:
         servis_kullanicisi.proje_dizini_sahipligini_garanti_et(PROJE_DIZIN)
         servis_kullanicisi.calisma_zamani_dosyalarini_devret(PROJE_DIZIN, env_yolu)
         servis_kullanicisi.paylasilan_yedek_dizinini_hazirla(PROJE_DIZIN)
+        servis_kullanicisi.statik_dosyalari_erisilebilir_yap(PROJE_DIZIN)
 
         servis_adi = PROJE_DIZIN.name
         servis = sunucu.gunicorn_servisi_kur(
