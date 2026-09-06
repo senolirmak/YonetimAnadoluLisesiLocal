@@ -389,6 +389,62 @@ class SinavSalonYoklama(models.Model):
         return f"{self.tarih} {self.saat} {self.salon} – {self.okulno} {self.adi_soyadi}"
 
 
+class SinavOgrenci(models.Model):
+    """Bir Ortak Sınav için, Oturma Planı İLK KEZ üretildiği andaki öğrenci
+    listesinin donmuş kopyası — `sorumluluk.SorumluOgrenci` / `sinav.MazeretOgrenci`
+    ile aynı ilke.
+
+    Canlı `ogrenci.Ogrenci` tablosu zamanla değişir (terfi, yeni kayıt, mezuniyet,
+    tasdikname); bu sınav ARTIK GEÇMİŞTE kaldıktan sonra yeniden üretilirse (ör.
+    tek bir oturumu düzeltmek için), canlı veri o dönemki gerçek listeyle
+    KARIŞMASIN diye `ortaksinav_engine.services.oturma` bu anlık görüntüyü
+    kullanır — bkz. görüşme notları (2026-2027'nin yeni 9. sınıf öğrencilerinin
+    2025-2026'ya ait bir sınavda görünmesi olayı).
+
+    Zaten üretilmiş eski sınavlar için `sinav_ogrenci_anlik_goruntu_doldur`
+    yönetim komutu, mevcut `OturmaPlani` kayıtlarındaki donmuş metin alanlarından
+    (okulno/adı-soyadı/sinifsube) geriye dönük bir anlık görüntü oluşturur."""
+    sinav = models.ForeignKey(
+        SinavBilgisi, on_delete=models.CASCADE,
+        related_name="sinav_ogrencileri", verbose_name="Sınav",
+    )
+    okulno = models.PositiveIntegerField(verbose_name="Okul No")
+    adi = models.CharField(max_length=150, verbose_name="Adı")
+    soyadi = models.CharField(max_length=150, verbose_name="Soyadı")
+    cinsiyet = models.CharField(max_length=1, blank=True, verbose_name="Cinsiyet")
+    sinif = models.IntegerField(verbose_name="Sınıf")
+    sube = models.CharField(max_length=2, verbose_name="Şube")
+    sureksiz_devamsiz = models.BooleanField(default=False, verbose_name="Sürekli Devamsız")
+
+    class Meta:
+        unique_together = [("sinav", "okulno")]
+        verbose_name = "Sınav Öğrencisi (Anlık Görüntü)"
+        verbose_name_plural = "Sınav Öğrencileri (Anlık Görüntü)"
+
+    def __str__(self):
+        return f"{self.sinav} — {self.okulno} {self.adi} {self.soyadi}"
+
+
+class SinavOgrenciMuaf(models.Model):
+    """`SinavOgrenci` anlık görüntüsü alınırken donan (okulno, ders_adi) muafiyet
+    eşleşmeleri — canlı `ogrenci.OgrenciMuaf`'ın o anki (aktif eğitim yılına göre)
+    hâlinin donmuş kopyası. Bkz. `SinavOgrenci`."""
+    sinav = models.ForeignKey(
+        SinavBilgisi, on_delete=models.CASCADE,
+        related_name="ogrenci_muafiyetleri", verbose_name="Sınav",
+    )
+    okulno = models.PositiveIntegerField(verbose_name="Okul No")
+    ders_adi = models.CharField(max_length=200, verbose_name="Ders Adı")
+
+    class Meta:
+        unique_together = [("sinav", "okulno", "ders_adi")]
+        verbose_name = "Sınav Öğrencisi Muafiyeti (Anlık Görüntü)"
+        verbose_name_plural = "Sınav Öğrencisi Muafiyetleri (Anlık Görüntü)"
+
+    def __str__(self):
+        return f"{self.sinav} — {self.okulno}: {self.ders_adi} muaf"
+
+
 # ---------------------------------------------------------------------------
 # Mazeret Sınav Modelleri
 # ---------------------------------------------------------------------------
