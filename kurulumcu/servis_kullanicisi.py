@@ -198,6 +198,31 @@ def calisma_zamani_dosyalarini_devret(proje_dizin: Path, env_yolu: Path) -> None
     y.basari("'.env' ve 'media/' servis kullanıcısına devredildi.")
 
 
+def statik_dosyalari_erisilebilir_yap(proje_dizin: Path) -> None:
+    """`staticfiles/`'ı nginx için (grup/sahiplik değil) "diğer" (other) erişimiyle
+    okunabilir/gezilebilir yapar: dizinler 755, dosyalar 644.
+
+    `staticfiles/`, `media/`'nin aksine `SERVIS_KULLANICISI`'na devredilmez —
+    `collectstatic`'i çalıştıran, kurulumu/deploy'u yapan kullanıcının sahipliğinde
+    kalır (nginx zaten `www-data` grubunda değil bu kullanıcının grubunda, yani
+    grup üzerinden değil "other" bitleri üzerinden okur). `collectstatic` bu
+    fonksiyondan ÖNCE, sudo'suz ve kurulumu çalıştıran kullanıcının o anki
+    umask'ıyla dosya/dizin oluşturur (bkz. `cli.py`: `_manage_py_sessiz`) — umask
+    varsayılandan (022) daha kısıtlayıcıysa (örn. sudoers'da `Defaults umask=077`)
+    sonuç dizinler/dosyalar "other" için hiç okunabilir olmaz ve nginx `/static/`
+    isteklerine 403 döner. `deploy.sh`'ın adım 10'unda ("İzinleri düzelt") her
+    güncellemede tekrarlanan aynı `find ... chmod` çifti burada ilk kuruluma da
+    uygulanıyor — aksi halde bu sorun yalnızca ilk `deploy.sh` çalıştırılana kadar
+    fark edilmeyebilir."""
+    statik_dizin = proje_dizin / "staticfiles"
+    if not statik_dizin.is_dir():
+        y.uyari("'staticfiles/' bulunamadı, izin düzenlemesi atlandı (collectstatic çalışmamış olabilir).")
+        return
+    y.calistir(["find", str(statik_dizin), "-type", "d", "-exec", "chmod", "755", "{}", "+"], sudo=True)
+    y.calistir(["find", str(statik_dizin), "-type", "f", "-exec", "chmod", "644", "{}", "+"], sudo=True)
+    y.basari("'staticfiles/' nginx için erişilebilir hale getirildi.")
+
+
 def paylasilan_yedek_dizinini_hazirla(proje_dizin: Path) -> None:
     """`backups/`, kurulumu/deploy'u çalıştıran kullanıcı (`deploy.sh`) İLE servis
     kullanıcısının (`akalsite`, web üzerinden yedek al/geri yükle — bkz.
