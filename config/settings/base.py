@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "ogrencidersleri",
     "senesonu",
     "yedekleme",
+    "ebagiris",
 ]
 
 MIDDLEWARE = [
@@ -99,3 +100,10 @@ MEDIA_ROOT = BASE_DIR / "media"
 LOGIN_URL = "/giris/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/giris/"
+
+# EBA (Eğitim Bilişim Ağı) karekod ile giriş/hesap bağlama — bkz. ebagiris app'i.
+# `{token}` yerine her EbaOturum'un kendi rastgele kimliği geçer (bkz.
+# ebagiris/services/eba_client.py modül docstring'i — gerçek EBA sunucusunun
+# MAC yerine bunu kabul edip etmeyeceği HENÜZ DOĞRULANMADI, prototip aşaması
+# yerel sahte sunucuyla test edilir; bkz. `python manage.py eba_mock_sunucu`).
+EBA_QR_WS_URL = os.getenv("EBA_QR_WS_URL", "wss://qr-etap.eba.gov.tr/api/v1/ws/{token}")

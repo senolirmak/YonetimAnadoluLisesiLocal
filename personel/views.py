@@ -234,6 +234,7 @@ def profil(request):
         personel = user.personel
     except Exception:
         personel = None
+    eba_hesap = getattr(personel, "eba_hesap", None) if personel else None
 
     profil_form = ProfilDuzenleForm(
         initial={
@@ -271,5 +272,6 @@ def profil(request):
             "profil_form": profil_form,
             "sifre_form": sifre_form,
             "personel": personel,
+            "eba_hesap": eba_hesap,
         },
     )

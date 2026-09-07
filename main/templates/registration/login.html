@@ -84,6 +84,46 @@
             margin-bottom: 18px;
             font-size: 0.9em;
         }
+        .login-tabs {
+            display: flex;
+            margin-bottom: 22px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .login-tab {
+            flex: 1;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            padding: 8px 4px;
+            font-size: 0.88em;
+            font-weight: 600;
+            color: #6c757d;
+            cursor: pointer;
+        }
+        .login-tab.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+        }
+        #eba-qr-wrap {
+            margin: 16px auto;
+            width: 190px;
+            height: 190px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        #eba-qr-img { width: 100%; height: 100%; display: none; }
+        .btn-secondary-sm {
+            padding: 7px 16px;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.88em;
+        }
     </style>
 </head>
 <body>
@@ -103,22 +143,110 @@
         </div>
         {% endif %}
 
-        <form method="post">
-            {% csrf_token %}
-            <div class="form-group">
-                <label for="id_username">Kullanıcı Adı</label>
-                <input type="text" id="id_username" name="username" autofocus autocomplete="username" required>
+        <div class="login-tabs">
+            <button type="button" id="tab-sifre" class="login-tab active" onclick="ebaSekmeSec('sifre')">Kullanıcı Adı / Şifre</button>
+            <button type="button" id="tab-eba" class="login-tab" onclick="ebaSekmeSec('eba')">EBA Karekod</button>
+        </div>
+
+        <div id="panel-sifre">
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="id_username">Kullanıcı Adı</label>
+                    <input type="text" id="id_username" name="username" autofocus autocomplete="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="id_password">Şifre</label>
+                    <input type="password" id="id_password" name="password" autocomplete="current-password" required>
+                </div>
+                <input type="hidden" name="next" value="{{ next }}">
+                <button type="submit" class="btn-login">Giriş Yap</button>
+            </form>
+        </div>
+
+        <div id="panel-eba" style="display:none; text-align:center;">
+            <input type="hidden" id="eba-next" value="{{ next }}">
+            <div id="eba-qr-wrap">
+                <img id="eba-qr-img" alt="EBA karekod">
+                <span id="eba-yukleniyor" style="color:#adb5bd; font-size:0.85em;">Yükleniyor…</span>
             </div>
-            <div class="form-group">
-                <label for="id_password">Şifre</label>
-                <input type="password" id="id_password" name="password" autocomplete="current-password" required>
-            </div>
-            <input type="hidden" name="next" value="{{ next }}">
-            <button type="submit" class="btn-login">Giriş Yap</button>
-        </form>
+            <p id="eba-mesaj" style="color:#6c757d; font-size:0.88em; min-height:1.3em; margin:0 0 14px;">
+                Karekodu EBA Mobil uygulamasıyla okutun.
+            </p>
+            <button type="button" class="btn-secondary-sm" onclick="ebaGirisBaslat()">Yenile</button>
+        </div>
+
         <div style="text-align:center; margin-top:18px; font-size:0.9em; color:#6c757d;">
             Hesabınız yok mu? <a href="{% url 'kayit' %}" style="color:#417690; text-decoration:none; font-weight:600;">Kayıt Olun</a>
         </div>
     </div>
+
+    <script>
+        let ebaToken = null;
+        let ebaPollTimer = null;
+
+        function getCookie(name) {
+            const eslesme = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
+            return eslesme ? decodeURIComponent(eslesme.pop()) : "";
+        }
+
+        function ebaSekmeSec(hangisi) {
+            document.getElementById("panel-sifre").style.display = hangisi === "sifre" ? "block" : "none";
+            document.getElementById("panel-eba").style.display = hangisi === "eba" ? "block" : "none";
+            document.getElementById("tab-sifre").classList.toggle("active", hangisi === "sifre");
+            document.getElementById("tab-eba").classList.toggle("active", hangisi === "eba");
+            if (hangisi === "eba") {
+                ebaGirisBaslat();
+            } else if (ebaPollTimer) {
+                clearInterval(ebaPollTimer);
+                ebaPollTimer = null;
+            }
+        }
+
+        async function ebaGirisBaslat() {
+            if (ebaPollTimer) { clearInterval(ebaPollTimer); ebaPollTimer = null; }
+            ebaToken = null;
+            document.getElementById("eba-qr-img").style.display = "none";
+            document.getElementById("eba-yukleniyor").style.display = "inline";
+            document.getElementById("eba-mesaj").textContent = "QR kod hazırlanıyor…";
+            try {
+                const resp = await fetch("{% url 'ebagiris:eba_giris_baslat' %}", {
+                    method: "POST",
+                    headers: {"X-CSRFToken": getCookie("csrftoken")},
+                });
+                const veri = await resp.json();
+                ebaToken = veri.token;
+                ebaPollTimer = setInterval(ebaDurumSorgula, 1500);
+            } catch (e) {
+                document.getElementById("eba-mesaj").textContent = "EBA servisine ulaşılamadı.";
+            }
+        }
+
+        async function ebaDurumSorgula() {
+            if (!ebaToken) return;
+            const next = encodeURIComponent(document.getElementById("eba-next").value || "");
+            try {
+                const resp = await fetch(`/eba/giris/durum/${ebaToken}/?next=${next}`);
+                const veri = await resp.json();
+                if (veri.qr_png_base64) {
+                    document.getElementById("eba-qr-img").src = "data:image/png;base64," + veri.qr_png_base64;
+                    document.getElementById("eba-qr-img").style.display = "block";
+                    document.getElementById("eba-yukleniyor").style.display = "none";
+                }
+                document.getElementById("eba-mesaj").textContent = veri.mesaj || (
+                    veri.durum === "qr_hazir" ? "Karekodu EBA Mobil uygulamasıyla okutun."
+                    : "Bağlanılıyor…"
+                );
+                if (veri.durum === "tamamlandi") {
+                    clearInterval(ebaPollTimer);
+                    window.location.href = veri.redirect || "/";
+                } else if (veri.durum === "hata" || veri.durum === "suresi_doldu") {
+                    clearInterval(ebaPollTimer);
+                }
+            } catch (e) {
+                // geçici ağ hatası — bir sonraki yoklamada tekrar denenir
+            }
+        }
+    </script>
 </body>
 </html>
