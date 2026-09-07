@@ -456,8 +456,11 @@ class IstatistikService:
         updated_count = 0
 
         for ogretmen in ogretmenler:
-            # 1. Geçmiş görevler (Atanan nöbetler)
-            gecmis = NobetGecmisi.objects.filter(ogretmen=ogretmen)
+            # 1. Geçmiş görevler (Atanan nöbetler) — arşivlenmiş (geçmiş eğitim-öğretim
+            # yılına ait — bkz. senesonu.services.gecis_uygula) kayıtlar hariç tutulur;
+            # aksi hâlde adil dağıtım algoritması (AdvancedNobetDagitim) eski yıllardan
+            # kalan sayılarla kalıcı olarak yanlı kalır.
+            gecmis = NobetGecmisi.objects.filter(ogretmen=ogretmen, arsivlendi=False)
             toplam_nobet = gecmis.count()
 
             son_gorev = gecmis.order_by("-tarih").first()
@@ -466,7 +469,9 @@ class IstatistikService:
 
             # 2. Atanamayan (Öğretmenin devamsız olduğu ve dersinin boş geçtiği durumlar)
             # NobetAtanamayan modeli 'ogretmen' alanını devamsız öğretmene bağlar.
-            atanmayan_nobet = NobetAtanamayan.objects.filter(ogretmen=ogretmen).count()
+            atanmayan_nobet = NobetAtanamayan.objects.filter(
+                ogretmen=ogretmen, arsivlendi=False
+            ).count()
 
             # 3. Hafta sayısı hesaplama (Görev alınan benzersiz hafta sayısı)
             if toplam_nobet > 0:

@@ -28,6 +28,15 @@ class Devamsizlik(models.Model):
     ogretmen = models.ForeignKey(
         "nobet.NobetOgretmen", on_delete=models.CASCADE, related_name="devamsizlik"
     )
+    arsivlendi = models.BooleanField(
+        default=False,
+        verbose_name="Arşivlendi",
+        help_text=(
+            "Sene Sonu Geçişi uygulandığında geçmiş eğitim-öğretim yılına ait "
+            "devamsızlık kayıtları otomatik olarak arşivlenir; arşivlenen kayıtlar "
+            "güncel devamsızlık listesinde/ders doldurma istatistiklerinde görünmez."
+        ),
+    )
 
     class Meta:
         db_table = "nobet_devamsizlik"

@@ -14,9 +14,12 @@ class DevamsizlikListView(MudurYardimcisiMixin, ListView):
     ordering = ["-baslangic_tarihi"]
 
     def get_queryset(self):
+        # Sene Sonu Geçişi ile arşivlenen (geçmiş eğitim-öğretim yılına ait) kayıtlar
+        # bu listede görünmez — tam geçmiş için admin panelindeki DevamsizlikAdmin
+        # kaydı kullanılabilir (bkz. senesonu.services.gecis_uygula).
         return (
             Devamsizlik.objects.select_related("ogretmen__personel")
-            .all()
+            .filter(arsivlendi=False)
             .order_by("-baslangic_tarihi")
         )
 

@@ -29,9 +29,12 @@ def ogretmen_haftalik_nobet(request):
     if not (request.user.is_superuser or request.user.groups.filter(name="mudur_yardimcisi").exists() or _ogretmen_menu_gorumu(request.user)):
         raise PermissionDenied
 
-    # Distinct uygulama tarihleri (tebliğ tarihleri), sıralı
+    # Distinct uygulama tarihleri (tebliğ tarihleri), sıralı. Arşivlenmiş (geçmiş
+    # eğitim-öğretim yılına ait) görevler hariç tutulur — bkz.
+    # senesonu.services.gecis_uygula.
     uyg_tarihler = list(
-        NobetGorevi.objects.values_list("uygulama_tarihi", flat=True)
+        NobetGorevi.objects.filter(arsivlendi=False)
+        .values_list("uygulama_tarihi", flat=True)
         .distinct()
         .order_by("uygulama_tarihi")
     )
@@ -126,7 +129,7 @@ def ogretmen_gunun_nobetcileri(request):
     day_name_en = _DAYS_MAP[target_date.weekday()]
 
     gorev_date = (
-        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date)
+        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date, arsivlendi=False)
         .order_by("-uygulama_tarihi")
         .values_list("uygulama_tarihi", flat=True)
         .first()
@@ -282,7 +285,8 @@ def nobetci_ders_doldurma_istatistik(request):
 
     # ── Aktif nöbet tarifesi ──────────────────────────────────────
     aktif_gorev_tarihi = (
-        NobetGorevi.objects.order_by("-uygulama_tarihi")
+        NobetGorevi.objects.filter(arsivlendi=False)
+        .order_by("-uygulama_tarihi")
         .values_list("uygulama_tarihi", flat=True)
         .first()
     )
@@ -304,8 +308,10 @@ def nobetci_ders_doldurma_istatistik(request):
         donem = "30"
         tarih_siniri = today - timedelta(days=30)
 
-    gecmis_qs = NobetGecmisi.objects.all()
-    atanamayan_qs = NobetAtanamayan.objects.all()
+    # Arşivlenmiş (geçmiş eğitim-öğretim yılına ait) kayıtlar bu istatistik/geçmiş
+    # görünümüne dahil edilmez — bkz. senesonu.services.gecis_uygula.
+    gecmis_qs = NobetGecmisi.objects.filter(arsivlendi=False)
+    atanamayan_qs = NobetAtanamayan.objects.filter(arsivlendi=False)
     if tarih_siniri:
         gecmis_qs = gecmis_qs.filter(tarih__date__gte=tarih_siniri)
         atanamayan_qs = atanamayan_qs.filter(tarih__date__gte=tarih_siniri)
@@ -375,7 +381,7 @@ def nobetci_ders_doldurma_istatistik(request):
     # ── Son 20 ders doldurma kaydı ────────────────────────────────
     son_kayitlar_qs = (
         NobetGecmisi.objects
-        .filter(ogretmen_id__in=ogretmen_gunler)
+        .filter(ogretmen_id__in=ogretmen_gunler, arsivlendi=False)
         .select_related("ogretmen__personel")
         .order_by("-tarih")[:20]
     )

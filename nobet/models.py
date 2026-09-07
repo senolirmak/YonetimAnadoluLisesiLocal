@@ -59,10 +59,14 @@ class NobetOgretmen(models.Model):
 
 class NobetGoreviQuerySet(models.QuerySet):
     def aktif(self):
+        """Arşivlenmemiş (bkz. senesonu.services.gecis_uygula) görevleri döner —
+        aktif nöbet tarihi tanımlıysa o tarihe, tanımlı değilse arşivlenmemiş
+        görevlerin en güncel tarihine daralır."""
         from okul.utils import get_aktif_nobet_tarihi
 
+        guncel = self.filter(arsivlendi=False)
         tarih = get_aktif_nobet_tarihi()
-        return self.filter(uygulama_tarihi=tarih) if tarih else self
+        return guncel.filter(uygulama_tarihi=tarih) if tarih else guncel
 
 
 class NobetGorevi(models.Model):
@@ -95,6 +99,16 @@ class NobetGorevi(models.Model):
         related_name="nobet_gorevleri",
         verbose_name="Dönem",
     )
+    arsivlendi = models.BooleanField(
+        default=False,
+        verbose_name="Arşivlendi",
+        help_text=(
+            "Sene Sonu Geçişi uygulandığında geçmiş eğitim-öğretim yılına ait yüklenmiş "
+            "nöbet listeleri otomatik olarak arşivlenir; arşivlenen görevler artık "
+            "'aktif' nöbet listesi olarak öğretmenlere gösterilmez, yalnızca Nöbet "
+            "Listesi (arşiv) sayfasından eğitim yılı/dönem seçilerek görüntülenebilir."
+        ),
+    )
 
     class Meta:
         db_table = "nobet_gorevi"
@@ -109,6 +123,15 @@ class NobetGecmisi(models.Model):
     tarih = models.DateTimeField(default=timezone.now)
     atandi = models.IntegerField(default=1)
     ogretmen = models.ForeignKey(NobetOgretmen, on_delete=models.CASCADE, related_name="gecmis")
+    arsivlendi = models.BooleanField(
+        default=False,
+        verbose_name="Arşivlendi",
+        help_text=(
+            "Sene Sonu Geçişi uygulandığında geçmiş eğitim-öğretim yılına ait ders "
+            "doldurma kayıtları otomatik olarak arşivlenir; arşivlenen kayıtlar "
+            "istatistik hesaplamalarına (bkz. IstatistikService) dahil edilmez."
+        ),
+    )
 
     class Meta:
         db_table = "nobet_gecmis"
@@ -120,6 +143,15 @@ class NobetAtanamayan(models.Model):
     tarih = models.DateTimeField(default=timezone.now)
     atandi = models.IntegerField(default=0)
     ogretmen = models.ForeignKey(NobetOgretmen, on_delete=models.CASCADE, related_name="atanamayan")
+    arsivlendi = models.BooleanField(
+        default=False,
+        verbose_name="Arşivlendi",
+        help_text=(
+            "Sene Sonu Geçişi uygulandığında geçmiş eğitim-öğretim yılına ait ders "
+            "doldurma kayıtları otomatik olarak arşivlenir; arşivlenen kayıtlar "
+            "istatistik hesaplamalarına (bkz. IstatistikService) dahil edilmez."
+        ),
+    )
 
     class Meta:
         db_table = "nobet_atanamayan"
