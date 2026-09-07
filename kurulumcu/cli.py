@@ -345,7 +345,7 @@ def main() -> None:
                 PROJE_DIZIN, servis_adi, degerler.get("ALLOWED_HOSTS", ""),
                 sertifika.SUNUCU_SERTIFIKA, sertifika.SUNUCU_ANAHTAR,
             )
-            env_dosyasi.anahtar_ayarla(env_yolu, "HTTPS_ETKIN", "True")
+            env_dosyasi.anahtar_ayarla(env_yolu, "HTTPS_ETKIN", "True", sudo=True)
             y.calistir(["systemctl", "restart", servis], sudo=True)
             sunucu.saglik_kontrolu_https(servis, sertifika.CA_SERTIFIKA)
             https_kuruldu = True
