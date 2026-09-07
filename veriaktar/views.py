@@ -113,7 +113,9 @@ def veriaktar_ana(request):
                     request,
                     f"Öğrenci listesi aktarıldı — "
                     f"{sonuc['yeni']} yeni, {sonuc['guncellenen']} güncellendi"
-                    + (f", {sonuc['hatali']} hatalı" if sonuc["hatali"] else "") + ".",
+                    + (f", {sonuc['hatali']} hatalı" if sonuc["hatali"] else "")
+                    + (f", {sonuc['ayrilan']} öğrenci Nakil olarak arşivlendi" if sonuc.get("ayrilan") else "")
+                    + ".",
                 )
 
         except Exception as e:

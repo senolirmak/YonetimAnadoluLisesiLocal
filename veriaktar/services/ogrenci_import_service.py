@@ -33,6 +33,7 @@ class OgrenciIsleyici:
         self.kullanici = kullanici
         self.dosya_tarihi = dosya_tarihi
         self._kayitlar = []
+        self._nakil_esik_asildi = None
 
     # ------------------------------------------------------------------
     def parse(self) -> list:
@@ -172,13 +173,89 @@ class OgrenciIsleyici:
             except Exception:
                 hatali += 1
 
-        return {"yeni": yeni, "guncellenen": guncellenen, "hatali": hatali}
+        ayrilan = self._nakil_olanlari_isaretle()
+
+        return {"yeni": yeni, "guncellenen": guncellenen, "hatali": hatali, "ayrilan": ayrilan}
+
+    # ------------------------------------------------------------------
+    # Bir e-Okul listesinde artık görünmeyen okulno, gerçekte okuldan
+    # AYRILDIĞI (nakil) için değil, RAPOR HİÇ ÜRETİLEMEDİĞİ (yanlış/eksik
+    # dosya, sadece birkaç sınıf seviyesi seçilerek alınmış rapor vb.)
+    # için de yok olabilir — bu ihtimalde aşağıdaki eşik, aktif öğrencilerin
+    # büyük bölümünü yanlışlıkla "Nakil" damgalayıp arşivlemeyi engeller.
+    NAKIL_ESIK_ORANI = 0.5
+    NAKIL_ESIK_TABAN = 300
+
+    def _nakil_olanlari_isaretle(self) -> int:
+        """Bu aktarımdaki e-Okul listesinde ARTIK bulunmayan mevcut aktif
+        öğrencileri "Nakil" sebebiyle ayrılmış sayıp arşive (OgrenciAyrilma +
+        aktif=False) gönderir. Döndürülen sayı, arşive gönderilen öğrenci
+        sayısıdır (eşik aşıldıysa/liste boşsa hiçbir şey yapılmadan 0 döner —
+        bu durum ayrıca `_aktar_gecmisi_kaydet`'te uyarı olarak not düşülür)."""
+        from ogrenci.models import Ogrenci, OgrenciAyrilma
+        from okul.utils import get_aktif_egitim_yili
+
+        yeni_okulnolar = {kayit["okulno"] for kayit in self._kayitlar}
+        if not yeni_okulnolar:
+            # Dosya hiç okunamamış/boş — kıyaslama anlamsız, tüm aktif
+            # öğrencileri yanlışlıkla "ayrıldı" saymamak için dokunma.
+            return 0
+
+        mevcut_aktif = Ogrenci.objects.filter(aktif=True)
+        adaylar = list(mevcut_aktif.exclude(okulno__in=yeni_okulnolar))
+        if not adaylar:
+            return 0
+
+        esik = max(self.NAKIL_ESIK_TABAN, int(mevcut_aktif.count() * self.NAKIL_ESIK_ORANI))
+        if len(adaylar) > esik:
+            self._nakil_esik_asildi = len(adaylar)
+            return 0
+
+        aktif_yil = get_aktif_egitim_yili()
+        ayrilma_tarihi = self.dosya_tarihi or date.today()
+        aciklama = (
+            f"e-Okul listesinde ({self._file_name}) bulunmadığı için otomatik "
+            "olarak nakil kaydedildi."
+        )
+
+        OgrenciAyrilma.objects.bulk_create(
+            [
+                OgrenciAyrilma(
+                    ogrenci=o,
+                    sebep="nakil",
+                    egitim_yili=aktif_yil,
+                    tarih=ayrilma_tarihi,
+                    aciklama=aciklama,
+                )
+                for o in adaylar
+            ],
+            ignore_conflicts=True,
+        )
+        Ogrenci.objects.filter(pk__in=[o.pk for o in adaylar]).update(aktif=False)
+
+        return len(adaylar)
 
     # ------------------------------------------------------------------
     def _aktar_gecmisi_kaydet(self, status):
         from okul.models import VeriAktarimGecmisi
 
+        notlar = []
+        if status.get("ayrilan"):
+            notlar.append(
+                f"{status['ayrilan']} öğrenci, e-Okul listesinde bulunmadığı için "
+                "Nakil olarak arşivlendi."
+            )
+        if self._nakil_esik_asildi:
+            notlar.append(
+                f"UYARI: {self._nakil_esik_asildi} aktif öğrenci e-Okul listesinde "
+                "bulunmuyor — bu, beklenenden çok yüksek olduğu için hiçbiri otomatik "
+                "olarak Nakil işaretlenmedi (yüklenen dosyanın eksiksiz/doğru olduğunu "
+                "kontrol edin; gerekiyorsa Öğrenciler ekranından elle işaretleyin)."
+            )
+
         durum = "basarili" if not status.get("hatali") else "kismi"
+        if self._nakil_esik_asildi:
+            durum = "kismi"
 
         VeriAktarimGecmisi.objects.create(
             dosya_turu="ogrenci_listesi",
@@ -188,6 +265,7 @@ class OgrenciIsleyici:
             kayit_sayisi=status.get("yeni", 0) + status.get("guncellenen", 0),
             hata_sayisi=status.get("hatali", 0),
             durum=durum,
+            notlar="\n".join(notlar),
         )
 
     def calistir(self) -> dict:
