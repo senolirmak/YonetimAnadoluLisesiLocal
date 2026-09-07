@@ -23,7 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import env_dosyasi, paket_yoneticisi, servis_kullanicisi, sunucu, veritabani
+from . import env_dosyasi, paket_yoneticisi, sertifika, servis_kullanicisi, sunucu, veritabani
 from . import yardimci as y
 
 PROJE_DIZIN = Path(__file__).resolve().parent.parent
@@ -332,7 +332,12 @@ def main() -> None:
         print("EBA/MEB'in bu API'nin bu şekilde kullanımına resmî izni olup olmadığı")
         print("netleşmedi — kurmadan önce değerlendirin (bkz. ebagiris app'i README/")
         print("docstring notları).")
+        print("Okul ağları genelde MEB'in kendi TLS denetimi yapan bir proxy'sinden")
+        print("geçtiğinden, bu adım MEB'in kök sertifikasını da sisteme kurar —")
+        print("aksi hâlde EBA sunucusuna bağlantı 'certificate verify failed' ile")
+        print("başarısız olabilir.")
         if y.sor("EBA karekod işçi servisi şimdi kurulsun mu?", "H").lower().startswith("e"):
+            sertifika.meb_sertifikasini_kur()
             eba_servis = sunucu.eba_ws_worker_servisi_kur(
                 PROJE_DIZIN, VENV, servis_kullanicisi.SERVIS_KULLANICISI, django_ayar_bayragi
             )
