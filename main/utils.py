@@ -48,7 +48,6 @@ def get_ogretmen_gorev_verileri(user, today):
     from django.db.models import Q
     from dersprogrami.models import DersProgrami
     from nobet.models import NobetGecmisi, NobetGorevi
-    from okul.utils import get_aktif_dp_tarihi
 
     _gruplar = set(user.groups.values_list("name", flat=True))
     _yonetici_gruplar = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
@@ -59,13 +58,11 @@ def get_ogretmen_gorev_verileri(user, today):
     ogretmen_nobetleri = []
     atanan_dersler = []
     if personel_bagli:
-        _aktif_tarih = get_aktif_dp_tarihi()
-        _dp_f = {"uygulama_tarihi": _aktif_tarih} if _aktif_tarih else {}
         rehberlik_ders = (
-            DersProgrami.objects.filter(
+            DersProgrami.objects.aktif()
+            .filter(
                 ogretmen=user.personel,
                 ders__ders_adi__iexact="rehberlik ve yönlendirme",
-                **_dp_f,
             )
             .select_related("sinif_sube", "ders")
             .first()
@@ -76,7 +73,7 @@ def get_ogretmen_gorev_verileri(user, today):
         try:
             nobet_ogretmen = user.personel.ogretmen
             son_uygulama = (
-                NobetGorevi.objects.filter(ogretmen=nobet_ogretmen)
+                NobetGorevi.objects.filter(ogretmen=nobet_ogretmen, arsivlendi=False)
                 .order_by("-uygulama_tarihi")
                 .values_list("uygulama_tarihi", flat=True)
                 .first()
@@ -88,7 +85,7 @@ def get_ogretmen_gorev_verileri(user, today):
                         "yer": n.nobet_yeri,
                     }
                     for n in NobetGorevi.objects.filter(
-                        ogretmen=nobet_ogretmen, uygulama_tarihi=son_uygulama
+                        ogretmen=nobet_ogretmen, uygulama_tarihi=son_uygulama, arsivlendi=False
                     ).order_by("nobet_gun")
                 ]
 
@@ -138,8 +135,8 @@ def get_ogretmen_gorev_verileri(user, today):
             from sorumluluk.models import SorumluGozetmen as _SGZ, SorumluKomisyonUyesi as _SKU
             _p = user.personel
             sorumluluk_gorev_var = (
-                _SKU.objects.filter(Q(uye1=_p) | Q(uye2=_p)).exists()
-                or _SGZ.objects.filter(gozetmen=_p).exists()
+                _SKU.objects.filter(Q(uye1=_p) | Q(uye2=_p), sinav__arsivlendi=False).exists()
+                or _SGZ.objects.filter(gozetmen=_p, sinav__arsivlendi=False).exists()
             )
         except Exception:
             pass

@@ -210,7 +210,7 @@ def _veri_yukle_ctx(request):
         "yeni_sinav_form": SinavBilgisiForm(),
         "dis_veri_gecmis": dis_veri,
         "ogrenci_sayisi":  OgrenciModel.objects.count(),
-        "program_sayisi":  DersProgrami.objects.count(),
+        "program_sayisi":  DersProgrami.objects.aktif().count(),
     }
 
 

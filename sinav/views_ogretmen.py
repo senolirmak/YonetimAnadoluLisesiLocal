@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
-from okul.utils import get_aktif_dp_tarihi, get_aktif_egitim_yili
+from okul.utils import get_aktif_egitim_yili
 from main.utils import _ogretmen_menu_gorumu
 
 
@@ -763,11 +763,9 @@ def ogretmen_yoklama_raporum(request):
         if aktif_sinav else None
     )
 
-    _aktif_tarih_dp = get_aktif_dp_tarihi()
-    _dp_tarih_f = {"uygulama_tarihi": _aktif_tarih_dp} if _aktif_tarih_dp else {}
     dp_qs = (
-        DersProgrami.objects
-        .filter(ogretmen=personel, **_dp_tarih_f)
+        DersProgrami.objects.aktif()
+        .filter(ogretmen=personel)
         .select_related("ders", "sinif_sube")
     )
     teacher_pairs = set()
@@ -851,11 +849,9 @@ def sinif_oturma_plani(request):
     if not user.is_superuser:
         if not hasattr(user, "personel"):
             raise PermissionDenied
-        _at = get_aktif_dp_tarihi()
-        rehberlik_qs = DersProgrami.objects.filter(
+        rehberlik_qs = DersProgrami.objects.aktif().filter(
             ogretmen=user.personel,
             ders__ders_adi__iexact="rehberlik ve yönlendirme",
-            **({"uygulama_tarihi": _at} if _at else {}),
         ).select_related("sinif_sube")
         if not rehberlik_qs.exists():
             raise PermissionDenied
@@ -972,13 +968,11 @@ def ogretmen_ogrenci_sinav_takvimi(request):
             "hata": "Kullanıcınıza bağlı öğretmen kaydı bulunamadı.",
         })
 
-    _aktif_tarih = get_aktif_dp_tarihi()
-    _dp_f = {"uygulama_tarihi": _aktif_tarih} if _aktif_tarih else {}
     rehberlik_ders = (
-        DersProgrami.objects.filter(
+        DersProgrami.objects.aktif()
+        .filter(
             ogretmen=personel,
             ders__ders_adi__iexact="rehberlik ve yönlendirme",
-            **_dp_f,
         )
         .select_related("sinif_sube")
         .first()

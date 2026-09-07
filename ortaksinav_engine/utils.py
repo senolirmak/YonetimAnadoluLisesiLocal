@@ -52,7 +52,6 @@ def salon_gozetmen_bul(tarih, saat_veya_ders_saati, ss_map: dict) -> dict:
     from datetime import datetime as _dt
     from dersprogrami.models import DersProgrami
     from okul.models import DersSaatleri as _DS
-    from okul.utils import get_aktif_dp_tarihi
 
     if not ss_map or not tarih or not saat_veya_ders_saati:
         return {k: "" for k in ss_map}
@@ -66,14 +65,10 @@ def salon_gozetmen_bul(tarih, saat_veya_ders_saati, ss_map: dict) -> dict:
             return {k: "" for k in ss_map}
         dp_filter = {"ders_saati__derssaati_baslangic": saat_time}
 
-    aktif_tarih = get_aktif_dp_tarihi()
-    if aktif_tarih:
-        dp_filter["uygulama_tarihi"] = aktif_tarih
-
     gun_adi = _EN_GUNLER.get(tarih.weekday(), "")
     dp_map = {
         dp.sinif_sube_id: dp
-        for dp in DersProgrami.objects.filter(
+        for dp in DersProgrami.objects.aktif().filter(
             sinif_sube__in=list(ss_map.values()),
             gun=gun_adi,
             **dp_filter,
