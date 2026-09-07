@@ -104,6 +104,47 @@
                 </div>
             </div>
 
+            {# EBA hesabı bağlama #}
+            {% if personel %}
+            <div class="card mt-20">
+                <div class="card-header bg-primary">EBA Hesabı</div>
+                <div style="padding:16px;">
+                    {% if eba_hesap %}
+                    <p style="margin:0 0 12px;">
+                        <strong>{{ eba_hesap.eba_adi_soyadi|default:"EBA hesabı" }}</strong> ile bağlı.
+                        <br><span style="color:#6c757d; font-size:0.85em;">
+                            {{ eba_hesap.baglanma_zamani|date:"d.m.Y H:i" }} tarihinde bağlandı.
+                        </span>
+                    </p>
+                    <form method="post" action="{% url 'ebagiris:eba_baglama_kaldir' %}"
+                          onsubmit="return confirm('EBA hesabı bağlantısı kaldırılsın mı? Karekod ile giriş artık çalışmaz.')">
+                        {% csrf_token %}
+                        <button type="submit" style="padding:7px 16px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">
+                            Bağlantıyı Kaldır
+                        </button>
+                    </form>
+                    {% else %}
+                    <p style="color:#6c757d; font-size:0.88em; margin:0 0 14px;">
+                        EBA hesabınızı bağlayarak sonraki girişlerinizde EBA Mobil ile karekod
+                        okutup giriş yapabilirsiniz.
+                    </p>
+                    <div id="eba-baglama-alan" style="display:none; text-align:center; margin-bottom:14px;">
+                        <div style="margin:0 auto 10px; width:170px; height:170px; display:flex; align-items:center; justify-content:center; background:#f8f9fa; border-radius:8px;">
+                            <img id="eba-qr-img" alt="EBA karekod" style="width:100%; height:100%; display:none;">
+                            <span id="eba-yukleniyor" style="color:#adb5bd; font-size:0.82em;">Yükleniyor…</span>
+                        </div>
+                        <p id="eba-mesaj" style="color:#6c757d; font-size:0.85em; min-height:1.2em; margin:0;">
+                            Karekodu EBA Mobil ile okutun.
+                        </p>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="ebaBaglamaBaslat()">
+                        EBA Hesabımı Bağla
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
         </div>
 
         {# ── Sağ kolon: Formlar ── #}
@@ -156,4 +197,65 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if personel and not eba_hesap %}
+<script>
+    function getCookie(name) {
+        const eslesme = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
+        return eslesme ? decodeURIComponent(eslesme.pop()) : "";
+    }
+
+    let ebaBaglamaToken = null;
+    let ebaBaglamaPollTimer = null;
+
+    async function ebaBaglamaBaslat() {
+        document.getElementById("eba-baglama-alan").style.display = "block";
+        document.getElementById("eba-qr-img").style.display = "none";
+        document.getElementById("eba-yukleniyor").style.display = "inline";
+        document.getElementById("eba-mesaj").textContent = "QR kod hazırlanıyor…";
+        if (ebaBaglamaPollTimer) { clearInterval(ebaBaglamaPollTimer); }
+        try {
+            const resp = await fetch("{% url 'ebagiris:eba_baglama_baslat' %}", {
+                method: "POST",
+                headers: {"X-CSRFToken": getCookie("csrftoken")},
+            });
+            const veri = await resp.json();
+            if (veri.hata) {
+                document.getElementById("eba-mesaj").textContent = veri.hata;
+                return;
+            }
+            ebaBaglamaToken = veri.token;
+            ebaBaglamaPollTimer = setInterval(ebaBaglamaDurumSorgula, 1500);
+        } catch (e) {
+            document.getElementById("eba-mesaj").textContent = "EBA servisine ulaşılamadı.";
+        }
+    }
+
+    async function ebaBaglamaDurumSorgula() {
+        if (!ebaBaglamaToken) return;
+        try {
+            const resp = await fetch(`/eba/baglama/durum/${ebaBaglamaToken}/`);
+            const veri = await resp.json();
+            if (veri.qr_png_base64) {
+                document.getElementById("eba-qr-img").src = "data:image/png;base64," + veri.qr_png_base64;
+                document.getElementById("eba-qr-img").style.display = "block";
+                document.getElementById("eba-yukleniyor").style.display = "none";
+            }
+            document.getElementById("eba-mesaj").textContent = veri.mesaj || (
+                veri.durum === "qr_hazir" ? "Karekodu EBA Mobil ile okutun." : "Bağlanılıyor…"
+            );
+            if (veri.durum === "tamamlandi") {
+                clearInterval(ebaBaglamaPollTimer);
+                window.location.reload();
+            } else if (veri.durum === "hata" || veri.durum === "suresi_doldu") {
+                clearInterval(ebaBaglamaPollTimer);
+            }
+        } catch (e) {
+            // geçici ağ hatası — bir sonraki yoklamada tekrar denenir
+        }
+    }
+</script>
+{% endif %}
 {% endblock %}
