@@ -179,6 +179,17 @@
         <div style="text-align:center; margin-top:18px; font-size:0.9em; color:#6c757d;">
             Hesabınız yok mu? <a href="{% url 'kayit' %}" style="color:#417690; text-decoration:none; font-weight:600;">Kayıt Olun</a>
         </div>
+
+        {% if yerel_ca_indirilebilir %}
+        <div style="text-align:center; margin-top:14px; padding-top:14px; border-top:1px solid #f0f0f0; font-size:0.82em; color:#adb5bd;">
+            Tarayıcınız "Bağlantınız güvenli değil" uyarısı mı gösteriyor?
+            <br>
+            <a href="{% url 'yerel_ca_sertifikasi_indir' %}" style="color:#6c757d; text-decoration:underline;">
+                Güvenlik sertifikasını indirin
+            </a>
+            ve bilgisayarınıza bir kez kurun.
+        </div>
+        {% endif %}
     </div>
 
     <script>

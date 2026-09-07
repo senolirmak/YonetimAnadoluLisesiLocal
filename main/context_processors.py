@@ -1,3 +1,7 @@
+from pathlib import Path
+
+from django.conf import settings
+
 from okul.auth import is_ust_yonetici as _is_ust_yonetici
 
 YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
@@ -40,3 +44,15 @@ def kullanici_rol(request):
         "is_ogretmen": False,
         "is_ogretmen_menu": False,
     }
+
+
+def yerel_ca_bilgisi(request):
+    """Sunucu, kendi yerel CA'sıyla imzalı bir sertifikayla HTTPS'e geçirildiyse
+    (bkz. kurulumcu/sertifika.py, HTTPS_ETKIN) giriş/ana sayfalarda CA'nın
+    genel sertifikasını indirme bağlantısını göstermek için kullanılır — bkz.
+    main.views.yerel_ca_sertifikasi_indir. Anonim ziyaretçiler dahil TÜM
+    template'lere enjekte edilir (giriş sayfası, güvene henüz kavuşmamış bir
+    tarayıcının ilk indireceği yer olduğundan kimlik doğrulaması gerektirmez).
+    """
+    dosya_var = (Path(settings.BASE_DIR) / "yerel-ca-sertifikasi.crt").is_file()
+    return {"yerel_ca_indirilebilir": getattr(settings, "HTTPS_ETKIN", False) and dosya_var}
