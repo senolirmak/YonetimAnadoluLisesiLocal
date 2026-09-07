@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.db.models import Max
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
@@ -52,7 +53,9 @@ def nobetci_form(request):
 
     # O gün + sınıf için kayıtlı nöbetçi öğrenci id'leri
     kayitli_ids = set()
-    # Daha önce (başka tarihlerde) nöbet görmüş öğrenci id'leri → seçilemez
+    # Daha önce (arşivlenmemiş, yani cari eğitim-öğretim yılı içinde başka tarihlerde)
+    # nöbet görmüş öğrenci id'leri → seçilemez. Arşivlenmiş görevler (geçmiş eğitim-
+    # öğretim yıllarından — bkz. senesonu.services.gecis_uygula) bu kısıtı etkilemez.
     onceki_nobet_ids = set()
     if secili_sinif and secili_sube:
         kayitli_ids = set(
@@ -67,12 +70,29 @@ def nobetci_form(request):
                 OgrenciNobetGorevi.objects.filter(
                     ogrenci__sinif=secili_sinif,
                     ogrenci__sube__iexact=secili_sube,
+                    arsivlendi=False,
                 )
                 .exclude(tarih=secili_tarih)
                 .values_list("ogrenci_id", flat=True)
             )
             - kayitli_ids
         )  # bugün zaten nöbetçiyse ayrıca engelleme
+
+        # Arşivlenmiş (geçmiş eğitim-öğretim yılına ait) görevler artık seçimi
+        # engellemiyor, ancak öğrencinin yanında bilgi amaçlı rozet olarak gösterilir —
+        # en son arşivlenmiş nöbet tarihi bu amaçla öğrenciye eklenir.
+        gecmis_nobet_tarihleri = dict(
+            OgrenciNobetGorevi.objects.filter(
+                ogrenci__sinif=secili_sinif,
+                ogrenci__sube__iexact=secili_sube,
+                arsivlendi=True,
+            )
+            .values("ogrenci_id")
+            .annotate(son_tarih=Max("tarih"))
+            .values_list("ogrenci_id", "son_tarih")
+        )
+        for ogr in ogrenciler:
+            ogr.gecmis_nobet_tarihi = gecmis_nobet_tarihleri.get(ogr.pk)
 
     if request.method == "POST":
         secili_ids = set(int(x) for x in request.POST.getlist("nobetci"))
