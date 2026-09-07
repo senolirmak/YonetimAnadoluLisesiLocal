@@ -324,6 +324,26 @@ def main() -> None:
         sunucu.nginx_yapilandir(PROJE_DIZIN, servis_adi, degerler.get("ALLOWED_HOSTS", ""))
         sunucu.saglik_kontrolu(servis)
 
+        # ── 6.5 EBA karekod ile giriş (isteğe bağlı) ─────────────
+        print()
+        print("EBA (Eğitim Bilişim Ağı) karekod ile giriş özelliği, gerçek EBA")
+        print("sunucusuna (qr-etap.eba.gov.tr — kapalı/resmî bir MEB servisi) sürekli")
+        print("bir websocket bağlantısı açan ayrı bir arka plan servisi gerektirir.")
+        print("EBA/MEB'in bu API'nin bu şekilde kullanımına resmî izni olup olmadığı")
+        print("netleşmedi — kurmadan önce değerlendirin (bkz. ebagiris app'i README/")
+        print("docstring notları).")
+        if y.sor("EBA karekod işçi servisi şimdi kurulsun mu?", "H").lower().startswith("e"):
+            eba_servis = sunucu.eba_ws_worker_servisi_kur(
+                PROJE_DIZIN, VENV, servis_kullanicisi.SERVIS_KULLANICISI, django_ayar_bayragi
+            )
+            print(f"  Durum        : sudo systemctl status {eba_servis}")
+            print(f"  Canlı loglar : sudo journalctl -u {eba_servis} -f")
+        else:
+            y.uyari(
+                "Atlandı — daha sonra 'okulyonetim-kur' ile sihirbazı tekrar çalıştırıp "
+                "kurabilir ya da sunucu.eba_ws_worker_servisi_kur()'u elle çağırabilirsiniz."
+            )
+
     # ── 7. Bitiş ──────────────────────────────────────────────────
     _banner("Kurulum tamamlandı!", y.YESIL)
 

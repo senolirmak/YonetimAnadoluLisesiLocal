@@ -63,6 +63,49 @@ WantedBy=multi-user.target
     return servis
 
 
+def eba_ws_worker_servisi_kur(
+    proje_dizin: Path, venv: Path, kullanici: str, django_ayar_bayragi: list[str]
+) -> str:
+    """EBA karekod ile giriş özelliğinin arka plan websocket işçisini (bkz.
+    ebagiris/management/commands/eba_ws_worker.py) systemd servisi olarak kurar.
+
+    Gunicorn'un aksine bir unix soketi açmaz, nginx'le paylaşacağı bir kaynağı
+    yoktur — yalnızca EBA'nın websocket'iyle konuşup veritabanına yazar; bu
+    yüzden `Group=`/`UMask=`/`SupplementaryGroups=` inceliklerine (bkz.
+    `gunicorn_servisi_kur`) ihtiyaç duymaz, kendi birincil grubu (`kullanici`
+    ile aynı ad) yeterlidir."""
+    servis = "eba-ws-worker.service"
+    y.bilgi(f"EBA karekod işçisi systemd servisi yazılıyor: {servis}")
+
+    ayar_bayragi_str = " ".join(django_ayar_bayragi)
+    icerik = f"""[Unit]
+Description=EBA Karekod Girişi Websocket İşçisi (Okul Yönetim Sistemi)
+After=network.target
+
+[Service]
+User={kullanici}
+Group={kullanici}
+WorkingDirectory={proje_dizin}
+EnvironmentFile={proje_dizin}/.env
+ExecStart={venv}/bin/python manage.py eba_ws_worker {ayar_bayragi_str}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+"""
+    y.calistir(["tee", f"/etc/systemd/system/{servis}"], sudo=True, sessiz=True, girdi=icerik)
+
+    y.calistir(["systemctl", "daemon-reload"], sudo=True)
+    y.calistir(["systemctl", "enable", servis], sudo=True, sessiz=True)
+    y.calistir(["systemctl", "restart", servis], sudo=True)
+    time.sleep(2)
+    if not y.basarili_mi(["systemctl", "is-active", "--quiet", servis]):
+        y.hata(f"Servis başlatılamadı! Loglar: sudo journalctl -u {servis} -n 30")
+    y.basari(f"EBA karekod işçisi servisi çalışıyor: {servis}")
+    return servis
+
+
 def _varsayilan_siteyi_devre_disi_birak() -> None:
     """Nginx paketiyle birlikte gelen varsayılan site tanımını devre dışı bırakır.
 
