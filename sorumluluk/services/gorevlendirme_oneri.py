@@ -183,11 +183,14 @@ def komisyon_gorev_sayisi(kayitlar: list[tuple]) -> int:
 
 
 def _kumulatif_komisyon_baseline(sinav):
-    """Bu sınav HARİÇ tüm sınavlardaki komisyon görev sayıları (aynı ders_adi veya
-    aynı slotta birleşen atamalar tek görev sayılır — mevcut gorevlendirme() view'ı
-    ile aynı union-find mantığı)."""
+    """Bu sınav HARİÇ, arşivlenmemiş diğer sınavlardaki komisyon görev sayıları (aynı
+    ders_adi veya aynı slotta birleşen atamalar tek görev sayılır — mevcut
+    gorevlendirme() view'ı ile aynı union-find mantığı). Arşivlenmiş (bkz.
+    SorumluSinav.arsivlendi, senesonu.services.gecis_uygula) sınavların görevleri bu
+    tabana dahil edilmez — aksi hâlde geçmiş eğitim-öğretim yılından kalan görev
+    sayıları öğretmenleri kalıcı olarak yeni dönem atamalarında dezavantajlı gösterir."""
     kayitlar_by_pid = defaultdict(list)
-    for ku in SorumluKomisyonUyesi.objects.exclude(sinav=sinav):
+    for ku in SorumluKomisyonUyesi.objects.exclude(sinav=sinav).filter(sinav__arsivlendi=False):
         for pid in (ku.uye1_id, ku.uye2_id):
             if pid:
                 kayitlar_by_pid[pid].append((ku.sinav_id, ku.ders_adi, ku.tarih, ku.oturum_no))
@@ -226,9 +229,11 @@ def oner_gorevlendirme(sinav, takvim_rows, active_salons):
 
     running_komisyon = defaultdict(int, _kumulatif_komisyon_baseline(sinav))
     running_gozetmen = defaultdict(int)
-    for gz in SorumluGozetmen.objects.exclude(sinav=sinav).filter(gozetmen__isnull=False):
+    for gz in SorumluGozetmen.objects.exclude(sinav=sinav).filter(
+        gozetmen__isnull=False, sinav__arsivlendi=False
+    ):
         running_gozetmen[gz.gozetmen_id] += 1
-    for og in OncekiDonemGorev.objects.all():
+    for og in OncekiDonemGorev.objects.filter(donem__arsivlendi=False):
         running_komisyon[og.personel_id] += og.komisyon
         running_gozetmen[og.personel_id] += og.gozetmen
 
@@ -447,11 +452,13 @@ def gorevlendirme_baglami_olustur(sinav, takvim_rows, active_salons, komisyon_di
         if gz.gozetmen_id and gz.gozetmen_id in gorev_sayac:
             gorev_sayac[gz.gozetmen_id]["gozetmen"] += 1
 
-    # Kümülatif görev sayısı — tüm SorumluSinav kayıtları
+    # Kümülatif görev sayısı — arşivlenmemiş tüm SorumluSinav kayıtları (arşivlenmiş
+    # eğitim-öğretim yıllarına ait görevler bu toplama dahil edilmez — bkz.
+    # SorumluSinav.arsivlendi, senesonu.services.gecis_uygula).
     kumulatif_sayac = {p.pk: {"komisyon": 0, "gozetmen": 0} for p in personel_listesi}
 
     kum_komisyon_kayitlar: dict = {}  # personel_pk → [(sinav_id, ders_adi, tarih, oturum_no)]
-    for ku in SorumluKomisyonUyesi.objects.all():
+    for ku in SorumluKomisyonUyesi.objects.filter(sinav__arsivlendi=False):
         for pid in (ku.uye1_id, ku.uye2_id):
             if pid and pid in kumulatif_sayac:
                 kum_komisyon_kayitlar.setdefault(pid, []).append(
@@ -460,12 +467,15 @@ def gorevlendirme_baglami_olustur(sinav, takvim_rows, active_salons, komisyon_di
     for pid, kayitlar in kum_komisyon_kayitlar.items():
         kumulatif_sayac[pid]["komisyon"] = komisyon_gorev_sayisi(kayitlar)
 
-    for gz in SorumluGozetmen.objects.all():
+    for gz in SorumluGozetmen.objects.filter(sinav__arsivlendi=False):
         if gz.gozetmen_id and gz.gozetmen_id in kumulatif_sayac:
             kumulatif_sayac[gz.gozetmen_id]["gozetmen"] += 1
 
-    # Geçmiş dönem (OncekiDonemGorev) kümülatife ekle
-    for og in OncekiDonemGorev.objects.filter(personel_id__in=kumulatif_sayac):
+    # Geçmiş dönem (OncekiDonemGorev) kümülatife ekle — arşivlenmiş (eğitim-öğretim
+    # yılı sona ermiş — bkz. OncekiDonem.arsivlendi) dönemler hariç.
+    for og in OncekiDonemGorev.objects.filter(
+        personel_id__in=kumulatif_sayac, donem__arsivlendi=False
+    ):
         kumulatif_sayac[og.personel_id]["komisyon"] += og.komisyon
         kumulatif_sayac[og.personel_id]["gozetmen"] += og.gozetmen
 
