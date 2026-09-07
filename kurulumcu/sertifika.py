@@ -141,8 +141,21 @@ def yerel_ca_olustur(force: bool = False) -> bool:
     `force=False` (varsayılan) iken CA zaten varsa atlar — CA'yı yeniden
     üretmek, ondan daha önce imzalanmış TÜM sunucu sertifikalarını (ve
     istemcilere dağıtılmış eski CA sertifikasını) geçersiz kılar; bu yüzden
-    `force=True` yalnızca bilinçli bir CA yenileme/dönüşü olarak kullanılmalı."""
-    if not force and CA_SERTIFIKA.is_file():
+    `force=True` yalnızca bilinçli bir CA yenileme/dönüşü olarak kullanılmalı.
+
+    NOT: `CA_DIZIN` kasıtlı olarak 700 DEĞİL 755'tir — özel anahtarın
+    (`ca.key`) koruması dizin izninden değil KENDİ dosya izninden (600,
+    aşağıda) gelir; `ca.crt` kamuya açık bir sertifika olduğundan (mod 644)
+    dizinin dünyaya kapalı olması hem bu fonksiyonun kendi idempotency
+    kontrolünü hem de `sunucu.saglik_kontrolu_https()`'in CA'yı Python `ssl`
+    modülüyle DOĞRUDAN (sudo'suz) okumasını kırardı — üretimde tam olarak bu
+    şekilde yaşandı (bkz. commit geçmişi). Bu satır, dizin daha önce (bu
+    düzeltmeden önce) 700 oluşturulmuş olsa bile idempotency kontrolünden
+    ÖNCE çalışarak izni her seferinde düzeltir."""
+    y.calistir(["mkdir", "-p", str(CA_DIZIN)], sudo=True)
+    y.calistir(["chmod", "755", str(CA_DIZIN)], sudo=True)
+
+    if not force and y.basarili_mi(["test", "-f", str(CA_SERTIFIKA)], sudo=True):
         y.uyari(f"Yerel CA zaten var ({CA_SERTIFIKA}), atlanıyor.")
         return True
 
@@ -150,9 +163,6 @@ def yerel_ca_olustur(force: bool = False) -> bool:
         y.hata("'openssl' bulunamadı, yerel CA oluşturulamıyor.")
 
     y.bilgi("Yerel sertifika otoritesi (CA) oluşturuluyor...")
-    y.calistir(["mkdir", "-p", str(CA_DIZIN)], sudo=True)
-    y.calistir(["chmod", "700", str(CA_DIZIN)], sudo=True)
-
     y.calistir(
         [
             "openssl", "req", "-x509", "-newkey", "rsa:4096", "-sha256", "-nodes",
@@ -176,7 +186,7 @@ def sunucu_sertifikasi_olustur(sanlar: list[str], force: bool = False) -> bool:
     daha önce çalıştırılmış olmalı.
 
     `force=False` (varsayılan) iken sertifika zaten varsa atlar."""
-    if not force and SUNUCU_SERTIFIKA.is_file():
+    if not force and y.basarili_mi(["test", "-f", str(SUNUCU_SERTIFIKA)], sudo=True):
         y.uyari(f"Sunucu sertifikası zaten var ({SUNUCU_SERTIFIKA}), atlanıyor.")
         return True
 
