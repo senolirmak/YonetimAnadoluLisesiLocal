@@ -421,16 +421,16 @@
               <td style="white-space:nowrap;">{{ a.yukleme_tarihi|date:"d.m.Y H:i" }}</td>
               <td>{{ a.kullanici|default:"-" }}</td>
               <td style="text-align:center;">{{ a.kayit_sayisi }}</td>
-              <td style="text-align:center;">
+              <td style="text-align:center;" {% if a.notlar %}title="{{ a.notlar }}"{% endif %}>
                 {% if a.hata_sayisi %}
                 <span style="color:#dc3545;font-weight:600;">{{ a.hata_sayisi }}</span>
                 {% else %}—{% endif %}
               </td>
-              <td>
+              <td {% if a.notlar %}title="{{ a.notlar }}"{% endif %}>
                 {% if a.durum == "basarili" %}
                 <span style="color:#28a745;">✔ Başarılı</span>
                 {% elif a.durum == "kismi" %}
-                <span style="color:#fd7e14;">⚠ Kısmi</span>
+                <span style="color:#fd7e14;">⚠ Kısmi{% if a.notlar %} ⓘ{% endif %}</span>
                 {% else %}
                 <span style="color:#dc3545;">✖ Hatalı</span>
                 {% endif %}

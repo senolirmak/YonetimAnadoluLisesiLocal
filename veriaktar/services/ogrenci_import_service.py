@@ -149,6 +149,7 @@ class OgrenciIsleyici:
         yeni = 0
         guncellenen = 0
         hatali = 0
+        hata_detaylari = []
 
         for kayit in self._kayitlar:
             okulno = kayit["okulno"]
@@ -170,12 +171,22 @@ class OgrenciIsleyici:
                     yeni += 1
                 else:
                     guncellenen += 1
-            except Exception:
+            except Exception as exc:
                 hatali += 1
+                hata_detaylari.append(
+                    f"Okul No {okulno} ({kayit.get('adi', '')} {kayit.get('soyadi', '')}, "
+                    f"{kayit.get('sinif', '')}/{kayit.get('sube', '')}): {exc}"
+                )
 
         ayrilan = self._nakil_olanlari_isaretle()
 
-        return {"yeni": yeni, "guncellenen": guncellenen, "hatali": hatali, "ayrilan": ayrilan}
+        return {
+            "yeni": yeni,
+            "guncellenen": guncellenen,
+            "hatali": hatali,
+            "hata_detaylari": hata_detaylari,
+            "ayrilan": ayrilan,
+        }
 
     # ------------------------------------------------------------------
     # Bir e-Okul listesinde artık görünmeyen okulno, gerçekte okuldan
@@ -240,6 +251,8 @@ class OgrenciIsleyici:
         from okul.models import VeriAktarimGecmisi
 
         notlar = []
+        if status.get("hata_detaylari"):
+            notlar.append("Hatalı kayıtlar:\n" + "\n".join(status["hata_detaylari"]))
         if status.get("ayrilan"):
             notlar.append(
                 f"{status['ayrilan']} öğrenci, e-Okul listesinde bulunmadığı için "
