@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci
-from okul.utils import get_aktif_dp_tarihi, get_aktif_egitim_yili
+from okul.utils import get_aktif_egitim_yili
 
 from .models import OgrenciDevamsizlik
 
@@ -90,13 +90,12 @@ def ogretmen_devamsizlik(request, ders_saati=None):
         for i in range(5)  # Pazartesi–Cuma
     ]
 
-    aktif_tarih = get_aktif_dp_tarihi()
-    dp_filter = {"ogretmen": personel, "gun": gun_adi}
-    if aktif_tarih:
-        dp_filter["uygulama_tarihi"] = aktif_tarih
-    bugun_dersleri = DersProgrami.objects.filter(
-        **dp_filter
-    ).select_related("ders_saati").order_by("ders_saati__derssaati_no")
+    bugun_dersleri = (
+        DersProgrami.objects.aktif()
+        .filter(ogretmen=personel, gun=gun_adi)
+        .select_related("ders_saati")
+        .order_by("ders_saati__derssaati_no")
+    )
 
     if not bugun_dersleri.exists():
         return render(
@@ -288,6 +287,13 @@ def ogrenci_devamsizlik_listesi(request):
     qs = OgrenciDevamsizlik.objects.select_related("ogrenci").order_by(
         "-tarih", "ogrenci__sinif", "ogrenci__sube", "ders_saati__derssaati_no"
     )
+
+    # Sene Sonu Geçişi ile arşivlenen (geçmiş eğitim-öğretim yılına ait) kayıtlar,
+    # açıkça bir tarih aralığı seçilmediği sürece varsayılan listede gösterilmez —
+    # bkz. senesonu.services.gecis_uygula. Tarih filtresi verildiğinde arşivlenmiş
+    # kayıtlar da (geçmişe dönük arama amacıyla) sonuçlara dahil edilir.
+    if not (tarih_bas or tarih_bit):
+        qs = qs.filter(arsivlendi=False)
 
     if tarih_bas:
         qs = qs.filter(tarih__gte=tarih_bas)

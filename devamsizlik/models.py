@@ -21,6 +21,15 @@ class OgrenciDevamsizlik(models.Model):
     ogretmen_adi = models.CharField(max_length=100, verbose_name="Öğretmen")
     aciklama = models.CharField(max_length=200, blank=True, null=True, verbose_name="Açıklama")
     olusturma_zamani = models.DateTimeField(auto_now_add=True)
+    arsivlendi = models.BooleanField(
+        default=False,
+        verbose_name="Arşivlendi",
+        help_text=(
+            "Sene Sonu Geçişi uygulandığında geçmiş eğitim-öğretim yılına ait "
+            "devamsızlık kayıtları otomatik olarak arşivlenir; arşivlenen kayıtlar "
+            "varsayılan devamsızlık listesinde görünmez (tarih filtresiyle aranabilir)."
+        ),
+    )
 
     class Meta:
         db_table = "ogrenci_devamsizlik"

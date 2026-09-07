@@ -40,6 +40,15 @@ class Faaliyet(models.Model):
     onaylayan_adi = models.CharField(max_length=200, blank=True, verbose_name="Onaylayan")
     onay_zamani = models.DateTimeField(null=True, blank=True, verbose_name="Onay Tarihi")
     olusturma_zamani = models.DateTimeField(auto_now_add=True)
+    arsivlendi = models.BooleanField(
+        default=False,
+        verbose_name="Arşivlendi",
+        help_text=(
+            "Sene Sonu Geçişi uygulandığında geçmiş eğitim-öğretim yılına ait "
+            "faaliyet kayıtları otomatik olarak arşivlenir; arşivlenen kayıtlar "
+            "varsayılan yönetim listesinde görünmez (tarih filtresiyle aranabilir)."
+        ),
+    )
 
     class Meta:
         db_table = "faaliyet"
