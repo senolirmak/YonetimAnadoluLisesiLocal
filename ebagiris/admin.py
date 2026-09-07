@@ -13,10 +13,10 @@ class EbaHesapAdmin(admin.ModelAdmin):
 @admin.register(EbaOturum)
 class EbaOturumAdmin(admin.ModelAdmin):
     list_display = (
-        "token", "amac", "durum", "eba_id", "eslesen_personel", "olusturma_zamani",
+        "token", "amac", "durum", "eslesen_personel", "istek_ip", "olusturma_zamani",
     )
     list_filter = ("amac", "durum")
-    search_fields = ("token", "eba_id", "eba_adi_soyadi")
+    search_fields = ("token", "istek_ip", "eba_id", "eba_adi_soyadi")
     readonly_fields = [f.name for f in EbaOturum._meta.fields]
 
     def has_add_permission(self, request):

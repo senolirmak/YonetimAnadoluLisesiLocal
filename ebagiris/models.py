@@ -80,6 +80,21 @@ class EbaOturum(models.Model):
         max_length=15, choices=DURUM_CHOICES, default=DURUM_BEKLIYOR, verbose_name="Durum"
     )
 
+    # Güvenlik: `token` tek başına giriş yapmaya YETMEMELİDİR — sunucu erişim
+    # logları, tarayıcı geçmişi ya da bir ekranı paylaşan/omuz üzerinden bakan biri
+    # token'ı ele geçirirse, bu alan olmadan `durum=dogrulandi` anındaki dar
+    # pencerede KENDİ tarayıcısından bir istekle öğretmenin hesabına giriş
+    # yapabilirdi (bkz. views.eba_giris_durum). Akışı başlatan tarayıcının Django
+    # oturum anahtarı burada saklanır; giriş yalnızca AYNI oturumdan gelen bir
+    # yoklamayla tamamlanabilir. AMAC_BAGLAMA zaten `request.user` ile bağlı
+    # olduğundan (bkz. views.eba_baglama_durum) orada bu alan yalnızca bilgi/
+    # tutarlılık amaçlıdır, güvenlik onun için şart değildir.
+    baslatan_session_key = models.CharField(max_length=40, blank=True)
+
+    # Kaba kuvvet/aşırı istek (DoS) koruması için — bkz. views._rate_limit_asildi_mi.
+    # Ayrıca kaba bir denetim izi sağlar.
+    istek_ip = models.GenericIPAddressField(null=True, blank=True, verbose_name="İstek IP")
+
     # AMAC_BAGLAMA akışında: hangi personel bağlıyor (kimlik doğrulanmış kullanıcı,
     # baştan bilinir). AMAC_GIRIS akışında boştur — eşleşen personel EBA'nın
     # doğruladığı eba_id'ye göre sonradan bulunur (bkz. eslesen_personel).
