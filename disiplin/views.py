@@ -8,7 +8,6 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from okul.models import SinifSube
-from okul.utils import get_aktif_dp_tarihi
 from ogrenci.models import Ogrenci
 
 from .models import DisiplinGorusme
@@ -410,12 +409,9 @@ def ders_programi_api(request):
     except (SinifSube.DoesNotExist, ValueError):
         return JsonResponse([], safe=False)
 
-    aktif_tarih = get_aktif_dp_tarihi()
-    dp_filter = {"sinif_sube": ss, "gun": gun}
-    if aktif_tarih:
-        dp_filter["uygulama_tarihi"] = aktif_tarih
     dersler = (
-        DersProgrami.objects.filter(**dp_filter)
+        DersProgrami.objects.aktif()
+        .filter(sinif_sube=ss, gun=gun)
         .select_related("ogretmen", "ders_saati")
         .order_by("ders_saati__derssaati_no")
     )

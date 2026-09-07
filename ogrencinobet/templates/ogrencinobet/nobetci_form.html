@@ -94,7 +94,15 @@
                                         {% if ogr.pk in kayitli_ids %}checked{% endif %}>
                                 </td>
                                 <td>{{ ogr.okulno }}</td>
-                                <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                                <td>
+                                    {{ ogr.adi }} {{ ogr.soyadi }}
+                                    {% if ogr.gecmis_nobet_tarihi %}
+                                    <span style="font-size:0.78em;background:#17a2b8;color:#fff;padding:1px 6px;border-radius:8px;margin-left:4px;"
+                                          title="Geçmiş bir eğitim-öğretim yılında nöbet tuttu, seçimi engellemez.">
+                                        {{ ogr.gecmis_nobet_tarihi|date:"d.m.Y" }}
+                                    </span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ ogr.get_cinsiyet_display }}</td>
                             </tr>
                             {% endif %}

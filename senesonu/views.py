@@ -72,6 +72,13 @@ def gecis_detay(request, pk):
         "inceleme_gerekli": gecis.ogrenci_gecisleri.filter(durum="inceleme_gerekli").count(),
     }
 
+    # Öğrenci sınıf/şube geçişinin yanı sıra bu geçişin arşivleyeceği/arşivlediği
+    # diğer modülleri de göster — bkz. services.arsiv_ozeti / _arsiv_kalemleri.
+    arsiv_kalemleri = services.arsiv_ozeti(
+        gecis.eski_egitim_yili, arsivlenmis=gecis.uygulandi
+    )
+    arsiv_toplam = sum(k["sayi"] for k in arsiv_kalemleri)
+
     return render(request, "senesonu/gecis_detay.html", {
         "title": f"Sene Sonu Geçişi — {gecis}",
         "gecis": gecis,
@@ -79,6 +86,8 @@ def gecis_detay(request, pk):
         "ozet": ozet,
         "durum_filtre": durum_filtre,
         "durum_choices": SeneSonuOgrenciGecisi.DURUM_CHOICES,
+        "arsiv_kalemleri": arsiv_kalemleri,
+        "arsiv_toplam": arsiv_toplam,
     })
 
 
@@ -121,10 +130,13 @@ def satir_duzenle(request, pk):
 def gecis_uygula(request, pk):
     gecis = get_object_or_404(SeneSonuGecisi, pk=pk)
     try:
+        eski_yil = gecis.eski_egitim_yili
+        arsiv_toplam = sum(k["sayi"] for k in services.arsiv_ozeti(eski_yil, arsivlenmis=False))
         services.gecis_uygula(gecis)
         messages.success(
             request,
-            f"Sene sonu geçişi uygulandı: aktif eğitim-öğretim yılı artık {gecis.yeni_egitim_yili}.",
+            f"Sene sonu geçişi uygulandı: aktif eğitim-öğretim yılı artık {gecis.yeni_egitim_yili}. "
+            f"{eski_yil} yılına ait {arsiv_toplam} kayıt arşivlendi.",
         )
     except ValueError as e:
         messages.error(request, str(e))

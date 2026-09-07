@@ -43,13 +43,17 @@ def set_aktif_tarih(veri_turu: str, uygulama_tarihi: datetime.date) -> None:
 def get_aktif_nobet_tarihi() -> datetime.date | None:
     """
     Aktif nöbet listesi uygulama_tarihi'ni döner.
-    Konfigürasyon yoksa DB'deki en son NobetOgretmen tarihine fall-back yapar.
+    Konfigürasyon yoksa DB'deki en son (arşivlenmemiş) NobetGorevi tarihine fall-back
+    yapar — arşivlenmiş (geçmiş eğitim-öğretim yılına ait — bkz.
+    senesonu.services.gecis_uygula) görevler bu geri düşüşe dahil edilmez; aksi hâlde
+    yeni yıl için henüz liste yüklenmemişken eski yılın listesi "aktif" görünmeye
+    devam eder.
     """
     tarih = get_aktif_tarih("nobet_listesi")
     if tarih is None:
         from nobet.models import NobetGorevi
         tarih = (
-            NobetGorevi.objects
+            NobetGorevi.objects.filter(arsivlendi=False)
             .order_by("-uygulama_tarihi")
             .values_list("uygulama_tarihi", flat=True)
             .first()
@@ -96,14 +100,18 @@ def donem_tarihe_gore(tarih):
 def get_aktif_dp_tarihi() -> datetime.date | None:
     """
     Aktif ders programı uygulama_tarihi'ni döner.
-    Konfigürasyon yoksa DB'deki en son tarihe fall-back yapar.
+    Konfigürasyon yoksa DB'deki en son (arşivlenmemiş) tarihe fall-back yapar —
+    arşivlenmiş (geçmiş eğitim-öğretim yılına ait — bkz.
+    senesonu.services.gecis_uygula) kayıtlar bu geri düşüşe dahil edilmez; aksi
+    hâlde yeni yıl için henüz ders programı yüklenmemişken eski yılın programı
+    "aktif" görünmeye devam eder.
     Her iki durumda da None dönebilir (hiç kayıt yoksa).
     """
     tarih = get_aktif_tarih("ders_programi")
     if tarih is None:
         from dersprogrami.models import DersProgrami
         tarih = (
-            DersProgrami.objects
+            DersProgrami.objects.filter(arsivlendi=False)
             .order_by("-uygulama_tarihi")
             .values_list("uygulama_tarihi", flat=True)
             .first()

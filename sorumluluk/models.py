@@ -492,6 +492,16 @@ class OncekiDonem(models.Model):
     )
     aciklama         = models.CharField(max_length=300, blank=True, verbose_name="Açıklama")
     olusturma_tarihi = models.DateTimeField(auto_now_add=True)
+    arsivlendi       = models.BooleanField(
+        default=False,
+        verbose_name="Arşivlendi",
+        help_text=(
+            "Sene Sonu Geçişi uygulandığında bu döneme ait eğitim-öğretim yılı sona "
+            "erdiğinde otomatik olarak arşivlenir; arşivlenen dönemin görev sayıları "
+            "(bkz. OncekiDonemGorev) adalet puanlaması kümülatiflerine artık dahil "
+            "edilmez — bkz. sorumluluk/services/gorevlendirme_oneri.py, rapor_ozet.py."
+        ),
+    )
 
     class Meta:
         ordering            = ["-olusturma_tarihi"]

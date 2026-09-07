@@ -14,10 +14,14 @@ GUNLER = (
 
 class DersProgramiQuerySet(models.QuerySet):
     def aktif(self):
+        """Arşivlenmemiş (bkz. senesonu.services.gecis_uygula) kayıtları döner —
+        aktif ders programı tarihi tanımlıysa o tarihe, tanımlı değilse
+        arşivlenmemiş kayıtların en güncel tarihine daralır."""
         from okul.utils import get_aktif_dp_tarihi
 
+        guncel = self.filter(arsivlendi=False)
         tarih = get_aktif_dp_tarihi()
-        return self.filter(uygulama_tarihi=tarih) if tarih else self
+        return guncel.filter(uygulama_tarihi=tarih) if tarih else guncel
 
 
 class DersProgrami(models.Model):
@@ -66,6 +70,16 @@ class DersProgrami(models.Model):
         blank=True,
         related_name="ders_programlari",
         verbose_name="Dönem",
+    )
+    arsivlendi = models.BooleanField(
+        default=False,
+        verbose_name="Arşivlendi",
+        help_text=(
+            "Sene Sonu Geçişi uygulandığında geçmiş eğitim-öğretim yılına ait ders "
+            "programı yüklemeleri otomatik olarak arşivlenir; arşivlenen kayıtlar "
+            "artık 'aktif' ders programı olarak gösterilmez, yalnızca Ders Programı "
+            "Listesi (arşiv) sayfasından eğitim yılı/dönem seçilerek görüntülenebilir."
+        ),
     )
 
     class Meta:

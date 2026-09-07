@@ -28,15 +28,18 @@ DAYS_MAP = {
 
 
 def aktif_program_tarihi(target_date):
+    # Arşivlenmiş (geçmiş eğitim-öğretim yılına ait) ders programı kayıtları burada
+    # dikkate alınmaz — bkz. senesonu.services.gecis_uygula, DersProgramiQuerySet.aktif.
     t = (
-        DersProgrami.objects.filter(uygulama_tarihi__lte=target_date)
+        DersProgrami.objects.filter(uygulama_tarihi__lte=target_date, arsivlendi=False)
         .order_by("-uygulama_tarihi")
         .values_list("uygulama_tarihi", flat=True)
         .first()
     )
     if not t:
         t = (
-            DersProgrami.objects.order_by("-uygulama_tarihi")
+            DersProgrami.objects.filter(arsivlendi=False)
+            .order_by("-uygulama_tarihi")
             .values_list("uygulama_tarihi", flat=True)
             .first()
         )
@@ -44,8 +47,11 @@ def aktif_program_tarihi(target_date):
 
 
 def aktif_gorev_tarihi(target_date):
+    # Arşivlenmiş (geçmiş eğitim-öğretim yılına ait) görevler burada dikkate alınmaz —
+    # aksi hâlde yeni yıl için henüz nöbet listesi yüklenmemişken ders doldurma eski
+    # yılın listesini "geçerli" sayar (bkz. senesonu.services.gecis_uygula).
     return (
-        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date)
+        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date, arsivlendi=False)
         .order_by("-uygulama_tarihi")
         .values_list("uygulama_tarihi", flat=True)
         .first()
@@ -87,11 +93,23 @@ def en_son_kayit_dt(target_date):
     """
     target_date için en son kaydedilen atama datetime'ını döner, yoksa None.
     İki tabloyu 2 sorguda kontrol eder; exists()+iter pattern'ını önler.
+
+    Arşivlenmiş (geçmiş eğitim-öğretim yılına ait — bkz.
+    senesonu.services.gecis_uygula) kayıtlar dikkate alınmaz: "Ders Doldurma" bir
+    güncel işlem ekranıdır, geçmiş yılın kayıtlarını göstermeye devam etmemeli —
+    o veriye ihtiyaç duyan geçmiş inceleme, nöbetçi öğretmenin "Ders Doldurma
+    İstatistikleri" sayfasından yapılır.
     """
     start = timezone.make_aware(datetime.combine(target_date, time.min))
     end   = timezone.make_aware(datetime.combine(target_date, time.max))
-    rec = NobetGecmisi.objects.filter(tarih__range=[start, end]).order_by("-tarih").first()
-    un  = NobetAtanamayan.objects.filter(tarih__range=[start, end]).order_by("-tarih").first()
+    rec = (
+        NobetGecmisi.objects.filter(tarih__range=[start, end], arsivlendi=False)
+        .order_by("-tarih").first()
+    )
+    un  = (
+        NobetAtanamayan.objects.filter(tarih__range=[start, end], arsivlendi=False)
+        .order_by("-tarih").first()
+    )
     candidates = [x.tarih for x in (rec, un) if x]
     return max(candidates) if candidates else None
 
@@ -100,22 +118,31 @@ def kayitli_atamalar_ve_atamayanlar(start_dt, end_dt):
     """
     Her iki tabloyu list() ile önbelleğe alarak döner.
     exists() + iterasyon çifti yerine tek değerlendirme.
+
+    Arşivlenmiş kayıtlar hariç tutulur — bkz. `en_son_kayit_dt`.
     """
     assigns = list(
-        NobetGecmisi.objects.filter(tarih__range=[start_dt, end_dt])
+        NobetGecmisi.objects.filter(tarih__range=[start_dt, end_dt], arsivlendi=False)
         .select_related("ogretmen__personel")
     )
     unassigns = list(
-        NobetAtanamayan.objects.filter(tarih__range=[start_dt, end_dt])
+        NobetAtanamayan.objects.filter(tarih__range=[start_dt, end_dt], arsivlendi=False)
         .select_related("ogretmen__personel")
     )
     return assigns, unassigns
 
 
 def gecmis_tarihler(target_date):
-    """Aynı haftanın günündeki önceki 5 kayıt tarihini döner."""
+    """Aynı haftanın günündeki önceki 5 kayıt tarihini döner. Arşivlenmiş kayıtlar
+    hariç tutulur — bkz. `en_son_kayit_dt`."""
     wd_map = {0: 2, 1: 3, 2: 4, 3: 5, 4: 6, 5: 7, 6: 1}
     d_wd = wd_map.get(target_date.weekday(), 2)
-    d1 = set(NobetGecmisi.objects.filter(tarih__week_day=d_wd).values_list("tarih", flat=True))
-    d2 = set(NobetAtanamayan.objects.filter(tarih__week_day=d_wd).values_list("tarih", flat=True))
+    d1 = set(
+        NobetGecmisi.objects.filter(tarih__week_day=d_wd, arsivlendi=False)
+        .values_list("tarih", flat=True)
+    )
+    d2 = set(
+        NobetAtanamayan.objects.filter(tarih__week_day=d_wd, arsivlendi=False)
+        .values_list("tarih", flat=True)
+    )
     return sorted(d1 | d2, reverse=True)[:5]

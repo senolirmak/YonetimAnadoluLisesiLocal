@@ -96,7 +96,7 @@ def gunun_nobetcileri(request):
     day_name_en = days_map[target_date.weekday()]
 
     gorev_date = (
-        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date)
+        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date, arsivlendi=False)
         .order_by("-uygulama_tarihi")
         .values_list("uygulama_tarihi", flat=True)
         .first()
@@ -191,7 +191,7 @@ def _generate_gunun_nobetcileri_pdf_bytes(target_date):
     day_name_en = days_map[target_date.weekday()]
 
     gorev_date = (
-        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date)
+        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date, arsivlendi=False)
         .order_by("-uygulama_tarihi")
         .values_list("uygulama_tarihi", flat=True)
         .first()

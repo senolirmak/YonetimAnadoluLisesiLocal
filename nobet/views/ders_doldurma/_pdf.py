@@ -43,7 +43,7 @@ def _load_atamalar(tarih_str):
             return [], None
 
     saved = list(
-        NobetGecmisi.objects.filter(tarih__range=[start_dt, end_dt])
+        NobetGecmisi.objects.filter(tarih__range=[start_dt, end_dt], arsivlendi=False)
         .select_related("ogretmen__personel")
     )
     if not saved:

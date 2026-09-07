@@ -5,6 +5,7 @@ kayıtlarına dokunmaz. `gecis_uygula` taslağı kalıcı hale getirir.
 """
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import SeneSonuGecisi, SeneSonuOgrenciGecisi
@@ -137,9 +138,125 @@ def gecis_olustur(eski_yil, yeni_yil, kullanici=None):
     return gecis
 
 
+def _arsiv_kalemleri(egitim_yili, arsivlenmis=False):
+    """`egitim_yili`ye ait, Sene Sonu Geçişi'nin arşivlediği kayıtları modül bazında
+    listeler — hem `gecis_uygula` (arşivlemeyi fiilen uygulamak için) hem de
+    `arsiv_ozeti` (önizleme/özet göstermek için — bkz. senesonu/views.py:
+    gecis_detay) tarafından kullanılır; tek kaynaktan geldiği için ikisi arasında
+    sapma olmaz.
+
+    `arsivlenmis=False` (varsayılan) iken HENÜZ arşivlenmemiş kayıtları (uygulama
+    öncesi "arşivlenecek" önizlemesi ve bizzat uygulama için); `arsivlenmis=True`
+    iken zaten arşivlenmiş kayıtları (uygulama sonrası özet için) döner.
+
+    Her kalem `{"grup", "etiket", "qs", "update"}` taşır — `update`, kaydı
+    arşivlenmiş duruma geçirmek için `qs.update(**update)` ile kullanılır (yalnızca
+    `arsivlenmis=False` çağrısında anlamlıdır).
+    """
+    from dersprogrami.models import DersProgrami
+    from devamsizlik.models import OgrenciDevamsizlik
+    from faaliyet.models import Faaliyet
+    from nobet.models import NobetAtanamayan, NobetGecmisi, NobetGorevi
+    from ogrencinobet.models import OgrenciNobetGorevi
+    from personeldevamsizlik.models import Devamsizlik
+    from sinav.models import SinavBilgisi
+    from sorumluluk.models import OncekiDonem, SorumluSinav
+
+    bitis = egitim_yili.egitim_bitis
+    bayrak = arsivlenmis  # arsivlendi alanının aranacağı değer
+
+    return [
+        {
+            "grup": "Öğrenci Nöbeti",
+            "etiket": "Öğrenci nöbet görevi",
+            "qs": OgrenciNobetGorevi.objects.filter(arsivlendi=bayrak, tarih__lte=bitis),
+            "update": {"arsivlendi": True},
+        },
+        {
+            "grup": "Öğretmen Nöbeti",
+            "etiket": "Yüklenmiş haftalık nöbet listesi",
+            "qs": NobetGorevi.objects.filter(arsivlendi=bayrak).filter(
+                Q(egitim_yili=egitim_yili)
+                | Q(egitim_yili__isnull=True, uygulama_tarihi__lte=bitis)
+            ),
+            "update": {"arsivlendi": True},
+        },
+        {
+            "grup": "Öğretmen Nöbeti",
+            "etiket": "Ders doldurma kaydı",
+            "qs": NobetGecmisi.objects.filter(arsivlendi=bayrak, tarih__date__lte=bitis),
+            "update": {"arsivlendi": True},
+        },
+        {
+            "grup": "Öğretmen Nöbeti",
+            "etiket": "Atanamayan ders kaydı",
+            "qs": NobetAtanamayan.objects.filter(arsivlendi=bayrak, tarih__date__lte=bitis),
+            "update": {"arsivlendi": True},
+        },
+        {
+            "grup": "Devamsızlık",
+            "etiket": "Öğretmen devamsızlık kaydı",
+            "qs": Devamsizlik.objects.filter(arsivlendi=bayrak, baslangic_tarihi__lte=bitis),
+            "update": {"arsivlendi": True},
+        },
+        {
+            "grup": "Devamsızlık",
+            "etiket": "Öğrenci devamsızlık kaydı",
+            "qs": OgrenciDevamsizlik.objects.filter(arsivlendi=bayrak, tarih__lte=bitis),
+            "update": {"arsivlendi": True},
+        },
+        {
+            "grup": "Faaliyet",
+            "etiket": "Faaliyet kaydı",
+            "qs": Faaliyet.objects.filter(arsivlendi=bayrak, tarih__lte=bitis),
+            "update": {"arsivlendi": True},
+        },
+        {
+            "grup": "Ders Programı",
+            "etiket": "Yüklenmiş haftalık ders programı",
+            "qs": DersProgrami.objects.filter(arsivlendi=bayrak).filter(
+                Q(egitim_yili=egitim_yili)
+                | Q(egitim_yili__isnull=True, uygulama_tarihi__lte=bitis)
+            ),
+            "update": {"arsivlendi": True},
+        },
+        {
+            "grup": "Ortak Sınav",
+            "etiket": "Aktif işaretli ortak sınav",
+            "qs": SinavBilgisi.objects.filter(aktif=not bayrak).filter(
+                Q(egitim_yili_fk=egitim_yili)
+                | Q(egitim_yili_fk__isnull=True, egitim_ogretim_yili=egitim_yili.egitim_yili)
+            ),
+            "update": {"aktif": False},
+        },
+        {
+            "grup": "Sorumluluk Sınavı",
+            "etiket": "Sorumluluk sınavı",
+            "qs": SorumluSinav.objects.filter(arsivlendi=bayrak, egitim_yili=egitim_yili),
+            "update": {"arsivlendi": True, "arsivlenme_tarihi": timezone.now()},
+        },
+        {
+            "grup": "Sorumluluk Sınavı",
+            "etiket": "Geçmiş dönem (adalet puanlaması)",
+            "qs": OncekiDonem.objects.filter(arsivlendi=bayrak, egitim_yili=egitim_yili),
+            "update": {"arsivlendi": True},
+        },
+    ]
+
+
+def arsiv_ozeti(egitim_yili, arsivlenmis=False):
+    """`gecis_detay` şablonunda gösterilecek modül bazlı arşiv özeti: her kalem
+    için `{"grup", "etiket", "sayi"}`. Bkz. `_arsiv_kalemleri`."""
+    return [
+        {"grup": k["grup"], "etiket": k["etiket"], "sayi": k["qs"].count()}
+        for k in _arsiv_kalemleri(egitim_yili, arsivlenmis=arsivlenmis)
+    ]
+
+
 def gecis_uygula(gecis):
     from ogrenci.models import Ogrenci
     from okul.models import OkulBilgi, SinifSube, SinifSubeYil
+    from utility.services.main_services import IstatistikService
 
     if gecis.uygulandi:
         raise ValueError("Bu geçiş zaten uygulanmış.")
@@ -180,6 +297,27 @@ def gecis_uygula(gecis):
             ogrenciler.append(ogr)
         if ogrenciler:
             Ogrenci.objects.bulk_update(ogrenciler, ["sinif", "sube"])
+
+        # Eski eğitim-öğretim yılına ait tüm arşivlenebilir modüller tek noktadan
+        # (bkz. `_arsiv_kalemleri`) arşivlenir: öğrenci nöbeti, öğretmen nöbeti
+        # (yüklenmiş liste + ders doldurma geçmişi + atanamayan kayıtlar), ders
+        # programı, öğrenci/öğretmen devamsızlığı, faaliyet, ortak sınav (aktif
+        # bayrağı) ve sorumluluk sınavı (+ geçmiş dönem adalet puanlaması). Arşivlenen
+        # kayıtların kendisine dokunulmaz, yalnızca ilgili "aktif/güncel" sorgularda
+        # artık görünmezler — tam geçmiş, her modülün kendi arşiv/listesi sayfasından
+        # erişilebilir olmaya devam eder (bkz. ogrencinobet/views.py,
+        # nobet.NobetGoreviQuerySet.aktif, DersProgramiQuerySet.aktif,
+        # devamsizlik/faaliyet views.py, sinav/views_ogretmen.py,
+        # sorumluluk/services/gorevlendirme_oneri.py, rapor_ozet.py).
+        for kalem in _arsiv_kalemleri(gecis.eski_egitim_yili, arsivlenmis=False):
+            kalem["qs"].update(**kalem["update"])
+
+        # NobetIstatistik ayrı bir arşiv alanı taşımaz — tamamen arşivlenmemiş
+        # NobetGecmisi/NobetAtanamayan üzerinden türetilen bir önbellektir (bkz.
+        # IstatistikService.hesapla_ve_kaydet); yukarıdaki arşivlemenin ardından
+        # yeniden hesaplandığında yeni eğitim-öğretim yılı için sıfırlanmış (hazır)
+        # istatistiklere döner.
+        IstatistikService().hesapla_ve_kaydet()
 
         okul = OkulBilgi.get()
         okul.okul_egtyil = gecis.yeni_egitim_yili

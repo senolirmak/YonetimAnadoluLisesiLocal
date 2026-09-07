@@ -38,20 +38,26 @@ def ogretmen_gorev_ozeti_hesapla(secili_sinav) -> dict:
     personel_listesi = list(Personel.objects.select_related("brans").order_by("brans__ad", "adi_soyadi"))
     pid_set = {p.pk for p in personel_listesi}
 
-    # ── Geçmiş dönem toplamları (tüm OncekiDonem kayıtlarının toplamı) ────────
+    # ── Geçmiş dönem toplamları (arşivlenmemiş OncekiDonem kayıtlarının toplamı) ──
+    # Arşivlenmiş (eğitim-öğretim yılı sona ermiş — bkz. OncekiDonem.arsivlendi,
+    # senesonu.services.gecis_uygula) dönemler bu toplama dahil edilmez.
     onceki_kum: dict = {}   # pid → {"komisyon": n, "gozetmen": n}
-    for g in OncekiDonemGorev.objects.filter(personel_id__in=pid_set):
+    for g in OncekiDonemGorev.objects.filter(personel_id__in=pid_set, donem__arsivlendi=False):
         entry = onceki_kum.setdefault(g.personel_id, {"komisyon": 0, "gozetmen": 0})
         entry["komisyon"] += g.komisyon
         entry["gozetmen"] += g.gozetmen
 
     gecmis_donemler = list(OncekiDonem.objects.all())
 
-    # ── Kümülatif (tüm sınavlar — sistem kayıtları) ───────────────────────────
+    # ── Kümülatif (arşivlenmemiş tüm sınavlar — sistem kayıtları) ─────────────
+    # Arşivlenmiş (geçmiş eğitim-öğretim yılına ait — bkz. SorumluSinav.arsivlendi,
+    # senesonu.services.gecis_uygula) sınavların görevleri bu kümülatife dahil
+    # edilmez; onlar yalnızca "onc_*" (geçmiş dönem) sütunlarına değil, tamamen
+    # sayaç dışında kalır — arşivlenmiş yılın görev sayıları böylece sıfırlanmış olur.
     sistem_kum = {p.pk: {"komisyon": 0, "gozetmen": 0} for p in personel_listesi}
 
     kum_komisyon_kayitlar: dict = {}
-    for ku in SorumluKomisyonUyesi.objects.all():
+    for ku in SorumluKomisyonUyesi.objects.filter(sinav__arsivlendi=False):
         for pid in (ku.uye1_id, ku.uye2_id):
             if pid and pid in pid_set:
                 kum_komisyon_kayitlar.setdefault(pid, []).append(
@@ -60,7 +66,7 @@ def ogretmen_gorev_ozeti_hesapla(secili_sinav) -> dict:
     for pid, kayitlar in kum_komisyon_kayitlar.items():
         sistem_kum[pid]["komisyon"] = komisyon_gorev_sayisi(kayitlar)
 
-    for gz in SorumluGozetmen.objects.all():
+    for gz in SorumluGozetmen.objects.filter(sinav__arsivlendi=False):
         if gz.gozetmen_id and gz.gozetmen_id in pid_set:
             sistem_kum[gz.gozetmen_id]["gozetmen"] += 1
 

@@ -24,7 +24,6 @@ def _personel(request):
 
 
 from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
-from okul.utils import get_aktif_dp_tarihi
 
 
 def _ogrenci_verileri():
@@ -32,12 +31,9 @@ def _ogrenci_verileri():
         Ogrenci.objects.filter(aktif=True)
         .values_list("sinif", "sube").distinct().order_by("sinif", "sube")
     )
-    aktif_tarih = get_aktif_dp_tarihi()
-    dp_filter = {"sinif_sube__isnull": False}
-    if aktif_tarih:
-        dp_filter["uygulama_tarihi"] = aktif_tarih
     dp_sinifsube = (
-        DersProgrami.objects.filter(**dp_filter)
+        DersProgrami.objects.aktif()
+        .filter(sinif_sube__isnull=False)
         .values_list("sinif_sube__sinif", "sinif_sube__sube")
         .distinct()
         .order_by("sinif_sube__sinif", "sinif_sube__sube")
@@ -256,12 +252,9 @@ def ders_programi_getir(request):
     if not (gun and sinif and sube):
         return JsonResponse({"dersler": []})
 
-    aktif_tarih = get_aktif_dp_tarihi()
-    dp_filter = {"gun": gun, "sinif_sube__sinif": sinif, "sinif_sube__sube__iexact": sube}
-    if aktif_tarih:
-        dp_filter["uygulama_tarihi"] = aktif_tarih
     qs = (
-        DersProgrami.objects.filter(**dp_filter)
+        DersProgrami.objects.aktif()
+        .filter(gun=gun, sinif_sube__sinif=sinif, sinif_sube__sube__iexact=sube)
         .select_related("sinif_sube", "ders_saati")
         .order_by("ders_saati__derssaati_no")
     )
@@ -302,6 +295,13 @@ def faaliyet_yonetim_listesi(request):
     durum = request.GET.get("durum", "").strip()
     tarih_bas = request.GET.get("tarih_bas", "").strip()
     tarih_bit = request.GET.get("tarih_bit", "").strip()
+
+    # Sene Sonu Geçişi ile arşivlenen (geçmiş eğitim-öğretim yılına ait) kayıtlar,
+    # açıkça bir tarih aralığı seçilmediği sürece varsayılan listede gösterilmez —
+    # bkz. senesonu.services.gecis_uygula. Tarih filtresi verildiğinde arşivlenmiş
+    # kayıtlar da (geçmişe dönük arama amacıyla) sonuçlara dahil edilir.
+    if not (tarih_bas or tarih_bit):
+        qs = qs.filter(arsivlendi=False)
 
     if ogretmen_id:
         qs = qs.filter(ogretmen_id=ogretmen_id)

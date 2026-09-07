@@ -49,7 +49,7 @@ def _gun_adi_tr(date):
 def nobet_dagitim(request):
     if not is_yonetici(request.user):
         raise PermissionDenied
-    son_kayit = NobetGorevi.objects.order_by("-uygulama_tarihi").first()
+    son_kayit = NobetGorevi.objects.filter(arsivlendi=False).order_by("-uygulama_tarihi").first()
     if son_kayit:
         ref_date = son_kayit.uygulama_tarihi
     else:
@@ -215,10 +215,10 @@ def manuel_dagitim(request):
         from ..models import NobetAtanamayan, NobetGecmisi
 
         has_assignments = NobetGecmisi.objects.filter(
-            tarih__range=[check_start, check_end]
+            tarih__range=[check_start, check_end], arsivlendi=False
         ).exists()
         has_unassigned = NobetAtanamayan.objects.filter(
-            tarih__range=[check_start, check_end]
+            tarih__range=[check_start, check_end], arsivlendi=False
         ).exists()
 
         if not (has_assignments or has_unassigned):
@@ -256,7 +256,7 @@ def manuel_dagitim(request):
                 baslangic_tarihi__lte=save_date, bitis_tarihi__gte=save_date
             ).select_related("ogretmen__personel")
             program_date_q = (
-                DersProgrami.objects.filter(uygulama_tarihi__lte=save_date)
+                DersProgrami.objects.filter(uygulama_tarihi__lte=save_date, arsivlendi=False)
                 .order_by("-uygulama_tarihi")
                 .values_list("uygulama_tarihi", flat=True)
                 .first()
@@ -373,7 +373,7 @@ def manuel_dagitim(request):
     day_name_en = days_map[target_date.weekday()]
 
     gorev_date = (
-        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date)
+        NobetGorevi.objects.filter(uygulama_tarihi__lte=target_date, arsivlendi=False)
         .order_by("-uygulama_tarihi")
         .values_list("uygulama_tarihi", flat=True)
         .first()
@@ -415,7 +415,7 @@ def manuel_dagitim(request):
     bos_dersler_havuzu = {i: [] for i in range(1, 9)}
 
     program_date = (
-        DersProgrami.objects.filter(uygulama_tarihi__lte=target_date)
+        DersProgrami.objects.filter(uygulama_tarihi__lte=target_date, arsivlendi=False)
         .order_by("-uygulama_tarihi")
         .values_list("uygulama_tarihi", flat=True)
         .first()
@@ -463,7 +463,7 @@ def manuel_dagitim(request):
         from ..models import NobetGecmisi
 
         latest = (
-            NobetGecmisi.objects.filter(tarih__range=[start_day, end_day])
+            NobetGecmisi.objects.filter(tarih__range=[start_day, end_day], arsivlendi=False)
             .order_by("-tarih")
             .first()
         )
@@ -477,7 +477,7 @@ def manuel_dagitim(request):
     from ..models import NobetGecmisi
 
     mevcut_atamalar = NobetGecmisi.objects.filter(
-        tarih__range=[atama_start, atama_end]
+        tarih__range=[atama_start, atama_end], arsivlendi=False
     ).select_related("ogretmen__personel")
     atama_map = {
         (k.ogretmen.personel.pk, k.saat): f"{k.devamsiz}|{k.sinif}" for k in mevcut_atamalar

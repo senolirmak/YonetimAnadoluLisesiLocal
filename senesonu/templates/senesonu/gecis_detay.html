@@ -40,6 +40,49 @@
         </div>
     </div>
 
+    <div class="card" style="margin-bottom:16px;">
+        <div style="padding:12px 16px; border-bottom:1px solid #e9ecef; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <strong style="font-size:.92em; color:#343a40;">
+                {% if gecis.uygulandi %}
+                    Bu geçişle birlikte arşivlenen diğer modüller
+                {% else %}
+                    Bu geçiş uygulandığında ayrıca arşivlenecek modüller
+                {% endif %}
+            </strong>
+            <span style="font-size:.8em; color:#6c757d;">
+                Toplam {{ arsiv_toplam }} kayıt — {{ gecis.eski_egitim_yili }} yılına ait
+            </span>
+        </div>
+        {% if arsiv_toplam %}
+        <div style="overflow-x:auto;">
+            <table class="table" style="margin-bottom:0;">
+                <tbody>
+                    {% regroup arsiv_kalemleri by grup as arsiv_gruplari %}
+                    {% for grup in arsiv_gruplari %}
+                    {% for kalem in grup.list %}
+                    <tr>
+                        {% if forloop.first %}
+                        <td rowspan="{{ grup.list|length }}" style="font-weight:600; color:#495057; white-space:nowrap; vertical-align:top; width:1%;">{{ grup.grouper }}</td>
+                        {% endif %}
+                        <td>{{ kalem.etiket }}</td>
+                        <td style="text-align:right; font-weight:600; {% if kalem.sayi %}color:#1d4ed8;{% else %}color:#adb5bd;{% endif %}">{{ kalem.sayi }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="padding:16px; color:#6c757d; font-size:.88em;">
+            {% if gecis.uygulandi %}
+                Bu geçişle arşivlenecek başka bir kayıt bulunmuyordu.
+            {% else %}
+                Arşivlenecek başka bir kayıt bulunmuyor.
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
     {% if not gecis.uygulandi %}
     <div class="card" style="margin-bottom:16px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
@@ -56,7 +99,7 @@
                 {% csrf_token %}
                 <button type="submit" style="padding:7px 16px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;">Taslağı Sil</button>
             </form>
-            <form method="post" action="{% url 'senesonu:gecis_uygula' gecis.pk %}" onsubmit="return confirm('Bu işlem {{ ozet.toplam }} öğrencinin sınıf/şubesini güncelleyecek ve aktif eğitim-öğretim yılını {{ gecis.yeni_egitim_yili }} olarak değiştirecek. Emin misiniz?')">
+            <form method="post" action="{% url 'senesonu:gecis_uygula' gecis.pk %}" onsubmit="return confirm('Bu işlem {{ ozet.toplam }} öğrencinin sınıf/şubesini güncelleyecek, aktif eğitim-öğretim yılını {{ gecis.yeni_egitim_yili }} olarak değiştirecek ve {{ arsiv_toplam }} kaydı ({{ gecis.eski_egitim_yili }} yılına ait nöbet, devamsızlık, faaliyet, ders programı ve sınav verileri) arşivleyecek. Emin misiniz?')">
                 {% csrf_token %}
                 <button type="submit" {% if ozet.inceleme_gerekli %}disabled{% endif %} style="padding:7px 16px; background:#198754; color:#fff; border:none; border-radius:4px; cursor:pointer; {% if ozet.inceleme_gerekli %}opacity:.5; cursor:not-allowed;{% endif %}">Uygula</button>
             </form>
