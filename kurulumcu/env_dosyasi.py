@@ -36,15 +36,31 @@ def yaz(yol: Path, degerler: dict[str, str]) -> None:
     yol.chmod(0o600)
 
 
-def anahtar_ayarla(yol: Path, anahtar: str, deger: str) -> None:
+def anahtar_ayarla(yol: Path, anahtar: str, deger: str, *, sudo: bool = False) -> None:
     """Var olan bir .env dosyasında tek bir anahtarı günceller ya da (yoksa)
     sona ekler; diğer satırları ve sırayı korur. `yaz()`'ın aksine sabit bir
     şema varsaymaz — SATIR_SIRASI'nda olmayan anahtarlar (örn.
-    YEDEKLEME_POSTGRES_KONTEYNER) için kullanılır. Dosya yoksa hiçbir şey
-    yapmaz."""
+    YEDEKLEME_POSTGRES_KONTEYNER, HTTPS_ETKIN) için kullanılır. Dosya yoksa
+    hiçbir şey yapmaz.
+
+    `sudo=True`: `.env`, servis kullanıcısına devredildikten SONRA (bkz.
+    servis_kullanicisi.calisma_zamani_dosyalarini_devret — mod 640, yalnızca
+    sahibi `akalsite` yazabilir) çağrılan yerler için ŞARTTIR — kurulumu
+    çalıştıran kullanıcı o gruba üye olsa bile bu mod yalnızca OKUMA izni
+    verir, yazma denemesi `PermissionError` ile başarısız olur (üretimde
+    gerçekten yaşandı: `okulyonetim-kur` adım 6.5'te HTTPS_ETKIN yazarken).
+    `sudo tee`, var olan dosyanın sahiplik/izin bitlerine dokunmadan yalnızca
+    içeriğini değiştirdiğinden ek bir chmod/chown gerekmez."""
     if not yol.is_file():
         return
-    satirlar = yol.read_text().splitlines()
+
+    if sudo:
+        from . import yardimci as y
+        mevcut_icerik = y.cikti(["cat", str(yol)], sudo=True)
+    else:
+        mevcut_icerik = yol.read_text()
+
+    satirlar = mevcut_icerik.splitlines()
     on_ek = f"{anahtar}="
     for i, satir in enumerate(satirlar):
         if satir.strip().startswith(on_ek):
@@ -52,5 +68,10 @@ def anahtar_ayarla(yol: Path, anahtar: str, deger: str) -> None:
             break
     else:
         satirlar.append(f"{anahtar}={deger}")
-    yol.write_text("\n".join(satirlar) + "\n")
-    yol.chmod(0o600)
+    yeni_icerik = "\n".join(satirlar) + "\n"
+
+    if sudo:
+        y.calistir(["tee", str(yol)], sudo=True, sessiz=True, girdi=yeni_icerik)
+    else:
+        yol.write_text(yeni_icerik)
+        yol.chmod(0o600)
