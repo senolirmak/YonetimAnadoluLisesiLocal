@@ -530,6 +530,19 @@
                 <p class="text-muted" style="font-size:0.9em;">Bugün için nöbet çizelgesi oluşturulmamış.</p>
                 {% endif %}
             </div>
+
+            {% if yerel_ca_indirilebilir %}
+            <div class="menu-group">
+                <div class="menu-group-title">Güvenlik Sertifikası</div>
+                <p class="text-muted" style="font-size:0.85em;">
+                    Bu bilgisayarda site "güvenli değil" uyarısı gösteriyorsa,
+                    sertifikayı indirip bir kez kurun.
+                </p>
+                <a href="{% url 'yerel_ca_sertifikasi_indir' %}" class="btn btn-secondary" style="font-size:0.85em;">
+                    Sertifikayı İndir
+                </a>
+            </div>
+            {% endif %}
         </div>
 
     </div>

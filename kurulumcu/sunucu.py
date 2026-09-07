@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -60,6 +61,49 @@ WantedBy=multi-user.target
     if not y.basarili_mi(["systemctl", "is-active", "--quiet", servis]):
         y.hata(f"Servis başlatılamadı! Loglar: sudo journalctl -u {servis} -n 30")
     y.basari(f"Gunicorn servisi çalışıyor: {servis}")
+    return servis
+
+
+def eba_ws_worker_servisi_kur(
+    proje_dizin: Path, venv: Path, kullanici: str, django_ayar_bayragi: list[str]
+) -> str:
+    """EBA karekod ile giriş özelliğinin arka plan websocket işçisini (bkz.
+    ebagiris/management/commands/eba_ws_worker.py) systemd servisi olarak kurar.
+
+    Gunicorn'un aksine bir unix soketi açmaz, nginx'le paylaşacağı bir kaynağı
+    yoktur — yalnızca EBA'nın websocket'iyle konuşup veritabanına yazar; bu
+    yüzden `Group=`/`UMask=`/`SupplementaryGroups=` inceliklerine (bkz.
+    `gunicorn_servisi_kur`) ihtiyaç duymaz, kendi birincil grubu (`kullanici`
+    ile aynı ad) yeterlidir."""
+    servis = "eba-ws-worker.service"
+    y.bilgi(f"EBA karekod işçisi systemd servisi yazılıyor: {servis}")
+
+    ayar_bayragi_str = " ".join(django_ayar_bayragi)
+    icerik = f"""[Unit]
+Description=EBA Karekod Girişi Websocket İşçisi (Okul Yönetim Sistemi)
+After=network.target
+
+[Service]
+User={kullanici}
+Group={kullanici}
+WorkingDirectory={proje_dizin}
+EnvironmentFile={proje_dizin}/.env
+ExecStart={venv}/bin/python manage.py eba_ws_worker {ayar_bayragi_str}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+"""
+    y.calistir(["tee", f"/etc/systemd/system/{servis}"], sudo=True, sessiz=True, girdi=icerik)
+
+    y.calistir(["systemctl", "daemon-reload"], sudo=True)
+    y.calistir(["systemctl", "enable", servis], sudo=True, sessiz=True)
+    y.calistir(["systemctl", "restart", servis], sudo=True)
+    time.sleep(2)
+    if not y.basarili_mi(["systemctl", "is-active", "--quiet", servis]):
+        y.hata(f"Servis başlatılamadı! Loglar: sudo journalctl -u {servis} -n 30")
+    y.basari(f"EBA karekod işçisi servisi çalışıyor: {servis}")
     return servis
 
 
@@ -141,3 +185,90 @@ def saglik_kontrolu(servis: str) -> None:
     except Exception:
         pass
     y.uyari(f"Site henüz yanıt vermiyor. Kontrol: 'sudo journalctl -u {servis} -f' ve 'sudo journalctl -u nginx -f'")
+
+
+def nginx_https_yapilandir(
+    proje_dizin: Path, servis_adi: str, allowed_hosts: str, sertifika_yolu: Path, anahtar_yolu: Path
+) -> None:
+    """`nginx_yapilandir`in HTTPS'li sürümü — aynı conf.d dosyasının üzerine
+    yazar (idempotent, tekrar çalıştırmak güvenlidir). Port 80'i 443'e
+    yönlendirir, TLS'i `sertifika_yolu`/`anahtar_yolu` (bkz. sertifika.py:
+    yerel_ca_olustur/sunucu_sertifikasi_olustur — genel internete kapalı,
+    alan adı olmayan bir sunucu için Let's Encrypt kullanılamadığından kendi
+    yerel CA'mızla imzalı) ile sonlandırır.
+
+    `X-Forwarded-Proto` başlığı Django'ya (bkz. config/settings/production.py:
+    SECURE_PROXY_SSL_HEADER) isteğin aslında HTTPS üzerinden geldiğini bildirir
+    — bu olmadan `request.is_secure()` her zaman False döner (gunicorn'a giden
+    iç bağlantı zaten düz unix soketi üzerinden), bu da CSRF/çerez güvenlik
+    mantığını ve `ebagiris`'in `next` yönlendirme doğrulamasını yanlış
+    çalıştırır."""
+    server_name = allowed_hosts.replace(",", " ").strip() or "_"
+    dosya = f"/etc/nginx/conf.d/{servis_adi}.conf"
+    y.bilgi(f"Nginx HTTPS yapılandırması yazılıyor: {dosya}")
+
+    _varsayilan_siteyi_devre_disi_birak()
+
+    icerik = f"""server {{
+    listen 80 default_server;
+    server_name {server_name};
+    return 301 https://$host$request_uri;
+}}
+
+server {{
+    listen 443 ssl default_server;
+    server_name {server_name};
+
+    ssl_certificate {sertifika_yolu};
+    ssl_certificate_key {anahtar_yolu};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    client_max_body_size 20M;
+
+    location /static/ {{
+        alias {proje_dizin}/staticfiles/;
+    }}
+
+    location /media/ {{
+        alias {proje_dizin}/media/;
+    }}
+
+    location / {{
+        proxy_pass http://unix:/run/{servis_adi}/gunicorn.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+}}
+"""
+    y.calistir(["tee", dosya], sudo=True, sessiz=True, girdi=icerik)
+
+    if not y.basarili_mi(["nginx", "-t"], sudo=True):
+        y.hata("Nginx yapılandırma testi başarısız. 'sudo nginx -t' ile inceleyin.")
+    y.calistir(["systemctl", "enable", "nginx"], sudo=True, sessiz=True)
+    y.calistir(["systemctl", "restart", "nginx"], sudo=True)
+    y.basari("Nginx HTTPS ile yapılandırıldı ve yeniden başlatıldı.")
+
+
+def saglik_kontrolu_https(servis: str, ca_sertifika_yolu: Path) -> None:
+    """`saglik_kontrolu`nun HTTPS sürümü — kendi yerel CA'mızla imzalandığı
+    için sistemin genel güven deposu bu sertifikayı tanımaz;
+    `ca_sertifika_yolu`'nu doğrulama için açıkça kullanarak sahte bir
+    "güvensiz sertifika" hatası yerine gerçek bir sağlık kontrolü yapılır."""
+    y.bilgi("HTTPS sağlık kontrolü yapılıyor...")
+    time.sleep(1)
+    try:
+        baglam = ssl.create_default_context(cafile=str(ca_sertifika_yolu))
+        with urllib.request.urlopen("https://127.0.0.1/", timeout=5, context=baglam) as yanit:
+            if yanit.status < 500:
+                y.basari(f"Site ayağa kalktı: https://127.0.0.1/ üzerinden {yanit.status} yanıtı alınıyor.")
+                return
+    except urllib.error.HTTPError as hata_nesnesi:
+        if hata_nesnesi.code < 500:
+            y.basari(f"Site ayağa kalktı: https://127.0.0.1/ üzerinden {hata_nesnesi.code} yanıtı alınıyor.")
+            return
+    except Exception:
+        pass
+    y.uyari(f"Site HTTPS üzerinden henüz yanıt vermiyor. Kontrol: 'sudo journalctl -u {servis} -f' ve 'sudo journalctl -u nginx -f'")

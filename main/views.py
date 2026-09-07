@@ -1,5 +1,9 @@
+from pathlib import Path
+
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
+from django.http import FileResponse, Http404
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -130,4 +134,26 @@ def gorevlerim(request):
             "title": "Görevlerim",
             **gorev,
         },
+    )
+
+
+def yerel_ca_sertifikasi_indir(request):
+    """Sunucunun yerel CA'sının GENEL sertifikasını (bkz. kurulumcu/sertifika.py:
+    ca_sertifikasini_disari_kopyala — özel anahtar değil, kamuya açık bir CA
+    sertifikası) indirilebilir yapar; okuldaki istemci bilgisayarların bunu
+    "Güvenilen Kök Sertifika Yetkilileri" deposuna eklemesi içindir.
+
+    Kasıtlı olarak `login_required` DEĞİLDİR: henüz siteye güvenmeyen bir
+    tarayıcının (bkz. context_processors.yerel_ca_bilgisi, HTTPS_ETKIN) bu
+    dosyayı tam da güvenmediği için ihtiyaç duyduğu an — giriş sayfasından —
+    indirebilmesi gerekir; içerik zaten kamuya açık olacak şekilde tasarlanmış
+    bir sertifikadır."""
+    dosya = Path(settings.BASE_DIR) / "yerel-ca-sertifikasi.crt"
+    if not dosya.is_file():
+        raise Http404("Yerel CA sertifikası bulunamadı.")
+    return FileResponse(
+        open(dosya, "rb"),
+        as_attachment=True,
+        filename="okul-yonetim-sistemi-ca.crt",
+        content_type="application/x-x509-ca-cert",
     )

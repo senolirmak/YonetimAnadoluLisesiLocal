@@ -13,6 +13,12 @@ VENV="$PROJE_DIZIN/venv"
 YEDEK_DIZIN="$PROJE_DIZIN/backups"
 
 SERVIS="akalyonetim.service"
+# İsteğe bağlı: yalnızca kurulum sırasında "EBA karekod işçi servisi şimdi
+# kurulsun mu?" sorusuna evet denmişse var olur (bkz. kurulumcu/cli.py,
+# sunucu.eba_ws_worker_servisi_kur). Var olup olmadığı aşağıda `systemctl
+# list-unit-files` ile kontrol edilip yalnızca varsa durdurulup başlatılır —
+# kurulmamış bir deploy'da bu adımlar sessizce atlanır.
+EBA_SERVIS="eba-ws-worker.service"
 
 KIRMIZI='\033[0;31m'
 YESIL='\033[0;32m'
@@ -136,6 +142,13 @@ echo "        Boyut: $(du -h "$YEDEK_DOSYA" | cut -f1)"
 bilgi "Servis durduruluyor..."
 sudo systemctl stop "$SERVIS" || uyari "Servis zaten durmuş olabilir."
 
+EBA_SERVIS_KURULU=0
+if systemctl list-unit-files "$EBA_SERVIS" &>/dev/null && systemctl list-unit-files "$EBA_SERVIS" | grep -q "$EBA_SERVIS"; then
+    EBA_SERVIS_KURULU=1
+    bilgi "EBA karekod işçi servisi durduruluyor..."
+    sudo systemctl stop "$EBA_SERVIS" || uyari "EBA karekod işçi servisi zaten durmuş olabilir."
+fi
+
 # ── 4. Kodu güncelle ─────────────────────────────────────────
 bilgi "Kod çekiliyor (git pull)..."
 
@@ -230,6 +243,17 @@ else
     hata "Servis başlatılamadı! Loglar: sudo journalctl -u $SERVIS -n 30"
 fi
 
+if [[ "$EBA_SERVIS_KURULU" -eq 1 ]]; then
+    bilgi "EBA karekod işçi servisi başlatılıyor..."
+    sudo systemctl start "$EBA_SERVIS"
+    sleep 2
+    if systemctl is-active --quiet "$EBA_SERVIS"; then
+        basari "EBA karekod işçi servisi çalışıyor."
+    else
+        uyari "EBA karekod işçi servisi başlatılamadı! Loglar: sudo journalctl -u $EBA_SERVIS -n 30"
+    fi
+fi
+
 # ── 12. Kritik tablo özeti ────────────────────────────────────
 echo ""
 bilgi "Kritik tablo kayıt sayıları:"
@@ -277,4 +301,7 @@ echo ""
 echo -e "  Yedek dosyası : ${SARI}$YEDEK_DOSYA${SIFIRLA}"
 echo -e "  Servis durumu : sudo systemctl status $SERVIS"
 echo -e "  Canlı loglar  : sudo journalctl -u $SERVIS -f"
+if [[ "$EBA_SERVIS_KURULU" -eq 1 ]]; then
+    echo -e "  EBA işçisi    : sudo systemctl status $EBA_SERVIS"
+fi
 echo ""

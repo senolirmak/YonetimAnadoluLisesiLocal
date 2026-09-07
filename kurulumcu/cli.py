@@ -23,7 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import env_dosyasi, paket_yoneticisi, servis_kullanicisi, sunucu, veritabani
+from . import env_dosyasi, paket_yoneticisi, sertifika, servis_kullanicisi, sunucu, veritabani
 from . import yardimci as y
 
 PROJE_DIZIN = Path(__file__).resolve().parent.parent
@@ -324,6 +324,67 @@ def main() -> None:
         sunucu.nginx_yapilandir(PROJE_DIZIN, servis_adi, degerler.get("ALLOWED_HOSTS", ""))
         sunucu.saglik_kontrolu(servis)
 
+        # ── 6.5 Nginx + HTTPS (yerel CA ile, isteğe bağlı) ───────
+        print()
+        print("Sunucu okul ağı içinde, dışarıya kapalı çalışıyor ve genel bir alan")
+        print("adı yok — bu yüzden Let's Encrypt gibi genel sertifika otoriteleri")
+        print("kullanılamaz. Bunun yerine kendi yerel sertifika otoriteniz (CA)")
+        print("oluşturulup onunla imzalı bir sunucu sertifikası kurulabilir. Bu")
+        print("CA'nın genel sertifikasının (özel anahtar DEĞİL) okuldaki istemci")
+        print("bilgisayarlara güvenilir kök sertifika olarak eklenmesi gerekir,")
+        print("aksi hâlde tarayıcılar 'Bağlantınız güvenli değil' uyarısı gösterir")
+        print("(yine de 'Devam et' ile siteye girilebilir).")
+        if y.sor("Nginx + HTTPS (yerel CA ile) şimdi kurulsun mu?", "E").lower().startswith("e"):
+            sanlar = [s.strip() for s in degerler.get("ALLOWED_HOSTS", "").split(",") if s.strip()]
+            if not sanlar:
+                sanlar = ["localhost", "127.0.0.1"]
+            sertifika.yerel_ca_olustur()
+            sertifika.sunucu_sertifikasi_olustur(sanlar)
+            ca_kopya = sertifika.ca_sertifikasini_disari_kopyala(PROJE_DIZIN)
+            sunucu.nginx_https_yapilandir(
+                PROJE_DIZIN, servis_adi, degerler.get("ALLOWED_HOSTS", ""),
+                sertifika.SUNUCU_SERTIFIKA, sertifika.SUNUCU_ANAHTAR,
+            )
+            env_dosyasi.anahtar_ayarla(env_yolu, "HTTPS_ETKIN", "True")
+            y.calistir(["systemctl", "restart", servis], sudo=True)
+            sunucu.saglik_kontrolu_https(servis, sertifika.CA_SERTIFIKA)
+            https_kuruldu = True
+            print()
+            print(f"  İstemcilere dağıtılacak CA sertifikası : {ca_kopya}")
+            print("  Windows  : dosyaya çift tıklayıp 'Yerel Bilgisayar' > 'Güvenilen")
+            print("             Kök Sertifika Yetkilileri' deposuna kurun (GPO ile de")
+            print("             toplu dağıtılabilir).")
+            print(f"  Site artık https://{sanlar[0]}/ üzerinden erişilir; http istekleri")
+            print("  otomatik olarak https'e yönlendirilir.")
+        else:
+            https_kuruldu = False
+            y.uyari("Atlandı — site http üzerinden çalışmaya devam ediyor.")
+
+        # ── 6.6 EBA karekod ile giriş (isteğe bağlı) ─────────────
+        print()
+        print("EBA (Eğitim Bilişim Ağı) karekod ile giriş özelliği, gerçek EBA")
+        print("sunucusuna (qr-etap.eba.gov.tr — kapalı/resmî bir MEB servisi) sürekli")
+        print("bir websocket bağlantısı açan ayrı bir arka plan servisi gerektirir.")
+        print("EBA/MEB'in bu API'nin bu şekilde kullanımına resmî izni olup olmadığı")
+        print("netleşmedi — kurmadan önce değerlendirin (bkz. ebagiris app'i README/")
+        print("docstring notları).")
+        print("Okul ağları genelde MEB'in kendi TLS denetimi yapan bir proxy'sinden")
+        print("geçtiğinden, bu adım MEB'in kök sertifikasını da sisteme kurar —")
+        print("aksi hâlde EBA sunucusuna bağlantı 'certificate verify failed' ile")
+        print("başarısız olabilir.")
+        if y.sor("EBA karekod işçi servisi şimdi kurulsun mu?", "H").lower().startswith("e"):
+            sertifika.meb_sertifikasini_kur()
+            eba_servis = sunucu.eba_ws_worker_servisi_kur(
+                PROJE_DIZIN, VENV, servis_kullanicisi.SERVIS_KULLANICISI, django_ayar_bayragi
+            )
+            print(f"  Durum        : sudo systemctl status {eba_servis}")
+            print(f"  Canlı loglar : sudo journalctl -u {eba_servis} -f")
+        else:
+            y.uyari(
+                "Atlandı — daha sonra 'okulyonetim-kur' ile sihirbazı tekrar çalıştırıp "
+                "kurabilir ya da sunucu.eba_ws_worker_servisi_kur()'u elle çağırabilirsiniz."
+            )
+
     # ── 7. Bitiş ──────────────────────────────────────────────────
     _banner("Kurulum tamamlandı!", y.YESIL)
 
@@ -350,9 +411,10 @@ def main() -> None:
         print("  Nginx durumu : sudo systemctl status nginx")
         print("  Sonraki güncellemeler için: bash deploy.sh")
         print()
+        sema = "https" if https_kuruldu else "http"
         print(
-            "ALLOWED_HOSTS listesindeki adres(ler) üzerinden tarayıcıdan erişilebilir "
-            f"({degerler.get('ALLOWED_HOSTS', 'tanımsız')})."
+            f"ALLOWED_HOSTS listesindeki adres(ler) üzerinden ({sema}://) tarayıcıdan "
+            f"erişilebilir ({degerler.get('ALLOWED_HOSTS', 'tanımsız')})."
         )
     else:
         print("Sunucuyu başlatmak için:")
