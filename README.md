@@ -250,9 +250,9 @@ python manage.py ogretmen_kullanici_olustur
 python manage.py ogretmen_kullanici_olustur --kaydet
 ```
 
-Personel, nöbet, ders programı ve sınıf/şube verilerini içeri aktarmak için
-`/veriaktar/` altındaki 5 adımlı Excel import sihirbazını kullanın (bkz.
-"Uygulama Modülleri" tablosu).
+Okul bilgileri, sınıf/şube, ders programı, nöbet ve öğrenci verilerini içeri
+aktarmak için `/veriaktar/` altındaki 5 adımlı Excel import sihirbazını
+kullanın (bkz. "Uygulama Modülleri" tablosu).
 
 ---
 

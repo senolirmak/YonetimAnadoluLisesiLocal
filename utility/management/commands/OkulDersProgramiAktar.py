@@ -1,12 +1,29 @@
-from django.core.management.base import BaseCommand
+import os
+from io import BytesIO
+
+from django.core.management.base import BaseCommand, CommandError
 
 from veriaktar.services.ders_programi_import_service import DersProgramiIsleyici
 
 
 class Command(BaseCommand):
-    help = "Excel ders programını içe aktarır"
+    help = "Excel ders programını (OOK...XLS) içe aktarır"
 
-    def handle(self, *args, **kwargs):
-        isleyici = DersProgramiIsleyici(file_path="OOK11002_R01_222.XLS")
+    def add_arguments(self, parser):
+        parser.add_argument("dosya_yolu", help="Ders programı Excel dosyasının yolu")
+        parser.add_argument(
+            "--uygulama-tarihi", default="2026/02/23", help="Uygulama tarihi (YYYY/AA/GG)"
+        )
+
+    def handle(self, *args, **options):
+        dosya_yolu = options["dosya_yolu"]
+        try:
+            with open(dosya_yolu, "rb") as fh:
+                dosya = BytesIO(fh.read())
+        except OSError as exc:
+            raise CommandError(f"Dosya okunamadı: {dosya_yolu} ({exc})") from exc
+        dosya.name = os.path.basename(dosya_yolu)
+
+        isleyici = DersProgramiIsleyici(dosya=dosya, uygulama_tarihi=options["uygulama_tarihi"])
         isleyici.calistir()
         self.stdout.write(self.style.SUCCESS("Ders programı aktarıldı"))

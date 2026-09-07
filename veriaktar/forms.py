@@ -15,10 +15,6 @@ class BaseImportForm(forms.Form):
     )
 
 
-class PersonelImportForm(BaseImportForm):
-    dosya = forms.FileField(label="Personel Excel Dosyası (personel.xlsx)")
-
-
 class NobetImportForm(BaseImportForm):
     dosya = forms.FileField(label="Nöbet Excel Dosyası (..ÖğretmenNöbet.xlsx)")
 

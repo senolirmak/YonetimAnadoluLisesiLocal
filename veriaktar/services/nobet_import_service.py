@@ -3,19 +3,23 @@ import warnings
 import pandas as pd
 
 from utility.services.main_services import EOkulVeriAktar
-from veriaktar.services.default_path_service import DefaultPath
 
 warnings.filterwarnings("ignore")
 
 
 class NobetIsleyici:
-    def __init__(self, nobet_path, uygulama_tarihi="2026/02/23", kullanici=None):
+    """Haftalık nöbetçi listesi Excel dosyasını (..ÖğretmenNöbet.xlsx) içe aktarır.
+
+    Yüklenen dosya diske yazılmadan, doğrudan bellekte (Django'nun UploadedFile
+    nesnesinden) işlenir — ayrı bir "veri"/"hazırlık" dizinine ihtiyaç duymaz.
+    """
+
+    def __init__(self, dosya, uygulama_tarihi="2026/02/23", kullanici=None):
         self.uygulama_tarihi = uygulama_tarihi
         self.kullanici = kullanici
-        self.Default_Path = DefaultPath()
-        self.nobet_path = self.Default_Path.resolve_veri_path(nobet_path)
+        self.dosya_adi = getattr(dosya, "name", "nobet.xlsx")
 
-        df_nobet_raw = pd.read_excel(self.nobet_path, sheet_name="SABAH")
+        df_nobet_raw = pd.read_excel(dosya, sheet_name="SABAH")
         df_nobet_raw = df_nobet_raw.iloc[3:, :4]
         df_nobet_raw.columns = ["nobetgun", "_", "adisoyadi", "nobetyeri"]
         self.df_nobet = df_nobet_raw
@@ -48,11 +52,6 @@ class NobetIsleyici:
         self.nobetci_veri = self.nobetci_data()
         self.nobetci_veri["nobetci"] = self.nobetci_veri["nobetci"].str.strip()
 
-    def kaydet(self, nobet_listesi):
-        nobet_listesi = self.Default_Path.resolve_hazirlik_path(nobet_listesi)
-        nobet_listesi.parent.mkdir(parents=True, exist_ok=True)
-        self.nobetci_veri.to_excel(nobet_listesi, index=False)
-
     def _nobet_yerlerini_sync_et(self):
         from nobet.models import NobetYerleri
 
@@ -66,9 +65,8 @@ class NobetIsleyici:
         veri_aktar = EOkulVeriAktar()
         return veri_aktar.save_yeni_veri_NobetGorevi(self.nobetci_veri.copy())
 
-    def calistir(self, nobet_listesi="hz_duzenlenmis_nobet.xlsx"):
+    def calistir(self):
         self.nobet_nobetgorevi_data()
-        self.kaydet(nobet_listesi)
         status = self.veritabanina_yaz()
         self._aktar_gecmisi_kaydet(status)
         return status
@@ -88,7 +86,6 @@ class NobetIsleyici:
         if uyarilar:
             durum = "kismi"
 
-        import pandas as pd
         uygulama_tarihi = None
         try:
             uygulama_tarihi = pd.to_datetime(self.uygulama_tarihi).date()
@@ -97,7 +94,7 @@ class NobetIsleyici:
 
         VeriAktarimGecmisi.objects.create(
             dosya_turu="nobet_listesi",
-            dosya_adi=self.nobet_path.name,
+            dosya_adi=self.dosya_adi,
             uygulama_tarihi=uygulama_tarihi,
             kullanici=self.kullanici,
             kayit_sayisi=status.get("inserted", 0),

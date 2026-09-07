@@ -9,6 +9,9 @@ Format:
 - Öğrenci satırları: col0 = S.No (sayı > 0), col1 = okulno,
   col4 = adi, col8 = soyadi, col12 = cinsiyet
 - Desteklenen formatlar: .XLS / .xls (xlrd), .XLSX / .xlsx (openpyxl)
+
+Yüklenen dosya diske yazılmadan, doğrudan bellekte (Django'nun UploadedFile
+nesnesinden) işlenir — ayrı bir "veri" dizinine ihtiyaç duymaz.
 """
 
 import re
@@ -24,9 +27,9 @@ class OgrenciIsleyici:
         re.IGNORECASE,
     )
 
-    def __init__(self, file_path, kullanici=None, dosya_tarihi=None):
-        self.file_path = str(file_path)
-        self._file_name = str(file_path).split("/")[-1].split("\\")[-1]
+    def __init__(self, dosya, kullanici=None, dosya_tarihi=None):
+        self.dosya = dosya
+        self._file_name = getattr(dosya, "name", "ogrenci.xlsx")
         self.kullanici = kullanici
         self.dosya_tarihi = dosya_tarihi
         self._kayitlar = []
@@ -35,12 +38,13 @@ class OgrenciIsleyici:
     def parse(self) -> list:
         """XLS veya XLSX dosyasını okuyup {sinif, sube, okulno, adi, soyadi, cinsiyet}
         sözlüklerinden oluşan listeyi döner. Uzantı büyük/küçük harf duyarsız."""
-        if self.file_path.lower().endswith(".xlsx"):
+        if self._file_name.lower().endswith(".xlsx"):
             return self._parse_xlsx()
         return self._parse_xls()
 
     def _parse_xls(self) -> list:
-        wb = xlrd.open_workbook(self.file_path)
+        self.dosya.seek(0)
+        wb = xlrd.open_workbook(file_contents=self.dosya.read())
         ws = wb.sheet_by_index(0)
 
         aktif_sinif = None
@@ -86,7 +90,8 @@ class OgrenciIsleyici:
         return sonuc
 
     def _parse_xlsx(self) -> list:
-        wb = load_workbook(self.file_path, read_only=True, data_only=True)
+        self.dosya.seek(0)
+        wb = load_workbook(self.dosya, read_only=True, data_only=True)
         ws = wb.active
 
         aktif_sinif = None

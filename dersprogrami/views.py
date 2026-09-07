@@ -896,18 +896,12 @@ def dersprogrami_yukle(request):
     form = DersProgramiImportForm(request.POST or None, request.FILES or None)
 
     if request.method == "POST" and form.is_valid():
-        from veriaktar.services.default_path_service import DefaultPath
         from veriaktar.services.ders_programi_import_service import DersProgramiIsleyici
 
-        dp = DefaultPath()
         try:
             f = request.FILES["dosya"]
             tarih = form.cleaned_data["uygulama_tarihi"]
-            file_path = dp.VERI_DIR / f.name
-            with open(file_path, "wb+") as dest:
-                for chunk in f.chunks():
-                    dest.write(chunk)
-            DersProgramiIsleyici(file_path=str(file_path), uygulama_tarihi=tarih).calistir()
+            DersProgramiIsleyici(dosya=f, uygulama_tarihi=tarih).calistir()
             messages.success(request, "Ders programı başarıyla aktarıldı.")
         except Exception as e:
             messages.error(request, f"Hata oluştu: {str(e)}")

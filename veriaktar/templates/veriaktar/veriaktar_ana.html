@@ -178,15 +178,14 @@
   {% endif %}
 
   <!-- Özet banner -->
-  {% if tamamlanan == 6 %}
+  {% if tamamlanan == 5 %}
   <div class="alert-banner success">✔ Tüm kurulum adımları tamamlandı. Sistem kullanıma hazır.</div>
   {% else %}
-  <div class="alert-banner warning">⚙ Kurulum devam ediyor — {{ tamamlanan }}/6 adım tamamlandı.</div>
+  <div class="alert-banner warning">⚙ Kurulum devam ediyor — {{ tamamlanan }}/5 adım tamamlandı.</div>
   {% endif %}
 
   <!-- İlerleme çubuğu -->
   <div class="progress-bar-wrap">
-    {% with labels="Okul Bilgileri|Personel|Şubeler|Ders Programı|Nöbet" %}
     <div class="prog-step">
       <div class="prog-circle {% if adimlar.0 %}done{% elif aktif_adim == 1 %}current{% endif %}">
         {% if adimlar.0 %}✓{% else %}1{% endif %}
@@ -198,37 +197,29 @@
       <div class="prog-circle {% if adimlar.1 %}done{% elif aktif_adim == 2 %}current{% endif %}">
         {% if adimlar.1 %}✓{% else %}2{% endif %}
       </div>
-      <div class="prog-label {% if adimlar.1 %}done{% elif aktif_adim == 2 %}current{% endif %}">Personel</div>
+      <div class="prog-label {% if adimlar.1 %}done{% elif aktif_adim == 2 %}current{% endif %}">Şubeler</div>
     </div>
     <div class="prog-connector {% if adimlar.1 %}done{% endif %}"></div>
     <div class="prog-step">
       <div class="prog-circle {% if adimlar.2 %}done{% elif aktif_adim == 3 %}current{% endif %}">
         {% if adimlar.2 %}✓{% else %}3{% endif %}
       </div>
-      <div class="prog-label {% if adimlar.2 %}done{% elif aktif_adim == 3 %}current{% endif %}">Şubeler</div>
+      <div class="prog-label {% if adimlar.2 %}done{% elif aktif_adim == 3 %}current{% endif %}">Ders Programı</div>
     </div>
     <div class="prog-connector {% if adimlar.2 %}done{% endif %}"></div>
     <div class="prog-step">
       <div class="prog-circle {% if adimlar.3 %}done{% elif aktif_adim == 4 %}current{% endif %}">
         {% if adimlar.3 %}✓{% else %}4{% endif %}
       </div>
-      <div class="prog-label {% if adimlar.3 %}done{% elif aktif_adim == 4 %}current{% endif %}">Ders Programı</div>
+      <div class="prog-label {% if adimlar.3 %}done{% elif aktif_adim == 4 %}current{% endif %}">Nöbet Listesi</div>
     </div>
     <div class="prog-connector {% if adimlar.3 %}done{% endif %}"></div>
     <div class="prog-step">
       <div class="prog-circle {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% endif %}">
         {% if adimlar.4 %}✓{% else %}5{% endif %}
       </div>
-      <div class="prog-label {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% endif %}">Nöbet Listesi</div>
+      <div class="prog-label {% if adimlar.4 %}done{% elif aktif_adim == 5 %}current{% endif %}">Öğrenciler</div>
     </div>
-    <div class="prog-connector {% if adimlar.4 %}done{% endif %}"></div>
-    <div class="prog-step">
-      <div class="prog-circle {% if adimlar.5 %}done{% elif aktif_adim == 6 %}current{% endif %}">
-        {% if adimlar.5 %}✓{% else %}6{% endif %}
-      </div>
-      <div class="prog-label {% if adimlar.5 %}done{% elif aktif_adim == 6 %}current{% endif %}">Öğrenciler</div>
-    </div>
-    {% endwith %}
   </div>
 
   <!-- ADIM 1 — Okul Bilgileri -->
@@ -264,47 +255,14 @@
     </div>
   </details>
 
-  <!-- ADIM 2 — Personel Listesi -->
+  <!-- ADIM 2 — Şube Bilgileri -->
   <details class="aktar-card {% if adimlar.1 %}done{% elif aktif_adim == 2 %}active{% else %}pending{% endif %}"
            {% if aktif_adim == 2 or adimlar.1 %}open{% endif %}>
     <summary>
       <span class="aktar-badge">{% if adimlar.1 %}✓{% else %}2{% endif %}</span>
-      <span class="aktar-card-title">Personel Listesi</span>
+      <span class="aktar-card-title">Sınıf / Şube Bilgileri</span>
       <span class="aktar-tag {% if adimlar.1 %}done{% elif aktif_adim == 2 %}active{% else %}pending{% endif %}">
         {% if adimlar.1 %}Tamamlandı{% elif aktif_adim == 2 %}Aktif Adım{% else %}Bekliyor{% endif %}
-      </span>
-      <span class="aktar-chevron">▼</span>
-    </summary>
-    <div class="aktar-card-body">
-      <p class="hint">Personel listesini içeren Excel dosyasını (personel.xlsx) yükleyiniz.</p>
-      <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div class="aktar-form-row">
-          {% for field in personel_form %}
-          <div>
-            {{ field.label_tag }}
-            {{ field }}
-            {% for error in field.errors %}<p class="error-text">{{ error }}</p>{% endfor %}
-          </div>
-          {% endfor %}
-        </div>
-        <div class="aktar-submit-row">
-          <button type="submit" name="personel_aktar" class="btn btn-primary">
-            {% if adimlar.1 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}
-          </button>
-        </div>
-      </form>
-    </div>
-  </details>
-
-  <!-- ADIM 3 — Şube Bilgileri -->
-  <details class="aktar-card {% if adimlar.2 %}done{% elif aktif_adim == 3 %}active{% else %}pending{% endif %}"
-           {% if aktif_adim == 3 or adimlar.2 %}open{% endif %}>
-    <summary>
-      <span class="aktar-badge">{% if adimlar.2 %}✓{% else %}3{% endif %}</span>
-      <span class="aktar-card-title">Sınıf / Şube Bilgileri</span>
-      <span class="aktar-tag {% if adimlar.2 %}done{% elif aktif_adim == 3 %}active{% else %}pending{% endif %}">
-        {% if adimlar.2 %}Tamamlandı{% elif aktif_adim == 3 %}Aktif Adım{% else %}Bekliyor{% endif %}
       </span>
       <span class="aktar-chevron">▼</span>
     </summary>
@@ -331,21 +289,21 @@
         </div>
         <div class="aktar-submit-row">
           <button type="submit" name="sinif_sube_aktar" class="btn btn-primary">
-            {% if adimlar.2 %}Güncelle{% else %}Kaydet ve Devam Et{% endif %}
+            {% if adimlar.1 %}Güncelle{% else %}Kaydet ve Devam Et{% endif %}
           </button>
         </div>
       </form>
     </div>
   </details>
 
-  <!-- ADIM 4 — Ders Programı -->
-  <details class="aktar-card {% if adimlar.3 %}done{% elif aktif_adim == 4 %}active{% else %}pending{% endif %}"
-           {% if aktif_adim == 4 or adimlar.3 %}open{% endif %}>
+  <!-- ADIM 3 — Ders Programı -->
+  <details class="aktar-card {% if adimlar.2 %}done{% elif aktif_adim == 3 %}active{% else %}pending{% endif %}"
+           {% if aktif_adim == 3 or adimlar.2 %}open{% endif %}>
     <summary>
-      <span class="aktar-badge">{% if adimlar.3 %}✓{% else %}4{% endif %}</span>
+      <span class="aktar-badge">{% if adimlar.2 %}✓{% else %}3{% endif %}</span>
       <span class="aktar-card-title">Okul Ders Programı</span>
-      <span class="aktar-tag {% if adimlar.3 %}done{% elif aktif_adim == 4 %}active{% else %}pending{% endif %}">
-        {% if adimlar.3 %}Tamamlandı{% elif aktif_adim == 4 %}Aktif Adım{% else %}Bekliyor{% endif %}
+      <span class="aktar-tag {% if adimlar.2 %}done{% elif aktif_adim == 3 %}active{% else %}pending{% endif %}">
+        {% if adimlar.2 %}Tamamlandı{% elif aktif_adim == 3 %}Aktif Adım{% else %}Bekliyor{% endif %}
       </span>
       <span class="aktar-chevron">▼</span>
     </summary>
@@ -364,21 +322,21 @@
         </div>
         <div class="aktar-submit-row">
           <button type="submit" name="ders_programi_aktar" class="btn btn-primary">
-            {% if adimlar.3 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}
+            {% if adimlar.2 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}
           </button>
         </div>
       </form>
     </div>
   </details>
 
-  <!-- ADIM 5 — Nöbet Listesi -->
-  <details class="aktar-card {% if adimlar.4 %}done{% elif aktif_adim == 5 %}active{% else %}pending{% endif %}"
-           {% if aktif_adim == 5 or adimlar.4 %}open{% endif %}>
+  <!-- ADIM 4 — Nöbet Listesi -->
+  <details class="aktar-card {% if adimlar.3 %}done{% elif aktif_adim == 4 %}active{% else %}pending{% endif %}"
+           {% if aktif_adim == 4 or adimlar.3 %}open{% endif %}>
     <summary>
-      <span class="aktar-badge">{% if adimlar.4 %}✓{% else %}5{% endif %}</span>
+      <span class="aktar-badge">{% if adimlar.3 %}✓{% else %}4{% endif %}</span>
       <span class="aktar-card-title">Nöbetçi Listesi</span>
-      <span class="aktar-tag {% if adimlar.4 %}done{% elif aktif_adim == 5 %}active{% else %}pending{% endif %}">
-        {% if adimlar.4 %}Tamamlandı{% elif aktif_adim == 5 %}Aktif Adım{% else %}Bekliyor{% endif %}
+      <span class="aktar-tag {% if adimlar.3 %}done{% elif aktif_adim == 4 %}active{% else %}pending{% endif %}">
+        {% if adimlar.3 %}Tamamlandı{% elif aktif_adim == 4 %}Aktif Adım{% else %}Bekliyor{% endif %}
       </span>
       <span class="aktar-chevron">▼</span>
     </summary>
@@ -397,21 +355,21 @@
         </div>
         <div class="aktar-submit-row">
           <button type="submit" name="nobet_aktar" class="btn btn-primary">
-            {% if adimlar.4 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}
+            {% if adimlar.3 %}Yeniden Yükle{% else %}Yükle ve Devam Et{% endif %}
           </button>
         </div>
       </form>
     </div>
   </details>
 
-  <!-- ADIM 6 — Öğrenci Listesi -->
-  <details class="aktar-card {% if adimlar.5 %}done{% elif aktif_adim == 6 %}active{% else %}pending{% endif %}"
-           {% if aktif_adim == 6 or adimlar.5 %}open{% endif %}>
+  <!-- ADIM 5 — Öğrenci Listesi -->
+  <details class="aktar-card {% if adimlar.4 %}done{% elif aktif_adim == 5 %}active{% else %}pending{% endif %}"
+           {% if aktif_adim == 5 or adimlar.4 %}open{% endif %}>
     <summary>
-      <span class="aktar-badge">{% if adimlar.5 %}✓{% else %}6{% endif %}</span>
+      <span class="aktar-badge">{% if adimlar.4 %}✓{% else %}5{% endif %}</span>
       <span class="aktar-card-title">Öğrenci Listesi</span>
-      <span class="aktar-tag {% if adimlar.5 %}done{% elif aktif_adim == 6 %}active{% else %}pending{% endif %}">
-        {% if adimlar.5 %}Tamamlandı{% elif aktif_adim == 6 %}Aktif Adım{% else %}Bekliyor{% endif %}
+      <span class="aktar-tag {% if adimlar.4 %}done{% elif aktif_adim == 5 %}active{% else %}pending{% endif %}">
+        {% if adimlar.4 %}Tamamlandı{% elif aktif_adim == 5 %}Aktif Adım{% else %}Bekliyor{% endif %}
       </span>
       <span class="aktar-chevron">▼</span>
     </summary>
@@ -431,7 +389,7 @@
         </div>
         <div class="aktar-submit-row">
           <button type="submit" name="ogrenci_aktar" class="btn btn-primary">
-            {% if adimlar.5 %}Yeniden Yükle{% else %}Yükle ve Tamamla{% endif %}
+            {% if adimlar.4 %}Yeniden Yükle{% else %}Yükle ve Tamamla{% endif %}
           </button>
         </div>
       </form>

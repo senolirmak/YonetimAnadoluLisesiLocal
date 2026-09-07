@@ -1,16 +1,20 @@
 import warnings
 from collections import defaultdict
 from io import BytesIO
-from pathlib import Path
 
 import pandas as pd
-
-from veriaktar.services.default_path_service import DefaultPath
 
 warnings.filterwarnings("ignore")
 
 
 class DersProgramiIsleyici:
+    """e-Okul'dan indirilen haftalık ders programı Excel dosyasını (OOK...XLS)
+    içe aktarır.
+
+    Yüklenen dosya diske yazılmadan, doğrudan bellekte (Django'nun UploadedFile
+    nesnesinden) işlenir — ayrı bir "veri"/"hazırlık" dizinine ihtiyaç duymaz.
+    """
+
     TRGUN_CHOICES = [
         ("PAZARTESİ", "Monday"),
         ("SALI", "Tuesday"),
@@ -32,13 +36,12 @@ class DersProgramiIsleyici:
         8: "14:25",
     }
 
-    def __init__(self, file_path, uygulama_tarihi="2026/02/23", kullanici=None):
+    def __init__(self, dosya, uygulama_tarihi="2026/02/23", kullanici=None):
         self.uygulama_tarihi = uygulama_tarihi
         self.kullanici = kullanici
+        self.dosya_adi = getattr(dosya, "name", "ders_programi.xlsx")
         self.sinif_bilgileri = self.sinif_bilgilerini_getir()
-        self.Default_Path = DefaultPath()
-        self.file_path = self.Default_Path.resolve_veri_path(file_path)
-        self.df = self.program_temizle(self.file_path)
+        self.df = self.program_temizle(dosya)
         self.gunler = [v[1] for v in self.TRGUN_CHOICES][:5]
         self.processed_df: pd.DataFrame
 
@@ -50,8 +53,8 @@ class DersProgramiIsleyici:
             sinif_bilgileri[sinif].append(sube)
         return dict(sinif_bilgileri)
 
-    def program_temizle(self, file_path: Path):
-        df = pd.read_excel(file_path, header=None, skiprows=6)
+    def program_temizle(self, dosya):
+        df = pd.read_excel(dosya, header=None, skiprows=6)
         kontrol_araligi = df.iloc[:, 0:24]
         mask_dolu = kontrol_araligi.notna().any(axis=1)
         df_temiz = df.loc[mask_dolu].reset_index(drop=True)
@@ -161,11 +164,6 @@ class DersProgramiIsleyici:
         self.processed_df["ders_saati_adi"] = self.processed_df["ders_saati"].astype(str) + ". Ders"
         self.processed_df["uygulama_tarihi"] = pd.to_datetime(self.uygulama_tarihi)
 
-    def kaydet(self, program_listesi):
-        program_listesi = self.Default_Path.resolve_hazirlik_path(program_listesi)
-        program_listesi.parent.mkdir(parents=True, exist_ok=True)
-        self.processed_df.to_excel(program_listesi, index=False)
-
     def _ders_havuzunu_sync_et(self):
         from okul.models import DersHavuzu
 
@@ -188,7 +186,6 @@ class DersProgramiIsleyici:
     def _aktar_gecmisi_kaydet(self, status):
         from okul.models import VeriAktarimGecmisi
 
-        import pandas as pd
         uygulama_tarihi = None
         try:
             uygulama_tarihi = pd.to_datetime(self.uygulama_tarihi).date()
@@ -209,7 +206,7 @@ class DersProgramiIsleyici:
 
         VeriAktarimGecmisi.objects.create(
             dosya_turu="ders_programi",
-            dosya_adi=self.file_path.name,
+            dosya_adi=self.dosya_adi,
             uygulama_tarihi=uygulama_tarihi,
             kullanici=self.kullanici,
             kayit_sayisi=status.get("inserted", 0),
@@ -223,10 +220,9 @@ class DersProgramiIsleyici:
             from okul.utils import set_aktif_tarih
             set_aktif_tarih("ders_programi", uygulama_tarihi)
 
-    def calistir(self, program_listesi="hz_duzenlenmis_program.xlsx"):
+    def calistir(self):
         self.parse_program()
         self.ekle_ders_saati()
-        self.kaydet(program_listesi)
         status = self.veritabanina_yaz()
         self._aktar_gecmisi_kaydet(status)
         return status
