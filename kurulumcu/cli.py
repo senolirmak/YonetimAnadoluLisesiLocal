@@ -324,7 +324,43 @@ def main() -> None:
         sunucu.nginx_yapilandir(PROJE_DIZIN, servis_adi, degerler.get("ALLOWED_HOSTS", ""))
         sunucu.saglik_kontrolu(servis)
 
-        # ── 6.5 EBA karekod ile giriş (isteğe bağlı) ─────────────
+        # ── 6.5 Nginx + HTTPS (yerel CA ile, isteğe bağlı) ───────
+        print()
+        print("Sunucu okul ağı içinde, dışarıya kapalı çalışıyor ve genel bir alan")
+        print("adı yok — bu yüzden Let's Encrypt gibi genel sertifika otoriteleri")
+        print("kullanılamaz. Bunun yerine kendi yerel sertifika otoriteniz (CA)")
+        print("oluşturulup onunla imzalı bir sunucu sertifikası kurulabilir. Bu")
+        print("CA'nın genel sertifikasının (özel anahtar DEĞİL) okuldaki istemci")
+        print("bilgisayarlara güvenilir kök sertifika olarak eklenmesi gerekir,")
+        print("aksi hâlde tarayıcılar 'Bağlantınız güvenli değil' uyarısı gösterir")
+        print("(yine de 'Devam et' ile siteye girilebilir).")
+        if y.sor("Nginx + HTTPS (yerel CA ile) şimdi kurulsun mu?", "E").lower().startswith("e"):
+            sanlar = [s.strip() for s in degerler.get("ALLOWED_HOSTS", "").split(",") if s.strip()]
+            if not sanlar:
+                sanlar = ["localhost", "127.0.0.1"]
+            sertifika.yerel_ca_olustur()
+            sertifika.sunucu_sertifikasi_olustur(sanlar)
+            ca_kopya = sertifika.ca_sertifikasini_disari_kopyala(PROJE_DIZIN)
+            sunucu.nginx_https_yapilandir(
+                PROJE_DIZIN, servis_adi, degerler.get("ALLOWED_HOSTS", ""),
+                sertifika.SUNUCU_SERTIFIKA, sertifika.SUNUCU_ANAHTAR,
+            )
+            env_dosyasi.anahtar_ayarla(env_yolu, "HTTPS_ETKIN", "True")
+            y.calistir(["systemctl", "restart", servis], sudo=True)
+            sunucu.saglik_kontrolu_https(servis, sertifika.CA_SERTIFIKA)
+            https_kuruldu = True
+            print()
+            print(f"  İstemcilere dağıtılacak CA sertifikası : {ca_kopya}")
+            print("  Windows  : dosyaya çift tıklayıp 'Yerel Bilgisayar' > 'Güvenilen")
+            print("             Kök Sertifika Yetkilileri' deposuna kurun (GPO ile de")
+            print("             toplu dağıtılabilir).")
+            print(f"  Site artık https://{sanlar[0]}/ üzerinden erişilir; http istekleri")
+            print("  otomatik olarak https'e yönlendirilir.")
+        else:
+            https_kuruldu = False
+            y.uyari("Atlandı — site http üzerinden çalışmaya devam ediyor.")
+
+        # ── 6.6 EBA karekod ile giriş (isteğe bağlı) ─────────────
         print()
         print("EBA (Eğitim Bilişim Ağı) karekod ile giriş özelliği, gerçek EBA")
         print("sunucusuna (qr-etap.eba.gov.tr — kapalı/resmî bir MEB servisi) sürekli")
@@ -375,9 +411,10 @@ def main() -> None:
         print("  Nginx durumu : sudo systemctl status nginx")
         print("  Sonraki güncellemeler için: bash deploy.sh")
         print()
+        sema = "https" if https_kuruldu else "http"
         print(
-            "ALLOWED_HOSTS listesindeki adres(ler) üzerinden tarayıcıdan erişilebilir "
-            f"({degerler.get('ALLOWED_HOSTS', 'tanımsız')})."
+            f"ALLOWED_HOSTS listesindeki adres(ler) üzerinden ({sema}://) tarayıcıdan "
+            f"erişilebilir ({degerler.get('ALLOWED_HOSTS', 'tanımsız')})."
         )
     else:
         print("Sunucuyu başlatmak için:")
