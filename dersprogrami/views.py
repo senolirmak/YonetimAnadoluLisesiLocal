@@ -5,6 +5,7 @@ from functools import wraps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db.models import Count
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
@@ -13,7 +14,7 @@ from personeldevamsizlik.models import Devamsizlik
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
 from veriaktar.forms import DersProgramiImportForm
 
-from .forms import SinifSubeSecimForm
+from .forms import FetSonucYukleForm, SinifSubeSecimForm
 from .models import DersProgrami
 
 # ─────────────────────────────────────────────
@@ -927,3 +928,96 @@ def dersprogrami_yukle(request):
         "toplam": DersProgrami.objects.aktif().count(),
     }
     return render(request, "dersprogrami/dersprogrami_yukle.html", context)
+
+
+# ─────────────────────────────────────────────
+# FET köprüsü — dışa aktar / sonucu içe al
+# ─────────────────────────────────────────────
+
+
+@ust_yonetici_required
+def fet_kopru(request):
+    from okul.models import VeriAktarimGecmisi
+    from okul.utils import get_aktif_dp_tarihi
+
+    from .services.fet_kopru import FetKopruHatasi, fet_iceri_aktar
+
+    form = FetSonucYukleForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            sonuc = fet_iceri_aktar(
+                request.FILES["dosya"], form.cleaned_data["uygulama_tarihi"], kullanici=request.user
+            )
+        except FetKopruHatasi as e:
+            messages.error(request, str(e))
+        else:
+            messages.success(
+                request,
+                f"FET sonucundan {sonuc['eklenen']} ders kaydı "
+                f"{sonuc['uygulama_tarihi']:%d.%m.%Y} tarihli yeni program olarak içe aktarıldı. "
+                "Gözden geçirip aşağıdan aktif yapabilirsiniz.",
+            )
+            for uyari in sonuc["uyarilar"]:
+                messages.warning(request, uyari)
+            return redirect("fet_kopru")
+
+    surumler = (
+        DersProgrami.objects.filter(arsivlendi=False)
+        .values("uygulama_tarihi")
+        .annotate(adet=Count("id"))
+        .order_by("-uygulama_tarihi")
+    )
+    fet_tarihleri = set(
+        VeriAktarimGecmisi.objects.filter(
+            dosya_turu="ders_programi", notlar__startswith="FET'ten"
+        ).values_list("uygulama_tarihi", flat=True)
+    )
+    context = {
+        "title": "FET Köprüsü",
+        "form": form,
+        "aktif_tarih": get_aktif_dp_tarihi(),
+        "aktif_adet": DersProgrami.objects.aktif().count(),
+        "surumler": [dict(s, fet=s["uygulama_tarihi"] in fet_tarihleri) for s in surumler],
+    }
+    return render(request, "dersprogrami/fet_kopru.html", context)
+
+
+@ust_yonetici_required
+def fet_indir(request):
+    from django.http import HttpResponse
+
+    from okul.models import OkulBilgi
+    from okul.utils import get_aktif_dp_tarihi
+
+    from .services.fet_kopru import FetKopruHatasi, fet_disa_aktar
+
+    okul = OkulBilgi.objects.first()
+    try:
+        icerik = fet_disa_aktar(kurum_adi=okul.okul_adi if okul else "")
+    except FetKopruHatasi as e:
+        messages.error(request, str(e))
+        return redirect("fet_kopru")
+
+    tarih = get_aktif_dp_tarihi()
+    dosya_adi = f"ders_programi_{tarih:%Y%m%d}.fet" if tarih else "ders_programi.fet"
+    response = HttpResponse(icerik, content_type="application/xml; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{dosya_adi}"'
+    return response
+
+
+@ust_yonetici_required
+def fet_aktif_yap(request):
+    from .services.fet_kopru import FetKopruHatasi, programi_aktif_yap
+
+    if request.method != "POST":
+        return redirect("fet_kopru")
+    try:
+        tarih = datetime.strptime(request.POST.get("uygulama_tarihi", ""), "%Y-%m-%d").date()
+        programi_aktif_yap(tarih)
+    except ValueError:
+        messages.error(request, "Geçersiz tarih.")
+    except FetKopruHatasi as e:
+        messages.error(request, str(e))
+    else:
+        messages.success(request, f"{tarih:%d.%m.%Y} tarihli ders programı artık aktif.")
+    return redirect("fet_kopru")
