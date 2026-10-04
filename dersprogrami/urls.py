@@ -11,4 +11,7 @@ urlpatterns = [
     path("haftalik-program/", views.haftalik_ders_programi, name="haftalik_ders_programi"),
     path("rehber-ogretmenler/", views.rehber_ogretmenler, name="rehber_ogretmenler"),
     path("ogretmen-ders-listesi/", views.ogretmen_ders_listesi, name="ogretmen_ders_listesi"),
+    path("fet/", views.fet_kopru, name="fet_kopru"),
+    path("fet/indir/", views.fet_indir, name="fet_indir"),
+    path("fet/aktif-yap/", views.fet_aktif_yap, name="fet_aktif_yap"),
 ]

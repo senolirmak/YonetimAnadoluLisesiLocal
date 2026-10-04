@@ -37,7 +37,9 @@ python manage.py makemigrations --check --dry-run --settings=config.settings.pro
 ```
 
 Not: Çoğu app'in `tests.py` dosyası `django-admin startapp` iskeletinden ibarettir (gerçek test
-yok). Gerçek testler yalnızca `sinav/`, `dersdefteri/`, `sinavmedia/`, `sorumluluk/` içindedir.
+yok). Gerçek testler yalnızca `sinav/`, `dersdefteri/`, `sinavmedia/`, `sorumluluk/`,
+`dersprogrami/` içindedir (`dersprogrami` FET köprüsü testlerinden biri `fet-cl` kuruluysa gerçek FET'i çalıştırır,
+yoksa atlanır).
 
 ### Ortam / Ayarlar
 

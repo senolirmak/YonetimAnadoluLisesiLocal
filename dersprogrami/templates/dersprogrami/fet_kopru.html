@@ -1,0 +1,118 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+  .fet-adimlar { margin: 0 0 1rem 1.2rem; color: #374151; font-size: .93em; line-height: 1.7; }
+  .fet-adimlar code { background: #f3f4f6; padding: 0 .3rem; border-radius: 3px; }
+  .fet-bolum { margin-bottom: 1.5rem; }
+  .fet-bolum h3 { font-size: 1.02rem; font-weight: 700; color: #1a1a2e; margin-bottom: .6rem; }
+  .fet-not { color: #6c757d; font-size: .9em; margin: .4rem 0 0; }
+  .fet-tablo { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .fet-tablo th, .fet-tablo td { border: 1px solid #e5e7eb; padding: .45rem .7rem; text-align: left; }
+  .fet-tablo th { background: #417690; color: #fff; font-weight: 600; }
+  .fet-rozet { font-size: .78rem; border-radius: 99px; padding: .1rem .55rem; margin-left: .35rem; }
+  .fet-rozet-aktif { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+  .fet-rozet-fet { background: #e0f2fe; color: #075985; border: 1px solid #7dd3fc; }
+  .fet-btn { display: inline-block; padding: .45rem 1rem; background: #417690; color: #fff; border: none;
+             border-radius: 5px; font-weight: 600; font-size: .9rem; cursor: pointer; text-decoration: none; }
+  .fet-btn:hover { background: #345f75; color: #fff; }
+  .fet-btn-kucuk { padding: .25rem .7rem; font-size: .82rem; }
+</style>
+
+<div class="container-sm">
+  <div class="card">
+    <div class="card-header">{{ title }}</div>
+    <div class="form-box">
+
+      {% if messages %}
+      <div class="messages">
+        {% for msg in messages %}
+        <div class="alert alert-{{ msg.tags }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="fet-bolum">
+        <h3>1. Aktif programı FET'e aktar</h3>
+        <ol class="fet-adimlar">
+          <li>Aşağıdaki düğmeyle aktif ders programından ({{ aktif_tarih|date:"d.m.Y"|default:"—" }},
+              {{ aktif_adet }} kayıt) üretilen <code>.fet</code> dosyasını indirin.</li>
+          <li>Dosyayı FET'te açın; öğretmen boş günleri, boşluk sınırları gibi kısıtları ekleyin.</li>
+          <li>Programı üretin (<em>Zaman Çizelgesi → Üret</em>).</li>
+          <li>FET'in çıktı klasöründeki <code>…_data_and_timetable.fet</code> dosyasını 2. adımda yükleyin.</li>
+        </ol>
+        <a href="{% url 'fet_indir' %}" class="fet-btn">FET Dosyasını İndir</a>
+        <p class="fet-not">
+          Dersler, mevcut programdaki blok yapısıyla (örn. 2+2 saat) ve aynı anda işlenen
+          seçmeli/birleştirilmiş derslerle birlikte aktarılır. FET'te etkinliklerin yorum
+          alanını silmeyin — içe aktarma, hangi öğretmenin hangi şubeye hangi dersi verdiğini
+          oradan okur.
+        </p>
+      </div>
+
+      <div class="fet-bolum">
+        <h3>2. FET sonucunu içe al</h3>
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="form-row">
+            <label for="{{ form.uygulama_tarihi.id_for_label }}">{{ form.uygulama_tarihi.label }}</label>
+            {{ form.uygulama_tarihi }}
+            {% if form.uygulama_tarihi.errors %}<span class="error">{{ form.uygulama_tarihi.errors }}</span>{% endif %}
+          </div>
+          <div class="form-row">
+            <label for="{{ form.dosya.id_for_label }}">{{ form.dosya.label }}</label>
+            {{ form.dosya }}
+            {% if form.dosya.errors %}<span class="error">{{ form.dosya.errors }}</span>{% endif %}
+          </div>
+          <button type="submit" class="fet-btn">İçe Aktar</button>
+        </form>
+        <p class="fet-not">
+          Sonuç yeni bir program sürümü olarak kaydedilir; mevcut aktif program ve ona bağlı
+          kayıtlar değişmez. Yeni sürümü, Ders Programı Listesi'nde tarihine göre inceleyip
+          aşağıdan aktif yapabilirsiniz.
+        </p>
+      </div>
+
+      <div class="fet-bolum">
+        <h3>3. Program sürümleri</h3>
+        {% if surumler %}
+        <table class="fet-tablo">
+          <thead>
+            <tr><th>Uygulama Tarihi</th><th>Kayıt</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for s in surumler %}
+            <tr>
+              <td>
+                {{ s.uygulama_tarihi|date:"d.m.Y" }}
+                {% if s.uygulama_tarihi == aktif_tarih %}<span class="fet-rozet fet-rozet-aktif">Aktif</span>{% endif %}
+                {% if s.fet %}<span class="fet-rozet fet-rozet-fet">FET</span>{% endif %}
+              </td>
+              <td>{{ s.adet }}</td>
+              <td>
+                {% if s.uygulama_tarihi != aktif_tarih %}
+                <form method="post" action="{% url 'fet_aktif_yap' %}" style="margin:0"
+                      onsubmit="return confirm('{{ s.uygulama_tarihi|date:"d.m.Y" }} tarihli program aktif yapılsın mı? Tüm ekranlar bu programı kullanmaya başlar.');">
+                  {% csrf_token %}
+                  <input type="hidden" name="uygulama_tarihi" value="{{ s.uygulama_tarihi|date:"Y-m-d" }}">
+                  <button type="submit" class="fet-btn fet-btn-kucuk">Aktif Yap</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="fet-not">Henüz ders programı yok.</p>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
