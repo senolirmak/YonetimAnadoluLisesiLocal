@@ -40,16 +40,38 @@ class DersProgramiIsleyici:
         self.uygulama_tarihi = uygulama_tarihi
         self.kullanici = kullanici
         self.dosya_adi = getattr(dosya, "name", "ders_programi.xlsx")
+        self.uyarilar = []
         self.sinif_bilgileri = self.sinif_bilgilerini_getir()
         self.df = self.program_temizle(dosya)
         self.gunler = [v[1] for v in self.TRGUN_CHOICES][:5]
         self.processed_df: pd.DataFrame
 
     def sinif_bilgilerini_getir(self):
-        from okul.models import SinifSube
+        """Aktif eğitim-öğretim yılında AÇIK olan şubeleri {sinif: [sube, ...]} olarak,
+        e-Okul çıktısındaki sırayla (sınıf, şube) döner.
+
+        Excel'deki 8 satırlık bloklar şubelere sırayla (konumsal) eşlendiğinden, aktif
+        yılda kapalı (`SinifSubeYil.acik=False`, bkz. /okul/yonetim/sinif-sube/) bir
+        şubenin listede kalması sonraki tüm şubelerin programını kaydırır — bu yüzden
+        kapalılar hariç tutulur. O yıl için kaydı olmayan şube açık sayılır
+        (bkz. SinifSube.acik_mi).
+        """
+        from okul.models import SinifSube, SinifSubeYil
+        from okul.utils import get_aktif_egitim_yili
+
+        kapali_kume = set()
+        aktif_yil = get_aktif_egitim_yili()
+        if aktif_yil is not None:
+            kapali_kume = set(
+                SinifSubeYil.objects.filter(egitim_yili=aktif_yil, acik=False).values_list(
+                    "sinif_sube__sinif", "sinif_sube__sube"
+                )
+            )
 
         sinif_bilgileri = defaultdict(list)
-        for sinif, sube in SinifSube.objects.values_list("sinif", "sube"):
+        for sinif, sube in SinifSube.objects.order_by("sinif", "sube").values_list("sinif", "sube"):
+            if (sinif, sube) in kapali_kume:
+                continue
             sinif_bilgileri[sinif].append(sube)
         return dict(sinif_bilgileri)
 
@@ -105,7 +127,13 @@ class DersProgramiIsleyici:
 
         blok_boyutu = 8
         toplam_satir = len(self.df)
-        toplam_sube = min(toplam_satir // blok_boyutu, len(tum_siniflar))
+        dosyadaki_blok = toplam_satir // blok_boyutu
+        toplam_sube = min(dosyadaki_blok, len(tum_siniflar))
+        if dosyadaki_blok != len(tum_siniflar):
+            self.uyarilar.append(
+                f"Dosyadaki şube sayısı ({dosyadaki_blok}) aktif yılda açık şube sayısıyla "
+                f"({len(tum_siniflar)}) uyuşmuyor — Sınıf/Şube ayarlarını kontrol edin."
+            )
 
         for sube_index in range(toplam_sube):
             start = sube_index * blok_boyutu
@@ -192,7 +220,7 @@ class DersProgramiIsleyici:
         except Exception:
             pass
 
-        uyarilar = []
+        uyarilar = list(self.uyarilar)
         if status.get("otomatik_eklenen_isimler"):
             uyarilar.append(
                 f"Otomatik oluşturulan personel: {', '.join(status['otomatik_eklenen_isimler'])}"
