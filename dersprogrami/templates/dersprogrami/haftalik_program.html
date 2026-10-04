@@ -215,6 +215,9 @@
       {% endif %}
     </div>
 
+    {% if not ders_kaydi_var %}
+    <div class="hp-bos-mesaj">Bu öğretmene ait ders programı kaydı bulunamadı.</div>
+    {% endif %}
     {% if program_tablo %}
     <div class="hp-tablo-wrap">
       <table class="hp-tablo">
@@ -235,15 +238,17 @@
               <small>{{ satir.giris_saat|time:"H:i" }}–{{ satir.cikis_saat|time:"H:i" }}</small>
               {% endif %}
             </td>
-            {% for ders in satir.cells %}
+            {% for hucre in satir.cells %}
             <td>
-              {% if ders %}
+              {% if hucre %}
+              {% for ders in hucre %}
               <div class="td-ders">
                 <div class="ders-adi">{{ ders.ders_adi }}</div>
                 {% if ders.sinif_sube %}
                 <div class="sinif-adi">{{ ders.sinif_sube }}</div>
                 {% endif %}
               </div>
+              {% endfor %}
               {% else %}
               <span class="td-bos">–</span>
               {% endif %}
@@ -254,8 +259,6 @@
         </tbody>
       </table>
     </div>
-    {% else %}
-    <div class="hp-bos-mesaj">Bu öğretmene ait ders programı kaydı bulunamadı.</div>
     {% endif %}
   </div>
 
@@ -266,7 +269,7 @@
 
   {% else %}
   <div class="hp-kart">
-    <div class="hp-bos-mesaj">Hesabınıza bağlı bir öğretmen kaydı bulunamadı.</div>
+    <div class="hp-bos-mesaj">Hesabınıza bağlı, görevde olan bir öğretmen kaydı bulunamadı.</div>
   </div>
   {% endif %}
 
