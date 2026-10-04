@@ -662,20 +662,24 @@ def dersprogrami_listesi(request):
 
 @login_required
 def haftalik_ders_programi(request):
-    GUN_DB = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    GUN_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]
+    from okul.models import DersSaatleri
+
+    from .models import GUNLER
 
     is_yonetici = _is_yonetici(request.user)
 
     secilen_personel = None
     tum_ogretmenler = None
 
+    # Görevde olmayan (izinli, emekli, tayin vb.) personelin güncel ders programı
+    # olmaz — seçim listesinde de, URL'deki ?ogretmen= ile doğrudan erişimde de
+    # yalnızca görevdeki personel dikkate alınır (bkz. PersonelQuerySet.gorevde).
     if is_yonetici:
-        tum_ogretmenler = NobetPersonel.objects.order_by("adi_soyadi")
+        tum_ogretmenler = NobetPersonel.objects.gorevde().select_related("brans").order_by("adi_soyadi")
         ogretmen_id = request.GET.get("ogretmen", "").strip()
         if ogretmen_id:
             try:
-                secilen_personel = NobetPersonel.objects.get(pk=int(ogretmen_id))
+                secilen_personel = tum_ogretmenler.get(pk=int(ogretmen_id))
             except (NobetPersonel.DoesNotExist, ValueError, TypeError):
                 pass
     else:
@@ -683,8 +687,11 @@ def haftalik_ders_programi(request):
             secilen_personel = request.user.personel
         except NobetPersonel.DoesNotExist:
             secilen_personel = None
+        if secilen_personel is not None and secilen_personel.durum != "Görevde":
+            secilen_personel = None
 
     program_tablo = []
+    gun_tr_list = []
     nobet_gorevleri = []
     rehberlik_siniflari = []
 
@@ -692,30 +699,36 @@ def haftalik_ders_programi(request):
         dersler = list(
             DersProgrami.objects.aktif().filter(ogretmen=secilen_personel)
             .select_related("sinif_sube", "ders_saati", "ders")
-            .order_by("ders_saati__derssaati_no")
+            .order_by("ders_saati__derssaati_no", "sinif_sube__sinif", "sinif_sube__sube")
         )
-        ders_saatleri_bilgi = {}
+
+        # Standart ızgara: sütunlar haftanın tüm iş günleri (Pzt–Cuma; o öğretmenin
+        # hafta sonu dersi varsa Cumartesi/Pazar da eklenir), satırlar tanımlı tüm
+        # ders saatleri — öğretmenin boş saatleri de "–" olarak görünür.
+        dersli_gunler = {d.gun for d in dersler}
+        gunler = [
+            (db, tr) for i, (db, tr) in enumerate(GUNLER)
+            if i < 5 or db in dersli_gunler
+        ]
+        gun_tr_list = [tr for _, tr in gunler]
+
+        ders_saatleri = {ds.pk: ds for ds in DersSaatleri.objects.all()}
         for d in dersler:
-            if d.ders_saati and d.ders_saati.derssaati_no not in ders_saatleri_bilgi:
-                ders_saatleri_bilgi[d.ders_saati.derssaati_no] = {
-                    "ders_saati_adi": d.ders_saati.ders_adi,
-                    "giris_saat": d.ders_saati.derssaati_baslangic,
-                    "cikis_saat": d.ders_saati.derssaati_bitis,
-                }
-        for ds in sorted(ders_saatleri_bilgi.keys()):
-            bilgi = ders_saatleri_bilgi[ds]
-            cells = []
-            for gun_db in GUN_DB:
-                match = next(
-                    (d for d in dersler if d.ders_saati and d.ders_saati.derssaati_no == ds and d.gun == gun_db), None
-                )
-                cells.append(match)
+            if d.ders_saati:
+                ders_saatleri.setdefault(d.ders_saati.pk, d.ders_saati)
+
+        hucreler = defaultdict(list)
+        for d in dersler:
+            if d.ders_saati_id:
+                hucreler[(d.ders_saati_id, d.gun)].append(d)
+
+        for ds in sorted(ders_saatleri.values(), key=lambda x: x.derssaati_no):
             program_tablo.append({
-                "ders_saati": ds,
-                "ders_saati_adi": bilgi["ders_saati_adi"],
-                "giris_saat": bilgi["giris_saat"],
-                "cikis_saat": bilgi["cikis_saat"],
-                "cells": cells,
+                "ders_saati": ds.derssaati_no,
+                "ders_saati_adi": ds.ders_adi,
+                "giris_saat": ds.derssaati_baslangic,
+                "cikis_saat": ds.derssaati_bitis,
+                "cells": [hucreler.get((ds.pk, gun_db), []) for gun_db, _ in gunler],
             })
 
         # Nöbet görevleri
@@ -753,11 +766,12 @@ def haftalik_ders_programi(request):
         "tum_ogretmenler": tum_ogretmenler,
         "secilen_personel": secilen_personel,
         "secilen_ogretmen_id": str(secilen_personel.pk) if secilen_personel else "",
-        "gun_tr_list": GUN_TR,
+        "gun_tr_list": gun_tr_list,
         "program_tablo": program_tablo,
         "nobet_gorevleri": nobet_gorevleri,
         "rehberlik_siniflari": rehberlik_siniflari,
         "ders_saati_toplam": ders_saati_toplam if secilen_personel else 0,
+        "ders_kaydi_var": any(any(c) for satir in program_tablo for c in satir["cells"]),
     }
     return render(request, "dersprogrami/haftalik_program.html", context)
 
