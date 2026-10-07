@@ -64,7 +64,7 @@ def _rehberlik_sinif_sube(user):
         DersProgrami.objects.aktif()
         .filter(
             ogretmen=personel,
-            ders__ders_adi__iexact="rehberlik ve yönlendirme",
+            ders__ders_adi__iexact="REHBERLİK VE YÖNLENDİRME",
         )
         .select_related("sinif_sube", "ders")
         .first()
