@@ -795,9 +795,12 @@ def rehber_ogretmenler(request):
         "Friday": "Cuma",
     }
 
-    rehberlik_ders = DersHavuzu.objects.filter(
-        ders_adi__icontains="rehberlik"
-    ).first()
+    # Aranan metin büyük harfle yazılır: PostgreSQL UPPER() C/en_US locale'inde
+    # "i" → "I" yapar ve "REHBERLİK" (İ) ile eşleşmez; büyük harf her locale'de sabit kalır.
+    rehberlik_ders = (
+        DersHavuzu.objects.filter(ders_adi="REHBERLİK VE YÖNLENDİRME").first()
+        or DersHavuzu.objects.filter(ders_adi__icontains="REHBERLİK").first()
+    )
 
     rows = []
     if rehberlik_ders:
