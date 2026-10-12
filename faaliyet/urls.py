@@ -18,6 +18,8 @@ urlpatterns = [
     path("ders-programi/", views.ders_programi_getir, name="ders_programi_getir"),
     # Müdür Yardımcısı
     path("yonetim/", views.faaliyet_yonetim_listesi, name="faaliyet_yonetim_listesi"),
+    path("yonetim/rapor/", views.faaliyet_toplu_rapor, name="faaliyet_toplu_rapor"),
+    path("yonetim/rapor/pdf/", views.faaliyet_toplu_rapor_pdf, name="faaliyet_toplu_rapor_pdf"),
     path("onay/", views.faaliyet_onay_listesi, name="faaliyet_onay_listesi"),
     path("<int:pk>/onayla/", views.faaliyet_onayla, name="faaliyet_onayla"),
     path("<int:pk>/reddet/", views.faaliyet_reddet, name="faaliyet_reddet"),

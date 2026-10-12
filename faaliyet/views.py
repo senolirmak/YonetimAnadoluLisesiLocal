@@ -558,7 +558,6 @@ def faaliyet_rapor(request, pk):
 
 @login_required
 def faaliyet_rapor_pdf(request, pk):
-    import os
     from io import BytesIO
 
     from reportlab.lib import colors
@@ -845,5 +844,96 @@ def faaliyet_rapor_pdf(request, pk):
 
     dosya_adi = f"faaliyet_rapor_{faaliyet.pk}_{faaliyet.tarih.strftime('%Y%m%d')}.pdf"
     response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{dosya_adi}"'
+    return response
+
+
+# ─────────────────────────────────────────────
+# Müdür Yardımcısı: tarihe göre gruplanmış toplu rapor
+# ─────────────────────────────────────────────
+
+
+def _toplu_rapor_filtreleri(request):
+    return {
+        "tarih_bas": request.GET.get("tarih_bas", "").strip(),
+        "tarih_bit": request.GET.get("tarih_bit", "").strip(),
+        "ogretmen_id": request.GET.get("ogretmen", "").strip(),
+    }
+
+
+@login_required
+def faaliyet_toplu_rapor(request):
+    if not _mudur_yardimcisi_mi(request.user):
+        messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
+        return redirect("index")
+
+    from okul.models import Personel
+
+    from .services.toplu_rapor import tamamlanan_faaliyetler, tarihe_gore_grupla
+
+    filtre = _toplu_rapor_filtreleri(request)
+    rapor = tarihe_gore_grupla(tamamlanan_faaliyetler(**filtre))
+    ogretmenler = (
+        Personel.objects.filter(
+            faaliyetler__durum=Faaliyet.DURUM_ONAYLANDI,
+            faaliyetler__devamsizlik_girildi=True,
+        )
+        .distinct()
+        .order_by("adi_soyadi")
+    )
+
+    return render(
+        request,
+        "faaliyet/faaliyet_toplu_rapor.html",
+        {
+            "gunler": rapor["gunler"],
+            "toplam": rapor["toplam"],
+            "ogretmenler": ogretmenler,
+            "secili_ogretmen": filtre["ogretmen_id"],
+            "tarih_bas": filtre["tarih_bas"],
+            "tarih_bit": filtre["tarih_bit"],
+            "sorgu": request.GET.urlencode(),
+        },
+    )
+
+
+@login_required
+def faaliyet_toplu_rapor_pdf(request):
+    if not _mudur_yardimcisi_mi(request.user):
+        messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
+        return redirect("index")
+
+    from datetime import date
+
+    from okul.models import Personel
+
+    from .services.toplu_rapor import (
+        tamamlanan_faaliyetler,
+        tarihe_gore_grupla,
+        toplu_rapor_pdf,
+    )
+
+    filtre = _toplu_rapor_filtreleri(request)
+    rapor = tarihe_gore_grupla(tamamlanan_faaliyetler(**filtre))
+
+    def _tr(t):
+        try:
+            return date.fromisoformat(t).strftime("%d.%m.%Y")
+        except ValueError:
+            return t
+
+    parcalar = []
+    if filtre["tarih_bas"] or filtre["tarih_bit"]:
+        parcalar.append(
+            f"Tarih: {_tr(filtre['tarih_bas']) or '…'} – {_tr(filtre['tarih_bit']) or '…'}"
+        )
+    if filtre["ogretmen_id"]:
+        p = Personel.objects.filter(pk=filtre["ogretmen_id"]).first()
+        if p:
+            parcalar.append(f"Öğretmen: {p.adi_soyadi}")
+
+    pdf = toplu_rapor_pdf(rapor, baslik_alt="  |  ".join(parcalar))
+    dosya_adi = f"faaliyet_toplu_rapor_{timezone.localdate():%Y%m%d}.pdf"
+    response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{dosya_adi}"'
     return response
