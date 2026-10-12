@@ -13,9 +13,13 @@
 
     <div class="flex-between mb-20">
         <h2 class="page-title">Tüm Faaliyetler</h2>
-        <span style="background:#417690;color:#fff;padding:4px 14px;border-radius:10px;font-weight:bold;">
-            {{ faaliyetler|length }} kayıt
-        </span>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <a href="{% url 'faaliyet:faaliyet_toplu_rapor' %}?tarih_bas={{ tarih_bas }}&tarih_bit={{ tarih_bit }}&ogretmen={{ secili_ogretmen }}"
+               class="btn" style="background:#e67e22;color:#fff;">&#128202; Tarihe Göre Rapor</a>
+            <span style="background:#417690;color:#fff;padding:4px 14px;border-radius:10px;font-weight:bold;">
+                {{ faaliyetler|length }} kayıt
+            </span>
+        </div>
     </div>
 
     {# Filtre Formu #}

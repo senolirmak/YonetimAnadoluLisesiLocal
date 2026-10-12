@@ -1,0 +1,148 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Faaliyet Toplu Raporu{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Faaliyet Toplu Raporu</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+            {% if gunler %}
+            <a href="{% url 'faaliyet:faaliyet_toplu_rapor_pdf' %}{% if sorgu %}?{{ sorgu }}{% endif %}"
+               class="btn btn-danger">&#128462; PDF İndir</a>
+            {% endif %}
+            <a href="{% url 'faaliyet:faaliyet_yonetim_listesi' %}" class="btn-cancel">← Tüm Faaliyetler</a>
+        </div>
+    </div>
+
+    <p style="color:#6c757d;font-size:0.9em;margin-top:-8px;">
+        Yalnızca onaylanmış ve devamsızlık girişi tamamlanmış faaliyetler listelenir.
+        Tarih aralığı seçilmezse arşivlenmiş (geçmiş eğitim-öğretim yılı) kayıtlar dahil edilmez.
+    </p>
+
+    {# Filtre Formu #}
+    <div class="card mb-20" style="padding:16px 20px;">
+        <form method="get" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Tarih Başlangıç</label>
+                <input type="date" name="tarih_bas" value="{{ tarih_bas }}"
+                       style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Tarih Bitiş</label>
+                <input type="date" name="tarih_bit" value="{{ tarih_bit }}"
+                       style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;min-width:180px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Öğretmen</label>
+                <select name="ogretmen" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                    <option value="">— Tümü —</option>
+                    {% for p in ogretmenler %}
+                    <option value="{{ p.pk }}" {% if secili_ogretmen == p.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ p.adi_soyadi }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding:6px 18px;">Rapor Oluştur</button>
+                <a href="{% url 'faaliyet:faaliyet_toplu_rapor' %}" class="btn" style="padding:6px 14px;background:#6c757d;color:#fff;">Temizle</a>
+            </div>
+        </form>
+    </div>
+
+    {% if gunler %}
+    {# Genel özet #}
+    <div class="card mb-20" style="padding:12px 20px;display:flex;flex-wrap:wrap;gap:28px;">
+        <span>Gün: <strong>{{ gunler|length }}</strong></span>
+        <span>Faaliyet: <strong style="color:#417690;">{{ toplam.faaliyet }}</strong></span>
+        <span>Öğrenci Katılımı: <strong style="color:#17a2b8;">{{ toplam.ogrenci }}</strong></span>
+        <span>Devamsız Öğrenci: <strong style="color:#dc3545;">{{ toplam.devamsiz_ogrenci }}</strong></span>
+        <span>Devamsız Ders Saati: <strong style="color:#dc3545;">{{ toplam.devamsiz_ders }}</strong></span>
+    </div>
+
+    {% for gun in gunler %}
+    <div class="card mb-20">
+        <div class="card-header" style="background:#e67e22;color:#fff;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <strong>{{ gun.tarih|date:"d.m.Y l" }}</strong>
+            <span style="font-size:0.88em;">
+                {{ gun.faaliyetler|length }} faaliyet &nbsp;|&nbsp;
+                {{ gun.ogrenci }} öğrenci &nbsp;|&nbsp;
+                {{ gun.devamsiz_ogrenci }} devamsız ({{ gun.devamsiz_ders }} ders saati)
+            </span>
+        </div>
+
+        {% for satir in gun.faaliyetler %}
+        <div style="{% if not forloop.first %}border-top:2px solid #dee2e6;{% endif %}">
+            <div style="padding:10px 15px;background:#eef3f7;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <strong style="color:#417690;">{{ satir.faaliyet.konu }}</strong>
+                    <div style="font-size:0.85em;color:#555;margin-top:2px;">
+                        Yer: {{ satir.faaliyet.yer }} &nbsp;·&nbsp;
+                        Öğretmen: {{ satir.faaliyet.ogretmen.adi_soyadi }} &nbsp;·&nbsp;
+                        Ders:
+                        {% for ds in satir.ders_saatleri %}
+                        <span class="badge badge-info" style="font-size:0.8em;">{{ ds.ders_no }}.</span>
+                        {% empty %}—{% endfor %}
+                        &nbsp;·&nbsp; {{ satir.ogrenci_sayisi }} öğrenci,
+                        <span style="{% if satir.devamsizlar %}color:#dc3545;font-weight:700;{% endif %}">{{ satir.devamsizlar|length }} devamsız</span>
+                    </div>
+                </div>
+                <a href="{% url 'faaliyet:faaliyet_rapor' satir.faaliyet.pk %}"
+                   class="btn btn-info" style="padding:3px 10px;font-size:0.82em;">Faaliyet Raporu</a>
+            </div>
+            {% if satir.ogrenciler %}
+            <div class="table-responsive">
+                <table class="table" style="margin:0;font-size:0.9em;">
+                    <thead>
+                        <tr>
+                            <th class="center" style="width:50px;">Sn</th>
+                            <th class="center" style="width:90px;">Okul No</th>
+                            <th>Adı Soyadı</th>
+                            <th class="center" style="width:100px;">Sınıf/Şube</th>
+                            <th style="width:220px;">Katılım</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for k in satir.ogrenciler %}
+                        <tr>
+                            <td class="center">{{ forloop.counter }}</td>
+                            <td class="center">{{ k.ogr.okulno }}</td>
+                            <td>{{ k.ogr.adi }} {{ k.ogr.soyadi }}</td>
+                            <td class="center">{{ k.ogr.sinif }}/{{ k.ogr.sube }}</td>
+                            <td>
+                                {% if k.dersler %}
+                                <span style="color:#dc3545;font-weight:600;">✗ Devamsız: {% for n in k.dersler %}{{ n }}.{% if not forloop.last %}, {% endif %}{% endfor %} ders</span>
+                                {% else %}
+                                <span style="color:#28a745;font-weight:600;">✓ Katıldı</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div style="padding:12px 15px;color:#6c757d;font-size:0.9em;">Katılımcı öğrenci yok.</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="card">
+        <div style="padding:40px;text-align:center;color:#6c757d;">
+            Seçilen kriterlere uygun, devamsızlık girişi tamamlanmış faaliyet bulunamadı.
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
