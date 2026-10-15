@@ -1420,8 +1420,14 @@ def ders_ayarlari(request):
     aktif = _aktif_sinav()
     veri = get_ayarlar(aktif)
 
-    dp_dersler = list(DersHavuzu.objects.order_by("ders_adi"))
-    tum_dersler = sorted(DersHavuzu.objects.values_list("ders_adi", flat=True))
+    # DersHavuzu yıllar boyunca birikir; yalnızca bu yılın güncel ders
+    # programında okutulan dersler gösterilir (seçilmeyen dersler görünmez).
+    dp_dersler = list(
+        DersHavuzu.objects.filter(
+            pk__in=DersProgrami.objects.aktif().values("ders_id")
+        ).order_by("ders_adi")
+    )
+    tum_dersler = [d.ders_adi for d in dp_dersler]
 
     catisma_gruplari      = veri.get("catisma_gruplari", [])
     esleme_ciftleri       = veri.get("ayni_slot_esleme", [])
