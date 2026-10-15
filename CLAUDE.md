@@ -38,7 +38,7 @@ python manage.py makemigrations --check --dry-run --settings=config.settings.pro
 
 Not: Çoğu app'in `tests.py` dosyası `django-admin startapp` iskeletinden ibarettir (gerçek test
 yok). Gerçek testler yalnızca `sinav/`, `dersdefteri/`, `sinavmedia/`, `sorumluluk/`,
-`dersprogrami/` içindedir (`dersprogrami` FET köprüsü testlerinden biri `fet-cl` kuruluysa gerçek FET'i çalıştırır,
+`dersprogrami/`, `faaliyet/` içindedir (`dersprogrami` FET köprüsü testlerinden biri `fet-cl` kuruluysa gerçek FET'i çalıştırır,
 yoksa atlanır).
 
 ### Ortam / Ayarlar
@@ -156,5 +156,8 @@ Her app kendi `templates/<app_adı>/` ve gerekirse `static/` klasörünü taşı
 - `main.context_processors.kullanici_rol` tüm şablonlara kullanıcının rolünü enjekte eder — yeni bir
   role dayalı UI koşulu eklerken önce bu context processor'ı kontrol edin.
 - `backups/` altındaki `.dump`/`.sql` dosyaları gerçek veritabanı yedekleridir, düzenlenmez/silinmez.
-- `SunucuTarifi.md` prod sunucu kurulum notlarıdır; gizli bilgi içermez (daha önce sızan şifreler
-  placeholder ile değiştirildi) ama yine de yeni gerçek kimlik bilgileri eklenmemelidir.
+- GitHub deposu herkese açıktır (public). Gerçek kimlik bilgileri (şifre, `SECRET_KEY`, token) hiçbir
+  dosyaya — dokümantasyon ve örnek komutlar dahil — yazılmaz; örneklerde `<DB_SIFRESI>` gibi açıkça
+  yer tutucu olan değerler kullanılır. Gerçek değerler yalnızca sunucudaki `.env`/`postgres.env`
+  dosyalarında durur (`.env.example` şablondur). Prod sunucuya özel kurulum notları (eski
+  `SunucuTarifi.md`) bu yüzden repoda tutulmaz.
