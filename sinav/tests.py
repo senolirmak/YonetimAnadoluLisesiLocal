@@ -386,3 +386,34 @@ class SubeDersGuncelleTestCase(TestCase):
         DersAnalizService({}, log_fn=lambda m: None).subeders_guncelle()
 
         self.assertEqual(self._subeders(), {(10, "A", "MATEMATİK")})
+
+
+class DersAyarlariTestCase(TestCase):
+    """Ders Ayarları yalnızca bu yılın güncel ders programındaki dersleri
+    göstermeli; havuzda kalmış ama bu yıl seçilmeyen dersler görünmemeli."""
+
+    def test_guncel_programda_olmayan_ders_listelenmez(self):
+        from django.contrib.auth.models import Group, User
+        from django.urls import reverse
+
+        from dersprogrami.models import DersProgrami
+        from okul.models import DersHavuzu, Personel, SinifSube
+
+        okutulan = DersHavuzu.objects.create(ders_adi="BEDEN EĞİTİMİ VE SPOR", sinav_yapilmayacak=True)
+        DersHavuzu.objects.create(ders_adi="SEÇMELİ SANAT EĞİTİMİ", sinav_yapilmayacak=True)
+        DersProgrami.objects.create(
+            gun="Monday", ders=okutulan, sinif_sube=SinifSube.objects.create(sinif=9, sube="A"),
+            ogretmen=Personel.objects.create(kimlikno="11111111111", adi_soyadi="ÖĞRETMEN"),
+            uygulama_tarihi=date(2026, 10, 4),
+        )
+        user = User.objects.create_superuser("mudur", password="x")
+        user.groups.add(Group.objects.get_or_create(name="mudur_yardimcisi")[0])
+        self.client.force_login(user)
+
+        yanit = self.client.get(reverse("sinav:ders_ayarlari"))
+
+        self.assertEqual(yanit.status_code, 200)
+        self.assertEqual(
+            [d.ders_adi for d in yanit.context["yapilmayacak_dersler"]], ["BEDEN EĞİTİMİ VE SPOR"]
+        )
+        self.assertNotIn("SEÇMELİ SANAT EĞİTİMİ", yanit.context["tum_dersler_sabit"])
