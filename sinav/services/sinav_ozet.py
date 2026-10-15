@@ -8,7 +8,7 @@ from sinav.models import OturmaPlani, SinavBilgisi, SubeDers, Takvim, TakvimUret
 def db_ozeti() -> dict:
     aktif = SinavBilgisi.objects.filter(aktif=True).first()
     return {
-        "ogrenci":      OgrenciModel.objects.count(),
+        "ogrenci":      OgrenciModel.objects.filter(aktif=True).count(),
         "ders_program": DersProgrami.objects.aktif().count(),
         "sube_ders":    SubeDers.objects.count(),
         "takvim":       Takvim.objects.filter(sinav=aktif).count(),

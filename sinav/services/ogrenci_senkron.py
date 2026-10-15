@@ -61,7 +61,9 @@ def nakil_ogrenci_senkronize_et(sinav) -> SenkronSonucu:
     mevcut_okulnolar = set(
         SinavOgrenci.objects.filter(sinav=sinav).values_list("okulno", flat=True)
     )
-    yeni_ogrenciler = list(OgrenciModel.objects.exclude(okulno__in=mevcut_okulnolar))
+    yeni_ogrenciler = list(
+        OgrenciModel.objects.filter(aktif=True).exclude(okulno__in=mevcut_okulnolar)
+    )
 
     SinavOgrenci.objects.bulk_create([
         SinavOgrenci(

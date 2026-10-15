@@ -13,9 +13,10 @@ uzerinde calistirilir.
 
 import random
 import time
+from datetime import date
 
 import pandas as pd
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from ortaksinav_engine.services.oturma import OturmaPlanService
 from ortaksinav_engine.services.takvim import TakvimService
@@ -275,3 +276,54 @@ class OturmaPlanServiceGATestCase(SimpleTestCase):
         layout = OturmaPlanService._build_layout(exam_counts, rows=6, cols=6)
         dolu = sum(1 for row in layout for cell in row if cell != _EMPTY_KEY)
         self.assertEqual(dolu, 36)
+
+
+class SinavOgrenciAnlikGoruntuTestCase(TestCase):
+    """Ortak sınav öğrenci listesi yalnızca aktif öğrencilerden oluşmalı —
+    mezun/nakil (aktif=False) öğrenciler salonlara yerleştirilmemeli."""
+
+    def setUp(self):
+        from ogrenci.models import Ogrenci
+        from sinav.models import SinavBilgisi
+
+        for okulno, aktif in [(1, True), (2, False)]:
+            Ogrenci.objects.create(
+                okulno=okulno, sinif=9, sube="A", tckimlikno=str(okulno).zfill(11),
+                adi="AD", soyadi="SOYAD", dogumtarihi=date(2010, 1, 1), cinsiyet="E",
+                aktif=aktif,
+            )
+        self.sinav = SinavBilgisi.objects.create(
+            egitim_ogretim_yili="2026-2027", donem="1", sinav_adi="1",
+            sinav_baslangic_tarihi=date(2026, 11, 2), eokul_veri_tarihi=date(2026, 10, 1),
+        )
+
+    def test_anlik_goruntu_pasif_ogrenciyi_almaz(self):
+        from ortaksinav_engine.services.oturma import anlik_goruntu_garanti_et
+        from sinav.models import SinavOgrenci
+
+        anlik_goruntu_garanti_et(self.sinav)
+
+        self.assertEqual(
+            list(SinavOgrenci.objects.filter(sinav=self.sinav).values_list("okulno", flat=True)),
+            [1],
+        )
+
+    def test_senkron_pasif_ogrenciyi_eklemez(self):
+        from ogrenci.models import Ogrenci
+        from sinav.models import SinavOgrenci
+        from sinav.services.ogrenci_senkron import nakil_ogrenci_senkronize_et
+
+        SinavOgrenci.objects.create(
+            sinav=self.sinav, okulno=1, adi="AD", soyadi="SOYAD", cinsiyet="E", sinif=9, sube="A",
+        )
+        Ogrenci.objects.create(
+            okulno=3, sinif=9, sube="A", tckimlikno="00000000003", adi="YENİ", soyadi="NAKİL",
+            dogumtarihi=date(2010, 1, 1), cinsiyet="E", aktif=False,
+        )
+
+        nakil_ogrenci_senkronize_et(self.sinav)
+
+        self.assertEqual(
+            set(SinavOgrenci.objects.filter(sinav=self.sinav).values_list("okulno", flat=True)),
+            {1},
+        )

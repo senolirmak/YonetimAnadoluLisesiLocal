@@ -28,7 +28,7 @@ class VeriImportService(BaseService):
 
         tekil_dersler = {
             d.strip()
-            for d in DersProgrami.objects.values_list("ders__ders_adi", flat=True).distinct()
+            for d in DersProgrami.objects.aktif().values_list("ders__ders_adi", flat=True).distinct()
             if d and d.strip()
         }
         mevcut_dh = set(DersHavuzu.objects.values_list("ders_adi", flat=True))
@@ -67,8 +67,8 @@ class VeriImportService(BaseService):
         from ogrenci.models import Ogrenci as OgrenciModel
 
         ss_count  = SinifSube.objects.count()
-        dp_count  = DersProgrami.objects.count()
-        ogr_count = OgrenciModel.objects.count()
+        dp_count  = DersProgrami.objects.aktif().count()
+        ogr_count = OgrenciModel.objects.filter(aktif=True).count()
 
         if not ss_count:
             raise RuntimeError("Sınıf/şube verisi yok. Veri aktarımı yapın.")
