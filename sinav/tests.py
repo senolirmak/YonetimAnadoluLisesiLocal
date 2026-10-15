@@ -327,3 +327,62 @@ class SinavOgrenciAnlikGoruntuTestCase(TestCase):
             set(SinavOgrenci.objects.filter(sinav=self.sinav).values_list("okulno", flat=True)),
             {1},
         )
+
+
+class SubeDersGuncelleTestCase(TestCase):
+    """SubeDers, güncel ders programının birebir yansıması olmalı: arşivlenmiş
+    eski programdaki ve bu yıl kapalı şubelerdeki dersler takvime girmemeli."""
+
+    def setUp(self):
+        from dersprogrami.models import DersProgrami
+        from okul.models import (
+            DersHavuzu, EgitimOgretimYili, OkulBilgi, Personel, SinifSube, SinifSubeYil,
+        )
+
+        yil = EgitimOgretimYili.objects.create(
+            egitim_yili="2026-2027",
+            egitim_baslangic=date(2026, 9, 1), egitim_bitis=date(2027, 6, 30),
+        )
+        okul = OkulBilgi.get()
+        okul.okul_egtyil = yil
+        okul.save()
+
+        ogretmen = Personel.objects.create(kimlikno="11111111111", adi_soyadi="ÖĞRETMEN")
+        mat = DersHavuzu.objects.create(ders_adi="MATEMATİK")
+        fiz = DersHavuzu.objects.create(ders_adi="FİZİK")
+        self.a = SinifSube.objects.create(sinif=10, sube="A")
+        self.g = SinifSube.objects.create(sinif=10, sube="G")
+        SinifSubeYil.objects.create(sinif_sube=self.g, egitim_yili=yil, acik=False)
+
+        def dp(ders, ss, tarih, arsiv=False):
+            DersProgrami.objects.create(
+                gun="Monday", ders=ders, sinif_sube=ss, ogretmen=ogretmen,
+                uygulama_tarihi=tarih, arsivlendi=arsiv,
+            )
+
+        dp(mat, self.a, date(2026, 10, 4))
+        dp(mat, self.g, date(2026, 10, 4))          # kapalı şube
+        dp(fiz, self.a, date(2026, 4, 20), arsiv=True)  # geçen yılın programı
+
+    def _subeders(self):
+        from sinav.models import SubeDers
+
+        return set(SubeDers.objects.values_list("sube__sinif", "sube__sube", "ders__ders_adi"))
+
+    def test_yalnizca_guncel_program_ve_acik_subeler(self):
+        from ortaksinav_engine.services.ders_analiz import DersAnalizService
+
+        DersAnalizService({}, log_fn=lambda m: None).subeders_guncelle()
+
+        self.assertEqual(self._subeders(), {(10, "A", "MATEMATİK")})
+
+    def test_artik_programda_olmayan_kayit_silinir(self):
+        from okul.models import DersHavuzu
+        from ortaksinav_engine.services.ders_analiz import DersAnalizService
+        from sinav.models import SubeDers
+
+        SubeDers.objects.create(ders=DersHavuzu.objects.get(ders_adi="FİZİK"), seviye=10, sube=self.g)
+
+        DersAnalizService({}, log_fn=lambda m: None).subeders_guncelle()
+
+        self.assertEqual(self._subeders(), {(10, "A", "MATEMATİK")})

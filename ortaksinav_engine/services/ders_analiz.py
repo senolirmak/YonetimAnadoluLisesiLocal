@@ -24,9 +24,10 @@ class DersAnalizService(BaseService):
         from okul.models import DersHavuzu
         from sinav.models import SubeDers
 
-        # DersProgrami'nden sinif / sube / ders_adi verisi
+        # Yalnızca güncel (arşivlenmemiş, aktif tarihli) ders programı kullanılır;
+        # eski programlardaki kapanmış şube/dersler takvime girmemeli.
         df = pd.DataFrame(
-            DersProgrami.objects.values(
+            DersProgrami.objects.aktif().values(
                 ders_adi=models.F("ders__ders_adi"),
                 sinif=models.F("sinif_sube__sinif"),
                 sube=models.F("sinif_sube__sube"),
@@ -94,34 +95,48 @@ class DersAnalizService(BaseService):
                     "Ders programı verilerini kontrol edin."
                 )
 
-        # Sinav yapilmayacak derslerin mevcut SubeDers kayitlarini kaldir
-        # NOT: df_filtreli hesabından SONRA silme yapılır ki döngüde geri eklenmesın
-        if sinav_yapilmayacak:
-            silinen, _ = SubeDers.objects.filter(ders__ders_adi__in=sinav_yapilmayacak).delete()
-            if silinen:
-                self.log(f"{silinen} sinav-yapilmayacak ders/sube kaydi SubeDers'ten silindi.")
+        # Aktif eğitim yılında kapalı işaretli şubeler sınava girmez.
+        from okul.models import SinifSubeYil
+        from okul.utils import get_aktif_egitim_yili
 
-        # Seçili seviye dışındaki mevcut SubeDers kayıtlarını kaldır
-        if ortak_seviyeleri:
-            silinen_sev, _ = SubeDers.objects.exclude(seviye__in=ortak_seviyeleri).delete()
-            if silinen_sev:
-                self.log(f"{silinen_sev} kayıt seçili seviye ({sorted(ortak_seviyeleri)}) dışı olduğu için SubeDers'ten silindi.")
+        aktif_yil = get_aktif_egitim_yili()
+        kapali_subeler = set(
+            SinifSubeYil.objects.filter(egitim_yili=aktif_yil, acik=False).values_list(
+                "sinif_sube_id", flat=True
+            )
+        ) if aktif_yil else set()
 
-        # Mevcut kayitlari topla; yalnizca eksik olanlari ekle
-        mevcut = set(SubeDers.objects.values_list("ders_id", "seviye", "sube_id"))
-
-        kayitlar = []
+        # SubeDers, güncel ders programının birebir yansımasıdır: hedef küme
+        # hesaplanır, eksikler eklenir, artık programda olmayanlar (kapanan
+        # şube, kaldırılan ders, sınav yapılmayacak ders, seçilmeyen seviye) silinir.
+        hedef = set()
         for row in df_filtreli.itertuples(index=False):
             ders_obj = ders_map.get(row.Ders)
             sube_obj = sube_map.get((int(row.Seviye), str(row.Sube)))
-            if not ders_obj or not sube_obj:
+            if not ders_obj or not sube_obj or sube_obj.pk in kapali_subeler:
                 continue
-            anahtar = (ders_obj.pk, int(row.Seviye), sube_obj.pk)
-            if anahtar not in mevcut:
-                kayitlar.append(SubeDers(ders=ders_obj, seviye=int(row.Seviye), sube=sube_obj))
+            hedef.add((ders_obj.pk, int(row.Seviye), sube_obj.pk))
 
+        if not hedef:
+            raise RuntimeError(
+                "SubeDers: Güncel ders programında sınava girecek açık şube/ders bulunamadı."
+            )
+
+        mevcut = {
+            (d, sev, s): pk
+            for pk, d, sev, s in SubeDers.objects.values_list("pk", "ders_id", "seviye", "sube_id")
+        }
+        fazla_pk = [pk for anahtar, pk in mevcut.items() if anahtar not in hedef]
+        if fazla_pk:
+            SubeDers.objects.filter(pk__in=fazla_pk).delete()
+            self.log(f"{len(fazla_pk)} güncel programda olmayan ders/şube kaydı SubeDers'ten silindi.")
+
+        kayitlar = [
+            SubeDers(ders_id=d, seviye=sev, sube_id=s)
+            for d, sev, s in hedef - mevcut.keys()
+        ]
         if kayitlar:
             SubeDers.objects.bulk_create(kayitlar, ignore_conflicts=True)
-            self.log(f"{len(kayitlar)} yeni ders/sube kaydi DB'ye yazildi.")
-        else:
-            self.log("Yeni ders/sube kaydi yok; mevcut veriler korundu.")
+            self.log(f"{len(kayitlar)} yeni ders/şube kaydı DB'ye yazıldı.")
+        if not fazla_pk and not kayitlar:
+            self.log("SubeDers güncel; değişiklik yok.")

@@ -1137,7 +1137,11 @@ def _run_step(task_id: str, session_cfg: dict, func_name: str):
         _log(task_id, f"> {label} baslatildi...")
 
         if func_name == "takvim":
+            from ortaksinav_engine.services.ders_analiz import DersAnalizService
             from ortaksinav_engine.services.takvim import TakvimService
+
+            # Takvim her zaman güncel ders programı/açık şubelerle üretilsin.
+            DersAnalizService(CONFIG, log_fn=lambda m: _log(task_id, m)).subeders_guncelle()
 
             def _cancel_fn():
                 with _TASKS_LOCK:
