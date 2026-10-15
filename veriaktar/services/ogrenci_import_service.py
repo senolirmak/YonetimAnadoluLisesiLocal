@@ -142,41 +142,72 @@ class OgrenciIsleyici:
 
     # ------------------------------------------------------------------
     def veritabanina_yaz(self) -> dict:
-        """parse() sonucunu ogrenci.Ogrenci tablosuna yazar.
-        tckimlikno ve dogumtarihi eksik olduğu için yer tutucu değer kullanılır."""
-        from ogrenci.models import Ogrenci
+        """parse() sonucunu ogrenci.Ogrenci tablosuna yazar. e-Okul listesi
+        esastır (master): listedeki her öğrenci sınıf/şube/ad bilgisiyle
+        güncellenir ve daha önce arşivlenmişse (Nakil vb.) tekrar aktif yapılır.
+
+        tckimlikno ve dogumtarihi e-Okul raporunda yoktur — yalnızca YENİ kayıtta
+        yer tutucu yazılır, mevcut kayıttaki (elle girilmiş olabilecek) gerçek
+        değerlere dokunulmaz. Tasdikname alan öğrenciler, listede görünseler de
+        otomatik aktifleştirilmez (bilinçli verilmiş bir karardır), uyarı olarak
+        raporlanır."""
+        from django.db import transaction
+
+        from ogrenci.models import Ogrenci, OgrenciAyrilma
+        from secmelidersler.models import OgrenciTasdikname
 
         yeni = 0
         guncellenen = 0
         hatali = 0
         hata_detaylari = []
+        aktiflestirilen = []
+        tasdikli_listede = []
+
+        tasdikli_okulnolar = set(
+            OgrenciTasdikname.objects.values_list("ogrenci__okulno", flat=True)
+        )
 
         for kayit in self._kayitlar:
             okulno = kayit["okulno"]
-            tckimlikno_placeholder = str(okulno).zfill(11)
+            etiket = (
+                f"Okul No {okulno} ({kayit['adi']} {kayit['soyadi']}, "
+                f"{kayit['sinif']}/{kayit['sube']})"
+            )
+            alanlar = {
+                "sinif": kayit["sinif"],
+                "sube": kayit["sube"],
+                "adi": kayit["adi"],
+                "soyadi": kayit["soyadi"],
+                "cinsiyet": kayit["cinsiyet"],
+            }
             try:
-                obj, created = Ogrenci.objects.update_or_create(
-                    okulno=okulno,
-                    defaults={
-                        "sinif": kayit["sinif"],
-                        "sube": kayit["sube"],
-                        "adi": kayit["adi"],
-                        "soyadi": kayit["soyadi"],
-                        "cinsiyet": kayit["cinsiyet"],
-                        "tckimlikno": tckimlikno_placeholder,
-                        "dogumtarihi": date(2000, 1, 1),
-                    },
-                )
-                if created:
-                    yeni += 1
-                else:
+                with transaction.atomic():
+                    obj = Ogrenci.objects.filter(okulno=okulno).first()
+                    if obj is None:
+                        Ogrenci.objects.create(
+                            okulno=okulno,
+                            tckimlikno=self._bos_yer_tutucu_tc(okulno),
+                            dogumtarihi=date(2000, 1, 1),
+                            aktif=True,
+                            **alanlar,
+                        )
+                        yeni += 1
+                        continue
+
+                    for alan, deger in alanlar.items():
+                        setattr(obj, alan, deger)
+                    if not obj.aktif:
+                        if okulno in tasdikli_okulnolar:
+                            tasdikli_listede.append(etiket)
+                        else:
+                            OgrenciAyrilma.objects.filter(ogrenci=obj).delete()
+                            obj.aktif = True
+                            aktiflestirilen.append(etiket)
+                    obj.save()
                     guncellenen += 1
             except Exception as exc:
                 hatali += 1
-                hata_detaylari.append(
-                    f"Okul No {okulno} ({kayit.get('adi', '')} {kayit.get('soyadi', '')}, "
-                    f"{kayit.get('sinif', '')}/{kayit.get('sube', '')}): {exc}"
-                )
+                hata_detaylari.append(f"{etiket}: {exc}")
 
         ayrilan = self._nakil_olanlari_isaretle()
 
@@ -186,7 +217,24 @@ class OgrenciIsleyici:
             "hatali": hatali,
             "hata_detaylari": hata_detaylari,
             "ayrilan": ayrilan,
+            "aktiflestirilen": aktiflestirilen,
+            "tasdikli_listede": tasdikli_listede,
         }
+
+    @staticmethod
+    def _bos_yer_tutucu_tc(okulno) -> str:
+        """Yeni öğrenci için benzersiz yer tutucu TC üretir. Varsayılan
+        `okulno`nun 11 haneye sıfırla doldurulmuş hâlidir; bu değeri başka
+        (eski/okul numarası değişmiş) bir kayıt zaten tutuyorsa ilk hane
+        değiştirilerek boş bir değer aranır."""
+        from ogrenci.models import Ogrenci
+
+        govde = str(okulno).zfill(11)[-10:]
+        for on_ek in "0123456789":
+            aday = on_ek + govde
+            if not Ogrenci.objects.filter(tckimlikno=aday).exists():
+                return aday
+        raise ValueError("Benzersiz yer tutucu TC kimlik no üretilemedi.")
 
     # ------------------------------------------------------------------
     # Bir e-Okul listesinde artık görünmeyen okulno, gerçekte okuldan
@@ -253,6 +301,17 @@ class OgrenciIsleyici:
         notlar = []
         if status.get("hata_detaylari"):
             notlar.append("Hatalı kayıtlar:\n" + "\n".join(status["hata_detaylari"]))
+        if status.get("aktiflestirilen"):
+            notlar.append(
+                f"{len(status['aktiflestirilen'])} arşivdeki öğrenci e-Okul listesinde "
+                "bulunduğu için tekrar aktif yapıldı:\n" + "\n".join(status["aktiflestirilen"])
+            )
+        if status.get("tasdikli_listede"):
+            notlar.append(
+                "UYARI: Tasdikname kaydı olan şu öğrenciler e-Okul listesinde hâlâ "
+                "görünüyor; aktif yapılmadı (gerekiyorsa tasdikname kaydını silin):\n"
+                + "\n".join(status["tasdikli_listede"])
+            )
         if status.get("ayrilan"):
             notlar.append(
                 f"{status['ayrilan']} öğrenci, e-Okul listesinde bulunmadığı için "
