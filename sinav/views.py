@@ -209,7 +209,7 @@ def _veri_yukle_ctx(request):
         "sinav_listesi":   SinavBilgisi.objects.all(),
         "yeni_sinav_form": SinavBilgisiForm(),
         "dis_veri_gecmis": dis_veri,
-        "ogrenci_sayisi":  OgrenciModel.objects.count(),
+        "ogrenci_sayisi":  OgrenciModel.objects.filter(aktif=True).count(),
         "program_sayisi":  DersProgrami.objects.aktif().count(),
     }
 
@@ -1318,14 +1318,14 @@ def ogrenci_yonetim(request):
     arama = request.GET.get("q", "").strip()
     sinif_filtre = request.GET.get("sinif", "").strip()
     from django.db.models import Q
-    qs = OgrenciModel.objects.all()
+    qs = OgrenciModel.objects.filter(aktif=True)
     if arama:
         qs = qs.filter(
             Q(adi__icontains=arama) | Q(soyadi__icontains=arama) | Q(okulno__icontains=arama)
         )
     if sinif_filtre:
         qs = qs.filter(sinif=sinif_filtre)
-    siniflar = OgrenciModel.objects.values_list("sinif", flat=True).distinct().order_by("sinif")
+    siniflar = OgrenciModel.objects.filter(aktif=True).values_list("sinif", flat=True).distinct().order_by("sinif")
 
     # Aktif sınavın SinavOgrenci anlık görüntüsü ile canlı Ogrenci listesi
     # arasındaki fark — "Nakil Öğrenci Senkronize Et" butonunun ne kadar
@@ -1339,7 +1339,7 @@ def ogrenci_yonetim(request):
             SinavOgrenci.objects.filter(sinav=aktif).values_list("okulno", flat=True)
         )
         if donmus_okulnolar:
-            canli_okulnolar = set(OgrenciModel.objects.values_list("okulno", flat=True))
+            canli_okulnolar = set(OgrenciModel.objects.filter(aktif=True).values_list("okulno", flat=True))
             senkron_bilgisi = {
                 "donmus_sayisi": len(donmus_okulnolar),
                 "eksik_sayisi": len(canli_okulnolar - donmus_okulnolar),

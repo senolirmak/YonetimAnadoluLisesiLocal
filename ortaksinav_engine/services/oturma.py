@@ -50,7 +50,7 @@ def anlik_goruntu_garanti_et(sinav):
             cinsiyet=o.cinsiyet, sinif=o.sinif, sube=o.sube,
             sureksiz_devamsiz=o.sureksiz_devamsiz,
         )
-        for o in OgrenciModel.objects.all()
+        for o in OgrenciModel.objects.filter(aktif=True)
     ], ignore_conflicts=True)
 
     SinavOgrenciMuaf.objects.bulk_create([

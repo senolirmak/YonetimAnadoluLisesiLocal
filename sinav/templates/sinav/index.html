@@ -30,7 +30,7 @@
         <div class="kurulum-adim-baslik">e-Okul Verisi</div>
         <div class="kurulum-adim-aciklama">
           {% if veri_tamam %}
-            {{ db_ozeti.ogrenci }} öğrenci · {{ db_ozeti.ders_program }} ders programı kaydı — veritabanından okunuyor.
+            {{ db_ozeti.ogrenci }} aktif öğrenci · {{ db_ozeti.ders_program }} ders programı kaydı — veritabanından okunuyor.
           {% elif okul_tamam %}
             Öğrenci listesi ve haftalık ders programı önce
             <a href="{% url 'veriaktar_ana' %}">Veri Aktarım</a>'dan yüklenmeli
