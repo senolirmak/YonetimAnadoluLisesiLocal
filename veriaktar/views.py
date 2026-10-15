@@ -114,9 +114,18 @@ def veriaktar_ana(request):
                     f"Öğrenci listesi aktarıldı — "
                     f"{sonuc['yeni']} yeni, {sonuc['guncellenen']} güncellendi"
                     + (f", {sonuc['hatali']} hatalı" if sonuc["hatali"] else "")
+                    + (f", {len(sonuc['aktiflestirilen'])} arşivdeki öğrenci tekrar aktif yapıldı" if sonuc.get("aktiflestirilen") else "")
                     + (f", {sonuc['ayrilan']} öğrenci Nakil olarak arşivlendi" if sonuc.get("ayrilan") else "")
                     + ".",
                 )
+                if sonuc["hatali"]:
+                    messages.error(request, "Aktarılamayan öğrenciler: " + "; ".join(sonuc["hata_detaylari"]))
+                if sonuc.get("tasdikli_listede"):
+                    messages.warning(
+                        request,
+                        "Tasdikname kaydı olduğu için aktif yapılmayan ama e-Okul listesinde "
+                        "görünen öğrenciler: " + "; ".join(sonuc["tasdikli_listede"]),
+                    )
 
         except Exception as e:
             messages.error(request, f"Hata oluştu: {str(e)}")
