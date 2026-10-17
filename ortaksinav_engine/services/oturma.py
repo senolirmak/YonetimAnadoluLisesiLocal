@@ -19,6 +19,7 @@ import hashlib
 import random
 import re
 from datetime import datetime
+from operator import eq, itemgetter
 
 import pandas as pd
 
@@ -480,14 +481,27 @@ class OturmaPlanService(BaseService):
         elif len(keys_expanded) > n:
             keys_expanded = keys_expanded[:n]
 
+        # Tek tür key varsa (örn. salonda tek sınav grubu) her permütasyon aynı
+        # çakışmayı verir; GA'nın iyileştirebileceği bir şey yoktur.
+        if len(set(keys_expanded)) == 1:
+            return dict(zip(occupied_list, keys_expanded))
+
+        # Komşu çiftler bir kez indeks çiftlerine çevrilir (her çift tek sayılır);
+        # fitness yalnızca bu çiftlerin key'lerini karşılaştırır.
+        index_of = {pos: i for i, pos in enumerate(occupied_list)}
+        edges = [
+            (index_of[pos], index_of[nb])
+            for pos in occupied_list
+            for nb in adj[pos]
+            if index_of[pos] < index_of[nb]
+        ]
+        if not edges:
+            return dict(zip(occupied_list, keys_expanded))
+        sol = [i for i, _ in edges]
+        sag = [j for _, j in edges]
+
         def conflict_count(perm) -> int:
-            pos_key = dict(zip(occupied_list, perm))
-            total = 0
-            for pos, key in pos_key.items():
-                for nb in adj[pos]:
-                    if pos_key.get(nb) == key:
-                        total += 1
-            return total // 2  # her çakışan çift iki kez sayılır
+            return sum(map(eq, map(perm.__getitem__, sol), map(perm.__getitem__, sag)))
 
         rng = random.Random()
 
@@ -502,8 +516,12 @@ class OturmaPlanService(BaseService):
         swaps_per_mutation = max(1, n // 10)
 
         for _generation in range(generations):
-            population.sort(key=conflict_count)
-            current_best = conflict_count(population[0])
+            # Her bireyin fitness'ı nesil başına bir kez hesaplanır (sıralama kararlı)
+            scored = sorted(
+                ((conflict_count(p), p) for p in population), key=itemgetter(0)
+            )
+            population = [p for _, p in scored]
+            current_best = scored[0][0]
             if current_best == 0:
                 break
             if current_best < best_fitness:
