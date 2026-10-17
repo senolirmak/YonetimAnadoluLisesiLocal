@@ -278,6 +278,38 @@ class OturmaPlanServiceGATestCase(SimpleTestCase):
         self.assertEqual(dolu, 36)
 
 
+class OturmaPlanServiceIptalTestCase(TestCase):
+    """generate_selected iptal istendiğinde kalan oturumları işlememeli ve
+    yalnızca tamamlanan oturumları döndürmeli."""
+
+    SESSIONS = [
+        {"tarih": "2026-01-05", "saat": "09:00", "oturum": i} for i in (1, 2, 3)
+    ]
+
+    def _calistir(self, iptal_sonrasi):
+        from unittest import mock
+
+        islenen = []
+        svc = OturmaPlanService(
+            {}, log_fn=lambda m: None, cancel_fn=lambda: len(islenen) >= iptal_sonrasi,
+        )
+        with mock.patch.object(
+            svc, "generate_oturum", side_effect=lambda *a, **k: islenen.append(a[2]),
+        ):
+            tamamlanan = svc.generate_selected(self.SESSIONS)
+        return islenen, tamamlanan
+
+    def test_iptal_kalan_oturumlari_atlar(self):
+        islenen, tamamlanan = self._calistir(iptal_sonrasi=1)
+        self.assertEqual(islenen, [1])
+        self.assertEqual(tamamlanan, self.SESSIONS[:1])
+
+    def test_iptal_yoksa_tum_oturumlar_doner(self):
+        islenen, tamamlanan = self._calistir(iptal_sonrasi=99)
+        self.assertEqual(islenen, [1, 2, 3])
+        self.assertEqual(tamamlanan, self.SESSIONS)
+
+
 class SinavOgrenciAnlikGoruntuTestCase(TestCase):
     """Ortak sınav öğrenci listesi yalnızca aktif öğrencilerden oluşmalı —
     mezun/nakil (aktif=False) öğrenciler salonlara yerleştirilmemeli."""

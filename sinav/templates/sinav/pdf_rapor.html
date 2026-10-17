@@ -344,6 +344,7 @@ async function runTumu() {
   badgeUret.className = "badge badge-running";
   badgeUret.textContent = "Oturma planı oluşturuluyor...";
   btnUret.disabled = true;
+  btnDurdur.disabled = false;
   btnDurdur.style.display = "inline-flex";
   logUret.textContent = "";
   _setPassive(true);
@@ -368,6 +369,8 @@ async function runTumu() {
 
   _activeTaskId = data.task_id;
   let ok = false;
+  let durduruldu = false;
+  let tamamlanan = [];
   while (true) {
     await new Promise(r => setTimeout(r, 1200));
     const res = await fetch(`{% url 'sinav:gorev_durumu' '00' %}`.replace('00', data.task_id)).then(r => r.json());
@@ -375,14 +378,22 @@ async function runTumu() {
     logUret.scrollTop = logUret.scrollHeight;
     if (res.done) {
       ok = !res.error;
+      durduruldu = res.cancelled;
+      tamamlanan = res.tamamlanan || [];
       _activeTaskId = null;
       break;
     }
   }
 
-  if (ok) _markDone(sessions);
-  badgeUret.className = ok ? "badge badge-done" : "badge badge-error";
-  badgeUret.textContent = ok ? "Tamamlandı" : "Hata";
+  // Yalnızca hatasız tamamlanan oturumlar işaretlenir (durdurma/hata olsa bile)
+  _markDone(tamamlanan);
+  if (durduruldu) {
+    badgeUret.className = "badge badge-running";
+    badgeUret.textContent = `Durduruldu (${tamamlanan.length}/${sessions.length})`;
+  } else {
+    badgeUret.className = ok ? "badge badge-done" : "badge badge-error";
+    badgeUret.textContent = ok ? "Tamamlandı" : "Hata";
+  }
   btnUret.disabled = false;
   btnDurdur.style.display = "none";
   _setPassive(false);

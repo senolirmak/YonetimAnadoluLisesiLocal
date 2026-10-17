@@ -91,6 +91,9 @@ class OturmaPlanService(BaseService):
 
         self.log(f"Toplam {unique_sessions.count()} oturum bulundu.\n")
         for tarih, saat, oturum in unique_sessions:
+            if self.is_cancelled():
+                self.log("\nDurduruldu: kalan oturumlar icin oturma plani olusturulmadi.")
+                return
             try:
                 self.log("────────────────────────────────────────────")
                 self.log(f"{tarih} {saat} (Oturum {oturum}) isleniyor...")
@@ -100,10 +103,12 @@ class OturmaPlanService(BaseService):
 
         self.log("\nTum oturumlar icin oturma plani tamamlandi.\n")
 
-    def generate_selected(self, sessions: list):
+    def generate_selected(self, sessions: list) -> list:
         """Yalnızca verilen oturumlar için oturma planı oluşturur.
 
         sessions: [{"tarih": "YYYY-MM-DD", "saat": "HH:MM", "oturum": int}, ...]
+        İptal her oturumdan önce kontrol edilir; yarıdaki oturum yarıda kesilmez.
+        Döndürür: hatasız tamamlanan oturumlar (sessions'taki sözlüklerle aynı).
         """
         from sinav.models import SinavBilgisi, TakvimUretim
 
@@ -113,7 +118,14 @@ class OturmaPlanService(BaseService):
             if aktif_sinav else None
         )
         self.log(f"\nSecili {len(sessions)} oturum icin oturma plani olusturuluyor...\n")
+        tamamlanan = []
         for s in sessions:
+            if self.is_cancelled():
+                self.log(
+                    f"\nDurduruldu: {len(tamamlanan)}/{len(sessions)} oturum tamamlandi, "
+                    "kalanlar icin oturma plani olusturulmadi."
+                )
+                return tamamlanan
             tarih  = s.get("tarih", "")
             saat   = s.get("saat", "")
             oturum = int(s.get("oturum", 1))
@@ -121,11 +133,13 @@ class OturmaPlanService(BaseService):
                 self.log("────────────────────────────────────────────")
                 self.log(f"{tarih} {saat} (Oturum {oturum}) isleniyor...")
                 self.generate_oturum(tarih, saat, oturum, aktif_sinav, aktif_uretim)
+                tamamlanan.append(s)
             except Exception as e:
                 import traceback as _tb
                 self.log(f"HATA {tarih} {saat} (Oturum {oturum}): {e}")
                 self.log(_tb.format_exc())
         self.log("\nSecili oturumlar tamamlandi.\n")
+        return tamamlanan
 
     def generate_oturum(self, tarih: str, saat: str, oturum: int, aktif_sinav=None, aktif_uretim=None):
         from sinav.models import OturmaPlani, SinavOgrenci, SinavOgrenciMuaf, Takvim
