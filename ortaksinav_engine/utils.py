@@ -47,14 +47,16 @@ def salon_gozetmen_bul(tarih, saat_veya_ders_saati, ss_map: dict) -> dict:
 
     saat_veya_ders_saati: str ("HH:MM") veya DersSaatleri instance
     ss_map  : {"Salon-9_A": SinifSube instance, ...}
-    Döndürür: {"Salon-9_A": "ÖĞRETMEN ADI", ...}  — bulunamayanlar boş string.
+    Döndürür: {"Salon-9_A": Personel instance, ...}  — bulunamayanlar None.
+    Aynı şube/gün/saatte birden fazla ders kaydı varsa (grup dersleri) öğretmeni
+    atanmış en eski kayıt (en küçük pk) seçilir.
     """
     from datetime import datetime as _dt
     from dersprogrami.models import DersProgrami
     from okul.models import DersSaatleri as _DS
 
     if not ss_map or not tarih or not saat_veya_ders_saati:
-        return {k: "" for k in ss_map}
+        return dict.fromkeys(ss_map)
 
     if isinstance(saat_veya_ders_saati, _DS):
         dp_filter = {"ders_saati": saat_veya_ders_saati}
@@ -62,23 +64,20 @@ def salon_gozetmen_bul(tarih, saat_veya_ders_saati, ss_map: dict) -> dict:
         try:
             saat_time = _dt.strptime(saat_veya_ders_saati, "%H:%M").time()
         except (ValueError, TypeError):
-            return {k: "" for k in ss_map}
+            return dict.fromkeys(ss_map)
         dp_filter = {"ders_saati__derssaati_baslangic": saat_time}
 
     gun_adi = _EN_GUNLER.get(tarih.weekday(), "")
-    dp_map = {
-        dp.sinif_sube_id: dp
-        for dp in DersProgrami.objects.aktif().filter(
-            sinif_sube__in=list(ss_map.values()),
-            gun=gun_adi,
-            **dp_filter,
-        ).select_related("ogretmen")
-    }
+    ogretmen_map = {}
+    for dp in DersProgrami.objects.aktif().filter(
+        sinif_sube__in=list(ss_map.values()),
+        gun=gun_adi,
+        ogretmen__isnull=False,
+        **dp_filter,
+    ).select_related("ogretmen").order_by("pk"):
+        ogretmen_map.setdefault(dp.sinif_sube_id, dp.ogretmen)
     return {
-        salon_adi: (
-            dp_map[ss.pk].ogretmen
-            if ss.pk in dp_map and dp_map[ss.pk].ogretmen else None
-        )
+        salon_adi: ogretmen_map.get(ss.pk)
         for salon_adi, ss in ss_map.items()
     }
 
