@@ -104,3 +104,50 @@ class VarsayilanDersVerileriniYukleTestCase(TestCase):
         self.assertEqual(SecmeliDersGrubu.objects.count(), grup_sayisi_1)
         self.assertEqual(SecmeliDers.objects.count(), ders_sayisi_1)
         self.assertEqual(Brans.objects.count(), brans_sayisi_1)
+
+
+class SecmeliDersAdlarinaOnekEkleMigrationTestCase(TestCase):
+    """0029_secmeli_ders_adlarina_onek_ekle: havuzdaki ön eksiz seçmeli ders adları ve
+    onlara ad üzerinden bağlı grup dersleri "SEÇMELİ " ön ekini almalı."""
+
+    def _calistir(self):
+        import importlib
+
+        from django.apps import apps
+
+        importlib.import_module(
+            "secmelidersler.migrations.0029_secmeli_ders_adlarina_onek_ekle"
+        ).onek_ekle(apps, None)
+
+    def setUp(self):
+        SecmeliDersHavuzu.objects.create(ders_adi="KLASİK AHLAK METİNLERİ")
+        SecmeliDersHavuzu.objects.create(ders_adi="SEÇMELİ FİZİK")
+        grup = SecmeliDersGrubu.objects.create(sinif_seviyesi=11, adi="TEST GRUBU")
+        self.ahlak = SecmeliDers.objects.create(grup=grup, ders_adi="KLASİK AHLAK METİNLERİ (2)")
+        self.fizik = SecmeliDers.objects.create(grup=grup, ders_adi="SEÇMELİ FİZİK (4)")
+        self.havuzsuz = SecmeliDers.objects.create(grup=grup, ders_adi="HAVUZDA OLMAYAN DERS (1)")
+
+    def test_onek_eklenir_saat_eki_korunur(self):
+        self._calistir()
+        self.assertEqual(
+            set(SecmeliDersHavuzu.objects.values_list("ders_adi", flat=True)),
+            {"SEÇMELİ KLASİK AHLAK METİNLERİ", "SEÇMELİ FİZİK"},
+        )
+        for ders in (self.ahlak, self.fizik, self.havuzsuz):
+            ders.refresh_from_db()
+        self.assertEqual(self.ahlak.ders_adi, "SEÇMELİ KLASİK AHLAK METİNLERİ (2)")
+        self.assertEqual(self.fizik.ders_adi, "SEÇMELİ FİZİK (4)")
+        self.assertEqual(self.havuzsuz.ders_adi, "HAVUZDA OLMAYAN DERS (1)")
+
+    def test_ikinci_calistirma_degistirmez(self):
+        self._calistir()
+        self._calistir()
+        self.ahlak.refresh_from_db()
+        self.assertEqual(self.ahlak.ders_adi, "SEÇMELİ KLASİK AHLAK METİNLERİ (2)")
+
+    def test_cakisan_ad_atlanir(self):
+        SecmeliDersHavuzu.objects.create(ders_adi="SEÇMELİ KLASİK AHLAK METİNLERİ")
+        self._calistir()
+        self.assertTrue(SecmeliDersHavuzu.objects.filter(ders_adi="KLASİK AHLAK METİNLERİ").exists())
+        self.ahlak.refresh_from_db()
+        self.assertEqual(self.ahlak.ders_adi, "KLASİK AHLAK METİNLERİ (2)")
