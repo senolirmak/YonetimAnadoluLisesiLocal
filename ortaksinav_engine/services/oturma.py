@@ -2,23 +2,24 @@
 """
 OturmaPlanService – Adim 5
 
-Takvim ve Ogrenci tablolarindan bir oturumun ogrencilerini alarak
-Kelebek karisik oturma duzeni olusturur, OturmaPlani tablosuna kaydeder
-ve Excel ciktisi uretir.
+Takvim ve SinavOgrenci tablolarindan bir oturumun ogrencilerini alarak
+Kelebek karisik oturma duzeni olusturur ve OturmaPlani tablosuna kaydeder.
 
 Ozel metodlar:
   _build_layout       – 6x6 matris icin stride bosluk + GA tabanli yerlesim
   _ga_seat_assignment – komsu-cakisma sayisini minimize eden permutasyon GA'si
   _place_matrix       – 6x6 matrisi 3 blok x 6 sira x 2 koltuk yapisina donusturur
-  _write_excel        – oturma plani Excel dosyasini olusturur
+  _simple_grid        – kelebek kapaliyken ogrencileri sirayla yerlestirir
   generate_oturum     – tek oturum icin plani uretir
   generate_all        – takvimdeki tum oturumlar icin calistirir
+  generate_selected   – yalnizca secilen oturumlar icin calistirir
 """
 
 import hashlib
 import random
 import re
 from datetime import datetime
+from operator import eq, itemgetter
 
 import pandas as pd
 
@@ -90,6 +91,9 @@ class OturmaPlanService(BaseService):
 
         self.log(f"Toplam {unique_sessions.count()} oturum bulundu.\n")
         for tarih, saat, oturum in unique_sessions:
+            if self.is_cancelled():
+                self.log("\nDurduruldu: kalan oturumlar icin oturma plani olusturulmadi.")
+                return
             try:
                 self.log("────────────────────────────────────────────")
                 self.log(f"{tarih} {saat} (Oturum {oturum}) isleniyor...")
@@ -99,10 +103,12 @@ class OturmaPlanService(BaseService):
 
         self.log("\nTum oturumlar icin oturma plani tamamlandi.\n")
 
-    def generate_selected(self, sessions: list):
+    def generate_selected(self, sessions: list) -> list:
         """Yalnızca verilen oturumlar için oturma planı oluşturur.
 
         sessions: [{"tarih": "YYYY-MM-DD", "saat": "HH:MM", "oturum": int}, ...]
+        İptal her oturumdan önce kontrol edilir; yarıdaki oturum yarıda kesilmez.
+        Döndürür: hatasız tamamlanan oturumlar (sessions'taki sözlüklerle aynı).
         """
         from sinav.models import SinavBilgisi, TakvimUretim
 
@@ -112,7 +118,14 @@ class OturmaPlanService(BaseService):
             if aktif_sinav else None
         )
         self.log(f"\nSecili {len(sessions)} oturum icin oturma plani olusturuluyor...\n")
+        tamamlanan = []
         for s in sessions:
+            if self.is_cancelled():
+                self.log(
+                    f"\nDurduruldu: {len(tamamlanan)}/{len(sessions)} oturum tamamlandi, "
+                    "kalanlar icin oturma plani olusturulmadi."
+                )
+                return tamamlanan
             tarih  = s.get("tarih", "")
             saat   = s.get("saat", "")
             oturum = int(s.get("oturum", 1))
@@ -120,17 +133,18 @@ class OturmaPlanService(BaseService):
                 self.log("────────────────────────────────────────────")
                 self.log(f"{tarih} {saat} (Oturum {oturum}) isleniyor...")
                 self.generate_oturum(tarih, saat, oturum, aktif_sinav, aktif_uretim)
+                tamamlanan.append(s)
             except Exception as e:
                 import traceback as _tb
                 self.log(f"HATA {tarih} {saat} (Oturum {oturum}): {e}")
                 self.log(_tb.format_exc())
         self.log("\nSecili oturumlar tamamlandi.\n")
+        return tamamlanan
 
     def generate_oturum(self, tarih: str, saat: str, oturum: int, aktif_sinav=None, aktif_uretim=None):
         from sinav.models import OturmaPlani, SinavOgrenci, SinavOgrenciMuaf, Takvim
 
         self.log(f"\nOturum yerlesimi: {tarih} {saat} (Oturum {oturum})")
-        baslik = f"{tarih} {saat} (Oturum {oturum})"
 
         # Öğrenci listesi CANLI ogrenci.Ogrenci'den değil, bu sınav için dondurulmuş
         # SinavOgrenci anlık görüntüsünden okunur — bkz. sinav.models.SinavOgrenci
@@ -142,60 +156,52 @@ class OturmaPlanService(BaseService):
         anlik_goruntu_garanti_et(sinav_kapsam)
 
         # Yeniden üretimde eski kayıtları temizle (aynı uretim + tarih + saat + oturum)
-        if aktif_uretim is not None:
-            silinen, _ = OturmaPlani.objects.filter(
-                uretim=aktif_uretim, tarih=tarih, saat=saat, oturum=oturum
-            ).delete()
-            if silinen:
-                self.log(f"Önceki üretimden {silinen} kayıt silindi.")
-            takvim_qs = Takvim.objects.filter(tarih=tarih, saat=saat, uretim=aktif_uretim).select_related("ders_saati")
-        else:
-            takvim_qs = Takvim.objects.filter(tarih=tarih, saat=saat, sinav=aktif_sinav).select_related("ders_saati")
-        if not takvim_qs.exists():
+        silinen, _ = OturmaPlani.objects.filter(
+            uretim=aktif_uretim, tarih=tarih, saat=saat, oturum=oturum
+        ).delete()
+        if silinen:
+            self.log(f"Önceki üretimden {silinen} kayıt silindi.")
+
+        takvim_filtre = {"uretim": aktif_uretim} if aktif_uretim is not None else {"sinav": aktif_sinav}
+        takvimler = list(
+            Takvim.objects.filter(tarih=tarih, saat=saat, **takvim_filtre)
+            .select_related("ders", "ders_saati")
+        )
+        if not takvimler:
             self.log("Belirtilen tarih/saat icin takvim verisi bulunamadi.")
             return
 
-        subeler = sorted(set(
-            s for t in takvim_qs for s in normalize_sube_cell(t.subeler)
-        ))
+        sube_to_ders = {
+            s: t.ders_tam_adi
+            for t in takvimler
+            for s in normalize_sube_cell(t.subeler)
+        }
+        subeler = sorted(sube_to_ders)
         if not subeler:
             self.log("Bu oturumda sube bulunamadi.")
             return
 
         salon_adlari = [f"Salon-{s.replace('/', '_')}" for s in subeler]
-        sube_to_ders = {
-            s: t.ders_tam_adi
-            for t in takvim_qs.select_related("ders")
-            for s in normalize_sube_cell(t.subeler)
-        }
-
-        # Özel durum 1: Sürekli devamsız öğrencileri hiçbir sınavda oturma planına alma
-        # (bu sınavın anlık görüntüsündeki, o anda dondurulmuş hâli)
-        sureksiz_set = set(
-            SinavOgrenci.objects.filter(sinav=sinav_kapsam, sureksiz_devamsiz=True)
-            .values_list("okulno", flat=True)
-        )
 
         df_o = pd.DataFrame(SinavOgrenci.objects.filter(sinav=sinav_kapsam).values(
-            "okulno", "adi", "soyadi", "cinsiyet", "sinif", "sube",
+            "okulno", "adi", "soyadi", "cinsiyet", "sinif", "sube", "sureksiz_devamsiz",
         ))
-        if not df_o.empty:
-            df_o["sinifsube"] = df_o["sinif"].astype(str) + "/" + df_o["sube"].astype(str)
         if df_o.empty:
             self.log("Bu sinav icin ogrenci anlik goruntusu bulunamadi. Adim 1'i calistirin.")
             return
 
-        # Sürekli devamsız filtresi
-        if sureksiz_set:
-            onceki = len(df_o)
-            df_o = df_o[~df_o["okulno"].isin(sureksiz_set)].copy()
-            hariç_sureksiz = onceki - len(df_o)
-            if hariç_sureksiz:
-                self.log(f"  Özel durum: {hariç_sureksiz} sürekli devamsız öğrenci hariç tutuldu.")
+        # Özel durum 1: Sürekli devamsız öğrencileri hiçbir sınavda oturma planına alma
+        # (bu sınavın anlık görüntüsündeki, o anda dondurulmuş hâli)
+        hariç_sureksiz = int(df_o["sureksiz_devamsiz"].sum())
+        df_o = df_o[~df_o["sureksiz_devamsiz"]].drop(columns=["sureksiz_devamsiz"])
+        if hariç_sureksiz:
+            self.log(f"  Özel durum: {hariç_sureksiz} sürekli devamsız öğrenci hariç tutuldu.")
 
-        df_o["sinifsube"] = df_o["sinifsube"].astype(str).str.upper().str.replace(" ", "")
-        df_o["ders"] = df_o["sinifsube"].map(sube_to_ders).fillna("Diger")
-        df_o = df_o[df_o["ders"] != "Diger"].copy()
+        df_o["sinifsube"] = (
+            df_o["sinif"].astype(str) + "/" + df_o["sube"].astype(str)
+        ).str.upper().str.replace(" ", "")
+        df_o["ders"] = df_o["sinifsube"].map(sube_to_ders)
+        df_o = df_o[df_o["ders"].notna()].copy()
         if df_o.empty:
             self.log("Bu oturumda sinava girecek ogrenci bulunamadi.")
             return
@@ -215,15 +221,12 @@ class OturmaPlanService(BaseService):
             ).values_list("okulno", "ders_adi")
         )
         if muaf_pairs:
-            df_o["_ders_base"] = df_o["ders"].apply(_base_ders)
             onceki = len(df_o)
-            df_o = df_o[
-                ~df_o.apply(
-                    lambda r: (r["okulno"], r["_ders_base"]) in muaf_pairs,
-                    axis=1,
-                )
-            ].copy()
-            df_o = df_o.drop(columns=["_ders_base"])
+            muaf_mi = [
+                (okulno, _base_ders(ders)) in muaf_pairs
+                for okulno, ders in zip(df_o["okulno"], df_o["ders"])
+            ]
+            df_o = df_o[[not m for m in muaf_mi]]
             hariç_muaf = onceki - len(df_o)
             if hariç_muaf:
                 self.log(f"  Özel durum: {hariç_muaf} muaf öğrenci bu oturum için hariç tutuldu.")
@@ -234,7 +237,7 @@ class OturmaPlanService(BaseService):
 
         kelebek = self.config.get("KELEBEK_DAGITIM", True)
         _seed = int(hashlib.md5(f"{tarih}{saat}{oturum}".encode()).hexdigest(), 16) % (2 ** 31)
-        ogr = df_o.sample(frac=1, random_state=_seed).reset_index(drop=True)
+        ogr = df_o.sample(frac=1, random_state=_seed).to_dict("records")
         salon_map = {name: [] for name in salon_adlari}
         n_salons = len(salon_adlari)
         SALON_KAPASITE = 36  # 3 blok × 6 sıra × 2 koltuk
@@ -244,8 +247,8 @@ class OturmaPlanService(BaseService):
             # Round-robin (tüm öğrenci karışık) yerine per-grup round-robin:
             # her salona her gruptan floor ya da ceil kadar düşer → garantili denge.
             groups_by_ders: dict[str, list] = {}
-            for _, row in ogr.iterrows():
-                groups_by_ders.setdefault(row["ders"], []).append(row.to_dict())
+            for row in ogr:
+                groups_by_ders.setdefault(row["ders"], []).append(row)
 
             for students in groups_by_ders.values():
                 for i, student in enumerate(students):
@@ -260,30 +263,22 @@ class OturmaPlanService(BaseService):
         else:
             # Kelebek yok: her öğrenci kendi şube salonuna gider.
             self.log("Kelebek dağılımı kapalı: her sınıf kendi salonunda.")
-            for _, row in ogr.iterrows():
-                sinifsube = str(row.get("sinifsube", "")).upper().replace(" ", "")
-                salon_key = f"Salon-{sinifsube.replace('/', '_')}"
+            for row in ogr:
+                salon_key = f"Salon-{row['sinifsube'].replace('/', '_')}"
                 if salon_key in salon_map:
-                    salon_map[salon_key].append(row.to_dict())
+                    salon_map[salon_key].append(row)
 
         salon_grids = {}
         for salon, lst in salon_map.items():
             if not lst:
                 continue
             if kelebek:
-                df_salon = pd.DataFrame(lst)
-                for col in ("ders", "sinif"):
-                    if col not in df_salon.columns:
-                        df_salon[col] = ""
-                salon_grids[salon] = self._place_matrix(df_salon)
+                salon_grids[salon] = self._place_matrix(lst)
             else:
                 salon_grids[salon] = self._simple_grid(lst)
 
         # DB kaydet
         tarih_date = datetime.strptime(tarih, "%Y-%m-%d").date()
-        OturmaPlani.objects.filter(
-            tarih=tarih_date, saat=saat, oturum=oturum, uretim=aktif_uretim
-        ).delete()
 
         # OturmaUretim kaydı: bu oturum için üretim tarihi ve TakvimUretim FK
         if aktif_uretim is not None:
@@ -298,24 +293,24 @@ class OturmaPlanService(BaseService):
         # Salon → gözetmen: sınav saatinde o salonun ders programındaki öğretmen
         from okul.models import SinifSube as _SS
         from ortaksinav_engine.utils import salon_gozetmen_bul
+        ss_by_key = {(ss.sinif, ss.sube): ss for ss in _SS.objects.all()}
         ss_map = {}
         for sube_str in subeler:
             parts = sube_str.split("/")
-            if len(parts) == 2:
-                try:
-                    ss = _SS.objects.filter(sinif=int(parts[0]), sube=parts[1]).first()
-                except (ValueError, TypeError):
-                    ss = None
-                if ss:
-                    ss_map[f"Salon-{sube_str.replace('/', '_')}"] = ss
-        ders_saati_obj = takvim_qs.first().ders_saati
+            if len(parts) != 2:
+                continue
+            try:
+                ss = ss_by_key.get((int(parts[0]), parts[1]))
+            except ValueError:
+                ss = None
+            if ss:
+                ss_map[f"Salon-{sube_str.replace('/', '_')}"] = ss
+        ders_saati_obj = takvimler[0].ders_saati
         salon_gozetmen = salon_gozetmen_bul(tarih_date, ders_saati_obj or saat, ss_map)
 
         # Sıra numaralandırması: pdf_rapor.oturum_plani_pdf ile birebir aynı seat_map
         # Grup 1→1-12, Grup 2→13-24, Grup 3→25-36
         # Çift satır sol→sağ, tek satır sağ→sol (S-şekli)
-        COLS_PER_BLOCK = 2
-
         op_records = []
         for salon, grid in salon_grids.items():
             gozetmen_obj = salon_gozetmen.get(salon)
@@ -336,8 +331,8 @@ class OturmaPlanService(BaseService):
                     for col_idx, s in enumerate(row_cells):
                         seat_number = seat_map[(block_idx, row_idx, col_idx)]
                         if isinstance(s, dict):
-                            adi = str(s.get("adi") or s.get("ad") or "")
-                            soyadi = str(s.get("soyadi") or s.get("soyad") or "")
+                            adi = str(s.get("adi") or "")
+                            soyadi = str(s.get("soyadi") or "")
                             op_records.append(OturmaPlani(
                                 sinav=aktif_sinav,
                                 uretim=aktif_uretim,
@@ -373,34 +368,18 @@ class OturmaPlanService(BaseService):
             for r in range(ROWS):
                 for c in range(COLS_PER_BLOCK):
                     if idx < len(lst):
-                        grid[b][r][c] = lst[idx] if isinstance(lst[idx], dict) else lst[idx].to_dict()
+                        grid[b][r][c] = lst[idx]
                         idx += 1
         return grid
 
-    def _place_matrix(self, df_students):
+    def _place_matrix(self, students: list) -> list:
+        """students: öğrenci dict'leri (en az "ders" ve "sinif" anahtarlı)."""
         ROWS, COLS_PER_BLOCK, BLOCKS = 6, 2, 3
         TOTAL_COLS = COLS_PER_BLOCK * BLOCKS
 
-        def get_level(ogr):
-            seviye = ogr.get("sinif", None)
-            if seviye not in (None, ""):
-                try:
-                    return int(seviye)
-                except Exception:
-                    pass
-            sinifsube = str(ogr.get("sinifsube", "") or "")
-            m = re.search(r"(\d+)", sinifsube)
-            if m:
-                try:
-                    return int(m.group(1))
-                except Exception:
-                    pass
-            return None
-
         groups = {}
-        for _, row in df_students.iterrows():
-            ogr = row.to_dict()
-            k = (ogr.get("ders", "") or "", get_level(ogr))
+        for ogr in students:
+            k = (ogr["ders"], int(ogr["sinif"]))
             groups.setdefault(k, []).append(ogr)
 
         exam_counts = {k: len(v) for k, v in groups.items()}
@@ -516,14 +495,27 @@ class OturmaPlanService(BaseService):
         elif len(keys_expanded) > n:
             keys_expanded = keys_expanded[:n]
 
+        # Tek tür key varsa (örn. salonda tek sınav grubu) her permütasyon aynı
+        # çakışmayı verir; GA'nın iyileştirebileceği bir şey yoktur.
+        if len(set(keys_expanded)) == 1:
+            return dict(zip(occupied_list, keys_expanded))
+
+        # Komşu çiftler bir kez indeks çiftlerine çevrilir (her çift tek sayılır);
+        # fitness yalnızca bu çiftlerin key'lerini karşılaştırır.
+        index_of = {pos: i for i, pos in enumerate(occupied_list)}
+        edges = [
+            (index_of[pos], index_of[nb])
+            for pos in occupied_list
+            for nb in adj[pos]
+            if index_of[pos] < index_of[nb]
+        ]
+        if not edges:
+            return dict(zip(occupied_list, keys_expanded))
+        sol = [i for i, _ in edges]
+        sag = [j for _, j in edges]
+
         def conflict_count(perm) -> int:
-            pos_key = dict(zip(occupied_list, perm))
-            total = 0
-            for pos, key in pos_key.items():
-                for nb in adj[pos]:
-                    if pos_key.get(nb) == key:
-                        total += 1
-            return total // 2  # her çakışan çift iki kez sayılır
+            return sum(map(eq, map(perm.__getitem__, sol), map(perm.__getitem__, sag)))
 
         rng = random.Random()
 
@@ -538,8 +530,12 @@ class OturmaPlanService(BaseService):
         swaps_per_mutation = max(1, n // 10)
 
         for _generation in range(generations):
-            population.sort(key=conflict_count)
-            current_best = conflict_count(population[0])
+            # Her bireyin fitness'ı nesil başına bir kez hesaplanır (sıralama kararlı)
+            scored = sorted(
+                ((conflict_count(p), p) for p in population), key=itemgetter(0)
+            )
+            population = [p for _, p in scored]
+            current_best = scored[0][0]
             if current_best == 0:
                 break
             if current_best < best_fitness:

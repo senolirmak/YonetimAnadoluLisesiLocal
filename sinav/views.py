@@ -97,6 +97,11 @@ def _log(task_id: str, msg: str):
         _TASKS[task_id]["logs"].append(msg)
 
 
+def _iptal_istendi_mi(task_id: str) -> bool:
+    with _TASKS_LOCK:
+        return _TASKS.get(task_id, {}).get("cancel", False)
+
+
 def _finish(task_id: str, error: bool = False):
     with _TASKS_LOCK:
         _TASKS[task_id]["done"] = True
@@ -838,8 +843,14 @@ def _run_oturma_secili(task_id: str, session_cfg: dict, sessions: list):
     try:
         config_uygula(session_cfg)
         from ortaksinav_engine.services.oturma import OturmaPlanService
-        OturmaPlanService(CONFIG, log_fn=lambda m: _log(task_id, m)).generate_selected(sessions)
-        if _TASKS.get(task_id, {}).get("cancel"):
+        tamamlanan = OturmaPlanService(
+            CONFIG,
+            log_fn=lambda m: _log(task_id, m),
+            cancel_fn=lambda: _iptal_istendi_mi(task_id),
+        ).generate_selected(sessions)
+        with _TASKS_LOCK:
+            _TASKS[task_id]["tamamlanan"] = tamamlanan
+        if _iptal_istendi_mi(task_id):
             _finish(task_id, error=True)
             return
     except Exception as e:
@@ -1143,11 +1154,11 @@ def _run_step(task_id: str, session_cfg: dict, func_name: str):
             # Takvim her zaman güncel ders programı/açık şubelerle üretilsin.
             DersAnalizService(CONFIG, log_fn=lambda m: _log(task_id, m)).subeders_guncelle()
 
-            def _cancel_fn():
-                with _TASKS_LOCK:
-                    return _TASKS.get(task_id, {}).get("cancel", False)
-
-            svc = TakvimService(CONFIG, log_fn=lambda m: _log(task_id, m), cancel_fn=_cancel_fn)
+            svc = TakvimService(
+                CONFIG,
+                log_fn=lambda m: _log(task_id, m),
+                cancel_fn=lambda: _iptal_istendi_mi(task_id),
+            )
             svc.takvimolustur()
         else:
             func, _ = ADIM_FUNCLARI[func_name]
@@ -1225,6 +1236,8 @@ def gorev_durumu(request, task_id: str):
         "logs": task["logs"],
         "done": task["done"],
         "error": task["error"],
+        "cancelled": task["cancel"],
+        "tamamlanan": task.get("tamamlanan", []),
     })
 
 
@@ -1234,7 +1247,7 @@ def gorev_iptal(request, task_id: str):
         if task_id in _TASKS and not _TASKS[task_id]["done"]:
             _TASKS[task_id]["cancel"] = True
             _TASKS[task_id]["logs"].append(
-                "! Durdurma istegi alindi. Mevcut adim tamamlaninca durulacak..."
+                "! Durdurma istegi alindi. Mevcut adim/oturum tamamlaninca durulacak..."
             )
     return JsonResponse({"ok": True})
 
