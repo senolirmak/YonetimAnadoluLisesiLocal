@@ -37,6 +37,7 @@ from okul.testing import (
     nobet_gorevi_olustur,
     nobet_ogretmen_olustur,
     nobet_yeri_olustur,
+    personel_olustur,
     sinif_sube_olustur,
 )
 from okul.utils import set_aktif_tarih
@@ -432,3 +433,56 @@ class GununNobetcileriTestCase(TestCase):
             )
 
         self.assertEqual(GunlukNobetCizelgesi.objects.get().nobet_yeri, "Koridor")
+
+
+# ─────────────────────────────────────────────────────────────
+# PDF / PNG çıktıları
+# ─────────────────────────────────────────────────────────────
+
+
+class NobetCiktiTestCase(TestCase):
+    def test_ciktilar_yalnizca_yoneticilere_acik(self):
+        from okul.testing import yetki_dogrula
+
+        urller = [reverse(ad) + f"?tarih={PAZARTESI.isoformat()}" for ad in (
+            "download_ders_doldurma_pdf", "download_ders_doldurma_png",
+            "download_gunun_nobetcileri_pdf", "download_gunun_nobetcileri_png",
+            "download_unassigned_ders_png",
+        )]
+        yetki_dogrula(self, urller, ("ogretmen",), ("mudur_yardimcisi", "rehber_ogretmen"))
+
+    def test_dagitilamayan_dersler_png_uretilir(self):
+        """Önceden eksik reportlab importları (A4, Spacer, ParagraphStyle) yüzünden 500 veriyordu."""
+        import shutil
+        import unittest
+
+        if not shutil.which("pdftoppm"):
+            raise unittest.SkipTest("poppler-utils (pdftoppm) kurulu değil")
+
+        devamsiz = nobet_ogretmen_olustur()
+        zaman = _gun_ici(PAZARTESI, 10)
+        NobetAtanamayan.objects.create(saat=2, sinif="9/A", tarih=zaman, ogretmen=devamsiz)
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+
+        resp = self.client.get(
+            reverse("download_unassigned_ders_png"),
+            {"tarih": timezone.localtime(zaman).strftime("%Y-%m-%d %H:%M:%S")},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "image/png")
+
+
+class OgretmenSayfalariTestCase(TestCase):
+    """Öğretmen sayfaları, açamayacağı yönetim ekranlarına bağlantı göstermez."""
+
+    def test_ogretmene_yonetim_baglantisi_gosterilmez(self):
+        user = kullanici_olustur("ogretmen")
+        nobet_ogretmen_olustur(personel=personel_olustur(user=user))
+        self.client.force_login(user)
+        for ad in ("ogretmen_haftalik_nobet", "ogretmen_gunun_nobetcileri", "ogretmen_ders_doldurma"):
+            with self.subTest(ad=ad):
+                resp = self.client.get(reverse(ad))
+                self.assertEqual(resp.status_code, 200)
+                self.assertNotContains(resp, f'href="{reverse("nobet_dagitim")}"')
+                self.assertNotContains(resp, f'href="{reverse("devamsizlik_list")}"')

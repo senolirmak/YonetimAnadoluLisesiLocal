@@ -181,3 +181,15 @@ class FetKopruTestCase(TestCase):
             _uclu_saatleri(DersProgrami.objects.filter(uygulama_tarihi=YENI_TARIH)),
             _uclu_saatleri(DersProgrami.objects.filter(uygulama_tarihi=ESKI_TARIH)),
         )
+
+
+class DersProgramiListesiYetkiTestCase(TestCase):
+    def test_yalnizca_yoneticiler(self):
+        from django.urls import reverse
+
+        from okul.testing import yetki_dogrula
+
+        yetki_dogrula(
+            self, [reverse("dersprogrami_listesi")], ("ogretmen",),
+            ("mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"),
+        )

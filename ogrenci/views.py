@@ -8,12 +8,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from dersprogrami.models import DersProgrami
-from okul.auth import mudur_yardimcisi_required
+from okul.auth import is_yonetici, mudur_yardimcisi_required
 from okul.models import DersHavuzu, SinifSube
 from okul.utils import get_aktif_egitim_yili
 
 from .forms import OgrenciAdresForm, OgrenciAyrilmaForm, OgrenciDetayForm, OgrenciForm
 from .models import Ogrenci, OgrenciAdres, OgrenciAyrilma, OgrenciDetay, OgrenciMuaf
+from .services.aktiflik import aktifligi_guncelle
 
 
 def _gorunur_ogrenciler_ve_durum(ogrenciler):
@@ -72,14 +73,6 @@ def _rehberlik_sinif_sube(user):
     return ders.sinif_sube if ders else None
 
 
-def _only_ogretmen(user):
-    if user.is_superuser:
-        return False
-    gruplar = set(user.groups.values_list("name", flat=True))
-    yonetici = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-    return "ogretmen" in gruplar and not (gruplar & yonetici)
-
-
 EXCEL_SUTUNLAR = [
     "okulno",
     "sinif",
@@ -134,7 +127,7 @@ def normalize_cinsiyet(deger):
     return CINSIYET_MAP.get(deger.strip().lower())
 
 
-@login_required
+@mudur_yardimcisi_required
 def excel_yukle(request):
     if request.method == "POST":
         dosya = request.FILES.get("excel_dosya")
@@ -222,8 +215,9 @@ def excel_yukle(request):
 
 @login_required
 def ogrenci_liste(request):
-    # Ogretmen: yalnızca kendi sınıf rehberliği sınıfını görebilir
-    if _only_ogretmen(request.user):
+    # Yönetici olmayan (öğretmen ya da hiçbir gruba üye olmayan) kullanıcı yalnızca kendi
+    # sınıf rehberliği sınıfını görebilir; varsayılan ret.
+    if not is_yonetici(request.user):
         ss = _rehberlik_sinif_sube(request.user)
         if not ss:
             messages.error(
@@ -290,7 +284,8 @@ def sureksiz_devamsiz_listesi(request):
                 pass
         guncellenen = 0
         for ogr in qs:
-            yeni_sureksiz = ogr.okulno in sureksiz_isaretli
+            # Form okulno'yu metin olarak gönderir; int ile karşılaştırma her zaman False olurdu.
+            yeni_sureksiz = str(ogr.okulno) in sureksiz_isaretli
             if ogr.sureksiz_devamsiz != yeni_sureksiz:
                 ogr.sureksiz_devamsiz = yeni_sureksiz
                 ogr.save(update_fields=["sureksiz_devamsiz"])
@@ -367,8 +362,9 @@ def sureksiz_devamsiz_toggle(request, pk):
 def ogrenci_detay_duzenle(request, pk):
     ogrenci = get_object_or_404(Ogrenci, pk=pk)
 
-    # Ogretmen: yalnızca kendi sınıf rehberliği sınıfındaki öğrenciyi düzenleyebilir
-    if _only_ogretmen(request.user):
+    # Yönetici olmayan kullanıcı yalnızca kendi sınıf rehberliği sınıfındaki öğrenciyi
+    # düzenleyebilir; varsayılan ret.
+    if not is_yonetici(request.user):
         ss = _rehberlik_sinif_sube(request.user)
         if not ss or ogrenci.sinif != ss.sinif or ogrenci.sube.upper() != ss.sube.upper():
             raise PermissionDenied
@@ -725,10 +721,14 @@ def ayrilma_sil(request, pk):
             ogr = kayit.ogrenci
             ad = f"{ogr.adi} {ogr.soyadi}"
             kayit.delete()
-            if not ogr.aktif:
-                ogr.aktif = True
-                ogr.save(update_fields=["aktif"])
-            messages.success(
-                request, f"{ad} ayrılma kaydından çıkarıldı ve tekrar aktif hale getirildi."
-            )
+            kalan = aktifligi_guncelle(ogr)
+            if kalan:
+                messages.warning(
+                    request,
+                    f"{ad} ayrılma kaydından çıkarıldı ama pasif kaldı ({', '.join(kalan)} var).",
+                )
+            else:
+                messages.success(
+                    request, f"{ad} ayrılma kaydından çıkarıldı ve tekrar aktif hale getirildi."
+                )
     return redirect("ogrenci:ayrilma_listesi")

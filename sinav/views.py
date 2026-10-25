@@ -5,6 +5,7 @@ from datetime import date
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -32,6 +33,7 @@ from sinav.services.ders_ayarlari import (
     parse_ders_ayarlari_post,
     save_ayarlar,
 )
+from sinav.services.gozetim_erisim import kontrolden_muaf_mi, sinif_listesi_erisimi
 from sinav.services.mazeret_belge import mazeret_belge_ctx, mazeret_belge_kaydet
 from sinav.services.mazeret_rapor import (
     mazeret_detay_verisi,
@@ -176,7 +178,7 @@ def _alg_form_initial(request):
 # ---------------------------------------------------------------
 # Ana sayfa – dashboard
 # ---------------------------------------------------------------
-@login_required
+@ust_yonetici_required
 def index(request):
     # Aktif sinav yoksa en yenisini otomatik aktif yap
     aktif = _aktif_sinav()
@@ -219,7 +221,7 @@ def _veri_yukle_ctx(request):
     }
 
 
-@login_required
+@ust_yonetici_required
 def veri_yukle_sayfasi(request):
     okul = OkulBilgi.get()
     if not bool(okul.okul_adi.strip() and okul.okul_kodu.strip()):
@@ -246,6 +248,7 @@ def _veri_yukle_calistir(request):
 
 
 @require_POST
+@ust_yonetici_required
 def veri_yukle(request):
     """DB-first veri eşitleme: Excel yüklemesi gerekmez."""
     okul = OkulBilgi.get()
@@ -261,6 +264,7 @@ def veri_yukle(request):
 
 
 @require_POST
+@ust_yonetici_required
 def veri_yukle_onayla(request):
     """DB-first modelde onay adımı yoktur; doğrudan eşitlemeye yönlendir."""
     return redirect("sinav:veri_yukle")
@@ -270,6 +274,7 @@ def veri_yukle_onayla(request):
 # Sınav Bilgisi – Hizli aktif yap (next destekli)
 # ---------------------------------------------------------------
 @require_POST
+@ust_yonetici_required
 def sinav_bilgisi_aktif_yap(request, pk: int):
     obj = SinavBilgisi.objects.get(pk=pk)
     obj.aktif_yap()
@@ -291,7 +296,7 @@ def sinav_bilgisi_aktif_yap(request, pk: int):
     return redirect("sinav:sinav_bilgisi_listesi")
 
 
-@login_required
+@ust_yonetici_required
 def takvim_uretim_aktif_yap(request, pk: int):
     """Seçili TakvimUretim'i aktif yap → öğretmen sayfaları bu üretime göre güncellenir."""
     uretim = get_object_or_404(TakvimUretim, pk=pk)
@@ -308,7 +313,13 @@ def admin_force_aktif_toggle(request):
     if not request.user.is_superuser:
         return JsonResponse({"error": "Yetkisiz işlem."}, status=403)
     AdminOverride.toggle(request)
+    from django.utils.http import url_has_allowed_host_and_scheme
+
     next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "/"
+    if not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        next_url = "/"
     return redirect(next_url)
 
 
@@ -363,7 +374,7 @@ def takvim_slot_sil(request):
     return redirect(f"{reverse('sinav:pdf_rapor')}?uretim_pk={uretim_pk}")
 
 
-@login_required
+@ust_yonetici_required
 def gozetmen_ozet(request):
     """Aktif TakvimUretim'deki tüm gözetmenler + Sınıf Listesi PDF öğretmenlerini listeler."""
     aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
@@ -404,12 +415,12 @@ def _takvim_ctx(request, alg_form=None):
     }
 
 
-@login_required
+@ust_yonetici_required
 def takvim_sayfasi(request):
     return render(request, "sinav/takvim.html", _takvim_ctx(request))
 
 
-@login_required
+@ust_yonetici_required
 def takvim_onizleme(request):
     from collections import defaultdict
 
@@ -470,6 +481,7 @@ def takvim_onizleme(request):
 
 
 @require_POST
+@ust_yonetici_required
 def takvim_onayla(request):
     from sinav.models import TakvimUretim
     aktif_sinav = _aktif_sinav()
@@ -487,6 +499,7 @@ def takvim_onayla(request):
 
 
 @require_POST
+@ust_yonetici_required
 def takvim_onizleme_guncelle(request):
     """Onaylanmamış önizleme JSON'undaki tarih/saat değişikliklerini uygular."""
     from datetime import datetime as dt
@@ -530,6 +543,7 @@ def takvim_onizleme_guncelle(request):
     return redirect(url)
 
 
+@ust_yonetici_required
 def takvim_ders_duzenle(request):
     """Ders bazında tarih/saat düzenleme ekranı.
 
@@ -595,6 +609,7 @@ def takvim_ders_duzenle(request):
 
 
 @require_POST
+@ust_yonetici_required
 def takvim_onizleme_iptal(request):
     """Önizleme taslağını temizler ve Takvim (GA) sayfasına döner."""
     aktif_sinav = _aktif_sinav()
@@ -607,6 +622,7 @@ def takvim_onizleme_iptal(request):
 
 
 @require_POST
+@ust_yonetici_required
 def takvim_guncelle(request):
     """Takvim Formu'ndan gelen tarih/saat düzenlemelerini DB'ye yazar.
     Kayıt sonrası oturum numaraları gün bazında otomatik yeniden hesaplanır."""
@@ -652,6 +668,7 @@ def takvim_guncelle(request):
 
 
 @require_POST
+@ust_yonetici_required
 def parametre_kaydet(request):
     form = AlgoritmaForm(request.POST)
     if not form.is_valid():
@@ -696,7 +713,7 @@ def parametre_kaydet(request):
 # ---------------------------------------------------------------
 # A4 Raporlar sayfasi
 # ---------------------------------------------------------------
-@login_required
+@ust_yonetici_required
 def takvim_gecmisi(request):
     """Üretilen takvimlerin listesi: aktif sınava ait üretimler."""
     from django.db.models import Count
@@ -721,7 +738,7 @@ def takvim_gecmisi(request):
     })
 
 
-@login_required
+@ust_yonetici_required
 def pdf_rapor(request):
     """PDF rapor üretim sayfası: seçili TakvimUretim'e bağlı takvim verilerini gösterir."""
     from collections import defaultdict
@@ -812,6 +829,7 @@ def pdf_rapor(request):
 
 
 @require_POST
+@ust_yonetici_required
 def calistir_oturma_secili(request):
     """Seçili oturumlar için oturma planı oluştur (arka plan görevi)."""
     import json as _json
@@ -861,7 +879,7 @@ def _run_oturma_secili(task_id: str, session_cfg: dict, sessions: list):
     _finish(task_id)
 
 
-@login_required
+@ust_yonetici_required
 def oturma_plani_pdf_view(request):
     """OturmaPlani DB'den Oturma Planı PDF'ini anlık üretip döner."""
     import io
@@ -934,7 +952,7 @@ def _sinav_takvimi_pdf_response(request, goster_subeler: bool):
                         headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 
-@login_required
+@ust_yonetici_required
 def sinav_takvimi_pdf_view(request):
     """Aktif TakvimUretim'e bağlı tek sayfalık öğrenci Sınav Takvimi PDF'i döner.
     ?subeler=0  →  Şubeler sütunu olmadan üretir (varsayılan: şubeli).
@@ -943,7 +961,7 @@ def sinav_takvimi_pdf_view(request):
     return _sinav_takvimi_pdf_response(request, goster_subeler)
 
 
-@login_required
+@ust_yonetici_required
 def sinav_takvimi_subesiz_pdf_view(request):
     """Şubeler sütunu olmadan sınav takvimi PDF'i döner."""
     return _sinav_takvimi_pdf_response(request, goster_subeler=False)
@@ -976,6 +994,22 @@ def sinif_listesi_pdf_view(request):
         tarih=tarih_date, saat=saat, oturum=oturum, uretim=aktif_uretim
     ).exists():
         raise Http404
+
+    if not kontrolden_muaf_mi(request.user):
+        # Öğretmen yalnızca gözetim ekranındaki kendi slotunu, saat penceresinde açabilir
+        # (bkz. sinav/services/gozetim_erisim.py).
+        from sinav.models import TakvimUretim
+
+        aktif_sinav = _aktif_sinav()
+        ogretmen_uretimi = (
+            TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+            if aktif_sinav else None
+        )
+        personel = getattr(request.user, "personel", None)
+        if aktif_uretim != ogretmen_uretimi or not sinif_listesi_erisimi(
+            personel, aktif_uretim, tarih_date, saat, sinifsube_filtre, oturum
+        ):
+            raise PermissionDenied
 
     okul  = OkulBilgi.get()
     buf   = io.BytesIO()
@@ -1031,7 +1065,7 @@ def _toplu_pdf_yanit(uretim, buffers, dosya_oneki):
                         headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
-@login_required
+@ust_yonetici_required
 def oturma_plani_toplu_pdf_view(request):
     """Bir üretime ait TÜM oturumların Oturma Planı (kelebek) PDF'lerini tek bir
     PDF'te birleştirip indirilebilir olarak döner — oturum oturum tek tek
@@ -1048,7 +1082,7 @@ def oturma_plani_toplu_pdf_view(request):
     return _toplu_pdf_yanit(uretim, buffers, "Kelebek_Tumu")
 
 
-@login_required
+@ust_yonetici_required
 def sinif_listesi_toplu_pdf_view(request):
     """Bir üretime ait TÜM oturumların Sınıf Listesi PDF'lerini tek bir PDF'te
     birleştirip indirilebilir olarak döner (bkz. `oturma_plani_toplu_pdf_view`)."""
@@ -1064,7 +1098,7 @@ def sinif_listesi_toplu_pdf_view(request):
     return _toplu_pdf_yanit(uretim, buffers, "Sinif_Listesi_Tumu")
 
 
-@login_required
+@ust_yonetici_required
 def oturum_bazli_toplu_pdf_view(request):
     """Bir üretime ait TÜM oturumlar için, her oturumun Kelebek Planı'nın hemen
     ardından o oturumun Sınıf Listesi'ni ekleyerek TEK bir PDF'te birleştirir
@@ -1087,7 +1121,7 @@ def oturum_bazli_toplu_pdf_view(request):
 
 
 @require_POST
-@login_required
+@ust_yonetici_required
 def takvim_uretim_aciklama_guncelle(request, pk):
     import json
 
@@ -1107,6 +1141,7 @@ def takvim_uretim_aciklama_guncelle(request, pk):
 
 
 @require_POST
+@ust_yonetici_required
 def takvim_uretim_sil(request, pk):
     from sinav.models import TakvimUretim
     TakvimUretim.objects.filter(pk=pk).delete()
@@ -1114,6 +1149,7 @@ def takvim_uretim_sil(request, pk):
 
 
 @require_POST
+@ust_yonetici_required
 def takvim_uretim_kullan(request, pk):
     from sinav.models import TakvimUretim
     uretim = TakvimUretim.objects.filter(pk=pk).select_related("sinav").first()
@@ -1203,22 +1239,27 @@ def _start_task(request, func_name: str) -> JsonResponse:
 
 
 @require_POST
+@ust_yonetici_required
 def calistir_temel_veriler(request):
     return _start_task(request, "temel_veriler")
 
 @require_POST
+@ust_yonetici_required
 def calistir_veri_aktar(request):
     return _start_task(request, "veri_aktar")
 
 @require_POST
+@ust_yonetici_required
 def calistir_subeders(request):
     return _start_task(request, "subeders")
 
 @require_POST
+@ust_yonetici_required
 def calistir_takvim(request):
     return _start_task(request, "takvim")
 
 @require_POST
+@ust_yonetici_required
 def calistir_oturma(request):
     return _start_task(request, "oturma")
 
@@ -1226,7 +1267,7 @@ def calistir_oturma(request):
 # ---------------------------------------------------------------
 # Gorev durumu (polling) + iptal
 # ---------------------------------------------------------------
-@login_required
+@ust_yonetici_required
 def gorev_durumu(request, task_id: str):
     with _TASKS_LOCK:
         task = _TASKS.get(task_id)
@@ -1242,6 +1283,7 @@ def gorev_durumu(request, task_id: str):
 
 
 @require_POST
+@ust_yonetici_required
 def gorev_iptal(request, task_id: str):
     with _TASKS_LOCK:
         if task_id in _TASKS and not _TASKS[task_id]["done"]:
@@ -1256,7 +1298,7 @@ def gorev_iptal(request, task_id: str):
 # ---------------------------------------------------------------
 # Sinav Bilgisi CRUD
 # ---------------------------------------------------------------
-@login_required
+@ust_yonetici_required
 def sinav_bilgisi_listesi(request):
     okul = OkulBilgi.get()
     okul_tamam = bool(okul.okul_adi.strip())
@@ -1299,12 +1341,14 @@ def sinav_bilgisi_listesi(request):
 
 
 @require_POST
+@ust_yonetici_required
 def okul_bilgileri_kaydet(request):
     """Okul bilgileri artık /okul-ayarlari/ sayfasından yönetilmektedir."""
     return redirect("main:okul_ayarlari")
 
 
 @require_POST
+@ust_yonetici_required
 def sinav_bilgisi_duzenle(request, pk: int):
     obj = SinavBilgisi.objects.get(pk=pk)
     form = SinavBilgisiForm(request.POST, instance=obj)
@@ -1319,6 +1363,7 @@ def sinav_bilgisi_duzenle(request, pk: int):
 
 
 @require_POST
+@ust_yonetici_required
 def sinav_bilgisi_sil(request, pk: int):
     obj = SinavBilgisi.objects.get(pk=pk)
     obj.delete()
@@ -1329,7 +1374,7 @@ def sinav_bilgisi_sil(request, pk: int):
 # ---------------------------------------------------------------
 # Ogrenci Yonetimi
 # ---------------------------------------------------------------
-@login_required
+@ust_yonetici_required
 def ogrenci_yonetim(request):
     aktif = _aktif_sinav()
     arama = request.GET.get("q", "").strip()
@@ -1374,6 +1419,7 @@ def ogrenci_yonetim(request):
 
 
 @require_POST
+@ust_yonetici_required
 def ogrenci_ekle(request):
     """Öğrenci yönetimi Veri Aktarım sayfasından yapılmaktadır."""
     messages.info(request, "Öğrenci eklemek için Veri Aktarım sayfasını kullanın.")
@@ -1381,7 +1427,7 @@ def ogrenci_ekle(request):
 
 
 @require_POST
-@login_required
+@ust_yonetici_required
 def sinav_ogrenci_senkronize_et(request):
     """Aktif sınavın SinavOgrenci anlık görüntüsüne, ilk üretimden sonra canlı
     Ogrenci'ye eklenmiş (nakil gelen, yeni kayıt olan) öğrencileri ekler —
@@ -1413,6 +1459,7 @@ def sinav_ogrenci_senkronize_et(request):
 
 
 @require_POST
+@ust_yonetici_required
 def ogrenci_sil(request, pk: int):
     try:
         ogr = OgrenciModel.objects.get(pk=pk)
@@ -1427,7 +1474,7 @@ def ogrenci_sil(request, pk: int):
 # ---------------------------------------------------------------
 # Ders Ayarlari
 # ---------------------------------------------------------------
-@login_required
+@ust_yonetici_required
 def ders_ayarlari(request):
     from okul.models import DersHavuzu
     aktif = _aktif_sinav()
@@ -1473,6 +1520,7 @@ def ders_ayarlari(request):
 
 
 @require_POST
+@ust_yonetici_required
 def ders_ayarlari_kaydet(request):
     aktif = _aktif_sinav()
     if not aktif:
@@ -1505,6 +1553,7 @@ def ders_ayarlari_kaydet(request):
 
 
 @require_POST
+@ust_yonetici_required
 def ders_ayarlari_varsayilan_yukle(request):
     aktif = _aktif_sinav()
     if not aktif:
@@ -1530,6 +1579,7 @@ def ders_ayarlari_varsayilan_yukle(request):
 # Sabit Sinavlar (tarihi/saati onceden belirlenmis ortak sinavlar)
 # ---------------------------------------------------------------
 @require_POST
+@ust_yonetici_required
 def sabit_sinav_ekle(request):
     aktif = _aktif_sinav()
     if not aktif:
@@ -1561,6 +1611,7 @@ def sabit_sinav_ekle(request):
 
 
 @require_POST
+@ust_yonetici_required
 def sabit_sinav_sil(request, idx: int):
     aktif = _aktif_sinav()
 
@@ -1583,6 +1634,7 @@ def sabit_sinav_sil(request, idx: int):
 # Seviye Çakışma Grupları
 # ---------------------------------------------------------------
 @require_POST
+@ust_yonetici_required
 def catisma_grubu_ekle(request):
     aktif = _aktif_sinav()
     if not aktif:
@@ -1605,6 +1657,7 @@ def catisma_grubu_ekle(request):
 
 
 @require_POST
+@ust_yonetici_required
 def catisma_grubu_sil(request, idx: int):
     aktif = _aktif_sinav()
 
@@ -1624,6 +1677,7 @@ def catisma_grubu_sil(request, idx: int):
 
 
 @require_POST
+@ust_yonetici_required
 def catisma_grubu_varsayilan(request):
     aktif = _aktif_sinav()
     if not aktif:
@@ -1641,6 +1695,7 @@ def catisma_grubu_varsayilan(request):
 
 
 @require_POST
+@ust_yonetici_required
 def esleme_ekle(request):
     aktif = _aktif_sinav()
     if not aktif:
@@ -1670,6 +1725,7 @@ def esleme_ekle(request):
 
 
 @require_POST
+@ust_yonetici_required
 def esleme_sil(request, idx: int):
     aktif = _aktif_sinav()
 
@@ -1741,7 +1797,7 @@ def ogrenci_sinav_yeri(request):
 # Sınav Yoklama Raporu — Yönetim
 # ─────────────────────────────────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def sinav_yoklama_raporu(request):
     """Seviye ve Ders filtreli sınav yoklama listesi — yöneticiler için."""
     from django.core.exceptions import PermissionDenied
@@ -1795,6 +1851,7 @@ def sinav_yoklama_raporu(request):
     })
 
 
+@ust_yonetici_required
 def sinav_yoklama_yok_detay(request):
     """Belirli (seviye, ders_adi, tarih) için 'yok' durumundaki öğrencilerin listesi."""
     from django.core.exceptions import PermissionDenied
@@ -1830,7 +1887,7 @@ def sinav_yoklama_yok_detay(request):
 # Yoklama Simülasyonu
 # ===========================================================================
 
-@login_required
+@ust_yonetici_required
 def mazeret_yoklama_simule(request):
     """
     Aktif takvim üretiminin OturmaPlani kayıtlarından SinavSalonYoklama

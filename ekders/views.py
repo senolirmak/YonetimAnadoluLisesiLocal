@@ -1,16 +1,16 @@
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from ekders.forms import EkDersDonemiForm, EkDersOnayForm, OgretmenEkDersForm, TatilForm
 from ekders.models import EkDersDonemi, EkDersOnay, OgretmenEkDers, Tatil
 from ekders.services import donem_hesapla, donem_ozet_listesi, personel_ozet
+from okul.auth import ust_yonetici_required
 
 
 # ── Dönem Listesi ────────────────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def donem_listesi(request):
     donemler = EkDersDonemi.objects.select_related("olusturan").all()
     return render(request, "ekders/donem_listesi.html", {"donemler": donemler})
@@ -18,7 +18,7 @@ def donem_listesi(request):
 
 # ── Dönem Oluştur / Düzenle ──────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def donem_olustur(request):
     if request.method == "POST":
         form = EkDersDonemiForm(request.POST)
@@ -33,7 +33,7 @@ def donem_olustur(request):
     return render(request, "ekders/donem_olustur.html", {"form": form, "baslik": "Yeni Dönem"})
 
 
-@login_required
+@ust_yonetici_required
 def donem_duzenle(request, pk):
     donem = get_object_or_404(EkDersDonemi, pk=pk)
     if donem.kapandi:
@@ -52,7 +52,7 @@ def donem_duzenle(request, pk):
 
 # ── Dönem Detay ──────────────────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def donem_detay(request, pk):
     from datetime import date as date_type
     donem = get_object_or_404(EkDersDonemi, pk=pk)
@@ -98,7 +98,7 @@ def donem_detay(request, pk):
 # ── Otomatik Hesaplama ───────────────────────────────────────────────────────
 
 @require_POST
-@login_required
+@ust_yonetici_required
 def donem_hesapla_view(request, pk):
     donem = get_object_or_404(EkDersDonemi, pk=pk)
     if donem.kapandi:
@@ -111,7 +111,7 @@ def donem_hesapla_view(request, pk):
 
 # ── Haftalık Kayıt Düzenle ───────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def hafta_duzenle(request, pk, kayit_pk):
     donem = get_object_or_404(EkDersDonemi, pk=pk)
     kayit = get_object_or_404(OgretmenEkDers, pk=kayit_pk, donem=donem)
@@ -138,7 +138,7 @@ def hafta_duzenle(request, pk, kayit_pk):
 # ── Onay ─────────────────────────────────────────────────────────────────────
 
 @require_POST
-@login_required
+@ust_yonetici_required
 def donem_onayla(request, pk):
     donem = get_object_or_404(EkDersDonemi, pk=pk)
     if donem.kapandi:
@@ -161,7 +161,7 @@ def donem_onayla(request, pk):
 
 # ── Tatil CRUD ───────────────────────────────────────────────────────────────
 
-@login_required
+@ust_yonetici_required
 def tatil_listesi(request):
     tatiller = Tatil.objects.all()
     form = TatilForm()
@@ -175,7 +175,7 @@ def tatil_listesi(request):
 
 
 @require_POST
-@login_required
+@ust_yonetici_required
 def tatil_sil(request, pk):
     tatil = get_object_or_404(Tatil, pk=pk)
     tatil.delete()

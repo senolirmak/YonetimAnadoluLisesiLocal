@@ -25,6 +25,7 @@ from okul.auth import (  # noqa: E402
     _UST_YONETIM_GRUPLARI as TARIH_DEGISTIREBILIR_GRUPLAR,
     is_ust_yonetici,
     ust_yonetici_required,
+    yonetici_required,
 )
 
 YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
@@ -568,7 +569,7 @@ def sinif_ogretmenleri(request):
 # ─────────────────────────────────────────────
 
 
-@login_required
+@yonetici_required
 def dersprogrami_listesi(request):
     from okul.models import EgitimOgretimYili, OkulDonem, SinifSube
 

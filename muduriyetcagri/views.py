@@ -13,10 +13,10 @@ from .models import MuduriyetGorusme
 
 
 def _mudur_mi(user):
-    return (
-        user.is_superuser
-        or user.groups.filter(name__in=["mudur_yardimcisi", "okul_muduru"]).exists()
-    )
+    # okul.auth: pasife alınmış (okul_yonetici.aktif=False) yöneticiyi de reddeder.
+    from okul.auth import is_ust_yonetici
+
+    return is_ust_yonetici(user)
 
 
 def _sinifsube_secenekleri():

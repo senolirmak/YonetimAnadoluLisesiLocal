@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Max
 from django.shortcuts import redirect, render
@@ -7,6 +6,7 @@ from django.utils import timezone
 
 from devamsizlik.models import OgrenciDevamsizlik
 from ogrenci.models import Ogrenci
+from okul.auth import ust_yonetici_required
 
 from .models import OgrenciNobetGorevi
 
@@ -23,7 +23,7 @@ def _sinifsube_secenekleri():
     ]
 
 
-@login_required
+@ust_yonetici_required
 def nobetci_form(request):
     bugun = timezone.localdate()
     tarih_str = request.GET.get("tarih") or request.POST.get("tarih", "")

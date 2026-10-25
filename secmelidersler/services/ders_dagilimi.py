@@ -96,7 +96,13 @@ def plan_sinif_dagilimi(sinif_no, gelecek_sinif, aktif_yil, maks_sube=MAKS_SUBE)
         for a in alanlar
     }
 
-    ogrenciler = list(Ogrenci.objects.filter(sinif=sinif_no).order_by("okulno"))
+    # Okuldan ayrılan öğrenciler plana girmez. Tasdikname alanlar da pasiftir ama
+    # aşağıda ayrı bir listede gösterildikleri için `aktif=True` filtresi kullanılmaz.
+    # Not: ikinci sınıf tekrarı hem tasdikname hem ayrılma kaydı açar; böyle bir
+    # öğrenci de dışarıda kalır (bkz. secmelidersler/services/sinif_tekrari.py).
+    ogrenciler = list(
+        Ogrenci.objects.filter(sinif=sinif_no, ayrilma__isnull=True).order_by("okulno")
+    )
     ogr_ids = [o.pk for o in ogrenciler]
 
     # `aktif_yil`a göre kapsamlanır — aksi hâlde geçmiş bir yılda sınıfta kalmış ama

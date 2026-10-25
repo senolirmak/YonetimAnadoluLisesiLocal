@@ -103,3 +103,94 @@ def devamsizlik_olustur(ogretmen, baslangic, sure=1, **kwargs):
     return Devamsizlik.objects.create(
         ogretmen=ogretmen, baslangic_tarihi=baslangic, sure=sure, **kwargs
     )
+
+
+def ogrenci_olustur(sinif=9, sube="A", **kwargs):
+    from ogrenci.models import Ogrenci
+
+    n = _sira()
+    kwargs.setdefault("okulno", n)
+    kwargs.setdefault("tckimlikno", f"{20000000000 + n}")
+    kwargs.setdefault("adi", f"Öğrenci{n}")
+    kwargs.setdefault("soyadi", "Örnek")
+    kwargs.setdefault("dogumtarihi", datetime.date(2010, 1, 1))
+    kwargs.setdefault("cinsiyet", "E")
+    return Ogrenci.objects.create(sinif=sinif, sube=sube, **kwargs)
+
+
+def aktif_egitim_yili_olustur(egitim_yili="2025-2026"):
+    """Eğitim yılını oluşturur ve OkulBilgi'de aktif yıl yapar."""
+    from okul.models import EgitimOgretimYili, OkulBilgi
+
+    bas = int(egitim_yili[:4])
+    yil, _ = EgitimOgretimYili.objects.get_or_create(
+        egitim_yili=egitim_yili,
+        defaults={
+            "egitim_baslangic": datetime.date(bas, 9, 1),
+            "egitim_bitis": datetime.date(bas + 1, 6, 20),
+        },
+    )
+    OkulBilgi.objects.update_or_create(
+        pk=1, defaults={"okul_adi": "Örnek Anadolu Lisesi", "okul_egtyil": yil}
+    )
+    return yil
+
+
+def ders_olustur(ders_adi=None, **kwargs):
+    from okul.models import DersHavuzu
+
+    return DersHavuzu.objects.create(ders_adi=ders_adi or f"DERS {_sira()}", **kwargs)
+
+
+def zamani_dondur(tarih, saat, dakika=0):
+    """`timezone.localdate()` / argümansız `timezone.localtime()` sabit zamanı döndürsün.
+
+    Kullanım: `with zamani_dondur(datetime.date(2025, 9, 8), 10, 15): ...`
+    """
+    from unittest import mock
+
+    from django.utils import timezone
+
+    sabit = timezone.make_aware(datetime.datetime.combine(tarih, datetime.time(saat, dakika)))
+    gercek_localtime = timezone.localtime
+
+    def sahte_localtime(value=None, timezone=None):
+        if value is None:
+            return sabit
+        return gercek_localtime(value, timezone)
+
+    return mock.patch.multiple(
+        "django.utils.timezone",
+        localdate=mock.Mock(return_value=tarih),
+        localtime=sahte_localtime,
+    )
+
+
+def yetki_dogrula(testcase, urller, yasak_gruplar=(), izinli_gruplar=(), method="get"):
+    """Her URL için: anonim → login sayfasına yönlenir, `yasak_gruplar` → 403,
+    `izinli_gruplar` → 403 ya da login yönlendirmesi ALMAZ (sayfanın kendisi 200/302/404 dönebilir).
+
+    `urller`: tam URL yolları listesi (reverse edilmiş)."""
+    from django.conf import settings
+
+    istek = getattr(testcase.client, method)
+    testcase.client.logout()
+    for url in urller:
+        with testcase.subTest(kim="anonim", url=url):
+            resp = istek(url)
+            testcase.assertEqual(resp.status_code, 302)
+            testcase.assertTrue(resp["Location"].startswith(settings.LOGIN_URL), resp["Location"])
+    for grup in yasak_gruplar:
+        testcase.client.force_login(kullanici_olustur(grup))
+        for url in urller:
+            with testcase.subTest(kim=grup, url=url):
+                testcase.assertEqual(istek(url).status_code, 403)
+    for grup in izinli_gruplar:
+        testcase.client.force_login(kullanici_olustur(grup))
+        for url in urller:
+            with testcase.subTest(kim=grup, url=url):
+                resp = istek(url)
+                testcase.assertNotEqual(resp.status_code, 403)
+                if resp.status_code == 302:
+                    testcase.assertFalse(resp["Location"].startswith(settings.LOGIN_URL))
+    testcase.client.logout()

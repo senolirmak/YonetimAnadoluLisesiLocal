@@ -9,6 +9,22 @@ ders doldurma, devamsızlık, ders programı, ortak/mazeret/sorumluluk sınav y�
 dijital pano modüllerini tek bir Django projesinde barındırır. Kod ve arayüz metinleri Türkçe'dir
 (model/fonksiyon isimleri de dahil) — yeni kod eklerken bu dile uyun.
 
+Repo: `senolirmak/YonetimAnadoluLisesiLocal` (public). Tek geliştirici: Şenol Irmak.
+
+### Uygulama grupları
+
+| Grup | Uygulamalar |
+|---|---|
+| Akademik | `dersprogrami`, `dersdefteri`, `ogrencidersleri`, `secmelidersler`, `sorumluluk`, `senesonu` |
+| Sınav | `sinav`, `sinavmedia`, `ortaksinav_engine` |
+| Öğrenci | `ogrenci`, `devamsizlik`, `disiplin`, `rehberlik`, `ogrencinobet` |
+| Personel | `personel`, `personeldevamsizlik`, `nobet`, `ekders` |
+| İletişim/ekran | `duyuru`, `pano`, `muduriyetcagri`, `faaliyet` |
+| Sistem | `okul`, `main`, `ebagiris`, `veriaktar`, `yedekleme`, `utility`, `devtools`, `kurulumcu` |
+
+Model içermeyenler: `utility`, `veriaktar` (model'siz Django app'leri), `devtools` (yalnızca
+geliştirmede), `ortaksinav_engine` ve `kurulumcu` (Django app'i değil, düz Python paketleri).
+
 ## Komutlar
 
 ```bash
@@ -36,10 +52,13 @@ python manage.py migrate --settings=config.settings.production
 python manage.py makemigrations --check --dry-run --settings=config.settings.production
 ```
 
-Not: Çoğu app'in `tests.py` dosyası `django-admin startapp` iskeletinden ibarettir (gerçek test
-yok). Gerçek testler yalnızca `okul/`, `sinav/`, `dersprogrami/`, `faaliyet/`, `utility/`,
-`veriaktar/`, `yedekleme/`, `secmelidersler/` içindedir (`dersprogrami` FET köprüsü testlerinden biri `fet-cl` kuruluysa gerçek FET'i çalıştırır,
-yoksa atlanır).
+Not: Testler Django'nun kendi test çalıştırıcısıyla koşar (pytest kurulu değil). Gerçek testi olan
+app'ler: `okul/`, `nobet/`, `personeldevamsizlik/`, `devamsizlik/`, `ogrenci/`, `sinav/`,
+`secmelidersler/`, `dersprogrami/`, `faaliyet/`, `utility/`, `veriaktar/`, `yedekleme/`; diğerlerinin
+`tests.py`'si `startapp` iskeletidir. Bir app'te birden çok test dosyası olabilir (`test_*.py`).
+Sahte veri yardımcıları `okul/testing.py`'dedir (`kullanici_olustur`, `ogrenci_olustur`,
+`zamani_dondur` vb.) — bu dosya adı bilerek `test*.py` kalıbına uymaz. `dersprogrami` FET köprüsü
+testlerinden biri `fet-cl` kuruluysa gerçek FET'i çalıştırır, yoksa atlanır.
 
 ### Ortam / Ayarlar
 
@@ -60,7 +79,8 @@ yoksa atlanır).
 ### Ortamlar
 
 - **Geliştirme:** ev ağı (Claude Code burada çalışır), `config.settings.development`.
-- **Üretim:** okul sunucusu 192.168.1.70 (`/srv/akalyonetim`), MEB ağında. Evden erişim YOK.
+- **Üretim:** okul sunucusu 192.168.1.70 (`/srv/akalyonetim`), MEB ağında (SSL inceleme var).
+  Evden erişim YOK.
   Gunicorn systemd servisi (`akalyonetim.service`) olarak çalışır, önünde Nginx vardır;
   PostgreSQL bir podman konteynerindedir (`<DB_NAME>_pg`).
 - **Deploy** okulda `deploy.sh` ile yapılır: pg_dump ile DB yedeği → servisi durdur →
@@ -68,6 +88,8 @@ yoksa atlanır).
   nginx reload → servisi başlat. Bu akış çalışıyor; değiştirmeyin.
 - Deploy `main`'i çektiği için **`main` her zaman deploy edilebilir olmalı**: iş dallarda yapılır,
   testler ve prod migration kontrolü geçmeden `main`'e merge edilmez.
+- **Sürümleme:** git tag (`vX.Y.Z`; mevcut: `v1.0.0`, `v1.1.0`). Tag atmadan önce testler geçmeli.
+  Not: `deploy.sh` tag'i değil `main`'i çeker; tag'ler sürüm kaydıdır.
 
 ### Kurallar
 
@@ -76,13 +98,25 @@ yoksa atlanır).
   sorun ve okulda nasıl test edileceğini yazın.
 - Gerçek öğrenci/personel verisi kullanmayın; `backups/` içindeki dump'ları test verisi olarak
   açmayın. Testler için fixture/factory üretin.
-- `.env` ve sırlar repoya girmez (bkz. Notlar — repo public).
+- `.env` ve sırlar repoya girmez (bkz. Notlar — repo public). `venv/`, `staticfiles/`, `media/`,
+  `backups/`, `__pycache__/`, `*.egg-info` de repoya girmez (`.gitignore`).
+- **KVKK:** `rehberlik` ve `disiplin` özel nitelikli kişisel veri içerir — bu app'lerde yetki
+  kontrolünü asla gevşetmeyin, log'lara kişisel veri yazmayın.
+- **`ekders`** hesaplamaları maaşa yansır — davranış değiştiren her değişiklik testle gelmeli.
+- Migration'ları elle düzenlemeyin; üretilen migration'ı commit'ten önce kullanıcıya gösterin.
 
 ### Öncelikler
 
-1. **Test eksikliği:** 20 app'te hiç test yok (örn. `nobet`, `ogrenci`, `devamsizlik`, `disiplin`,
-   `rehberlik`, `personel`, `sorumluluk`, `pano`, `ekders`, `dersdefteri`, `sinavmedia`).
+1. **Test eksikliği:** hâlâ testi olmayan app'ler var (örn. `disiplin`, `rehberlik`, `personel`,
+   `sorumluluk`, `pano`, `ekders`, `dersdefteri`, `sinavmedia`). Sıra: önce `services/` katmanı,
+   sonra modeller, sonra view'lar.
 2. **DRY ihlallerini refactor etmek** — yalnızca ilgili app'in testleri yazıldıktan sonra.
+
+### Ajanlar (`.claude/agents/`)
+
+`test-yazici`, `refactor-uzmani`, `kod-inceleyici` (salt okunur), `guvenlik-denetcisi` (salt okunur),
+`devops-ajani`, `dokuman-yazici`. Not: `.claude/` `.gitignore`'da olduğu için bu dosyalar yalnızca
+geliştirme makinesinde durur, repoya girmez.
 
 ## Mimari
 
@@ -163,9 +197,14 @@ GA (`_phase1`/`_phase2`) çakışmasız takvimi üretir; `oturma.py` da salon i�
 şekilde permütasyon tabanlı bir GA (`_ga_seat_assignment`) ile bulur. Katılacak sınıf seviyeleri,
 kelebek/kendi sınıfı dağılım oranı ve günlük maks. sınav sayısı `AlgoritmaParametreleri` üzerinden
 yapılandırılır.
-Öğretmenlerin sınav günü kendi sınıflarının yerleşim listesini gördüğü gözetim ekranı
-(`/sinav/gozetim/`) yalnızca o öğretmen gözetmen olarak atanmışsa ve sınav saatinden 50 dakika önce
-itibaren aktif olur — bu zamanlama kısıtını değiştirirken dikkatli olun.
+Öğretmenlerin sınav günü kullandığı gözetim ekranında (`/sinav/gozetim/`) iki tür düğme vardır;
+saat pencereleri `sinav/utils.py: SLOT_ERISIM_KURALLARI`'ndadır:
+- **Salon yoklaması:** yalnızca o salona gözetmen atanmış (ya da nöbet devriyle üstlenmiş)
+  öğretmene, sınavdan 8 dk önce → 40 dk sonrasına kadar açık.
+- **Sınıf listesi PDF'i:** sınavdan önceki son derste o sınıfta olan öğretmene, o dersin
+  başlangıcından sınavdan 10 dk öncesine kadar açık.
+Aynı kural düğmelerin açtığı sayfalarda da uygulanır (`sinav/services/gozetim_erisim.py`);
+müdür yardımcısı/okul müdürü/staff muaftır. Bu kısıtları değiştirirken iki yeri birlikte düşünün.
 
 `sinav/services/` ise ayrı bir alt sistemdir: **mazeret sınavı** (makeup exam) ILP dağıtımı ve
 takvimi (`mazeret_ilp.py`, `mazeret_dagitim.py`, `mazeret_takvim.py`) — Kelebek motoruyla karıştırmayın.

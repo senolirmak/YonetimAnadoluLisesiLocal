@@ -158,6 +158,17 @@ def ogretmen_kullanici_olustur(request, personel_pk):
 
 
 @mudur_yardimcisi_required
+def ogretmen_kullanici_onayla(request, personel_pk):
+    """Kayıt sayfasından açılmış (pasif) hesabı aktif eder."""
+    personel = get_object_or_404(NobetPersonel.objects.select_related("user"), pk=personel_pk)
+    if request.method == "POST" and personel.user and not personel.user.is_active:
+        personel.user.is_active = True
+        personel.user.save(update_fields=["is_active"])
+        messages.success(request, f"{personel.adi_soyadi} kullanıcısı onaylandı.")
+    return redirect("ogretmen_kullanici_listesi")
+
+
+@mudur_yardimcisi_required
 def ogretmen_kullanici_kaldir(request, personel_pk):
     personel = get_object_or_404(NobetPersonel, pk=personel_pk)
     if request.method == "POST":
@@ -173,8 +184,27 @@ def ogretmen_kullanici_kaldir(request, personel_pk):
 # ─────────────────────────────────────────────
 
 
+def _hiz_siniri_asildi(request, islem, limit=10, sure_sn=600):
+    """Aynı IP'den `sure_sn` içinde `limit`ten fazla istek geldiyse True döner.
+    Giriş gerektirmeyen kayıt uçlarında TC kimlik no taramasını yavaşlatmak için."""
+    from django.core.cache import cache
+
+    anahtar = f"hiz:{islem}:{request.META.get('REMOTE_ADDR', '')}"
+    sayi = cache.get(anahtar, 0) + 1
+    cache.set(anahtar, sayi, sure_sn)
+    return sayi > limit
+
+
 def tc_sorgula(request):
-    """TC kimlik no ile personel kaydını AJAX ile sorgular."""
+    """TC kimlik no ile kaydın uygun olup olmadığını AJAX ile sorgular.
+
+    Giriş gerektirmez; bu yüzden kişisel veri (ad soyad, branş, cinsiyet) DÖNDÜRMEZ
+    (KVKK) ve IP başına hız sınırı uygular."""
+    if _hiz_siniri_asildi(request, "tc_sorgula"):
+        return JsonResponse(
+            {"status": "error", "message": "Çok fazla deneme. Lütfen biraz sonra tekrar deneyin."},
+            status=429,
+        )
     tc = request.GET.get("tc", "").strip()
     if not tc:
         return JsonResponse({"status": "error", "message": "TC kimlik no giriniz."})
@@ -184,15 +214,7 @@ def tc_sorgula(request):
         return JsonResponse({"status": "not_found"})
     if personel.user:
         return JsonResponse({"status": "has_user"})
-    return JsonResponse(
-        {
-            "status": "ok",
-            "adi_soyadi": personel.adi_soyadi,
-            "brans": personel.brans.ad if personel.brans else "",
-            "cinsiyet": "Erkek" if personel.cinsiyet else "Kadın",
-            "suggested_username": tc,
-        }
-    )
+    return JsonResponse({"status": "ok", "suggested_username": tc})
 
 
 def kayit(request):
@@ -201,6 +223,9 @@ def kayit(request):
         return redirect("index")
 
     form = KayitForm(request.POST or None)
+    if request.method == "POST" and _hiz_siniri_asildi(request, "kayit"):
+        messages.error(request, "Çok fazla deneme. Lütfen biraz sonra tekrar deneyin.")
+        return render(request, "registration/kayit.html", {"form": form}, status=429)
     if request.method == "POST" and form.is_valid():
         tc = form.cleaned_data["tckimlikno"]
         personel = NobetPersonel.objects.get(kimlikno=tc)
@@ -208,17 +233,23 @@ def kayit(request):
         first_name = " ".join(parcalar[:-1]) if len(parcalar) > 1 else personel.adi_soyadi
         last_name = parcalar[-1] if parcalar else ""
         with transaction.atomic():
+            # Hesap müdür yardımcısı onaylayana kadar pasif kalır: TC kimlik no'yu bilen
+            # herhangi biri başkası adına hesap açıp öğretmen yetkisi alamasın.
             user = User.objects.create_user(
                 username=form.cleaned_data["username"],
                 password=form.cleaned_data["password1"],
                 first_name=first_name,
                 last_name=last_name,
+                is_active=False,
             )
             ogretmen_grubu, _ = Group.objects.get_or_create(name="ogretmen")
             user.groups.add(ogretmen_grubu)
             personel.user = user
             personel.save()
-        messages.success(request, "Hesabınız oluşturuldu. Giriş yapabilirsiniz.")
+        messages.success(
+            request,
+            "Hesabınız oluşturuldu. Müdür yardımcısı onayladıktan sonra giriş yapabilirsiniz.",
+        )
         return redirect("login")
 
     return render(request, "registration/kayit.html", {"form": form})

@@ -98,6 +98,8 @@ def yonetici_required(view_func):
 class MudurYardimcisiMixin(LoginRequiredMixin):
     """Class-based view mixin."""
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()  # login sayfasına yönlendir
         if not is_mudur_yardimcisi(request.user):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
@@ -142,6 +144,8 @@ def ust_yonetici_required(view_func):
 class UstYoneticiMixin(LoginRequiredMixin):
     """Class-based view mixin."""
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()  # login sayfasına yönlendir
         if not is_ust_yonetici(request.user):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)

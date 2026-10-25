@@ -18,9 +18,12 @@ from .models import DisiplinGorusme
 
 
 def _disiplin_mi(user):
+    # Müdür yardımcısı için okul.auth kontrolü kullanılır: pasife alınmış (okul_yonetici
+    # profili aktif değil) müdür yardımcısı disiplin kayıtlarına erişemez.
     return (
         user.is_superuser
-        or user.groups.filter(name__in=["disiplin_kurulu", "mudur_yardimcisi"]).exists()
+        or user.groups.filter(name="disiplin_kurulu").exists()
+        or _mudur_yardimcisi_mi(user)
     )
 
 
@@ -234,13 +237,14 @@ def gorusme_olustur(request):
 def gorusme_detay(request, pk):
     gorusme = get_object_or_404(DisiplinGorusme, pk=pk)
     personel = _personel(request)
-    disiplin = _disiplin_mi(request.user)
     mudur = _mudur_yardimcisi_mi(request.user)
 
-    # Erişim kontrolü
+    # Erişim kontrolü (KVKK): liste ekranıyla aynı kural — kurul üyesi yalnızca kendi
+    # kayıtlarını, müdür yardımcısı gizli olmayan tüm kayıtları görür. Başka bir
+    # üyenin kaydı pk ile açılamaz.
     sahip = personel is not None and gorusme.kayit_eden == personel
 
-    if not sahip and not mudur and not disiplin:
+    if not sahip and not mudur:
         messages.error(request, "Bu görüşmeyi görme yetkiniz yok.")
         return redirect("disiplin:gorusme_liste")
 

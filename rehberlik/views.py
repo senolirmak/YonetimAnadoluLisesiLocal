@@ -231,13 +231,14 @@ def gorusme_olustur(request):
 def gorusme_detay(request, pk):
     gorusme = get_object_or_404(Gorusme, pk=pk)
     personel = _personel(request)
-    rehber = _rehber_mi(request.user)
     mudur = _mudur_yardimcisi_mi(request.user)
 
-    # Erişim kontrolü
+    # Erişim kontrolü (KVKK): liste ekranıyla aynı kural — rehber yalnızca kendi
+    # kayıtlarını, müdür yardımcısı gizli olmayan tüm kayıtları görür. Başka bir
+    # rehberin kaydı pk ile açılamaz.
     sahip = personel is not None and gorusme.rehber == personel
 
-    if not sahip and not mudur and not rehber:
+    if not sahip and not mudur:
         messages.error(request, "Bu görüşmeyi görme yetkiniz yok.")
         return redirect("rehberlik:gorusme_liste")
 

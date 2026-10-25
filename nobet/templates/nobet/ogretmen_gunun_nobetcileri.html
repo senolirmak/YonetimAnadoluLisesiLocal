@@ -11,9 +11,15 @@
 
     <!-- Sayfa Navigasyonu -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+        {% if is_yonetici %}
         <a href="{% url 'nobet_dagitim' %}" class="btn btn-primary">Haftalık Nöbet</a>
+        {% endif %}
+        {% if is_yonetici %}
         <a href="{% url 'gunun_nobetcileri' %}" class="btn btn-warning">Günün Nöbetçileri</a>
+        {% endif %}
+        {% if is_yonetici %}
         <a href="{% url 'nobet_ders_doldurma' %}" class="btn btn-success">Ders Doldurma</a>
+        {% endif %}
     </div>
 
     {% if messages %}
