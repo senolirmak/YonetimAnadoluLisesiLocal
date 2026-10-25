@@ -290,7 +290,8 @@ def sureksiz_devamsiz_listesi(request):
                 pass
         guncellenen = 0
         for ogr in qs:
-            yeni_sureksiz = ogr.okulno in sureksiz_isaretli
+            # Form okulno'yu metin olarak gönderir; int ile karşılaştırma her zaman False olurdu.
+            yeni_sureksiz = str(ogr.okulno) in sureksiz_isaretli
             if ogr.sureksiz_devamsiz != yeni_sureksiz:
                 ogr.sureksiz_devamsiz = yeni_sureksiz
                 ogr.save(update_fields=["sureksiz_devamsiz"])
