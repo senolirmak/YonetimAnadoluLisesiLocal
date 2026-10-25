@@ -153,6 +153,19 @@ def nginx_yapilandir(proje_dizin: Path, servis_adi: str, allowed_hosts: str) -> 
         alias {proje_dizin}/media/;
     }}
 
+    # Veritabanı/medya yedeği yükleme (yedekleme app'i): yedek arşivleri genel 20M
+    # sınırını aşar (413). Sınır yalnızca bu yol için yükseltilir; Nginx gövdeyi önce
+    # kendi geçici dizinine yazar, sunucuda yedek boyutu kadar boş disk gerekir.
+    location /yedekleme/ {{
+        client_max_body_size 2G;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_pass http://unix:/run/{servis_adi}/gunicorn.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }}
+
     location / {{
         proxy_pass http://unix:/run/{servis_adi}/gunicorn.sock;
         proxy_set_header Host $host;
@@ -232,6 +245,20 @@ server {{
 
     location /media/ {{
         alias {proje_dizin}/media/;
+    }}
+
+    # Veritabanı/medya yedeği yükleme (yedekleme app'i): yedek arşivleri genel 20M
+    # sınırını aşar (413). Sınır yalnızca bu yol için yükseltilir; Nginx gövdeyi önce
+    # kendi geçici dizinine yazar, sunucuda yedek boyutu kadar boş disk gerekir.
+    location /yedekleme/ {{
+        client_max_body_size 2G;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_pass http://unix:/run/{servis_adi}/gunicorn.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }}
 
     location / {{
