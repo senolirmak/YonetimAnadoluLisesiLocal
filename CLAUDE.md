@@ -37,8 +37,8 @@ python manage.py makemigrations --check --dry-run --settings=config.settings.pro
 ```
 
 Not: Çoğu app'in `tests.py` dosyası `django-admin startapp` iskeletinden ibarettir (gerçek test
-yok). Gerçek testler yalnızca `sinav/`, `dersdefteri/`, `sinavmedia/`, `sorumluluk/`,
-`dersprogrami/`, `faaliyet/`, `veriaktar/` içindedir (`dersprogrami` FET köprüsü testlerinden biri `fet-cl` kuruluysa gerçek FET'i çalıştırır,
+yok). Gerçek testler yalnızca `okul/`, `sinav/`, `dersprogrami/`, `faaliyet/`, `utility/`,
+`veriaktar/`, `yedekleme/`, `secmelidersler/` içindedir (`dersprogrami` FET köprüsü testlerinden biri `fet-cl` kuruluysa gerçek FET'i çalıştırır,
 yoksa atlanır).
 
 ### Ortam / Ayarlar
@@ -54,6 +54,35 @@ yoksa atlanır).
   fiziksel olarak varsa `INSTALLED_APPS`'e ekler, `config/urls.py` da aynı şekilde koşullu route eder.
   Bu iki dosyadaki koşullu mantığı bozmayın — amaç, devtools olmayan bir makinede projenin sorunsuz
   çalışmasıdır (bkz. `devtools/README.md`).
+
+## Ortamlar, Deploy ve Çalışma Kuralları
+
+### Ortamlar
+
+- **Geliştirme:** ev ağı (Claude Code burada çalışır), `config.settings.development`.
+- **Üretim:** okul sunucusu 192.168.1.70 (`/srv/akalyonetim`), MEB ağında. Evden erişim YOK.
+  Gunicorn systemd servisi (`akalyonetim.service`) olarak çalışır, önünde Nginx vardır;
+  PostgreSQL bir podman konteynerindedir (`<DB_NAME>_pg`).
+- **Deploy** okulda `deploy.sh` ile yapılır: pg_dump ile DB yedeği → servisi durdur →
+  `git pull origin main` → `pip install` → migrate + collectstatic (production ayarları) →
+  nginx reload → servisi başlat. Bu akış çalışıyor; değiştirmeyin.
+- Deploy `main`'i çektiği için **`main` her zaman deploy edilebilir olmalı**: iş dallarda yapılır,
+  testler ve prod migration kontrolü geçmeden `main`'e merge edilmez.
+
+### Kurallar
+
+- Sunucuya, `systemctl`'e veya üretim komutlarına dokunmayın.
+- `deploy.sh` ve `kurulumcu/` evde çalıştırılamaz; bunlarda değişiklik gerekirse önce kullanıcıya
+  sorun ve okulda nasıl test edileceğini yazın.
+- Gerçek öğrenci/personel verisi kullanmayın; `backups/` içindeki dump'ları test verisi olarak
+  açmayın. Testler için fixture/factory üretin.
+- `.env` ve sırlar repoya girmez (bkz. Notlar — repo public).
+
+### Öncelikler
+
+1. **Test eksikliği:** 20 app'te hiç test yok (örn. `nobet`, `ogrenci`, `devamsizlik`, `disiplin`,
+   `rehberlik`, `personel`, `sorumluluk`, `pano`, `ekders`, `dersdefteri`, `sinavmedia`).
+2. **DRY ihlallerini refactor etmek** — yalnızca ilgili app'in testleri yazıldıktan sonra.
 
 ## Mimari
 
