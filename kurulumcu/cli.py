@@ -18,6 +18,7 @@ Tekrar çalıştırmak güvenlidir: zaten tamamlanmış adımlar atlanır.
 from __future__ import annotations
 
 import datetime
+import os
 import secrets
 import subprocess
 import sys
@@ -308,9 +309,18 @@ def main() -> None:
         # ayrı, sudo yetkisiz bir sistem kullanıcısı (akalsite) altında çalışır —
         # bkz. kurulumcu/servis_kullanicisi.py.
         # Nginx şablonları (sunucu.py) /korumali-medya/ internal yolunu içerdiğinden sınav
-        # medyası teslimi Nginx'e bırakılır. .env servis kullanıcısına devredilmeden önce
-        # yazılır (devirden sonra sudo gerekir, bkz. env_dosyasi.anahtar_ayarla).
-        env_dosyasi.anahtar_ayarla(env_yolu, "SINAVMEDIA_X_ACCEL", "True")
+        # medyası teslimi Nginx'e bırakılır. İlk kurulumda .env henüz kurulumu çalıştıranındır;
+        # tekrar çalıştırmada servis kullanıcısına devredilmiş olur (mod 640) → sudo gerekir.
+        env_dosyasi.anahtar_ayarla(
+            env_yolu, "SINAVMEDIA_X_ACCEL", "True", sudo=not os.access(env_yolu, os.W_OK)
+        )
+
+        # Tekrar çalıştırmada HTTPS zaten kuruluysa Nginx hiç HTTP-only yapılandırmaya
+        # düşürülmez ve 6.5'te soru sorulmaz: "Hayır" cevabı siteyi HTTP'ye indirir, ama
+        # .env'de HTTPS_ETKIN=True kaldığından Secure çerezler gönderilmez, giriş kırılır.
+        https_zaten_etkin = (
+            degerler.get("HTTPS_ETKIN") == "True" and sertifika.SUNUCU_SERTIFIKA.is_file()
+        )
 
         servis_kullanicisi.servis_kullanicisini_hazirla(PROJE_DIZIN)
         servis_kullanicisi.proje_dizini_sahipligini_garanti_et(PROJE_DIZIN)
@@ -326,20 +336,26 @@ def main() -> None:
             servis_kullanicisi.SERVIS_KULLANICISI,
             servis_kullanicisi.SERVIS_GRUBU,
         )
-        sunucu.nginx_yapilandir(PROJE_DIZIN, servis_adi, degerler.get("ALLOWED_HOSTS", ""))
-        sunucu.saglik_kontrolu(servis)
+        if https_zaten_etkin:
+            y.bilgi("HTTPS zaten etkin; Nginx doğrudan HTTPS yapılandırmasıyla güncellenecek.")
+        else:
+            sunucu.nginx_yapilandir(PROJE_DIZIN, servis_adi, degerler.get("ALLOWED_HOSTS", ""))
+            sunucu.saglik_kontrolu(servis)
 
         # ── 6.5 Nginx + HTTPS (yerel CA ile, isteğe bağlı) ───────
-        print()
-        print("Sunucu okul ağı içinde, dışarıya kapalı çalışıyor ve genel bir alan")
-        print("adı yok — bu yüzden Let's Encrypt gibi genel sertifika otoriteleri")
-        print("kullanılamaz. Bunun yerine kendi yerel sertifika otoriteniz (CA)")
-        print("oluşturulup onunla imzalı bir sunucu sertifikası kurulabilir. Bu")
-        print("CA'nın genel sertifikasının (özel anahtar DEĞİL) okuldaki istemci")
-        print("bilgisayarlara güvenilir kök sertifika olarak eklenmesi gerekir,")
-        print("aksi hâlde tarayıcılar 'Bağlantınız güvenli değil' uyarısı gösterir")
-        print("(yine de 'Devam et' ile siteye girilebilir).")
-        if y.sor("Nginx + HTTPS (yerel CA ile) şimdi kurulsun mu?", "E").lower().startswith("e"):
+        if not https_zaten_etkin:
+            print()
+            print("Sunucu okul ağı içinde, dışarıya kapalı çalışıyor ve genel bir alan")
+            print("adı yok — bu yüzden Let's Encrypt gibi genel sertifika otoriteleri")
+            print("kullanılamaz. Bunun yerine kendi yerel sertifika otoriteniz (CA)")
+            print("oluşturulup onunla imzalı bir sunucu sertifikası kurulabilir. Bu")
+            print("CA'nın genel sertifikasının (özel anahtar DEĞİL) okuldaki istemci")
+            print("bilgisayarlara güvenilir kök sertifika olarak eklenmesi gerekir,")
+            print("aksi hâlde tarayıcılar 'Bağlantınız güvenli değil' uyarısı gösterir")
+            print("(yine de 'Devam et' ile siteye girilebilir).")
+        if https_zaten_etkin or y.sor(
+            "Nginx + HTTPS (yerel CA ile) şimdi kurulsun mu?", "E"
+        ).lower().startswith("e"):
             sanlar = [s.strip() for s in degerler.get("ALLOWED_HOSTS", "").split(",") if s.strip()]
             if not sanlar:
                 sanlar = ["localhost", "127.0.0.1"]
