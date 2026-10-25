@@ -41,13 +41,22 @@
                         {% endif %}
                     </td>
                     <td class="center">
-                        {% if personel.user %}
+                        {% if personel.user and not personel.user.is_active %}
+                            <span class="badge badge-warning">Onay Bekliyor</span>
+                        {% elif personel.user %}
                             <span class="badge badge-info">Tanımlı</span>
                         {% else %}
                             <span class="badge badge-secondary">Tanımsız</span>
                         {% endif %}
                     </td>
                     <td class="center">
+                        {% if personel.user and not personel.user.is_active %}
+                            <form method="post" action="{% url 'ogretmen_kullanici_onayla' personel.pk %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success"
+                                        style="font-size:0.85em; padding: 4px 10px;">Onayla</button>
+                            </form>
+                        {% endif %}
                         {% if personel.user %}
                             <a href="{% url 'ogretmen_kullanici_kaldir' personel.pk %}"
                                class="btn btn-danger"

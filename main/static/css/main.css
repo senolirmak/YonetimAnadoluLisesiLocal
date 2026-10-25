@@ -88,5 +88,6 @@
 .badge { padding: 3px 8px; border-radius: 10px; font-size: 0.85em; color: white; }
 .badge-info { background-color: #17a2b8; }
 .badge-secondary { background-color: #6c757d; }
+.badge-warning { background-color: #d97706; }
 .text-success-bold { color: #28a745; font-weight: bold; }
 .hr-divider { border: 0; border-top: 1px solid #eee; margin: 20px 0; }

@@ -195,12 +195,9 @@
         </div>
 
         <div id="personelKart" class="personel-kart hidden">
-            <div class="kart-baslik">Personel Bilgileri — Onaylıyor musunuz?</div>
-            <table>
-                <tr><td>Ad Soyad</td><td id="kart_adi_soyadi"></td></tr>
-                <tr><td>Branş</td><td id="kart_brans"></td></tr>
-                <tr><td>Cinsiyet</td><td id="kart_cinsiyet"></td></tr>
-            </table>
+            <div class="kart-baslik">Personel kaydı bulundu</div>
+            <p style="margin:0;font-size:0.9em;">Kullanıcı adı ve şifrenizi belirleyin. Hesabınız
+            müdür yardımcısı onayladıktan sonra açılır.</p>
         </div>
 
         {# ── Kullanıcı adı ve şifre (TC bulunursa aktif olur) ── #}
@@ -273,9 +270,6 @@
             .then(data => {
                 hideAll();
                 if (data.status === 'ok') {
-                    document.getElementById('kart_adi_soyadi').textContent = data.adi_soyadi;
-                    document.getElementById('kart_brans').textContent       = data.brans;
-                    document.getElementById('kart_cinsiyet').textContent    = data.cinsiyet;
                     kart.classList.remove('hidden');
                     kalanlar.classList.remove('hidden');
                     if (!usernameIn.value) {

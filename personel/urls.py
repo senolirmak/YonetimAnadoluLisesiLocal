@@ -13,6 +13,11 @@ urlpatterns = [
         name="ogretmen_kullanici_olustur",
     ),
     path(
+        "kullanicilari/<int:personel_pk>/onayla/",
+        views.ogretmen_kullanici_onayla,
+        name="ogretmen_kullanici_onayla",
+    ),
+    path(
         "kullanicilari/<int:personel_pk>/kaldir/",
         views.ogretmen_kullanici_kaldir,
         name="ogretmen_kullanici_kaldir",
