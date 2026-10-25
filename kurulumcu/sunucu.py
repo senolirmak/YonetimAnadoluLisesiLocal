@@ -42,9 +42,13 @@ EnvironmentFile={proje_dizin}/.env
 RuntimeDirectory={servis_adi}
 RuntimeDirectoryMode=0750
 
+# --no-control-socket: Gunicorn 25.1+ varsayılan olarak çalışma dizinine gunicorn.ctl açmaya
+# çalışır; servis kullanıcısı proje dizinine yazamadığından her başlangıçta "Control server
+# error: Permission denied" log'lanır. gunicornc arayüzü kullanılmadığından kapatılır.
 ExecStart={venv}/bin/gunicorn \\
     --workers 3 \\
     --timeout 120 \\
+    --no-control-socket \\
     --bind unix:/run/{servis_adi}/gunicorn.sock \\
     config.wsgi:application
 Restart=on-failure
