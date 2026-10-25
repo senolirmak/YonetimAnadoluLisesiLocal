@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from dersprogrami.models import DersProgrami
-from okul.auth import mudur_yardimcisi_required
+from okul.auth import is_yonetici, mudur_yardimcisi_required
 from okul.models import DersHavuzu, SinifSube
 from okul.utils import get_aktif_egitim_yili
 
@@ -71,14 +71,6 @@ def _rehberlik_sinif_sube(user):
         .first()
     )
     return ders.sinif_sube if ders else None
-
-
-def _only_ogretmen(user):
-    if user.is_superuser:
-        return False
-    gruplar = set(user.groups.values_list("name", flat=True))
-    yonetici = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-    return "ogretmen" in gruplar and not (gruplar & yonetici)
 
 
 EXCEL_SUTUNLAR = [
@@ -223,8 +215,9 @@ def excel_yukle(request):
 
 @login_required
 def ogrenci_liste(request):
-    # Ogretmen: yalnızca kendi sınıf rehberliği sınıfını görebilir
-    if _only_ogretmen(request.user):
+    # Yönetici olmayan (öğretmen ya da hiçbir gruba üye olmayan) kullanıcı yalnızca kendi
+    # sınıf rehberliği sınıfını görebilir; varsayılan ret.
+    if not is_yonetici(request.user):
         ss = _rehberlik_sinif_sube(request.user)
         if not ss:
             messages.error(
@@ -369,8 +362,9 @@ def sureksiz_devamsiz_toggle(request, pk):
 def ogrenci_detay_duzenle(request, pk):
     ogrenci = get_object_or_404(Ogrenci, pk=pk)
 
-    # Ogretmen: yalnızca kendi sınıf rehberliği sınıfındaki öğrenciyi düzenleyebilir
-    if _only_ogretmen(request.user):
+    # Yönetici olmayan kullanıcı yalnızca kendi sınıf rehberliği sınıfındaki öğrenciyi
+    # düzenleyebilir; varsayılan ret.
+    if not is_yonetici(request.user):
         ss = _rehberlik_sinif_sube(request.user)
         if not ss or ogrenci.sinif != ss.sinif or ogrenci.sube.upper() != ss.sube.upper():
             raise PermissionDenied

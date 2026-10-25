@@ -366,3 +366,25 @@ class OzelDurumTestCase(TestCase):
             {"MÜZİK", "RESİM"},
         )
         self.assertTrue(OgrenciMuaf.objects.filter(egitim_yili=eski_yil, ders=beden).exists())
+
+
+class VarsayilanRetTestCase(TestCase):
+    """Hiçbir gruba üye olmayan kullanıcı öğrenci listesine/detayına erişemez."""
+
+    def test_grupsuz_kullanici(self):
+        ogr = ogrenci_olustur(9, "A")
+        self.client.force_login(kullanici_olustur())
+
+        resp = self.client.get(reverse("ogrenci:ogrenci_liste"))
+        self.assertRedirects(resp, reverse("index"), fetch_redirect_response=False)
+        url = reverse("ogrenci:ogrenci_detay_duzenle", args=[ogr.pk])
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_yonetici_rolleri_tum_ogrencileri_gorur(self):
+        ogr = ogrenci_olustur(9, "A")
+        for grup in ("mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"):
+            self.client.force_login(kullanici_olustur(grup))
+            with self.subTest(grup=grup):
+                self.assertEqual(len(self.client.get(reverse("ogrenci:ogrenci_liste")).context["ogrenciler"]), 1)
+                url = reverse("ogrenci:ogrenci_detay_duzenle", args=[ogr.pk])
+                self.assertEqual(self.client.get(url).status_code, 200)
