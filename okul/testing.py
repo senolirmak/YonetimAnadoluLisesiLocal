@@ -116,3 +116,27 @@ def ogrenci_olustur(sinif=9, sube="A", **kwargs):
     kwargs.setdefault("dogumtarihi", datetime.date(2010, 1, 1))
     kwargs.setdefault("cinsiyet", "E")
     return Ogrenci.objects.create(sinif=sinif, sube=sube, **kwargs)
+
+
+def aktif_egitim_yili_olustur(egitim_yili="2025-2026"):
+    """Eğitim yılını oluşturur ve OkulBilgi'de aktif yıl yapar."""
+    from okul.models import EgitimOgretimYili, OkulBilgi
+
+    bas = int(egitim_yili[:4])
+    yil, _ = EgitimOgretimYili.objects.get_or_create(
+        egitim_yili=egitim_yili,
+        defaults={
+            "egitim_baslangic": datetime.date(bas, 9, 1),
+            "egitim_bitis": datetime.date(bas + 1, 6, 20),
+        },
+    )
+    OkulBilgi.objects.update_or_create(
+        pk=1, defaults={"okul_adi": "Örnek Anadolu Lisesi", "okul_egtyil": yil}
+    )
+    return yil
+
+
+def ders_olustur(ders_adi=None, **kwargs):
+    from okul.models import DersHavuzu
+
+    return DersHavuzu.objects.create(ders_adi=ders_adi or f"DERS {_sira()}", **kwargs)
