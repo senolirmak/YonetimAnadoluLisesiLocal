@@ -5,6 +5,7 @@ from datetime import date
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -32,6 +33,7 @@ from sinav.services.ders_ayarlari import (
     parse_ders_ayarlari_post,
     save_ayarlar,
 )
+from sinav.services.gozetim_erisim import kontrolden_muaf_mi, sinif_listesi_erisimi
 from sinav.services.mazeret_belge import mazeret_belge_ctx, mazeret_belge_kaydet
 from sinav.services.mazeret_rapor import (
     mazeret_detay_verisi,
@@ -976,6 +978,22 @@ def sinif_listesi_pdf_view(request):
         tarih=tarih_date, saat=saat, oturum=oturum, uretim=aktif_uretim
     ).exists():
         raise Http404
+
+    if not kontrolden_muaf_mi(request.user):
+        # Öğretmen yalnızca gözetim ekranındaki kendi slotunu, saat penceresinde açabilir
+        # (bkz. sinav/services/gozetim_erisim.py).
+        from sinav.models import TakvimUretim
+
+        aktif_sinav = _aktif_sinav()
+        ogretmen_uretimi = (
+            TakvimUretim.objects.filter(sinav=aktif_sinav, aktif=True).first()
+            if aktif_sinav else None
+        )
+        personel = getattr(request.user, "personel", None)
+        if aktif_uretim != ogretmen_uretimi or not sinif_listesi_erisimi(
+            personel, aktif_uretim, tarih_date, saat, sinifsube_filtre, oturum
+        ):
+            raise PermissionDenied
 
     okul  = OkulBilgi.get()
     buf   = io.BytesIO()

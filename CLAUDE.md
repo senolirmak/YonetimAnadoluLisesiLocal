@@ -163,9 +163,14 @@ GA (`_phase1`/`_phase2`) çakışmasız takvimi üretir; `oturma.py` da salon i�
 şekilde permütasyon tabanlı bir GA (`_ga_seat_assignment`) ile bulur. Katılacak sınıf seviyeleri,
 kelebek/kendi sınıfı dağılım oranı ve günlük maks. sınav sayısı `AlgoritmaParametreleri` üzerinden
 yapılandırılır.
-Öğretmenlerin sınav günü kendi sınıflarının yerleşim listesini gördüğü gözetim ekranı
-(`/sinav/gozetim/`) yalnızca o öğretmen gözetmen olarak atanmışsa ve sınav saatinden 50 dakika önce
-itibaren aktif olur — bu zamanlama kısıtını değiştirirken dikkatli olun.
+Öğretmenlerin sınav günü kullandığı gözetim ekranında (`/sinav/gozetim/`) iki tür düğme vardır;
+saat pencereleri `sinav/utils.py: SLOT_ERISIM_KURALLARI`'ndadır:
+- **Salon yoklaması:** yalnızca o salona gözetmen atanmış (ya da nöbet devriyle üstlenmiş)
+  öğretmene, sınavdan 8 dk önce → 40 dk sonrasına kadar açık.
+- **Sınıf listesi PDF'i:** sınavdan önceki son derste o sınıfta olan öğretmene, o dersin
+  başlangıcından sınavdan 10 dk öncesine kadar açık.
+Aynı kural düğmelerin açtığı sayfalarda da uygulanır (`sinav/services/gozetim_erisim.py`);
+müdür yardımcısı/okul müdürü/staff muaftır. Bu kısıtları değiştirirken iki yeri birlikte düşünün.
 
 `sinav/services/` ise ayrı bir alt sistemdir: **mazeret sınavı** (makeup exam) ILP dağıtımı ve
 takvimi (`mazeret_ilp.py`, `mazeret_dagitim.py`, `mazeret_takvim.py`) — Kelebek motoruyla karıştırmayın.
