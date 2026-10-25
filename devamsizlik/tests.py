@@ -128,6 +128,35 @@ class YoklamaTestCase(TestCase):
             list(OgrenciDevamsizlik.objects.values_list("ogrenci", flat=True)), [self.ogr2.pk]
         )
 
+    def test_ogretmen_form_tarihini_degistirerek_baska_gune_yazamaz(self):
+        OgrenciDevamsizlik.objects.create(
+            ogrenci=self.ogr1, tarih=SALI, ders_saati=self.ders.ders_saati,
+            ders_adi="X", ogretmen_adi="X",
+        )
+        self.client.force_login(self.user)
+        with _zamani_dondur(PAZARTESI, 10, 15):
+            self.client.post(
+                self._url(UCUNCU_DERS),
+                {"tarih": SALI.isoformat(), "devamsiz": [self.ogr2.pk]},
+            )
+
+        # Kayıt bugüne (Pazartesi) yazıldı; Salı'nın kaydı silinmedi.
+        self.assertEqual(
+            set(OgrenciDevamsizlik.objects.values_list("ogrenci", "tarih")),
+            {(self.ogr1.pk, SALI), (self.ogr2.pk, PAZARTESI)},
+        )
+
+    def test_yonetici_gecmis_gunun_yoklamasini_kaydedebilir(self):
+        self.client.force_login(self.yonetici)
+        with _zamani_dondur(PAZARTESI, 13, 0):
+            self.client.post(
+                self._url(UCUNCU_DERS) + f"?tarih={SALI.isoformat()}",
+                {"tarih": SALI.isoformat(), "devamsiz": [self.ogr1.pk]},
+            )
+
+        kayit = OgrenciDevamsizlik.objects.get()
+        self.assertEqual((kayit.ogrenci, kayit.tarih), (self.ogr1, SALI))
+
     def test_pasif_ogrenci_post_ile_devamsiz_yazilamaz(self):
         self.client.force_login(self.user)
         with _zamani_dondur(PAZARTESI, 10, 15):

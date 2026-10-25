@@ -171,7 +171,9 @@ def ogretmen_devamsizlik(request, ders_saati=None):
     )
 
     if request.method == "POST":
-        post_tarih = _parse_tarih(request.POST.get("tarih", ""), bugun)
+        # Tarih formdan değil, ekranın tarihinden alınır: öğretmen yalnızca bugünü görebilir
+        # ve form verisini değiştirerek başka bir güne yoklama yazamamalı.
+        post_tarih = secili_tarih
         devamsiz_ids = set(int(x) for x in request.POST.getlist("devamsiz"))
 
         with transaction.atomic():
