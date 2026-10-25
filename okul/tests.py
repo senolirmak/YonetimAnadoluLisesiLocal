@@ -63,3 +63,46 @@ class OkulBilgisiOlusturTestCase(TestCase):
         )
         self._calistir(okul_adi="Örnek Anadolu Lisesi", egitim_yili="2025-2026")
         self.assertEqual(EgitimOgretimYili.objects.filter(egitim_yili="2025-2026").count(), 1)
+
+
+class YetkiMixinTestCase(TestCase):
+    """okul.auth mixin'leri: anonim → login'e yönlendir, yetkisiz → 403."""
+
+    def _cevap(self, mixin, user):
+        from django.contrib.auth.models import AnonymousUser
+        from django.core.exceptions import PermissionDenied
+        from django.http import HttpResponse
+        from django.test import RequestFactory
+        from django.views import View
+
+        class Gorunum(mixin, View):
+            def get(self, request):
+                return HttpResponse("ok")
+
+        request = RequestFactory().get("/ornek/")
+        request.user = user or AnonymousUser()
+        try:
+            return Gorunum.as_view()(request).status_code
+        except PermissionDenied:
+            return 403
+
+    def test_mixinler(self):
+        from okul.auth import MudurYardimcisiMixin, UstYoneticiMixin
+        from okul.testing import kullanici_olustur
+
+        mudur_yrd = kullanici_olustur("mudur_yardimcisi")
+        mudur = kullanici_olustur("okul_muduru")
+        ogretmen = kullanici_olustur("ogretmen")
+        beklenen = {
+            (MudurYardimcisiMixin, None): 302,
+            (MudurYardimcisiMixin, ogretmen): 403,
+            (MudurYardimcisiMixin, mudur): 403,
+            (MudurYardimcisiMixin, mudur_yrd): 200,
+            (UstYoneticiMixin, None): 302,
+            (UstYoneticiMixin, ogretmen): 403,
+            (UstYoneticiMixin, mudur): 200,
+            (UstYoneticiMixin, mudur_yrd): 200,
+        }
+        for (mixin, user), kod in beklenen.items():
+            with self.subTest(mixin=mixin.__name__, user=user):
+                self.assertEqual(self._cevap(mixin, user), kod)
