@@ -9,4 +9,5 @@ urlpatterns = [
     path("serbest/<int:pk>/", views.serbest_toggle, name="serbest_toggle"),
     path("sil/<int:pk>/", views.sil, name="sil"),
     path("oynat/<int:pk>/", views.oynat, name="oynat"),
+    path("dosya/<int:pk>/", views.dosya, name="dosya"),
 ]

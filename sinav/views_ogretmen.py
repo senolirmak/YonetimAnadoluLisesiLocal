@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import date as dt_date
-from datetime import datetime, timedelta
+from datetime import datetime
 from datetime import time as dt_time
 
 from django.contrib import messages
@@ -230,7 +230,9 @@ def ogretmen_sinav_medya(request):
 
     from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani
     from sinavmedia.models import SinavMedia
-    from sinavmedia.views import TOLERANS_DAKIKA
+    from django.urls import reverse
+
+    from sinavmedia.services.erisim import oynatma_acik_mi
 
     preview_id = request.GET.get("preview_ogretmen_id", "").strip()
     if preview_id and preview_id.isdigit() and is_admin:
@@ -313,24 +315,14 @@ def ogretmen_sinav_medya(request):
                 if sev not in media_map[key]:
                     continue
                 m = media_map[key][sev]
-                if m.serbest:
-                    erisim_acik = True
-                else:
-                    sinav_saat = datetime.strptime(m.takvim.saat, "%H:%M").time()
-                    sinav_dt   = timezone.make_aware(
-                        datetime.combine(m.takvim.tarih, sinav_saat)
-                    )
-                    erisim_acik = (
-                        sinav_dt
-                        <= simdi <=
-                        sinav_dt + timedelta(minutes=TOLERANS_DAKIKA)
-                    )
+                erisim_acik = oynatma_acik_mi(m, simdi)
                 medyalar.append({
                     "obj":          m,
                     "seviye_adi":   m.get_seviye_display(),
                     "ders_adi":     m.takvim.ders_tam_adi,
                     "aciklama":     m.aciklama,
-                    "dosya_url":    m.dosya.url if erisim_acik else None,
+                    # Dosya korumalı view'dan verilir (bkz. sinavmedia/services/erisim.py).
+                    "dosya_url":    reverse("sinavmedia:dosya", args=[m.pk]) if erisim_acik else None,
                     "dosya_adi":    m.dosya.name,
                     "erisim_acik":  erisim_acik,
                     "sinav_saat":   m.takvim.saat,

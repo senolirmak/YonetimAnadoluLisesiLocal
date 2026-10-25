@@ -1,16 +1,21 @@
 import re
-from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 from sinav.models import Takvim
 
 from .models import SinavMedia
+from .services.erisim import (
+    TOLERANS_DAKIKA,
+    dosya_erisimi_var_mi,
+    oynatma_acik_mi,
+    sinav_baslangici,
+)
 
 SEVIYE_LABELS = {9: "9. Sınıf", 10: "10. Sınıf", 11: "11. Sınıf", 12: "12. Sınıf"}
 
@@ -29,11 +34,6 @@ def _seviye_from_subeler(subeler_str):
     if not seviyeler:
         return list(SEVIYE_LABELS.items())
     return [(sev, SEVIYE_LABELS[sev]) for sev in sorted(seviyeler)]
-
-TOLERANS_DAKIKA = 5
-
-
-from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 # ---------------------------------------------------------------
@@ -160,24 +160,48 @@ def oynat(request, pk):
     medya = get_object_or_404(SinavMedia, pk=pk)
     yonetici = _mudur_yardimcisi_mi(request.user)
 
-    if not yonetici and not medya.serbest:
-        # Zaman kısıtı: sınav saati ± TOLERANS_DAKIKA
-        sinav_saat = datetime.strptime(medya.takvim.saat, "%H:%M").time()
-        sinav_dt = timezone.make_aware(
-            datetime.combine(medya.takvim.tarih, sinav_saat)
-        )
-        simdi = timezone.now()
-        acilis  = sinav_dt
-        kapanis = sinav_dt + timedelta(minutes=TOLERANS_DAKIKA)
-
-        if not (acilis <= simdi <= kapanis):
-            return render(request, "sinavmedia/kilitli.html", {
-                "medya": medya,
-                "sinav_dt": sinav_dt,
-                "tolerans": TOLERANS_DAKIKA,
-            })
+    if not yonetici and not oynatma_acik_mi(medya):
+        return render(request, "sinavmedia/kilitli.html", {
+            "medya": medya,
+            "sinav_dt": sinav_baslangici(medya),
+            "tolerans": TOLERANS_DAKIKA,
+        })
 
     return render(request, "sinavmedia/oynatici.html", {
         "medya": medya,
         "yonetici": yonetici,
     })
+
+
+# ---------------------------------------------------------------
+# Dosya (korumalı)
+# ---------------------------------------------------------------
+@login_required
+def dosya(request, pk):
+    """Medya dosyasını erişim kuralına göre verir (bkz. services/erisim.py).
+
+    settings.SINAVMEDIA_X_ACCEL açıksa (prod, Nginx'te `internal` /korumali-medya/ yolu
+    tanımlıyken) dosyayı Nginx teslim eder — Range/seek desteği ve worker'ı meşgul
+    etmemek için. Kapalıysa (geliştirme ya da Nginx henüz güncellenmemişken) Django verir."""
+    import mimetypes
+    from urllib.parse import quote
+
+    from django.conf import settings
+    from django.core.exceptions import PermissionDenied
+    from django.http import FileResponse, HttpResponse
+
+    medya = get_object_or_404(SinavMedia.objects.select_related("takvim"), pk=pk)
+    if not medya.dosya or not dosya_erisimi_var_mi(request.user, medya):
+        raise PermissionDenied
+
+    icerik_turu = mimetypes.guess_type(medya.dosya.name)[0] or "application/octet-stream"
+    if getattr(settings, "SINAVMEDIA_X_ACCEL", False):
+        yanit = HttpResponse(content_type=icerik_turu)
+        yanit["X-Accel-Redirect"] = "/korumali-medya/" + quote(medya.dosya.name)
+    else:
+        try:
+            yanit = FileResponse(medya.dosya.open("rb"), content_type=icerik_turu)
+        except FileNotFoundError:
+            raise Http404
+    yanit["Cache-Control"] = "private, no-store"
+    return yanit
