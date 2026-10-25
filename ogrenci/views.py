@@ -14,6 +14,7 @@ from okul.utils import get_aktif_egitim_yili
 
 from .forms import OgrenciAdresForm, OgrenciAyrilmaForm, OgrenciDetayForm, OgrenciForm
 from .models import Ogrenci, OgrenciAdres, OgrenciAyrilma, OgrenciDetay, OgrenciMuaf
+from .services.aktiflik import aktifligi_guncelle
 
 
 def _gorunur_ogrenciler_ve_durum(ogrenciler):
@@ -134,7 +135,7 @@ def normalize_cinsiyet(deger):
     return CINSIYET_MAP.get(deger.strip().lower())
 
 
-@login_required
+@mudur_yardimcisi_required
 def excel_yukle(request):
     if request.method == "POST":
         dosya = request.FILES.get("excel_dosya")
@@ -726,10 +727,14 @@ def ayrilma_sil(request, pk):
             ogr = kayit.ogrenci
             ad = f"{ogr.adi} {ogr.soyadi}"
             kayit.delete()
-            if not ogr.aktif:
-                ogr.aktif = True
-                ogr.save(update_fields=["aktif"])
-            messages.success(
-                request, f"{ad} ayrılma kaydından çıkarıldı ve tekrar aktif hale getirildi."
-            )
+            kalan = aktifligi_guncelle(ogr)
+            if kalan:
+                messages.warning(
+                    request,
+                    f"{ad} ayrılma kaydından çıkarıldı ama pasif kaldı ({', '.join(kalan)} var).",
+                )
+            else:
+                messages.success(
+                    request, f"{ad} ayrılma kaydından çıkarıldı ve tekrar aktif hale getirildi."
+                )
     return redirect("ogrenci:ayrilma_listesi")

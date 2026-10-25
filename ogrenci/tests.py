@@ -2,7 +2,6 @@
 
 import datetime
 import io
-import unittest
 
 import pandas as pd
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -176,7 +175,6 @@ class ExcelYukleTestCase(TestCase):
 
         self.assertFalse(Ogrenci.objects.exists())
 
-    @unittest.expectedFailure  # Bilinen hata: excel_yukle'de yetki kontrolü yok.
     def test_ogretmen_excel_yukleyemez(self):
         self.client.force_login(kullanici_olustur("ogretmen"))
         self._yukle([_satir()])
@@ -274,6 +272,19 @@ class AyrilmaTestCase(TestCase):
         self.assertFalse(OgrenciAyrilma.objects.exists())
         self.ogr.refresh_from_db()
         self.assertTrue(self.ogr.aktif)
+
+    def test_tasdikname_de_varsa_ayrilma_silinince_pasif_kalir(self):
+        from secmelidersler.models import OgrenciTasdikname
+
+        kayit = OgrenciAyrilma.objects.create(ogrenci=self.ogr, sebep="ogrenim_hakki")
+        OgrenciTasdikname.objects.create(ogrenci=self.ogr, egitim_yili=self.yil)
+        self.ogr.aktif = False
+        self.ogr.save()
+
+        self.client.post(reverse("ogrenci:ayrilma_sil", args=[kayit.pk]))
+
+        self.ogr.refresh_from_db()
+        self.assertFalse(self.ogr.aktif)
 
     def test_ikinci_ayrilma_kaydi_eklenmez(self):
         OgrenciAyrilma.objects.create(ogrenci=self.ogr, sebep="nakil")

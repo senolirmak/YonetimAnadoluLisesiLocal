@@ -1449,12 +1449,18 @@ def tasdikname_sil(request, pk):
             ogr = kayit.ogrenci
             ad = f"{ogr.adi} {ogr.soyadi}"
             kayit.delete()
-            if not ogr.aktif:
-                ogr.aktif = True
-                ogr.save(update_fields=["aktif"])
-            messages.success(
-                request, f"{ad} tasdikname listesinden çıkarıldı ve tekrar aktif hale getirildi."
-            )
+            from ogrenci.services.aktiflik import aktifligi_guncelle
+
+            kalan = aktifligi_guncelle(ogr)
+            if kalan:
+                messages.warning(
+                    request,
+                    f"{ad} tasdikname listesinden çıkarıldı ama pasif kaldı ({', '.join(kalan)} var).",
+                )
+            else:
+                messages.success(
+                    request, f"{ad} tasdikname listesinden çıkarıldı ve tekrar aktif hale getirildi."
+                )
     return redirect("tasdikname_listesi")
 
 
