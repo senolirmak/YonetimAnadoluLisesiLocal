@@ -164,3 +164,33 @@ def zamani_dondur(tarih, saat, dakika=0):
         localdate=mock.Mock(return_value=tarih),
         localtime=sahte_localtime,
     )
+
+
+def yetki_dogrula(testcase, urller, yasak_gruplar=(), izinli_gruplar=(), method="get"):
+    """Her URL için: anonim → login sayfasına yönlenir, `yasak_gruplar` → 403,
+    `izinli_gruplar` → 403 ya da login yönlendirmesi ALMAZ (sayfanın kendisi 200/302/404 dönebilir).
+
+    `urller`: tam URL yolları listesi (reverse edilmiş)."""
+    from django.conf import settings
+
+    istek = getattr(testcase.client, method)
+    testcase.client.logout()
+    for url in urller:
+        with testcase.subTest(kim="anonim", url=url):
+            resp = istek(url)
+            testcase.assertEqual(resp.status_code, 302)
+            testcase.assertTrue(resp["Location"].startswith(settings.LOGIN_URL), resp["Location"])
+    for grup in yasak_gruplar:
+        testcase.client.force_login(kullanici_olustur(grup))
+        for url in urller:
+            with testcase.subTest(kim=grup, url=url):
+                testcase.assertEqual(istek(url).status_code, 403)
+    for grup in izinli_gruplar:
+        testcase.client.force_login(kullanici_olustur(grup))
+        for url in urller:
+            with testcase.subTest(kim=grup, url=url):
+                resp = istek(url)
+                testcase.assertNotEqual(resp.status_code, 403)
+                if resp.status_code == 302:
+                    testcase.assertFalse(resp["Location"].startswith(settings.LOGIN_URL))
+    testcase.client.logout()

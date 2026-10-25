@@ -11,8 +11,11 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from reportlab.lib import colors
-from reportlab.platypus import Paragraph, TableStyle
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import Paragraph, Spacer, TableStyle
 
+from okul.auth import yonetici_required
 from okul.utils import get_aktif_donem, get_aktif_egitim_yili
 from personeldevamsizlik.models import Devamsizlik
 
@@ -303,7 +306,7 @@ def _generate_gunun_nobetcileri_pdf_bytes(target_date):
     return pdf_bytes, target_date
 
 
-@login_required
+@yonetici_required
 def download_gunun_nobetcileri_pdf(request):
     target_date = timezone.localdate()
     if request.GET.get("tarih"):
@@ -320,7 +323,7 @@ def download_gunun_nobetcileri_pdf(request):
     return response
 
 
-@login_required
+@yonetici_required
 def download_gunun_nobetcileri_png(request):
     target_date = timezone.localdate()
     if request.GET.get("tarih"):
@@ -355,7 +358,7 @@ def download_gunun_nobetcileri_png(request):
 # ─────────────────────────────────────────────
 
 
-@login_required
+@yonetici_required
 def download_unassigned_ders_png(request):
     from pdf2image import convert_from_bytes
 

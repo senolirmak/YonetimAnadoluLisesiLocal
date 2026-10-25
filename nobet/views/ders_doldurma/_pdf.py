@@ -5,7 +5,6 @@ from datetime import datetime
 from io import BytesIO
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -13,6 +12,7 @@ from django.utils import timezone
 from reportlab.lib import colors
 from reportlab.platypus import Paragraph, TableStyle
 
+from okul.auth import yonetici_required
 from personeldevamsizlik.models import Devamsizlik
 from ...models import NobetGecmisi, NobetPersonel
 from ...services.pdf_rapor import NobetPDFReport
@@ -149,7 +149,7 @@ def generate_pdf_bytes(request, dynamic_height=False):
 # ── İndirme view'ları ──────────────────────────────────────────────────────────
 
 
-@login_required
+@yonetici_required
 def download_ders_doldurma_pdf(request):
     pdf_bytes, target_date = generate_pdf_bytes(request)
     if not pdf_bytes:
@@ -162,7 +162,7 @@ def download_ders_doldurma_pdf(request):
     return response
 
 
-@login_required
+@yonetici_required
 def download_ders_doldurma_png(request):
     from pdf2image import convert_from_bytes
     from PIL import Image as PILImage

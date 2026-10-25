@@ -106,3 +106,15 @@ class YetkiMixinTestCase(TestCase):
         for (mixin, user), kod in beklenen.items():
             with self.subTest(mixin=mixin.__name__, user=user):
                 self.assertEqual(self._cevap(mixin, user), kod)
+
+
+class DersHavuzuAyarlariYetkiTestCase(TestCase):
+    def test_yalnizca_ust_yonetici(self):
+        from django.urls import reverse
+
+        from okul.testing import yetki_dogrula
+
+        yasak = ("ogretmen", "rehber_ogretmen", "disiplin_kurulu")
+        izinli = ("mudur_yardimcisi", "okul_muduru")
+        yetki_dogrula(self, [reverse("okul:ders_havuzu_ayarlari")], yasak, izinli)
+        yetki_dogrula(self, [reverse("okul:ders_havuzu_ayarlari_kaydet")], yasak, izinli, method="post")

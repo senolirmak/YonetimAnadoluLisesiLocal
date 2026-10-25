@@ -4,11 +4,12 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
+from okul.auth import ust_yonetici_required
 from okul.forms import DersHavuzuForm
 from okul.models import DersHavuzu
 
 
-@login_required
+@ust_yonetici_required
 def ders_havuzu_ayarlari(request):
     from django.db.models import Case, When, IntegerField
     dersler = DersHavuzu.objects.annotate(
@@ -27,8 +28,8 @@ def ders_havuzu_ayarlari(request):
     })
 
 
-@login_required
 @require_POST
+@ust_yonetici_required
 def ders_havuzu_ayarlari_kaydet(request):
     dersler = DersHavuzu.objects.all()
     guncellenen = 0
