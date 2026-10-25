@@ -140,3 +140,27 @@ def ders_olustur(ders_adi=None, **kwargs):
     from okul.models import DersHavuzu
 
     return DersHavuzu.objects.create(ders_adi=ders_adi or f"DERS {_sira()}", **kwargs)
+
+
+def zamani_dondur(tarih, saat, dakika=0):
+    """`timezone.localdate()` / argümansız `timezone.localtime()` sabit zamanı döndürsün.
+
+    Kullanım: `with zamani_dondur(datetime.date(2025, 9, 8), 10, 15): ...`
+    """
+    from unittest import mock
+
+    from django.utils import timezone
+
+    sabit = timezone.make_aware(datetime.datetime.combine(tarih, datetime.time(saat, dakika)))
+    gercek_localtime = timezone.localtime
+
+    def sahte_localtime(value=None, timezone=None):
+        if value is None:
+            return sabit
+        return gercek_localtime(value, timezone)
+
+    return mock.patch.multiple(
+        "django.utils.timezone",
+        localdate=mock.Mock(return_value=tarih),
+        localtime=sahte_localtime,
+    )

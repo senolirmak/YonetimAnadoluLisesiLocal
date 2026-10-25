@@ -1,11 +1,9 @@
 """devamsizlik app testleri — öğretmenin ders yoklaması ve öğrenci devamsızlık raporları."""
 
 import datetime
-from unittest import mock
 
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 
 from devamsizlik.models import OgrenciDevamsizlik
 from okul.testing import (
@@ -14,29 +12,13 @@ from okul.testing import (
     ogrenci_olustur,
     personel_olustur,
     sinif_sube_olustur,
+    zamani_dondur,
 )
 
 PAZARTESI = datetime.date(2025, 9, 8)
 SALI = datetime.date(2025, 9, 9)
 # okul.testing.ders_saati_olustur: N. ders → (8+N-1):00–:40. 3. ders = 10:00–10:40.
 UCUNCU_DERS = 3
-
-
-def _zamani_dondur(tarih, saat, dakika=0):
-    """timezone.localdate()/localtime() argümansız çağrıldığında sabit zaman döndürür."""
-    sabit = timezone.make_aware(datetime.datetime.combine(tarih, datetime.time(saat, dakika)))
-    gercek_localtime = timezone.localtime
-
-    def sahte_localtime(value=None, timezone=None):
-        if value is None:
-            return sabit
-        return gercek_localtime(value, timezone)
-
-    return mock.patch.multiple(
-        "django.utils.timezone",
-        localdate=mock.Mock(return_value=tarih),
-        localtime=sahte_localtime,
-    )
 
 
 class YoklamaTestCase(TestCase):
@@ -69,7 +51,7 @@ class YoklamaTestCase(TestCase):
 
     def test_ders_saatinde_aktif_ders_acilir_ve_sadece_aktif_ogrenciler_listelenir(self):
         self.client.force_login(self.user)
-        with _zamani_dondur(PAZARTESI, 10, 15):
+        with zamani_dondur(PAZARTESI, 10, 15):
             resp = self.client.get(self._url())
 
         self.assertEqual(resp.context["durum"], "form")
@@ -78,7 +60,7 @@ class YoklamaTestCase(TestCase):
 
     def test_ders_saati_disinda_ders_secim_ekrani_gelir(self):
         self.client.force_login(self.user)
-        with _zamani_dondur(PAZARTESI, 13, 0):
+        with zamani_dondur(PAZARTESI, 13, 0):
             resp = self.client.get(self._url())
 
         self.assertEqual(resp.context["durum"], "ders_sec")
@@ -86,21 +68,21 @@ class YoklamaTestCase(TestCase):
 
     def test_ders_saati_disinda_dogrudan_url_ile_acilamaz(self):
         self.client.force_login(self.user)
-        with _zamani_dondur(PAZARTESI, 13, 0):
+        with zamani_dondur(PAZARTESI, 13, 0):
             resp = self.client.get(self._url(UCUNCU_DERS))
 
         self.assertEqual(resp.status_code, 302)
 
     def test_dersi_olmayan_gun(self):
         self.client.force_login(self.user)
-        with _zamani_dondur(SALI, 10, 15):
+        with zamani_dondur(SALI, 10, 15):
             resp = self.client.get(self._url())
 
         self.assertEqual(resp.context["durum"], "ders_yok")
 
     def test_ogretmen_baska_gunu_secemez(self):
         self.client.force_login(self.user)
-        with _zamani_dondur(SALI, 10, 15):
+        with zamani_dondur(SALI, 10, 15):
             resp = self.client.get(self._url(), {"tarih": PAZARTESI.isoformat()})
 
         self.assertEqual(resp.context["secili_tarih"], SALI)
@@ -108,7 +90,7 @@ class YoklamaTestCase(TestCase):
 
     def test_yoklama_kaydedilir_ve_tekrar_kayitta_degistirilir(self):
         self.client.force_login(self.user)
-        with _zamani_dondur(PAZARTESI, 10, 15):
+        with zamani_dondur(PAZARTESI, 10, 15):
             self.client.post(
                 self._url(UCUNCU_DERS),
                 {"tarih": PAZARTESI.isoformat(), "devamsiz": [self.ogr1.pk, self.ogr2.pk]},
@@ -134,7 +116,7 @@ class YoklamaTestCase(TestCase):
             ders_adi="X", ogretmen_adi="X",
         )
         self.client.force_login(self.user)
-        with _zamani_dondur(PAZARTESI, 10, 15):
+        with zamani_dondur(PAZARTESI, 10, 15):
             self.client.post(
                 self._url(UCUNCU_DERS),
                 {"tarih": SALI.isoformat(), "devamsiz": [self.ogr2.pk]},
@@ -148,7 +130,7 @@ class YoklamaTestCase(TestCase):
 
     def test_yonetici_gecmis_gunun_yoklamasini_kaydedebilir(self):
         self.client.force_login(self.yonetici)
-        with _zamani_dondur(PAZARTESI, 13, 0):
+        with zamani_dondur(PAZARTESI, 13, 0):
             self.client.post(
                 self._url(UCUNCU_DERS) + f"?tarih={SALI.isoformat()}",
                 {"tarih": SALI.isoformat(), "devamsiz": [self.ogr1.pk]},
@@ -159,7 +141,7 @@ class YoklamaTestCase(TestCase):
 
     def test_pasif_ogrenci_post_ile_devamsiz_yazilamaz(self):
         self.client.force_login(self.user)
-        with _zamani_dondur(PAZARTESI, 10, 15):
+        with zamani_dondur(PAZARTESI, 10, 15):
             self.client.post(
                 self._url(UCUNCU_DERS),
                 {"tarih": PAZARTESI.isoformat(), "devamsiz": [self.pasif.pk]},
@@ -169,7 +151,7 @@ class YoklamaTestCase(TestCase):
 
     def test_yonetici_gecmis_gunun_yoklamasini_acabilir(self):
         self.client.force_login(self.yonetici)
-        with _zamani_dondur(PAZARTESI, 13, 0):
+        with zamani_dondur(PAZARTESI, 13, 0):
             resp = self.client.get(self._url(UCUNCU_DERS), {"tarih": SALI.isoformat()})
 
         self.assertEqual(resp.context["durum"], "form")
