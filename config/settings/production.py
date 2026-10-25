@@ -37,3 +37,7 @@ if HTTPS_ETKIN:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+# Nginx'e `location /korumali-medya/ { internal; ... }` bloğu eklenmeden True yapılmamalı:
+# aksi hâlde sınav medyası dosyaları açılmaz (bkz. kurulumcu/sunucu.py, base.py).
+SINAVMEDIA_X_ACCEL = os.getenv("SINAVMEDIA_X_ACCEL", "False") == "True"

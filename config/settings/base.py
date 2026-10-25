@@ -132,3 +132,8 @@ CACHES = {
         "OPTIONS": {"MAX_ENTRIES": 2000},
     },
 }
+
+# Sınav medyası dosyaları sinavmedia:dosya view'ından erişim kontrolüyle verilir
+# (bkz. sinavmedia/services/erisim.py). True iken dosyayı Nginx teslim eder
+# (X-Accel-Redirect → Nginx'te `internal` /korumali-medya/ yolu gerekir); False iken Django.
+SINAVMEDIA_X_ACCEL = False

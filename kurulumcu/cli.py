@@ -307,6 +307,11 @@ def main() -> None:
         # Servis, kurulumu çalıştıran (sudo yetkili) kullanıcıdan kasıtlı olarak
         # ayrı, sudo yetkisiz bir sistem kullanıcısı (akalsite) altında çalışır —
         # bkz. kurulumcu/servis_kullanicisi.py.
+        # Nginx şablonları (sunucu.py) /korumali-medya/ internal yolunu içerdiğinden sınav
+        # medyası teslimi Nginx'e bırakılır. .env servis kullanıcısına devredilmeden önce
+        # yazılır (devirden sonra sudo gerekir, bkz. env_dosyasi.anahtar_ayarla).
+        env_dosyasi.anahtar_ayarla(env_yolu, "SINAVMEDIA_X_ACCEL", "True")
+
         servis_kullanicisi.servis_kullanicisini_hazirla(PROJE_DIZIN)
         servis_kullanicisi.proje_dizini_sahipligini_garanti_et(PROJE_DIZIN)
         servis_kullanicisi.calisma_zamani_dosyalarini_devret(PROJE_DIZIN, env_yolu)

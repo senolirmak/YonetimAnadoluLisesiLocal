@@ -153,6 +153,17 @@ def nginx_yapilandir(proje_dizin: Path, servis_adi: str, allowed_hosts: str) -> 
         alias {proje_dizin}/media/;
     }}
 
+    # Sınav medyası (dinleme/izleme sınavı) doğrudan sunulmaz: uygulama erişimi kontrol
+    # edip X-Accel-Redirect ile /korumali-medya/'ya yönlendirir (bkz. sinavmedia/services/erisim.py).
+    location /media/sinavmedia/ {{
+        return 404;
+    }}
+
+    location /korumali-medya/ {{
+        internal;
+        alias {proje_dizin}/media/;
+    }}
+
     # Veritabanı/medya yedeği yükleme (yedekleme app'i): yedek arşivleri genel 20M
     # sınırını aşar (413). Sınır yalnızca bu yol için yükseltilir; Nginx gövdeyi önce
     # kendi geçici dizinine yazar, sunucuda yedek boyutu kadar boş disk gerekir.
@@ -244,6 +255,17 @@ server {{
     }}
 
     location /media/ {{
+        alias {proje_dizin}/media/;
+    }}
+
+    # Sınav medyası (dinleme/izleme sınavı) doğrudan sunulmaz: uygulama erişimi kontrol
+    # edip X-Accel-Redirect ile /korumali-medya/'ya yönlendirir (bkz. sinavmedia/services/erisim.py).
+    location /media/sinavmedia/ {{
+        return 404;
+    }}
+
+    location /korumali-medya/ {{
+        internal;
         alias {proje_dizin}/media/;
     }}
 
