@@ -255,12 +255,29 @@
 const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? "";
 const GOREV_URL = "{% url 'sinav:gorev_durumu' '00' %}".replace('/00/', '/');
 
+// JSON olmayan yanıtlarda (403/CSRF/500 hata sayfası, ağ hatası) {error: ...} döner;
+// böylece düğme "hiçbir şey yapmıyor" gibi görünmez, hata ekrana yazılır.
 async function postJSON(url) {
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "X-CSRFToken": CSRF, "Content-Type": "application/json" },
-  });
-  return r.json();
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "X-CSRFToken": CSRF, "Content-Type": "application/json" },
+    });
+    try {
+      return await r.json();
+    } catch (e) {
+      return { error: `Sunucu hatası (HTTP ${r.status}). Yetkinizi kontrol edin ya da yöneticiye bildirin.` };
+    }
+  } catch (e) {
+    return { error: "Sunucuya ulaşılamadı." };
+  }
+}
+
+function gorevBaslatilamadi(data, logEl, badgeEl, btnEl) {
+  badgeEl.className = "badge badge-error";
+  badgeEl.textContent = "Hata";
+  if (btnEl) btnEl.disabled = false;
+  logEl.textContent = (data && data.error) || "Görev başlatılamadı.";
 }
 
 // Görev durumunu sorgular. Geçici bir hatada (ağ, 5xx, yeniden başlayan worker) null döner,
@@ -313,14 +330,13 @@ let _activeTaskId = null;
 
 async function runAdim(url, logEl, badgeEl, btnEl, durdurBtnId) {
   const data = await postJSON(url);
-  if (data.task_id) {
-    _activeTaskId = data.task_id;
-    const durdurBtn = durdurBtnId ? document.getElementById(durdurBtnId) : null;
-    if (durdurBtn) durdurBtn.style.display = "inline-flex";
-    await pollTask(data.task_id, logEl, badgeEl, btnEl);
-    if (durdurBtn) durdurBtn.style.display = "none";
-    _activeTaskId = null;
-  }
+  if (!data.task_id) { gorevBaslatilamadi(data, logEl, badgeEl, btnEl); return; }
+  _activeTaskId = data.task_id;
+  const durdurBtn = durdurBtnId ? document.getElementById(durdurBtnId) : null;
+  if (durdurBtn) durdurBtn.style.display = "inline-flex";
+  await pollTask(data.task_id, logEl, badgeEl, btnEl);
+  if (durdurBtn) durdurBtn.style.display = "none";
+  _activeTaskId = null;
 }
 
 async function iptalAdim(durdurBtnId) {

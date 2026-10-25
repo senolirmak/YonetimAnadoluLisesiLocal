@@ -87,9 +87,19 @@ from .models import (
 # ---------------------------------------------------------------
 # Görev durumu worker'lar arası paylaşılan depoda tutulur (bkz. sinav/services/gorev_deposu.py):
 # Gunicorn birden çok worker ile çalışır, durum sorgusu görevi başlatan worker'a düşmeyebilir.
+class GorevBaslatilamadi(Exception):
+    pass
+
+
 def _new_task() -> str:
     task_id = uuid.uuid4().hex
-    gorev_deposu.olustur(task_id)
+    try:
+        gorev_deposu.olustur(task_id)
+    except Exception as exc:  # örn. önbellek klasörüne yazma izni yok
+        import logging
+
+        logging.getLogger(__name__).exception("Görev deposuna yazılamadı")
+        raise GorevBaslatilamadi(f"Görev başlatılamadı: görev durumu kaydedilemiyor ({exc}).") from exc
     return task_id
 
 
@@ -841,7 +851,10 @@ def calistir_oturma_secili(request):
         from sinav.models import TakvimUretim as _TU
         _TU.objects.filter(sinav=aktif, aktif=True).update(oturma_sifirla=False, degisiklik_logu="")
 
-    task_id = _new_task()
+    try:
+        task_id = _new_task()
+    except GorevBaslatilamadi as exc:
+        return JsonResponse({"error": str(exc)}, status=500)
     session_cfg = dict(request.session.get("ortaksinav_config", {}))
     t = threading.Thread(
         target=_run_oturma_secili,
@@ -1223,7 +1236,10 @@ def _run_step(task_id: str, session_cfg: dict, func_name: str):
 
 
 def _start_task(request, func_name: str) -> JsonResponse:
-    task_id = _new_task()
+    try:
+        task_id = _new_task()
+    except GorevBaslatilamadi as exc:
+        return JsonResponse({"error": str(exc)}, status=500)
     session_cfg = dict(request.session.get("ortaksinav_config", {}))
     t = threading.Thread(
         target=_run_step, args=(task_id, session_cfg, func_name), daemon=True

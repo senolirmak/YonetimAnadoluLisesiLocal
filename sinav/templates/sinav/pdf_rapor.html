@@ -356,7 +356,9 @@ async function runTumu() {
     headers: { "X-CSRFToken": CSRF, "Content-Type": "application/json" },
     body: JSON.stringify({ sessions }),
   });
-  const data = await resp.json();
+  let data;
+  try { data = await resp.json(); }
+  catch (e) { data = { error: `Sunucu hatası (HTTP ${resp.status}).` }; }
   if (!data.task_id) {
     badgeUret.className = "badge badge-error";
     badgeUret.textContent = "Hata";

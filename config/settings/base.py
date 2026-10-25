@@ -113,15 +113,21 @@ EBA_QR_WS_URL = os.getenv("EBA_QR_WS_URL", "wss://qr-etap.eba.gov.tr/api/v1/ws/{
 # "gorevler": sınav takvimi/oturma planı gibi arka plan görevlerinin durumu
 # (bkz. sinav/services/gorev_deposu.py). Gunicorn birden çok worker ile çalıştığı için
 # tüm worker'ların ortak okuyabildiği dosya tabanlı önbellek kullanılır.
+# Klasör adında kullanıcı kimliği (uid) var: Django klasörü 0700 izniyle oluşturur;
+# deploy.sh'ın manage.py komutları (senolirmak) klasörü önce oluşturursa servis kullanıcısı
+# (akalsite) ona yazamaz ve her görev 500 verir (yaşandı). Her kullanıcı kendi klasörünü
+# kullanır; aynı servisin worker'ları aynı uid ile çalıştığından yine paylaşırlar.
 import tempfile  # noqa: E402
+
+_GOREV_ONBELLEK_VARSAYILAN = os.path.join(
+    tempfile.gettempdir(), f"okulyonetim_gorevler_{os.getuid() if hasattr(os, 'getuid') else 0}"
+)
 
 CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
     "gorevler": {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
-        "LOCATION": os.getenv(
-            "GOREV_ONBELLEK_DIZINI", os.path.join(tempfile.gettempdir(), "okulyonetim_gorevler")
-        ),
+        "LOCATION": os.getenv("GOREV_ONBELLEK_DIZINI", _GOREV_ONBELLEK_VARSAYILAN),
         "TIMEOUT": 6 * 60 * 60,
         "OPTIONS": {"MAX_ENTRIES": 2000},
     },
