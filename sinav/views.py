@@ -23,6 +23,7 @@ from ortaksinav_engine import (
     temel_verileri_olustur,
     verileri_aktar,
 )
+from sinav.services import gorev_deposu
 from sinav.services.config_builder import config_uygula
 from sinav.services.ders_ayarlari import (
     _VARSAYILAN_CATISMA_GRUBU,
@@ -80,34 +81,28 @@ from .models import (
     TakvimUretim,
 )
 
-# ---------------------------------------------------------------
-# Bellekte gorev durumu
-# ---------------------------------------------------------------
-_TASKS: dict = {}
-_TASKS_LOCK = threading.Lock()
 
-
+# ---------------------------------------------------------------
+# Arka plan gorev durumu
+# ---------------------------------------------------------------
+# Görev durumu worker'lar arası paylaşılan depoda tutulur (bkz. sinav/services/gorev_deposu.py):
+# Gunicorn birden çok worker ile çalışır, durum sorgusu görevi başlatan worker'a düşmeyebilir.
 def _new_task() -> str:
     task_id = uuid.uuid4().hex
-    with _TASKS_LOCK:
-        _TASKS[task_id] = {"logs": [], "done": False, "error": False, "cancel": False}
+    gorev_deposu.olustur(task_id)
     return task_id
 
 
 def _log(task_id: str, msg: str):
-    with _TASKS_LOCK:
-        _TASKS[task_id]["logs"].append(msg)
+    gorev_deposu.log_ekle(task_id, msg)
 
 
 def _iptal_istendi_mi(task_id: str) -> bool:
-    with _TASKS_LOCK:
-        return _TASKS.get(task_id, {}).get("cancel", False)
+    return gorev_deposu.iptal_istendi_mi(task_id)
 
 
 def _finish(task_id: str, error: bool = False):
-    with _TASKS_LOCK:
-        _TASKS[task_id]["done"] = True
-        _TASKS[task_id]["error"] = error
+    gorev_deposu.bitir(task_id, hata=error)
 
 
 # ---------------------------------------------------------------
@@ -866,8 +861,7 @@ def _run_oturma_secili(task_id: str, session_cfg: dict, sessions: list):
             log_fn=lambda m: _log(task_id, m),
             cancel_fn=lambda: _iptal_istendi_mi(task_id),
         ).generate_selected(sessions)
-        with _TASKS_LOCK:
-            _TASKS[task_id]["tamamlanan"] = tamamlanan
+        gorev_deposu.guncelle(task_id, tamamlanan=tamamlanan)
         if _iptal_istendi_mi(task_id):
             _finish(task_id, error=True)
             return
@@ -1200,7 +1194,7 @@ def _run_step(task_id: str, session_cfg: dict, func_name: str):
             func, _ = ADIM_FUNCLARI[func_name]
             func()
 
-        if _TASKS.get(task_id, {}).get("cancel"):
+        if _iptal_istendi_mi(task_id):
             _finish(task_id, error=True)
             return
         _log(task_id, f"+ {label} tamamlandi.")
@@ -1216,7 +1210,7 @@ def _run_step(task_id: str, session_cfg: dict, func_name: str):
             from sinav.models import TakvimUretim
             aktif = _SB.objects.filter(aktif=True).first()
             if aktif:
-                log_text = "\n".join(_TASKS.get(task_id, {}).get("logs", []))
+                log_text = "\n".join(gorev_deposu.loglar(task_id))
                 TakvimUretim.objects.create(
                     sinav=aktif,
                     log_metni=log_text,
@@ -1269,28 +1263,16 @@ def calistir_oturma(request):
 # ---------------------------------------------------------------
 @ust_yonetici_required
 def gorev_durumu(request, task_id: str):
-    with _TASKS_LOCK:
-        task = _TASKS.get(task_id)
-    if task is None:
+    durum = gorev_deposu.durum(task_id)
+    if durum is None:
         return JsonResponse({"error": "Gorev bulunamadi"}, status=404)
-    return JsonResponse({
-        "logs": task["logs"],
-        "done": task["done"],
-        "error": task["error"],
-        "cancelled": task["cancel"],
-        "tamamlanan": task.get("tamamlanan", []),
-    })
+    return JsonResponse(durum)
 
 
 @require_POST
 @ust_yonetici_required
 def gorev_iptal(request, task_id: str):
-    with _TASKS_LOCK:
-        if task_id in _TASKS and not _TASKS[task_id]["done"]:
-            _TASKS[task_id]["cancel"] = True
-            _TASKS[task_id]["logs"].append(
-                "! Durdurma istegi alindi. Mevcut adim/oturum tamamlaninca durulacak..."
-            )
+    gorev_deposu.iptal_iste(task_id)
     return JsonResponse({"ok": True})
 
 

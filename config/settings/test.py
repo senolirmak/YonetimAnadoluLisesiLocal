@@ -15,3 +15,9 @@ DATABASES = {
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+
+# Testler tek işlemde koşar; görev deposu için dosya yerine bellek yeterli.
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "gorevler": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "gorevler"},
+}

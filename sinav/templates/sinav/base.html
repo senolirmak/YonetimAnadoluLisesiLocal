@@ -263,6 +263,30 @@ async function postJSON(url) {
   return r.json();
 }
 
+// Görev durumunu sorgular. Geçici bir hatada (ağ, 5xx, yeniden başlayan worker) null döner,
+// çağıran döngü bir sonraki turda tekrar dener. Görev ~30 sn boyunca hiç bulunamazsa
+// (sunucu yeniden başladıysa) hata durumunda "bitmiş" sayılır — sayfa sonsuza kadar
+// "Calisiyor..." göstermesin.
+const _gorevBulunamadi = {};
+async function gorevDurumu(taskId) {
+  try {
+    const r = await fetch(`${GOREV_URL}${taskId}/`);
+    if (r.status === 404) {
+      _gorevBulunamadi[taskId] = (_gorevBulunamadi[taskId] || 0) + 1;
+      if (_gorevBulunamadi[taskId] >= 25) {
+        return { logs: ["! Görev bulunamadı (sunucu yeniden başlamış olabilir). Lütfen tekrar çalıştırın."],
+                 done: true, error: true, cancelled: false, tamamlanan: [] };
+      }
+      return null;
+    }
+    if (!r.ok) return null;
+    _gorevBulunamadi[taskId] = 0;
+    return await r.json();
+  } catch (e) {
+    return null;
+  }
+}
+
 async function pollTask(taskId, logEl, badgeEl, btnEl) {
   badgeEl.className = "badge badge-running";
   badgeEl.textContent = "Calisiyor...";
@@ -271,7 +295,8 @@ async function pollTask(taskId, logEl, badgeEl, btnEl) {
 
   while (true) {
     await new Promise(r => setTimeout(r, 1200));
-    const data = await fetch(`${GOREV_URL}${taskId}/`).then(r => r.json());
+    const data = await gorevDurumu(taskId);
+    if (!data) continue;
     logEl.textContent = data.logs.join("\n");
     logEl.scrollTop = logEl.scrollHeight;
 

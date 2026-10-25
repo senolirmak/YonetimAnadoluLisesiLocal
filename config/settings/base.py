@@ -108,3 +108,21 @@ LOGOUT_REDIRECT_URL = "/giris/"
 # MAC yerine bunu kabul edip etmeyeceği HENÜZ DOĞRULANMADI, prototip aşaması
 # yerel sahte sunucuyla test edilir; bkz. `python manage.py eba_mock_sunucu`).
 EBA_QR_WS_URL = os.getenv("EBA_QR_WS_URL", "wss://qr-etap.eba.gov.tr/api/v1/ws/{token}")
+
+# Önbellekler. "default" bilinçli olarak varsayılan (işlem içi) bellektir.
+# "gorevler": sınav takvimi/oturma planı gibi arka plan görevlerinin durumu
+# (bkz. sinav/services/gorev_deposu.py). Gunicorn birden çok worker ile çalıştığı için
+# tüm worker'ların ortak okuyabildiği dosya tabanlı önbellek kullanılır.
+import tempfile  # noqa: E402
+
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "gorevler": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": os.getenv(
+            "GOREV_ONBELLEK_DIZINI", os.path.join(tempfile.gettempdir(), "okulyonetim_gorevler")
+        ),
+        "TIMEOUT": 6 * 60 * 60,
+        "OPTIONS": {"MAX_ENTRIES": 2000},
+    },
+}
