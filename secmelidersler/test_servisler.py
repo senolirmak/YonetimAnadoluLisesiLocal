@@ -7,7 +7,6 @@ secmelidersler/tests.py içinde.
 """
 
 import datetime
-import unittest
 
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -198,7 +197,6 @@ class PlanSinifDagilimiTestCase(TestCase):
         self.assertEqual(plan["sinif_tekrari"], [tekrar])
         self.assertEqual(plan["alan_yok"], [])
 
-    @unittest.expectedFailure  # Bilinen hata: plan_sinif_dagilimi aktif=True filtresi kullanmıyor.
     def test_okuldan_ayrilan_ogrenci_plana_girmez(self):
         nakil = ogrenci_olustur(10, "A", aktif=False)
         OgrenciAyrilma.objects.create(ogrenci=nakil, sebep="nakil")
@@ -206,6 +204,15 @@ class PlanSinifDagilimiTestCase(TestCase):
         plan = self._plan()
 
         self.assertNotIn(nakil, plan["alan_yok"])
+
+    def test_ikinci_sinif_tekrari_ile_ogrenim_hakki_biten_plana_girmez(self):
+        ogr = ogrenci_olustur(10, "A", aktif=False)
+        OgrenciTasdikname.objects.create(ogrenci=ogr, egitim_yili=self.yil)
+        OgrenciAyrilma.objects.create(ogrenci=ogr, sebep="ogrenim_hakki")
+
+        plan = self._plan()
+
+        self.assertEqual((plan["tasdikname"], plan["alan_yok"]), ([], []))
 
 
 class SubeSayilariTestCase(TestCase):
@@ -252,7 +259,6 @@ class TasdiknameTestCase(TestCase):
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(OgrenciTasdikname.objects.exists())
 
-    @unittest.expectedFailure  # Bilinen hata: silme, başka sebeple pasif olan öğrenciyi de aktif yapıyor.
     def test_okuldan_ayrilmis_ogrenci_tasdikname_silinince_aktif_olmaz(self):
         OgrenciAyrilma.objects.create(ogrenci=self.ogr, sebep="nakil")
         self.ogr.aktif = False
