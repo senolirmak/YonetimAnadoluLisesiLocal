@@ -127,3 +127,29 @@ class GorevViewTestCase(TestCase):
         self.assertTrue(durum["done"])
         self.assertFalse(durum["error"], durum["logs"])
         self.assertIn("+ Sube-ders tamamlandi.", durum["logs"])
+
+
+class GorevDeposuYazilamazTestCase(TestCase):
+    """Önbellek klasörüne yazılamazsa (prod'da yaşandı: klasör başka kullanıcıya ait, 0700)
+    Çalıştır düğmesi sessizce 500 vermesin, açık bir JSON hata dönsün."""
+
+    def test_yazilamayan_depo_json_hata_doner(self):
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+        with mock.patch.object(gorev_deposu, "_depo") as depo:
+            depo.return_value.set.side_effect = PermissionError("[Errno 13] Permission denied")
+            with self.assertLogs("sinav.views", level="ERROR"):
+                resp = self.client.post(reverse("sinav:takvim"))
+
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(resp["Content-Type"], "application/json")
+        self.assertIn("Görev başlatılamadı", resp.json()["error"])
+
+    def test_onbellek_klasoru_kullaniciya_ozel(self):
+        import os
+
+        from django.conf import settings as dj_settings
+
+        from config.settings import base
+
+        self.assertTrue(base.CACHES["gorevler"]["LOCATION"].endswith(f"_{os.getuid()}"))
+        self.assertIn("gorevler", dj_settings.CACHES)

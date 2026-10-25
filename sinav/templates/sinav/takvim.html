@@ -206,7 +206,7 @@ const btnEl    = document.getElementById("btn-takvimolustur");
 
 async function runTakvimOlustur() {
   const data = await postJSON("{% url 'sinav:takvim' %}");
-  if (!data.task_id) return;
+  if (!data.task_id) { gorevBaslatilamadi(data, logBox, badgeEl, btnEl); return; }
   _activeTaskId = data.task_id;
   const durdurBtn = document.getElementById("durdur-takvimolustur");
   durdurBtn.style.display = "inline-flex";
