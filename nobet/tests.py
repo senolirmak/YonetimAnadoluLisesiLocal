@@ -37,6 +37,7 @@ from okul.testing import (
     nobet_gorevi_olustur,
     nobet_ogretmen_olustur,
     nobet_yeri_olustur,
+    personel_olustur,
     sinif_sube_olustur,
 )
 from okul.utils import set_aktif_tarih
@@ -470,3 +471,18 @@ class NobetCiktiTestCase(TestCase):
 
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "image/png")
+
+
+class OgretmenSayfalariTestCase(TestCase):
+    """Öğretmen sayfaları, açamayacağı yönetim ekranlarına bağlantı göstermez."""
+
+    def test_ogretmene_yonetim_baglantisi_gosterilmez(self):
+        user = kullanici_olustur("ogretmen")
+        nobet_ogretmen_olustur(personel=personel_olustur(user=user))
+        self.client.force_login(user)
+        for ad in ("ogretmen_haftalik_nobet", "ogretmen_gunun_nobetcileri", "ogretmen_ders_doldurma"):
+            with self.subTest(ad=ad):
+                resp = self.client.get(reverse(ad))
+                self.assertEqual(resp.status_code, 200)
+                self.assertNotContains(resp, f'href="{reverse("nobet_dagitim")}"')
+                self.assertNotContains(resp, f'href="{reverse("devamsizlik_list")}"')

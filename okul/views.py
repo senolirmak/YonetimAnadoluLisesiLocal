@@ -56,8 +56,9 @@ def okul_ayarlari(request):
     from nobet.models import OkulBilgi, EgitimOgretimYili, OkulDonem
     from main.forms import EgitimOgretimYiliForm, OkulBilgiAyarForm, OkulDonemForm
 
-    user = request.user
-    if not (user.is_superuser or user.groups.filter(name="mudur_yardimcisi").exists()):
+    from okul.auth import is_mudur_yardimcisi
+
+    if not is_mudur_yardimcisi(request.user):
         raise PermissionDenied
 
     okul = OkulBilgi.objects.select_related("okul_donem", "okul_egtyil").first()

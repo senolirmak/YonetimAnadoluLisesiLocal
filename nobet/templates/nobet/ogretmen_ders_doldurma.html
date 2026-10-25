@@ -11,11 +11,19 @@
 
     <!-- Sayfa Navigasyonu -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+        {% if is_mudur_yardimcisi %}
         <a href="{% url 'devamsizlik_list' %}" class="btn btn-info">Devamsızlık</a>
+        {% endif %}
+        {% if is_yonetici %}
         <a href="{% url 'nobet_dagitim' %}" class="btn btn-primary">Haftalık Nöbet</a>
+        {% endif %}
+        {% if is_yonetici %}
         <a href="{% url 'gunun_nobetcileri' %}" class="btn btn-warning">Günün Nöbetçileri</a>
+        {% endif %}
         <a href="{% url 'nobetci_ders_doldurma_istatistik' %}" class="btn btn-dark">İstatistikler</a>
+        {% if is_yonetici %}
         <a href="{% url 'nobet_ders_doldurma' %}" class="btn btn-success">Ders Doldurma</a>
+        {% endif %}
     </div>
 
     {% if messages %}

@@ -431,6 +431,7 @@ def ogretmen_gozetim_sinif_listesi(request):
 # Sınav Salon Yoklaması
 # ─────────────────────────────────────────────────────────
 
+@login_required
 def sinav_salon_yoklama(request):
     gruplar = set(request.user.groups.values_list("name", flat=True))
     if not (
