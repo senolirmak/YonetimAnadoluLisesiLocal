@@ -103,3 +103,16 @@ def devamsizlik_olustur(ogretmen, baslangic, sure=1, **kwargs):
     return Devamsizlik.objects.create(
         ogretmen=ogretmen, baslangic_tarihi=baslangic, sure=sure, **kwargs
     )
+
+
+def ogrenci_olustur(sinif=9, sube="A", **kwargs):
+    from ogrenci.models import Ogrenci
+
+    n = _sira()
+    kwargs.setdefault("okulno", n)
+    kwargs.setdefault("tckimlikno", f"{20000000000 + n}")
+    kwargs.setdefault("adi", f"Öğrenci{n}")
+    kwargs.setdefault("soyadi", "Örnek")
+    kwargs.setdefault("dogumtarihi", datetime.date(2010, 1, 1))
+    kwargs.setdefault("cinsiyet", "E")
+    return Ogrenci.objects.create(sinif=sinif, sube=sube, **kwargs)
