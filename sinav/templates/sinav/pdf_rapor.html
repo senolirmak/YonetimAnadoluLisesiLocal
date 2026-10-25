@@ -373,7 +373,8 @@ async function runTumu() {
   let tamamlanan = [];
   while (true) {
     await new Promise(r => setTimeout(r, 1200));
-    const res = await fetch(`{% url 'sinav:gorev_durumu' '00' %}`.replace('00', data.task_id)).then(r => r.json());
+    const res = await gorevDurumu(data.task_id);
+    if (!res) continue;
     logUret.textContent = res.logs.join("\n");
     logUret.scrollTop = logUret.scrollHeight;
     if (res.done) {
