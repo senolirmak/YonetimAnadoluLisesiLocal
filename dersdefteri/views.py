@@ -6,16 +6,15 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from nobet.models import NobetPersonel
+from okul.auth import is_ust_yonetici, is_yonetici
 from utility.constants import WEEKDAY_TO_DB
 
 from .forms import DersDefterForm
 from .models import DersDefteri
 
-YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-
-
-def _is_yonetici(user):
-    return user.is_superuser or user.groups.filter(name__in=YONETICI_GRUPLAR).exists()
+# Okuma: tüm yönetici rolleri başka öğretmenlerin defterini görebilir.
+# Yazma: başka öğretmenin dersine kayıt yalnızca üst yönetici (müdür yardımcısı / müdür).
+_is_yonetici = is_yonetici
 
 
 def _get_personel(user):
@@ -106,8 +105,9 @@ def kayit_form(request, dp_pk):
 
     dp = get_object_or_404(DersProgrami, pk=dp_pk)
 
-    # Öğretmen sadece kendi dersine erişebilir
-    if not is_yonetici and dp.ogretmen != personel:
+    # Öğretmen yalnızca kendi dersine yazar; başkasının dersine yalnızca üst yönetici.
+    # (rehber/disiplin rolleri okuyabilir ama yazamaz — bkz. gecmis_listesi.)
+    if dp.ogretmen != personel and not is_ust_yonetici(request.user):
         raise PermissionDenied
 
     # Yönetici ise dp'nin öğretmenini kullan
