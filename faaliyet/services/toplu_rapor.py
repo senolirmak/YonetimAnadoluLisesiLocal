@@ -199,6 +199,30 @@ def ogrenciye_gore_grupla(faaliyetler, sinif="", sube="", ara="", eokul=""):
     return {"ogrenciler": ogrenciler, "toplam": toplam}
 
 
+def eokul_ozeti(faaliyetler):
+    """Tamamlanmış faaliyetler için e-Okul işlenme özeti.
+
+    Dönüş: ``{faaliyet_id: {"islenen", "katilan"}}``. ``katilan`` faaliyete tam katılan
+    (hiçbir ders saatinde devamsız sayılmayan) öğrenci sayısıdır — öğrenci raporunda
+    işaretlenebilen katılımlar bunlardır; ``islenen`` bunlardan e-Okul'a işlenmiş olanlar.
+    Onaylanmamış ya da devamsızlığı girilmemiş faaliyetler sonuca girmez.
+    """
+    tamamlanan = [
+        f
+        for f in faaliyetler
+        if f.durum == Faaliyet.DURUM_ONAYLANDI and f.devamsizlik_girildi
+    ]
+    islenenler = eokul_islenenler([f.pk for f in tamamlanan])
+    ozet = {}
+    for f, _ders_saatleri, katilim in _katilimlar(tamamlanan):
+        tam = [k["ogr"].pk for k in katilim if not k["dersler"]]
+        ozet[f.pk] = {
+            "islenen": sum((f.pk, ogr_id) in islenenler for ogr_id in tam),
+            "katilan": len(tam),
+        }
+    return ozet
+
+
 def _pdf_fontlari():
     """Türkçe karakterler için DejaVu'yu kaydeder; ``(normal, kalın)`` font adlarını döndürür."""
     from django.conf import settings

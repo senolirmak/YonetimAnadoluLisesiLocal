@@ -315,11 +315,18 @@ def faaliyet_yonetim_listesi(request):
 
     ogretmenler = Personel.objects.filter(faaliyetler__isnull=False).distinct().order_by("adi_soyadi")
 
+    from .services.toplu_rapor import eokul_ozeti
+
+    faaliyetler = list(qs)
+    ozet = eokul_ozeti(faaliyetler)
+    for f in faaliyetler:
+        f.eokul = ozet.get(f.pk)
+
     return render(
         request,
         "faaliyet/faaliyet_yonetim_listesi.html",
         {
-            "faaliyetler": qs,
+            "faaliyetler": faaliyetler,
             "ogretmenler": ogretmenler,
             "secili_ogretmen": ogretmen_id,
             "secili_durum": durum,
