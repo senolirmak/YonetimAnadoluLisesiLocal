@@ -82,3 +82,38 @@ class FaaliyetDersSaati(models.Model):
 
     def __str__(self):
         return f"{self.ders_no}. Ders ({self.baslangic:%H:%M}–{self.bitis:%H:%M})"
+
+
+class FaaliyetEokulKaydi(models.Model):
+    """Öğrencinin bir faaliyete katılımının e-Okul'a işlendiğini gösterir.
+
+    Kaydın varlığı "işlendi" demektir; işaret kaldırılınca kayıt silinir.
+    """
+
+    faaliyet = models.ForeignKey(
+        Faaliyet,
+        on_delete=models.CASCADE,
+        related_name="eokul_kayitlari",
+        verbose_name="Faaliyet",
+    )
+    ogrenci = models.ForeignKey(
+        Ogrenci,
+        on_delete=models.CASCADE,
+        related_name="faaliyet_eokul_kayitlari",
+        verbose_name="Öğrenci",
+    )
+    isleyen_adi = models.CharField(max_length=200, blank=True, verbose_name="İşleyen")
+    isleme_zamani = models.DateTimeField(auto_now_add=True, verbose_name="İşlenme Zamanı")
+
+    class Meta:
+        db_table = "faaliyet_eokul_kaydi"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["faaliyet", "ogrenci"], name="faaliyet_eokul_kaydi_tekil"
+            )
+        ]
+        verbose_name = "Faaliyet e-Okul Kaydı"
+        verbose_name_plural = "Faaliyet e-Okul Kayıtları"
+
+    def __str__(self):
+        return f"{self.faaliyet} — {self.ogrenci}"

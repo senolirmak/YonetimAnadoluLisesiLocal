@@ -8,7 +8,8 @@ from devamsizlik.models import OgrenciDevamsizlik
 from ogrenci.models import Ogrenci
 from okul.models import DersSaatleri, Personel
 
-from .models import Faaliyet, FaaliyetDersSaati
+from .models import Faaliyet, FaaliyetDersSaati, FaaliyetEokulKaydi
+from .services.eokul import EokulIsaretHatasi, eokul_isaretle
 from .services.toplu_rapor import (
     ogrenci_rapor_pdf,
     ogrenciye_gore_grupla,
@@ -145,7 +146,7 @@ class FaaliyetOgrenciRaporTestCase(FaaliyetVerisiMixin, TestCase):
         konular = [[s["faaliyet"].konu for s in g["faaliyetler"]] for g in rapor["ogrenciler"]]
         # ogr1 "Gezi"nin 2. dersinde devamsız → o faaliyet ogr1'in listesine girmez
         self.assertEqual(konular, [["Seminer", "Tiyatro"], ["Gezi", "Seminer", "Tiyatro"]])
-        self.assertEqual(rapor["toplam"], {"ogrenci": 2, "katilim": 5})
+        self.assertEqual(rapor["toplam"], {"ogrenci": 2, "katilim": 5, "eokul": 0})
 
     def test_hic_katilimi_olmayan_ogrenci_listelenmez(self):
         # Yalnızca "Gezi" raporlanırsa ogr1'in (devamsız) hiç katılımı kalmaz
@@ -186,3 +187,84 @@ class FaaliyetOgrenciRaporTestCase(FaaliyetVerisiMixin, TestCase):
     def test_ogrenci_rapor_pdf_cok_faaliyet(self):
         rapor = ogrenciye_gore_grupla(tamamlanan_faaliyetler())
         self.assertTrue(ogrenci_rapor_pdf(rapor).startswith(b"%PDF"))
+
+
+class FaaliyetEokulTestCase(FaaliyetVerisiMixin, TestCase):
+    def _konular(self, **kw):
+        rapor = ogrenciye_gore_grupla(tamamlanan_faaliyetler(), **kw)
+        return {
+            g["ogr"].okulno: [s["faaliyet"].konu for s in g["faaliyetler"]]
+            for g in rapor["ogrenciler"]
+        }
+
+    def test_isaretle_ve_kaldir(self):
+        eokul_isaretle(self.f2.pk, self.ogr1.pk, True, isleyen_adi="MY")
+        eokul_isaretle(self.f2.pk, self.ogr1.pk, True)  # tekrar işaretlemek tekil kalır
+        self.assertEqual(FaaliyetEokulKaydi.objects.get().isleyen_adi, "MY")
+        eokul_isaretle(self.f2.pk, self.ogr1.pk, False)
+        self.assertFalse(FaaliyetEokulKaydi.objects.exists())
+
+    def test_tamamlanmamis_faaliyet_ve_katilmayan_ogrenci_reddedilir(self):
+        bekleyen = Faaliyet.objects.get(konu="Bekleyen")
+        with self.assertRaises(EokulIsaretHatasi):
+            eokul_isaretle(bekleyen.pk, self.ogr1.pk, True)
+        self.f3.ogrenciler.remove(self.ogr2)
+        with self.assertRaises(EokulIsaretHatasi):
+            eokul_isaretle(self.f3.pk, self.ogr2.pk, True)
+
+    def test_eokul_filtresi(self):
+        eokul_isaretle(self.f2.pk, self.ogr1.pk, True)
+        eokul_isaretle(self.f3.pk, self.ogr2.pk, True)
+        self.assertEqual(self._konular(eokul="islendi"), {101: ["Seminer"], 102: ["Tiyatro"]})
+        self.assertEqual(
+            self._konular(eokul="islenmedi"), {101: ["Tiyatro"], 102: ["Gezi", "Seminer"]}
+        )
+        rapor = ogrenciye_gore_grupla(tamamlanan_faaliyetler())
+        self.assertEqual(rapor["toplam"]["eokul"], 2)
+        self.assertTrue(ogrenci_rapor_pdf(rapor).startswith(b"%PDF"))
+
+    def test_isaretleme_view(self):
+        url = reverse("faaliyet:faaliyet_eokul_isaretle")
+        veri = {"faaliyet": self.f2.pk, "ogrenci": self.ogr1.pk, "islendi": "1"}
+
+        self.client.force_login(self.ogretmen_user)
+        self.assertEqual(self.client.post(url, veri).status_code, 403)
+        self.assertFalse(FaaliyetEokulKaydi.objects.exists())
+
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(url).status_code, 405)
+        r = self.client.post(url, veri)
+        self.assertEqual(r.json(), {"islendi": True})
+        self.assertTrue(FaaliyetEokulKaydi.objects.filter(faaliyet=self.f2, ogrenci=self.ogr1).exists())
+        self.assertEqual(self.client.post(url, {"faaliyet": "x"}).status_code, 400)
+
+        r = self.client.get(reverse("faaliyet:faaliyet_ogrenci_rapor"), {"eokul": "islendi"})
+        self.assertContains(r, "Seminer")
+        self.assertNotContains(r, "Tiyatro")
+        self.assertContains(r, 'class="eokul-kutu"', count=1)
+        self.assertContains(r, 'class="eokul-tumu"', count=1)
+
+    def test_toplu_isaretleme_view(self):
+        url = reverse("faaliyet:faaliyet_eokul_isaretle")
+        self.client.force_login(self.admin)
+        r = self.client.post(
+            url, {"faaliyet": [self.f1.pk, self.f2.pk, self.f3.pk], "ogrenci": self.ogr2.pk, "islendi": "1"}
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(FaaliyetEokulKaydi.objects.filter(ogrenci=self.ogr2).count(), 3)
+
+        r = self.client.post(url, {"faaliyet": [self.f1.pk, self.f2.pk], "ogrenci": self.ogr2.pk, "islendi": "0"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            list(FaaliyetEokulKaydi.objects.filter(ogrenci=self.ogr2).values_list("faaliyet", flat=True)),
+            [self.f3.pk],
+        )
+
+        # Biri geçersizse (tamamlanmamış faaliyet) hiçbiri kaydedilmez
+        bekleyen = Faaliyet.objects.get(konu="Bekleyen")
+        r = self.client.post(
+            url, {"faaliyet": [self.f1.pk, bekleyen.pk], "ogrenci": self.ogr2.pk, "islendi": "1"}
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(FaaliyetEokulKaydi.objects.filter(faaliyet=self.f1).exists())
+

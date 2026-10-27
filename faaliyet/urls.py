@@ -26,6 +26,11 @@ urlpatterns = [
         views.faaliyet_ogrenci_rapor_pdf,
         name="faaliyet_ogrenci_rapor_pdf",
     ),
+    path(
+        "yonetim/ogrenci-rapor/eokul/",
+        views.faaliyet_eokul_isaretle,
+        name="faaliyet_eokul_isaretle",
+    ),
     path("onay/", views.faaliyet_onay_listesi, name="faaliyet_onay_listesi"),
     path("<int:pk>/onayla/", views.faaliyet_onayla, name="faaliyet_onayla"),
     path("<int:pk>/reddet/", views.faaliyet_reddet, name="faaliyet_reddet"),

@@ -17,6 +17,7 @@ from io import BytesIO
 from devamsizlik.models import OgrenciDevamsizlik
 
 from ..models import Faaliyet
+from .eokul import eokul_islenenler
 
 
 def tamamlanan_faaliyetler(tarih_bas="", tarih_bit="", ogretmen_id=""):
@@ -134,17 +135,22 @@ def tarihe_gore_grupla(faaliyetler):
     return {"gunler": list(gunler.values()), "toplam": toplam}
 
 
-def ogrenciye_gore_grupla(faaliyetler, sinif="", sube="", ara=""):
+EOKUL_ISLENDI = "islendi"
+EOKUL_ISLENMEDI = "islenmedi"
+
+
+def ogrenciye_gore_grupla(faaliyetler, sinif="", sube="", ara="", eokul=""):
     """Öğrencilerin katıldığı faaliyetleri öğrenciye göre gruplar, tarihe göre sıralar.
 
     Yalnızca tam katılımlar raporlanır: öğrencinin faaliyetin herhangi bir ders saatinde
     devamsız sayıldığı faaliyetler listeye girmez (hiç katılımı kalmayan öğrenci de).
     ``sinif``/``sube`` verilirse yalnızca o sınıf(/şube) öğrencileri, ``ara`` verilirse
-    okul numarası ya da adı soyadı eşleşenler raporlanır.
+    okul numarası ya da adı soyadı eşleşenler raporlanır. ``eokul`` ``"islendi"`` ya da
+    ``"islenmedi"`` ise yalnızca e-Okul'a işlenmiş/işlenmemiş katılımlar raporlanır.
 
-    Dönüş: ``{"ogrenciler": [...], "toplam": {"ogrenci", "katilim"}}``. Her öğrenci
-    ``{"ogr", "faaliyetler": [{"faaliyet", "ders_saatleri"}...]}``; öğrenciler
-    sınıf/şube/okul no sırasındadır.
+    Dönüş: ``{"ogrenciler": [...], "toplam": {"ogrenci", "katilim", "eokul"}}``. Her
+    öğrenci ``{"ogr", "faaliyetler": [{"faaliyet", "ders_saatleri", "eokul"}...]}``
+    (``eokul``: e-Okul'a işlendi mi); öğrenciler sınıf/şube/okul no sırasındadır.
     """
     ara = (ara or "").strip().casefold()
 
@@ -158,14 +164,24 @@ def ogrenciye_gore_grupla(faaliyetler, sinif="", sube="", ara=""):
             return ara == str(ogr.okulno) or ara in ad
         return True
 
+    faaliyetler = list(faaliyetler)
+    islenenler = eokul_islenenler([f.pk for f in faaliyetler])
+
     gruplar = {}
     for f, ders_saatleri, katilim in _katilimlar(faaliyetler):
         for k in katilim:
             ogr = k["ogr"]
             if k["dersler"] or not uygun(ogr):
                 continue
+            islendi = (f.pk, ogr.pk) in islenenler
+            if (eokul == EOKUL_ISLENDI and not islendi) or (
+                eokul == EOKUL_ISLENMEDI and islendi
+            ):
+                continue
             grup = gruplar.setdefault(ogr.pk, {"ogr": ogr, "faaliyetler": []})
-            grup["faaliyetler"].append({"faaliyet": f, "ders_saatleri": ders_saatleri})
+            grup["faaliyetler"].append(
+                {"faaliyet": f, "ders_saatleri": ders_saatleri, "eokul": islendi}
+            )
 
     ogrenciler = sorted(
         gruplar.values(),
@@ -178,6 +194,7 @@ def ogrenciye_gore_grupla(faaliyetler, sinif="", sube="", ara=""):
     toplam = {
         "ogrenci": len(ogrenciler),
         "katilim": sum(len(g["faaliyetler"]) for g in ogrenciler),
+        "eokul": sum(s["eokul"] for g in ogrenciler for s in g["faaliyetler"]),
     }
     return {"ogrenciler": ogrenciler, "toplam": toplam}
 
@@ -432,6 +449,7 @@ def ogrenci_rapor_pdf(rapor, baslik_alt=""):
     s_hdr_c = ps("hc", bold=True, center=True, color=colors.white)
     s_bilgi = ps("b", size=9)
     s_katildi = ps("k", bold=True, color=KATILDI)
+    s_katildi_c = ps("kc", bold=True, center=True, color=KATILDI)
 
     buffer = BytesIO()
     margin = 1.2 * cm
@@ -456,9 +474,9 @@ def ogrenci_rapor_pdf(rapor, baslik_alt=""):
 
     # Her öğrenci ayrı bir tablodur: ilk satır öğrenci bilgisi (Okul No, Adı Soyadı, Sınıf),
     # ikinci satır sütun başlıkları (ikisi de sayfa geçişlerinde tekrarlanır), ardından
-    # her faaliyet bir satır. Sütunlar: Sn | Tarih | Etkinlik | Katılım
+    # her faaliyet bir satır. Sütunlar: Sn | Tarih | Etkinlik | Katılım | e-Okul
     w = doc.width
-    col_widths = [1.0 * cm, 2.2 * cm, w - 1.0 * cm - 2.2 * cm - 2.6 * cm, 2.6 * cm]
+    col_widths = [1.0 * cm, 2.2 * cm, w - 1.0 * cm - 2.2 * cm - 2.6 * cm - 2.0 * cm, 2.6 * cm, 2.0 * cm]
     cizgi = colors.HexColor("#c0c8d0")
 
     for g in rapor["ogrenciler"]:
@@ -470,12 +488,13 @@ def ogrenci_rapor_pdf(rapor, baslik_alt=""):
             f" &nbsp;·&nbsp; {len(g['faaliyetler'])} faaliyet"
         )
         data = [
-            [Paragraph(bilgi, s_bilgi), "", "", ""],
+            [Paragraph(bilgi, s_bilgi), "", "", "", ""],
             [
                 Paragraph("Sn", s_hdr_c),
                 Paragraph("Tarih", s_hdr_c),
                 Paragraph("Etkinlik", s_hdr),
                 Paragraph("Katılım", s_hdr),
+                Paragraph("e-Okul", s_hdr_c),
             ],
         ]
         for sira, satir in enumerate(g["faaliyetler"], start=1):
@@ -486,6 +505,7 @@ def ogrenci_rapor_pdf(rapor, baslik_alt=""):
                     Paragraph(f.tarih.strftime("%d.%m.%Y"), s_center),
                     Paragraph(escape(f.konu), s_normal),
                     Paragraph("✓ Katıldı", s_katildi),
+                    Paragraph("✓ İşlendi", s_katildi_c) if satir["eokul"] else Paragraph("—", s_center),
                 ]
             )
 
@@ -514,7 +534,8 @@ def ogrenci_rapor_pdf(rapor, baslik_alt=""):
         Spacer(1, 0.15 * cm),
         Paragraph(
             f'<font name="{bold_font}">Genel Toplam:</font> '
-            f"{t['ogrenci']} öğrenci, {t['katilim']} faaliyet katılımı",
+            f"{t['ogrenci']} öğrenci, {t['katilim']} faaliyet katılımı "
+            f"({t['eokul']} e-Okul'a işlendi)",
             s_normal,
         ),
         Spacer(1, 0.1 * cm),
