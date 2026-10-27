@@ -244,6 +244,28 @@ class FaaliyetEokulTestCase(FaaliyetVerisiMixin, TestCase):
         self.assertContains(r, 'class="eokul-kutu"', count=1)
         self.assertContains(r, 'class="eokul-tumu"', count=1)
 
+    def test_eokul_ozeti_ve_yonetim_listesi(self):
+        from .services.toplu_rapor import eokul_ozeti
+
+        eokul_isaretle(self.f1.pk, self.ogr2.pk, True)
+        eokul_isaretle(self.f2.pk, self.ogr1.pk, True)
+        eokul_isaretle(self.f2.pk, self.ogr2.pk, True)
+        ozet = eokul_ozeti(Faaliyet.objects.all())
+        # f1'de ogr1 devamsız → yalnızca ogr2 sayılır; bekleyen faaliyet özete girmez
+        self.assertEqual(
+            ozet,
+            {
+                self.f1.pk: {"islenen": 1, "katilan": 1},
+                self.f2.pk: {"islenen": 2, "katilan": 2},
+                self.f3.pk: {"islenen": 0, "katilan": 2},
+            },
+        )
+        self.client.force_login(self.admin)
+        r = self.client.get(reverse("faaliyet:faaliyet_yonetim_listesi"))
+        self.assertContains(r, "✓ 2/2")
+        self.assertContains(r, "✓ 1/1")
+        self.assertContains(r, "0/2")
+
     def test_toplu_isaretleme_view(self):
         url = reverse("faaliyet:faaliyet_eokul_isaretle")
         self.client.force_login(self.admin)
