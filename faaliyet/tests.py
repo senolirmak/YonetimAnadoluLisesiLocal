@@ -9,10 +9,18 @@ from ogrenci.models import Ogrenci
 from okul.models import DersSaatleri, Personel
 
 from .models import Faaliyet, FaaliyetDersSaati
-from .services.toplu_rapor import tamamlanan_faaliyetler, tarihe_gore_grupla, toplu_rapor_pdf
+from .services.toplu_rapor import (
+    ogrenci_rapor_pdf,
+    ogrenciye_gore_grupla,
+    tamamlanan_faaliyetler,
+    tarihe_gore_grupla,
+    toplu_rapor_pdf,
+)
 
 
-class FaaliyetTopluRaporTestCase(TestCase):
+class FaaliyetVerisiMixin:
+    """İki öğrenci, üç tamamlanmış ve bir devamsızlığı girilmemiş faaliyet."""
+
     @classmethod
     def setUpTestData(cls):
         cls.admin = User.objects.create_superuser("admin", "a@a.com", "x")
@@ -57,6 +65,8 @@ class FaaliyetTopluRaporTestCase(TestCase):
             )
         return f
 
+
+class FaaliyetTopluRaporTestCase(FaaliyetVerisiMixin, TestCase):
     def test_yalnizca_tamamlananlar_tarihe_gore_gruplanir(self):
         rapor = tarihe_gore_grupla(tamamlanan_faaliyetler())
         self.assertEqual([g["tarih"] for g in rapor["gunler"]], [self.gun1, self.gun2])
@@ -126,3 +136,53 @@ class FaaliyetTopluRaporTestCase(TestCase):
         rapor = tarihe_gore_grupla(tamamlanan_faaliyetler(tarih_bas="2026-10-07"))
         self.assertEqual(rapor["toplam"]["devamsiz_ogrenci"], 120)
         self.assertTrue(toplu_rapor_pdf(rapor).startswith(b"%PDF"))
+
+
+class FaaliyetOgrenciRaporTestCase(FaaliyetVerisiMixin, TestCase):
+    def test_ogrenciye_gore_tarih_sirali_devamsizlar_haric(self):
+        rapor = ogrenciye_gore_grupla(tamamlanan_faaliyetler())
+        self.assertEqual([g["ogr"] for g in rapor["ogrenciler"]], [self.ogr1, self.ogr2])
+        konular = [[s["faaliyet"].konu for s in g["faaliyetler"]] for g in rapor["ogrenciler"]]
+        # ogr1 "Gezi"nin 2. dersinde devamsız → o faaliyet ogr1'in listesine girmez
+        self.assertEqual(konular, [["Seminer", "Tiyatro"], ["Gezi", "Seminer", "Tiyatro"]])
+        self.assertEqual(rapor["toplam"], {"ogrenci": 2, "katilim": 5})
+
+    def test_hic_katilimi_olmayan_ogrenci_listelenmez(self):
+        # Yalnızca "Gezi" raporlanırsa ogr1'in (devamsız) hiç katılımı kalmaz
+        rapor = ogrenciye_gore_grupla(tamamlanan_faaliyetler().filter(pk=self.f1.pk))
+        self.assertEqual([g["ogr"] for g in rapor["ogrenciler"]], [self.ogr2])
+
+    def test_sinif_ve_arama_filtresi(self):
+        faaliyetler = tamamlanan_faaliyetler()
+        self.assertEqual(ogrenciye_gore_grupla(faaliyetler, sinif="10")["ogrenciler"], [])
+        self.assertEqual(
+            len(ogrenciye_gore_grupla(faaliyetler, sinif="9", sube="a")["ogrenciler"]), 2
+        )
+        for ara in ("102", "ad2 soyad2"):
+            rapor = ogrenciye_gore_grupla(faaliyetler, ara=ara)
+            self.assertEqual([g["ogr"] for g in rapor["ogrenciler"]], [self.ogr2])
+
+    def test_ogrenci_rapor_view_ve_pdf(self):
+        self.client.force_login(self.admin)
+        url = reverse("faaliyet:faaliyet_ogrenci_rapor")
+        r = self.client.get(url, {"sinif": "9/A", "ara": "101"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Ad1 Soyad1")
+        self.assertNotContains(r, "Ad2 Soyad2")
+        self.assertNotContains(r, "Bekleyen")
+        self.assertNotContains(r, "Gezi")
+        self.assertNotContains(r, "Devamsız:")
+        r = self.client.get(
+            reverse("faaliyet:faaliyet_ogrenci_rapor_pdf"), {"sinif": "9/A", "ara": "<b>"}
+        )
+        self.assertEqual(r["Content-Type"], "application/pdf")
+        self.assertTrue(r.content.startswith(b"%PDF"))
+
+    def test_ogrenci_rapor_ogretmen_erisemez(self):
+        self.client.force_login(self.ogretmen_user)
+        r = self.client.get(reverse("faaliyet:faaliyet_ogrenci_rapor"))
+        self.assertEqual(r.status_code, 302)
+
+    def test_ogrenci_rapor_pdf_cok_faaliyet(self):
+        rapor = ogrenciye_gore_grupla(tamamlanan_faaliyetler())
+        self.assertTrue(ogrenci_rapor_pdf(rapor).startswith(b"%PDF"))

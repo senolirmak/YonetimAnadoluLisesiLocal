@@ -937,3 +937,115 @@ def faaliyet_toplu_rapor_pdf(request):
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{dosya_adi}"'
     return response
+
+
+# ─────────────────────────────────────────────
+# Müdür Yardımcısı: öğrenciye göre gruplanmış rapor
+# ─────────────────────────────────────────────
+
+
+def _ogrenci_rapor_verisi(request):
+    """Filtreleri okur, ``(filtre, rapor)`` döndürür. ``sinif`` "9" ya da "9/A" biçimindedir."""
+    from .services.toplu_rapor import ogrenciye_gore_grupla, tamamlanan_faaliyetler
+
+    filtre = _toplu_rapor_filtreleri(request)
+    filtre["sinif"] = request.GET.get("sinif", "").strip()
+    filtre["ara"] = request.GET.get("ara", "").strip()
+    sinif, _, sube = filtre["sinif"].partition("/")
+
+    rapor = ogrenciye_gore_grupla(
+        tamamlanan_faaliyetler(
+            tarih_bas=filtre["tarih_bas"],
+            tarih_bit=filtre["tarih_bit"],
+            ogretmen_id=filtre["ogretmen_id"],
+        ),
+        sinif=sinif,
+        sube=sube,
+        ara=filtre["ara"],
+    )
+    return filtre, rapor
+
+
+@login_required
+def faaliyet_ogrenci_rapor(request):
+    if not _mudur_yardimcisi_mi(request.user):
+        messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
+        return redirect("index")
+
+    from okul.models import Personel
+
+    filtre, rapor = _ogrenci_rapor_verisi(request)
+
+    tamamlanan = {
+        "faaliyetler__durum": Faaliyet.DURUM_ONAYLANDI,
+        "faaliyetler__devamsizlik_girildi": True,
+    }
+    ogretmenler = Personel.objects.filter(**tamamlanan).distinct().order_by("adi_soyadi")
+    # Geçmiş rapor filtresi: tasdikname almış (aktif=False) öğrencilerin sınıfları da listelenir
+    siniflar = (
+        Ogrenci.objects.filter(**tamamlanan)
+        .values_list("sinif", "sube")
+        .distinct()
+        .order_by("sinif", "sube")
+    )
+
+    return render(
+        request,
+        "faaliyet/faaliyet_ogrenci_rapor.html",
+        {
+            "ogrenciler": rapor["ogrenciler"],
+            "toplam": rapor["toplam"],
+            "ogretmenler": ogretmenler,
+            "siniflar": [f"{s}/{b}" for s, b in siniflar],
+            "secili_ogretmen": filtre["ogretmen_id"],
+            "secili_sinif": filtre["sinif"],
+            "ara": filtre["ara"],
+            "tarih_bas": filtre["tarih_bas"],
+            "tarih_bit": filtre["tarih_bit"],
+            "sorgu": request.GET.urlencode(),
+        },
+    )
+
+
+@login_required
+def faaliyet_ogrenci_rapor_pdf(request):
+    if not _mudur_yardimcisi_mi(request.user):
+        messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
+        return redirect("index")
+
+    from datetime import date
+
+    from django.utils.html import escape
+
+    from okul.models import Personel
+
+    from .services.toplu_rapor import ogrenci_rapor_pdf
+
+    filtre, rapor = _ogrenci_rapor_verisi(request)
+
+    def _tr(t):
+        try:
+            return date.fromisoformat(t).strftime("%d.%m.%Y")
+        except ValueError:
+            return t
+
+    parcalar = []
+    if filtre["tarih_bas"] or filtre["tarih_bit"]:
+        parcalar.append(
+            f"Tarih: {_tr(filtre['tarih_bas']) or '…'} – {_tr(filtre['tarih_bit']) or '…'}"
+        )
+    if filtre["ogretmen_id"]:
+        p = Personel.objects.filter(pk=filtre["ogretmen_id"]).first()
+        if p:
+            parcalar.append(f"Öğretmen: {p.adi_soyadi}")
+    if filtre["sinif"]:
+        parcalar.append(f"Sınıf: {filtre['sinif']}")
+    if filtre["ara"]:
+        parcalar.append(f"Arama: {filtre['ara']}")
+
+    # Arama metni serbest girdi; Paragraph işaretleme dili kullandığından kaçışlanır
+    pdf = ogrenci_rapor_pdf(rapor, baslik_alt=escape("  |  ".join(parcalar)))
+    dosya_adi = f"faaliyet_ogrenci_rapor_{timezone.localdate():%Y%m%d}.pdf"
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{dosya_adi}"'
+    return response

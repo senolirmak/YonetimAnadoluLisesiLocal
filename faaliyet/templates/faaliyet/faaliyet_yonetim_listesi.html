@@ -16,6 +16,8 @@
         <div style="display:flex;gap:8px;align-items:center;">
             <a href="{% url 'faaliyet:faaliyet_toplu_rapor' %}?tarih_bas={{ tarih_bas }}&tarih_bit={{ tarih_bit }}&ogretmen={{ secili_ogretmen }}"
                class="btn" style="background:#e67e22;color:#fff;">&#128202; Tarihe Göre Rapor</a>
+            <a href="{% url 'faaliyet:faaliyet_ogrenci_rapor' %}?tarih_bas={{ tarih_bas }}&tarih_bit={{ tarih_bit }}&ogretmen={{ secili_ogretmen }}"
+               class="btn" style="background:#8e44ad;color:#fff;">&#128101; Öğrenciye Göre Rapor</a>
             <span style="background:#417690;color:#fff;padding:4px 14px;border-radius:10px;font-weight:bold;">
                 {{ faaliyetler|length }} kayıt
             </span>
