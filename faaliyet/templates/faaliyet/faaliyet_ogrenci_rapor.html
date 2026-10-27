@@ -66,6 +66,14 @@
                 <input type="text" name="ara" value="{{ ara }}" placeholder="Okul no ya da ad soyad"
                        style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
             </div>
+            <div style="display:flex;flex-direction:column;gap:4px;min-width:150px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">e-Okul Durumu</label>
+                <select name="eokul" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+                    <option value="">— Tümü —</option>
+                    <option value="islendi" {% if secili_eokul == "islendi" %}selected{% endif %}>e-Okul'a işlenmiş</option>
+                    <option value="islenmedi" {% if secili_eokul == "islenmedi" %}selected{% endif %}>e-Okul'a işlenmemiş</option>
+                </select>
+            </div>
             <div style="display:flex;gap:8px;align-items:flex-end;">
                 <button type="submit" class="btn btn-primary" style="padding:6px 18px;">Rapor Oluştur</button>
                 <a href="{% url 'faaliyet:faaliyet_ogrenci_rapor' %}" class="btn" style="padding:6px 14px;background:#6c757d;color:#fff;">Temizle</a>
@@ -78,17 +86,24 @@
     <div class="card mb-20" style="padding:12px 20px;display:flex;flex-wrap:wrap;gap:28px;">
         <span>Öğrenci: <strong style="color:#417690;">{{ toplam.ogrenci }}</strong></span>
         <span>Faaliyet Katılımı: <strong style="color:#17a2b8;">{{ toplam.katilim }}</strong></span>
+        <span>e-Okul'a İşlenen: <strong id="eokul-toplam" style="color:#28a745;">{{ toplam.eokul }}</strong></span>
     </div>
 
     {% for g in ogrenciler %}
-    <div class="card mb-20">
+    <div class="card mb-20 ogrenci-kart" data-ogrenci="{{ g.ogr.pk }}">
         <div class="card-header" style="background:#417690;color:#fff;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
             <span>
                 Okul No: <strong>{{ g.ogr.okulno }}</strong> &nbsp;·&nbsp;
                 Adı Soyadı: <strong>{{ g.ogr.adi }} {{ g.ogr.soyadi }}</strong> &nbsp;·&nbsp;
                 Sınıf: <strong>{{ g.ogr.sinif }}/{{ g.ogr.sube }}</strong>
             </span>
-            <span style="font-size:0.88em;">{{ g.faaliyetler|length }} faaliyet</span>
+            <span style="font-size:0.88em;display:flex;align-items:center;gap:14px;">
+                {{ g.faaliyetler|length }} faaliyet
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-weight:600;">
+                    <input type="checkbox" class="eokul-tumu" style="width:18px;height:18px;cursor:pointer;">
+                    Tümü e-Okul'a işlendi
+                </label>
+            </span>
         </div>
         <div class="table-responsive">
             <table class="table" style="margin:0;font-size:0.9em;">
@@ -98,6 +113,7 @@
                         <th class="center" style="width:110px;">Tarih</th>
                         <th>Etkinlik</th>
                         <th style="width:120px;">Katılım</th>
+                        <th class="center" style="width:90px;">e-Okul</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -109,6 +125,11 @@
                             <a href="{% url 'faaliyet:faaliyet_rapor' satir.faaliyet.pk %}">{{ satir.faaliyet.konu }}</a>
                         </td>
                         <td><span style="color:#28a745;font-weight:600;">✓ Katıldı</span></td>
+                        <td class="center">
+                            <input type="checkbox" class="eokul-kutu" style="width:18px;height:18px;cursor:pointer;"
+                                   data-faaliyet="{{ satir.faaliyet.pk }}" data-ogrenci="{{ g.ogr.pk }}"
+                                   title="e-Okul'a işlendi" {% if satir.eokul %}checked{% endif %}>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -125,4 +146,64 @@
     {% endif %}
 
 </div>
+
+<script>
+(function () {
+    const URL = "{% url 'faaliyet:faaliyet_eokul_isaretle' %}";
+    const CSRF = "{{ csrf_token }}";
+    const toplam = document.getElementById("eokul-toplam");
+
+    // Kutuları kaydeder; başarısız olursa eski hallerine döndürür.
+    function kaydet(kart, kutular, islendi) {
+        const tumu = kart.querySelector(".eokul-tumu");
+        const veri = new FormData();
+        veri.append("ogrenci", kart.dataset.ogrenci);
+        veri.append("islendi", islendi ? "1" : "0");
+        kutular.forEach(function (k) { veri.append("faaliyet", k.dataset.faaliyet); k.checked = islendi; k.disabled = true; });
+        tumu.disabled = true;
+        guncelleTumu(kart);
+        return fetch(URL, { method: "POST", headers: { "X-CSRFToken": CSRF }, body: veri })
+            .then(function (r) {
+                return r.json().then(function (j) {
+                    if (!r.ok) throw new Error(j.hata || "Kaydedilemedi.");
+                });
+            })
+            .then(function () {
+                if (toplam) toplam.textContent = (parseInt(toplam.textContent, 10) || 0) + (islendi ? 1 : -1) * kutular.length;
+            })
+            .catch(function (e) {
+                kutular.forEach(function (k) { k.checked = !islendi; });
+                alert(e.message || "Kaydedilemedi.");
+            })
+            .finally(function () {
+                kutular.forEach(function (k) { k.disabled = false; });
+                tumu.disabled = false;
+                guncelleTumu(kart);
+            });
+    }
+
+    // "Tümü" kutusu: hepsi işlendiyse işaretli, bir kısmı işlendiyse yarı dolu.
+    function guncelleTumu(kart) {
+        const kutular = kart.querySelectorAll(".eokul-kutu");
+        const isaretli = kart.querySelectorAll(".eokul-kutu:checked").length;
+        const tumu = kart.querySelector(".eokul-tumu");
+        tumu.checked = kutular.length > 0 && isaretli === kutular.length;
+        tumu.indeterminate = isaretli > 0 && isaretli < kutular.length;
+    }
+
+    document.querySelectorAll(".ogrenci-kart").forEach(function (kart) {
+        guncelleTumu(kart);
+        kart.querySelectorAll(".eokul-kutu").forEach(function (kutu) {
+            kutu.addEventListener("change", function () { kaydet(kart, [kutu], kutu.checked); });
+        });
+        kart.querySelector(".eokul-tumu").addEventListener("change", function () {
+            const islendi = this.checked;
+            // Yalnızca durumu değişecek satırlar gönderilir
+            const degisecek = Array.from(kart.querySelectorAll(".eokul-kutu"))
+                .filter(function (k) { return k.checked !== islendi; });
+            if (degisecek.length) kaydet(kart, degisecek, islendi);
+        });
+    });
+})();
+</script>
 {% endblock %}

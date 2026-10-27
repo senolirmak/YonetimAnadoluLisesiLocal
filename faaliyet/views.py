@@ -4,6 +4,7 @@ from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from dersprogrami.models import DersProgrami
 from devamsizlik.models import OgrenciDevamsizlik
@@ -951,6 +952,7 @@ def _ogrenci_rapor_verisi(request):
     filtre = _toplu_rapor_filtreleri(request)
     filtre["sinif"] = request.GET.get("sinif", "").strip()
     filtre["ara"] = request.GET.get("ara", "").strip()
+    filtre["eokul"] = request.GET.get("eokul", "").strip()
     sinif, _, sube = filtre["sinif"].partition("/")
 
     rapor = ogrenciye_gore_grupla(
@@ -962,6 +964,7 @@ def _ogrenci_rapor_verisi(request):
         sinif=sinif,
         sube=sube,
         ara=filtre["ara"],
+        eokul=filtre["eokul"],
     )
     return filtre, rapor
 
@@ -1000,6 +1003,7 @@ def faaliyet_ogrenci_rapor(request):
             "secili_ogretmen": filtre["ogretmen_id"],
             "secili_sinif": filtre["sinif"],
             "ara": filtre["ara"],
+            "secili_eokul": filtre["eokul"],
             "tarih_bas": filtre["tarih_bas"],
             "tarih_bit": filtre["tarih_bit"],
             "sorgu": request.GET.urlencode(),
@@ -1042,6 +1046,9 @@ def faaliyet_ogrenci_rapor_pdf(request):
         parcalar.append(f"Sınıf: {filtre['sinif']}")
     if filtre["ara"]:
         parcalar.append(f"Arama: {filtre['ara']}")
+    eokul_etiket = {"islendi": "e-Okul'a işlenmiş", "islenmedi": "e-Okul'a işlenmemiş"}
+    if filtre["eokul"] in eokul_etiket:
+        parcalar.append(eokul_etiket[filtre["eokul"]])
 
     # Arama metni serbest girdi; Paragraph işaretleme dili kullandığından kaçışlanır
     pdf = ogrenci_rapor_pdf(rapor, baslik_alt=escape("  |  ".join(parcalar)))
@@ -1049,3 +1056,34 @@ def faaliyet_ogrenci_rapor_pdf(request):
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{dosya_adi}"'
     return response
+
+
+@login_required
+@require_POST
+def faaliyet_eokul_isaretle(request):
+    """Öğrenci raporundaki e-Okul kutuları: katılımları işlendi/işlenmedi olarak kaydeder (AJAX).
+
+    ``faaliyet`` birden çok kez gönderilebilir (öğrencinin "tümü" kutusu); biri geçersizse
+    hiçbiri kaydedilmez.
+    """
+    if not _mudur_yardimcisi_mi(request.user):
+        return JsonResponse({"hata": "Bu işlem için yetkiniz yok."}, status=403)
+
+    from .services.eokul import EokulIsaretHatasi, eokul_toplu_isaretle
+
+    try:
+        faaliyet_idleri = [int(f) for f in request.POST.getlist("faaliyet")]
+        ogrenci_id = int(request.POST.get("ogrenci", ""))
+    except ValueError:
+        return JsonResponse({"hata": "Geçersiz istek."}, status=400)
+    if not faaliyet_idleri:
+        return JsonResponse({"hata": "Geçersiz istek."}, status=400)
+    islendi = request.POST.get("islendi") == "1"
+
+    personel = _personel(request)
+    isleyen = (personel.adi_soyadi if personel else "") or request.user.get_full_name() or request.user.username
+    try:
+        eokul_toplu_isaretle(faaliyet_idleri, ogrenci_id, islendi, isleyen_adi=isleyen)
+    except EokulIsaretHatasi as e:
+        return JsonResponse({"hata": str(e)}, status=400)
+    return JsonResponse({"islendi": islendi})
