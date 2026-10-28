@@ -235,13 +235,26 @@ class TakvimService(BaseService):
                 )
                 return f"{tarih:%d.%m.%Y} {self.config['OTURUM_SAATLERI'][t % OTURUM_SAYISI_GUN]}"
 
-            sorunlar = self._sabit_on_kontrol(
-                self._ga_build_context(
-                    G, DERSLER, SUBE_DERS_MAP, fixed_slots, catisma_gun_kisitlari,
-                    pairs, esleme_gercek,
-                ),
-                OTURUM_SAYISI_GUN, int(self.config.get("MAX_SINAV_PER_GUN", 2)), _slot_adi,
+            ctx_kontrol = self._ga_build_context(
+                G, DERSLER, SUBE_DERS_MAP, fixed_slots, catisma_gun_kisitlari,
+                pairs, esleme_gercek,
             )
+            sorunlar, sigmayanlar = self._sabit_on_kontrol(
+                ctx_kontrol, OTURUM_SAYISI_GUN, int(self.config.get("MAX_SINAV_PER_GUN", 2)), _slot_adi,
+            )
+            # Sabit Yazılı'nın gününe sığmayan Uygulama: aynı-gün bağı kaldırılır,
+            # GA onu başka bir güne planlar.
+            gevsek = set()
+            for es, u, engeller in sigmayanlar:
+                es_ad = " + ".join(ctx_kontrol["unit_courses"][es])
+                u_ad = " + ".join(ctx_kontrol["unit_courses"][u])
+                self.log(
+                    f"  UYARI: '{es_ad}', sabit '{u_ad}' ile aynı güne sığmıyor ({engeller}); "
+                    "başka bir güne planlanacak."
+                )
+                gevsek.update(ctx_kontrol["unit_courses"][es])
+            if gevsek:
+                pairs = [(dL, dK) for dL, dK in pairs if dL not in gevsek and dK not in gevsek]
             if sorunlar:
                 for sorun in sorunlar:
                     self.log(f"  SABIT SINAV SORUNU: {sorun}")
@@ -422,9 +435,14 @@ class TakvimService(BaseService):
         """Sabit sınavların tek başına yerleştirilebildiğini denetler.
 
         Sabit birimler her denemede aynı slota konduğundan aralarındaki bir çelişki
-        (ya da çift oturumlu eşin o güne sığmaması) gün ekleyerek çözülemez; Faz-1
-        boşuna onlarca gün ekler. Bu kontrol sorunu baştan, okunur sebeplerle bulur.
-        Döner: sorun açıklamalarının listesi (boşsa sorun yok).
+        gün ekleyerek çözülemez; Faz-1 boşuna onlarca gün ekler. Bu kontrol sorunu
+        baştan, okunur sebeplerle bulur.
+
+        Sabit birimin çift oturum eşi (Uygulama) o güne sığmıyorsa bu hata sayılmaz:
+        eş, "aynı gün" bağı kaldırılarak başka güne planlanmak üzere döndürülür
+        (ülke geneli sınav günleri dolu olabildiğinden).
+
+        Döner: (sorunlar, [(eş_birim, sabit_birim, açıklama)])
         """
         fixed = ctx["fixed_unit_slot"]
         placement: dict[str, int] = {}
@@ -457,7 +475,9 @@ class TakvimService(BaseService):
             self._ga_place(ctx, placement, day_count, catisma_day_count, u, t, oturum_sayisi_gun)
 
         # Sabit birimin çift oturum eşi (örn. Uygulama) aynı güne sığıyor mu?
-        for u, t in sorted(placement.items(), key=lambda kv: kv[1]):
+        # Sığanlar sırayla yerleştirilir ki aynı güne düşen eşler birbirini görsün.
+        sigmayanlar: list[tuple[str, str, str]] = []
+        for u, t in sorted(((u, fixed[u]) for u in fixed if u in placement), key=lambda kv: kv[1]):
             es = ctx["day_partner"].get(u)
             if es is None or es in placement:
                 continue
@@ -469,14 +489,12 @@ class TakvimService(BaseService):
                     oturum_sayisi_gun, max_sinav_per_gun,
                 )
                 if engel is None:
+                    self._ga_place(ctx, placement, day_count, catisma_day_count, es, t2, oturum_sayisi_gun)
                     break
                 engeller.append(f"{slot_adi(t2)}: {sebep(engel)}")
             else:
-                sorunlar.append(
-                    f"'{ad(es)}', sabit '{ad(u)}' ile aynı gün olmalı ama o gün boş oturum yok — "
-                    + "; ".join(engeller) + "."
-                )
-        return sorunlar
+                sigmayanlar.append((es, u, "; ".join(engeller)))
+        return sorunlar, sigmayanlar
 
     def _sabit_seviye_bol(self, dfE: pd.DataFrame, sabit_list, cift_dersler):
         """Sabit sınavları takvim düğümlerine eşler.
