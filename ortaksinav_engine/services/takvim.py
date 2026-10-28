@@ -227,6 +227,30 @@ class TakvimService(BaseService):
                 f"Faz-1 ve Faz-2'de aynı slota hard kısıt olarak uygulanacak."
             )
 
+        # Sabit sinavlar kendi aralarinda yerlesebiliyor mu? (gun eklemek cozmez)
+        if fixed_slots:
+            def _slot_adi(t):
+                tarih = self._nth_business_day(
+                    self.config["BASLANGIC_TARIH"], t // OTURUM_SAYISI_GUN, self.config["HOLIDAYS"]
+                )
+                return f"{tarih:%d.%m.%Y} {self.config['OTURUM_SAATLERI'][t % OTURUM_SAYISI_GUN]}"
+
+            sorunlar = self._sabit_on_kontrol(
+                self._ga_build_context(
+                    G, DERSLER, SUBE_DERS_MAP, fixed_slots, catisma_gun_kisitlari,
+                    pairs, esleme_gercek,
+                ),
+                OTURUM_SAYISI_GUN, int(self.config.get("MAX_SINAV_PER_GUN", 2)), _slot_adi,
+            )
+            if sorunlar:
+                for sorun in sorunlar:
+                    self.log(f"  SABIT SINAV SORUNU: {sorun}")
+                raise RuntimeError(
+                    "Sabit sınavlar birlikte yerleştirilemiyor (yukarıdaki 'SABIT SINAV SORUNU' "
+                    "satırlarına bakın). Ders Ayarları'nda sabit sınav tarih/saatlerini, "
+                    "Algoritma Parametreleri'nde günlük maks. sınav sayısını kontrol edin."
+                )
+
         # Faz-1
         while True:
             if self.is_cancelled():
@@ -393,6 +417,66 @@ class TakvimService(BaseService):
             if d.weekday() < 5 and d.date() not in holidays:
                 added += 1
         return d
+
+    def _sabit_on_kontrol(self, ctx, oturum_sayisi_gun, max_sinav_per_gun, slot_adi):
+        """Sabit sınavların tek başına yerleştirilebildiğini denetler.
+
+        Sabit birimler her denemede aynı slota konduğundan aralarındaki bir çelişki
+        (ya da çift oturumlu eşin o güne sığmaması) gün ekleyerek çözülemez; Faz-1
+        boşuna onlarca gün ekler. Bu kontrol sorunu baştan, okunur sebeplerle bulur.
+        Döner: sorun açıklamalarının listesi (boşsa sorun yok).
+        """
+        fixed = ctx["fixed_unit_slot"]
+        placement: dict[str, int] = {}
+        day_count: dict[tuple, int] = {}
+        catisma_day_count: dict[tuple, int] = {}
+        sorunlar: list[str] = []
+
+        def ad(u):
+            return " + ".join(ctx["unit_courses"].get(u, [u]))
+
+        def sebep(engel):
+            tur, x = engel
+            if tur == "komsu":
+                return f"aynı oturumda ortak öğrencisi olan '{ad(x)}' var"
+            if tur == "gun_bagi":
+                return f"çift oturum eşi '{ad(x)}' başka bir günde"
+            if tur == "kota":
+                return f"{x} şubesi o gün günlük sınav sınırını ({max_sinav_per_gun}) aşıyor"
+            return "aynı çakışma grubundan o gün başka bir sınav var"
+
+        for u in sorted(fixed, key=lambda u: fixed[u]):
+            t = fixed[u]
+            engel = self._ga_slot_engeli(
+                ctx, placement, day_count, catisma_day_count, u, t,
+                oturum_sayisi_gun, max_sinav_per_gun,
+            )
+            if engel:
+                sorunlar.append(f"'{ad(u)}' {slot_adi(t)} oturumuna konamıyor: {sebep(engel)}.")
+                continue
+            self._ga_place(ctx, placement, day_count, catisma_day_count, u, t, oturum_sayisi_gun)
+
+        # Sabit birimin çift oturum eşi (örn. Uygulama) aynı güne sığıyor mu?
+        for u, t in sorted(placement.items(), key=lambda kv: kv[1]):
+            es = ctx["day_partner"].get(u)
+            if es is None or es in placement:
+                continue
+            gun = t // oturum_sayisi_gun
+            engeller = []
+            for t2 in range(gun * oturum_sayisi_gun, (gun + 1) * oturum_sayisi_gun):
+                engel = self._ga_slot_engeli(
+                    ctx, placement, day_count, catisma_day_count, es, t2,
+                    oturum_sayisi_gun, max_sinav_per_gun,
+                )
+                if engel is None:
+                    break
+                engeller.append(f"{slot_adi(t2)}: {sebep(engel)}")
+            else:
+                sorunlar.append(
+                    f"'{ad(es)}', sabit '{ad(u)}' ile aynı gün olmalı ama o gün boş oturum yok — "
+                    + "; ".join(engeller) + "."
+                )
+        return sorunlar
 
     def _sabit_seviye_bol(self, dfE: pd.DataFrame, sabit_list, cift_dersler):
         """Sabit sınavları takvim düğümlerine eşler.
@@ -691,35 +775,48 @@ class TakvimService(BaseService):
         }
 
     @staticmethod
-    def _ga_slot_valid(ctx, placement, day_count, catisma_day_count, unit, t,
+    def _ga_slot_engeli(ctx, placement, day_count, catisma_day_count, unit, t,
                         oturum_sayisi_gun, max_sinav_per_gun):
-        """unit'in t slotuna yerlestirilmesi TUM sert kisitlara uyuyor mu?"""
+        """unit'in t slotuna yerlesmesini engelleyen ilk sert kisit; yoksa None.
+
+        Donus: ("komsu", komsu_birim) | ("gun_bagi", es_birim) |
+               ("kota", sube) | ("catisma_grubu", grup_idx)
+        """
         day = t // oturum_sayisi_gun
 
         # 1) Cakisma komsulugu: komsu birimlerden biri ayni slotta mi?
         for n in ctx["unit_neighbors"].get(unit, ()):
             if placement.get(n) == t:
-                return False
+                return ("komsu", n)
 
         # 2) Gun bagi: eslesigi (cift oturum) varsa ayni gunde olmali
         partner = ctx["day_partner"].get(unit)
         if partner is not None and partner in placement:
             if placement[partner] // oturum_sayisi_gun != day:
-                return False
+                return ("gun_bagi", partner)
 
         # 3) Sube/gun kotasi (MAX_SINAV_PER_GUN)
         for sube, adet in ctx["unit_sube_weight"].get(unit, {}).items():
             if day_count.get((sube, day), 0) + adet > max_sinav_per_gun:
-                return False
+                return ("kota", sube)
 
         # 4) Catisma grubu gun kisiti: (sube, grup) basina gunde <= 1 birim.
         #    (Birim >1 ders icerse bile pratikte esleme nadir oldugundan birim
         #    granularitesinde kontrol yeterlidir.)
         for grup_idx in ctx["unit_catisma_groups"].get(unit, ()):
             if catisma_day_count.get((grup_idx, day), 0) >= 1:
-                return False
+                return ("catisma_grubu", grup_idx)
 
-        return True
+        return None
+
+    @classmethod
+    def _ga_slot_valid(cls, ctx, placement, day_count, catisma_day_count, unit, t,
+                       oturum_sayisi_gun, max_sinav_per_gun):
+        """unit'in t slotuna yerlestirilmesi TUM sert kisitlara uyuyor mu?"""
+        return cls._ga_slot_engeli(
+            ctx, placement, day_count, catisma_day_count, unit, t,
+            oturum_sayisi_gun, max_sinav_per_gun,
+        ) is None
 
     @staticmethod
     def _ga_place(ctx, placement, day_count, catisma_day_count, unit, t, oturum_sayisi_gun):
