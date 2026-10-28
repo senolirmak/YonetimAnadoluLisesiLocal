@@ -336,6 +336,13 @@ class TakvimService(BaseService):
             else:
                 self.log("Catisma grubu gun kisiti saglandi: her sube/gunde <= 1.")
 
+        # Sabit sinav dogrulama: her sabit ders istenen slotta mi?
+        sapan = [d for d, t in fixed_slots.items() if ders_to_slot.get(d) != t]
+        if sapan:
+            self.log(f"IHLAL: {len(sapan)} sabit sinav istenen tarih/saatte degil: {', '.join(sapan)}")
+        elif fixed_slots:
+            self.log(f"Sabit sinavlar saglandi: {len(fixed_slots)} sinav istenen tarih/saatte.")
+
         # Kelebek karisimi raporu: slot basina kac farkli seviye var?
         tmp2 = df_out.copy()
         tmp2["Subeler"] = tmp2["Subeler"].str.split(", ")
@@ -828,7 +835,9 @@ class TakvimService(BaseService):
             partner = ctx["day_partner"].get(unit)
             old_t = placement[unit]
 
-            if partner is None or partner not in placement:
+            # Eşi sabit slotluysa birlikte taşınamaz: birim tek başına (eşinin
+            # gününde kalacak şekilde — _ga_slot_valid gün bağını denetler) taşınır.
+            if partner is None or partner not in placement or partner in ctx["fixed_unit_slot"]:
                 self._ga_unplace(ctx, placement, day_count, catisma_day_count, unit, oturum_sayisi_gun)
                 candidates = [
                     t for t in range(K)
