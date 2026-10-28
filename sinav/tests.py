@@ -210,6 +210,146 @@ class TakvimServiceGATestCase(SimpleTestCase):
         self.assertLess(sure, 20, f"GA {sure:.1f} saniye surdu")
 
 
+class SabitSinavSeviyeBolmeTestCase(SimpleTestCase):
+    """Aynı ders farklı seviyeler için farklı oturumlara sabitlenebilmeli
+    (örn. 10. sınıf TDE 03.11 08:50, 9/11/12 TDE 06.11 10:30)."""
+
+    TDE = "TÜRK DİLİ VE EDEBİYATI"
+
+    def _dfE(self, cift=True):
+        rows = []
+        for sev in (9, 10, 11, 12):
+            sube = f"{sev}/A"
+            if cift:
+                for sonek in (" (Uygulama)", " (Yazili)"):
+                    rows.append({"Ders": self.TDE + sonek, "Seviye": sev, "Sube": sube})
+            else:
+                rows.append({"Ders": self.TDE, "Seviye": sev, "Sube": sube})
+            rows.append({"Ders": "MATEMATİK", "Seviye": sev, "Sube": sube})
+        return pd.DataFrame(rows)
+
+    def _sabitler(self):
+        return [
+            {"ders": self.TDE, "tarih": "2026-11-03", "saat": "08:50", "seviyeler": [10]},
+            {"ders": self.TDE, "tarih": "2026-11-06", "saat": "10:30", "seviyeler": [9, 11, 12]},
+        ]
+
+    def test_ders_seviyelere_gore_bolunur(self):
+        svc = _service()
+        dfE, hazir, dugum_ders = svc._sabit_seviye_bol(self._dfE(cift=False), self._sabitler(), [])
+        on = f"{self.TDE} [10. sınıf]"
+        diger = f"{self.TDE} [9,11,12. sınıf]"
+        self.assertEqual([(d, sev) for d, _ss, sev in hazir], [(on, [10]), (diger, [9, 11, 12])])
+        self.assertEqual(dugum_ders, {on: self.TDE, diger: self.TDE})
+        self.assertEqual(set(dfE.loc[dfE["Ders"] == on, "Sube"]), {"10/A"})
+        self.assertNotIn(self.TDE, set(dfE["Ders"]))
+
+    def test_cift_oturumlu_derste_uygulama_da_bolunur(self):
+        svc = _service()
+        dfE, hazir, dugum_ders = svc._sabit_seviye_bol(self._dfE(), self._sabitler(), [self.TDE])
+        self.assertEqual(hazir[0][0], f"{self.TDE} [10. sınıf] (Yazili)")
+        self.assertEqual(dugum_ders[f"{self.TDE} [10. sınıf] (Uygulama)"], f"{self.TDE} (Uygulama)")
+        self.assertEqual(dugum_ders[f"{self.TDE} [10. sınıf] (Yazili)"], f"{self.TDE} (Yazili)")
+
+    def test_kalan_seviyeler_serbest_kalir(self):
+        svc = _service()
+        sabit = [self._sabitler()[0]]  # yalnızca 10. sınıf sabit
+        dfE, hazir, _ = svc._sabit_seviye_bol(self._dfE(cift=False), sabit, [])
+        self.assertEqual(len(hazir), 1)
+        self.assertEqual(set(dfE.loc[dfE["Ders"] == self.TDE, "Seviye"]), {9, 11, 12})
+
+    def test_seviyesiz_kayit_kalan_seviyeleri_sabitler(self):
+        svc = _service()
+        sabit = [self._sabitler()[0], {**self._sabitler()[1], "seviyeler": []}]
+        _dfE, hazir, _ = svc._sabit_seviye_bol(self._dfE(cift=False), sabit, [])
+        self.assertEqual([(d, sev) for d, _ss, sev in hazir],
+                         [(f"{self.TDE} [10. sınıf]", [10]), (self.TDE, [9, 11, 12])])
+
+    def test_bolunmus_dersler_farkli_sabit_slotlara_yerlesir(self):
+        svc = _service()
+        dfE, hazir, _ = svc._sabit_seviye_bol(self._dfE(), self._sabitler(), [self.TDE])
+        sube_dersler = dfE.groupby("Sube")["Ders"].apply(list).to_dict()
+        G, DERSLER, _ = _graph(sube_dersler)
+        fixed = {hazir[0][0]: 0, hazir[1][0]: 7}
+        pairs = [
+            (d, d[: -len(" (Uygulama)")] + " (Yazili)")
+            for d in DERSLER if d.endswith(" (Uygulama)")
+        ]
+        self.assertEqual(len(pairs), 2)
+        ders_to_slot, gun, _G = TakvimServiceGATestCase._run_full(
+            self, sube_dersler, svc=svc, pairs=pairs, fixed_slots=fixed
+        )
+        self.assertEqual(ders_to_slot[hazir[0][0]], 0)
+        self.assertEqual(ders_to_slot[hazir[1][0]], 7)
+        for uyg, yaz in pairs:  # Uygulama, Yazılı ile aynı gün
+            self.assertEqual(ders_to_slot[uyg] // gun, ders_to_slot[yaz] // gun)
+
+
+class SabitSinavTakvimUctanUcaTestCase(TestCase):
+    """takvimolustur() uçtan uca: seviyeye özel iki sabit TDE sınavı önizlemeye
+    doğru tarih/saat ve şubelerle, gerçek ders adıyla yansır."""
+
+    def test_onizleme_satirlari(self):
+        from datetime import datetime
+
+        from okul.models import DersHavuzu, SinifSube
+        from sinav.models import SubeDers
+
+        tde = DersHavuzu.objects.create(ders_adi="TÜRK DİLİ VE EDEBİYATI", cift_oturum=1)
+        mat = DersHavuzu.objects.create(ders_adi="MATEMATİK")
+        for sev in (9, 10, 11, 12):
+            ss = SinifSube.objects.create(sinif=sev, sube="A")
+            for ders in (tde, mat):
+                SubeDers.objects.create(ders=ders, seviye=sev, sube=ss)
+
+        svc = _service(
+            OTURUM_SAATLERI=["08:50", "10:30", "12:10"],
+            BASLANGIC_TARIH=datetime(2026, 11, 2),
+            HOLIDAYS=set(),
+            SABIT_SINAVLAR=[
+                {"ders": tde.ders_adi, "tarih": "2026-11-03", "saat": "08:50", "seviyeler": [10]},
+                {"ders": tde.ders_adi, "tarih": "2026-11-06", "saat": "10:30", "seviyeler": [9, 11, 12]},
+            ],
+        )
+        svc.takvimolustur()
+
+        yazili = {
+            (r["Tarih"], r["Saat"], r["Subeler"])
+            for r in svc._onizleme_kayitlar
+            if r["Ders"] == "TÜRK DİLİ VE EDEBİYATI (Yazili)"
+        }
+        self.assertEqual(yazili, {
+            ("2026-11-03", "08:50", "10/A"),
+            ("2026-11-06", "10:30", "11/A, 12/A, 9/A"),
+        })
+        # Düğüm etiketleri ("[10. sınıf]") önizlemeye sızmamalı
+        self.assertFalse(any("sınıf]" in r["Ders"] for r in svc._onizleme_kayitlar))
+
+
+class SabitSinavEklemeTestCase(SimpleTestCase):
+    def test_ayni_ders_farkli_seviyelerle_eklenebilir(self):
+        from sinav.services.ders_ayarlari import SabitSinavCakismasi, sabit_sinav_ekle_veya_guncelle
+
+        tde = "TÜRK DİLİ VE EDEBİYATI"
+        liste = []
+        on = {"ders_adi": tde, "tarih": "2026-11-03", "saat": "08:50", "seviyeler": [10]}
+        diger = {"ders_adi": tde, "tarih": "2026-11-06", "saat": "10:30", "seviyeler": [9, 11, 12]}
+        self.assertFalse(sabit_sinav_ekle_veya_guncelle(liste, on))
+        self.assertFalse(sabit_sinav_ekle_veya_guncelle(liste, diger))
+        self.assertEqual(len(liste), 2)
+
+        # Aynı seviyeler → güncelleme
+        self.assertTrue(sabit_sinav_ekle_veya_guncelle(liste, {**on, "saat": "10:30"}))
+        self.assertEqual(liste[0]["saat"], "10:30")
+
+        # Örtüşen seviye (ya da "tüm sınıflar") → hata, liste değişmez
+        with self.assertRaises(SabitSinavCakismasi):
+            sabit_sinav_ekle_veya_guncelle(liste, {**on, "seviyeler": [10, 11]})
+        with self.assertRaises(SabitSinavCakismasi):
+            sabit_sinav_ekle_veya_guncelle(liste, {**on, "seviyeler": []})
+        self.assertEqual(len(liste), 2)
+
+
 class OturmaPlanServiceGATestCase(SimpleTestCase):
     """OturmaPlanService._build_layout (GA tabanli koltuk atamasi, bkz.
     _ga_seat_assignment) icin saf mantik testleri. Faz-1 (stride bosluk

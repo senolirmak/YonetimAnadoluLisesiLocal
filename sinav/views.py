@@ -1591,16 +1591,16 @@ def sabit_sinav_ekle(request):
         messages.error(request, "Ders adı, tarih ve saat zorunludur.")
         return redirect("sinav:ders_ayarlari")
 
-    def _mutate(liste):
-        yeni = {"ders_adi": ders_adi, "tarih": tarih, "saat": saat, "seviyeler": seviyeler}
-        for i, ss in enumerate(liste):
-            if ss["ders_adi"] == ders_adi:
-                liste[i] = yeni
-                return True
-        liste.append(yeni)
-        return False
+    from sinav.services.ders_ayarlari import SabitSinavCakismasi, sabit_sinav_ekle_veya_guncelle
 
-    guncellendi = mutate_ayar_listesi(aktif, "sabit_sinavlar", _mutate)
+    yeni = {"ders_adi": ders_adi, "tarih": tarih, "saat": saat, "seviyeler": seviyeler}
+    try:
+        guncellendi = mutate_ayar_listesi(
+            aktif, "sabit_sinavlar", lambda liste: sabit_sinav_ekle_veya_guncelle(liste, yeni)
+        )
+    except SabitSinavCakismasi as exc:
+        messages.error(request, str(exc))
+        return redirect("sinav:ders_ayarlari")
     if guncellendi:
         messages.success(request, f'"{ders_adi}" sabit sınav güncellendi.')
     else:
