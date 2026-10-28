@@ -348,6 +348,62 @@ class SabitSinavMutasyonTestCase(SimpleTestCase):
             self.assertEqual(placement[ctx["course_unit"][uyg]] // 3, 2)  # aynı gün
 
 
+class SabitSinavOnKontrolTestCase(TestCase):
+    """Sabit sınavlar birbiriyle çelişiyorsa motor onlarca gün eklemeden hemen
+    durmalı ve sebebi okunur şekilde loglamalı."""
+
+    def _calistir(self, sabitler, oturumlar=("08:50", "10:30", "12:10")):
+        from datetime import datetime
+
+        from okul.models import DersHavuzu, SinifSube
+        from sinav.models import SubeDers
+
+        tde = DersHavuzu.objects.create(ders_adi="TÜRK DİLİ VE EDEBİYATI", cift_oturum=1)
+        mat = DersHavuzu.objects.create(ders_adi="MATEMATİK")
+        for sev in (9, 10):
+            ss = SinifSube.objects.create(sinif=sev, sube="A")
+            for ders in (tde, mat):
+                SubeDers.objects.create(ders=ders, seviye=sev, sube=ss)
+        loglar = []
+        svc = _service(
+            OTURUM_SAATLERI=list(oturumlar), BASLANGIC_TARIH=datetime(2026, 11, 9),
+            HOLIDAYS=set(), SABIT_SINAVLAR=sabitler,
+        )
+        svc._log_fn = loglar.append
+        return svc, loglar
+
+    def test_gunluk_kota_asiminda_hemen_durur(self):
+        # 9/A: 11.11'de MAT + TDE Yazılı sabit → TDE Uygulama da o gün olmalı → 3 sınav > 2
+        svc, loglar = self._calistir([
+            {"ders": "MATEMATİK", "tarih": "2026-11-11", "saat": "08:50", "seviyeler": [9]},
+            {"ders": "TÜRK DİLİ VE EDEBİYATI", "tarih": "2026-11-11", "saat": "10:30", "seviyeler": [9]},
+        ])
+        with self.assertRaisesRegex(RuntimeError, "Sabit sınavlar birlikte yerleştirilemiyor"):
+            svc.takvimolustur()
+        sorunlar = [m for m in loglar if "SABIT SINAV SORUNU" in m]
+        self.assertEqual(len(sorunlar), 1)
+        self.assertIn("(Uygulama)", sorunlar[0])
+        self.assertIn("9/A şubesi o gün günlük sınav sınırını (2) aşıyor", sorunlar[0])
+        self.assertFalse(any("Gun artirildi" in m for m in loglar))
+
+    def test_ayni_oturumda_ortak_ogrenci(self):
+        svc, loglar = self._calistir([
+            {"ders": "MATEMATİK", "tarih": "2026-11-11", "saat": "10:30", "seviyeler": []},
+            {"ders": "TÜRK DİLİ VE EDEBİYATI", "tarih": "2026-11-11", "saat": "10:30", "seviyeler": [10]},
+        ])
+        with self.assertRaises(RuntimeError):
+            svc.takvimolustur()
+        self.assertTrue(any("11.11.2026 10:30" in m and "ortak öğrencisi" in m for m in loglar))
+
+    def test_uyumlu_sabitlerde_takvim_uretilir(self):
+        svc, loglar = self._calistir([
+            {"ders": "TÜRK DİLİ VE EDEBİYATI", "tarih": "2026-11-12", "saat": "08:50", "seviyeler": [10]},
+            {"ders": "TÜRK DİLİ VE EDEBİYATI", "tarih": "2026-11-11", "saat": "10:30", "seviyeler": [9]},
+        ])
+        svc.takvimolustur()
+        self.assertTrue(any("Sabit sinavlar saglandi" in m for m in loglar))
+
+
 class SabitSinavEklemeTestCase(SimpleTestCase):
     def test_ayni_ders_farkli_seviyelerle_eklenebilir(self):
         from sinav.services.ders_ayarlari import SabitSinavCakismasi, sabit_sinav_ekle_veya_guncelle
