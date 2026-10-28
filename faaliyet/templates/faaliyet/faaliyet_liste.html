@@ -16,6 +16,14 @@
         <a href="{% url 'faaliyet:faaliyet_olustur' %}" class="btn btn-success">+ Yeni Faaliyet</a>
     </div>
 
+    {% if tarih_siniri %}
+    <div class="msg-box msg-info">
+        Faaliyetler en fazla <strong>{{ geriye_donuk_gun }} gün geriye dönük</strong> işlenebilir
+        (bugün için en eski tarih: <strong>{{ tarih_siniri|date:"d.m.Y" }}</strong>).
+        Faaliyetinizi yaptığınız hafta içinde kaydetmeyi unutmayın.
+    </div>
+    {% endif %}
+
     {% if faaliyetler %}
     <div class="table-responsive">
         <table class="table">
@@ -27,6 +35,7 @@
                     <th class="center">Ders</th>
                     <th class="center">Öğrenci</th>
                     <th class="center">Durum</th>
+                    <th class="center" title="e-Okul'a işlenen / faaliyete tam katılan öğrenci">e-Okul</th>
                     <th class="center">İşlemler</th>
                 </tr>
             </thead>
@@ -54,6 +63,9 @@
                         {% elif f.durum == 'reddedildi' %}
                         <span class="badge" style="background:#dc3545;">Reddedildi</span>
                         {% endif %}
+                    </td>
+                    <td class="center" style="white-space:nowrap;">
+                        {% include 'faaliyet/_eokul_rozet.html' %}
                     </td>
                     <td class="center" style="white-space:nowrap;">
                         <a href="{% url 'faaliyet:faaliyet_detay' f.pk %}" class="btn btn-info" style="padding:4px 10px;font-size:0.85em;">Detay</a>

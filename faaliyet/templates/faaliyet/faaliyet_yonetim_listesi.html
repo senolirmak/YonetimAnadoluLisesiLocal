@@ -111,15 +111,7 @@
                         {% endif %}
                     </td>
                     <td class="center" style="white-space:nowrap;">
-                        {% if not f.eokul or not f.eokul.katilan %}
-                        <span style="color:#adb5bd;">—</span>
-                        {% elif f.eokul.islenen == f.eokul.katilan %}
-                        <span class="badge" style="background:#28a745;" title="Tüm öğrenciler e-Okul'a işlendi">✓ {{ f.eokul.islenen }}/{{ f.eokul.katilan }}</span>
-                        {% elif f.eokul.islenen %}
-                        <span class="badge" style="background:#fd7e14;" title="Bazı öğrenciler e-Okul'a işlendi">{{ f.eokul.islenen }}/{{ f.eokul.katilan }}</span>
-                        {% else %}
-                        <span class="badge" style="background:#6c757d;" title="Henüz e-Okul'a işlenmedi">0/{{ f.eokul.katilan }}</span>
-                        {% endif %}
+                        {% include 'faaliyet/_eokul_rozet.html' %}
                     </td>
                     <td class="center" style="white-space:nowrap;">
                         <a href="{% url 'faaliyet:faaliyet_detay' f.pk %}"

@@ -1,3 +1,5 @@
+import datetime
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -11,6 +13,7 @@ from devamsizlik.models import OgrenciDevamsizlik
 from ogrenci.models import Ogrenci
 
 from .models import Faaliyet, FaaliyetDersSaati
+from .services.tarih_kurali import GERIYE_DONUK_GUN, en_erken_tarih, sinirdan_muaf_mi, tarih_hatasi
 
 # ─────────────────────────────────────────────
 # Yardımcılar
@@ -46,8 +49,25 @@ def _ogrenci_verileri():
     }
 
 
-def _post_to_faaliyet(request):
-    """POST verisinden faaliyet alan değerlerini toplar."""
+def _tarih_siniri_ctx(request, mevcut_tarih=None):
+    """Form şablonu için geriye dönük tarih sınırı bilgisi (muafsa boş)."""
+    if sinirdan_muaf_mi(request.user):
+        return {"tarih_siniri": None}
+    sinir = en_erken_tarih()
+    # Düzenlemede kayıtlı (daha eski) tarih korunabilsin diye tarayıcı sınırı esnetilir
+    tarayici_min = min(sinir, mevcut_tarih) if mevcut_tarih else sinir
+    return {
+        "tarih_siniri": sinir,
+        "tarih_min": tarayici_min,
+        "geriye_donuk_gun": GERIYE_DONUK_GUN,
+    }
+
+
+def _post_to_faaliyet(request, mevcut_tarih=None):
+    """POST verisinden faaliyet alan değerlerini toplar.
+
+    `mevcut_tarih`: düzenlemede faaliyetin kayıtlı tarihi (geriye dönük sınır için).
+    """
     konu = request.POST.get("konu", "").strip()
     tarih = request.POST.get("tarih", "").strip()
     yer = request.POST.get("yer", "").strip()
@@ -58,6 +78,15 @@ def _post_to_faaliyet(request):
         hatalar.append("Faaliyet konusu zorunludur.")
     if not tarih:
         hatalar.append("Tarih zorunludur.")
+    else:
+        try:
+            tarih = datetime.date.fromisoformat(tarih)
+        except ValueError:
+            hatalar.append("Geçersiz tarih.")
+        else:
+            hata = tarih_hatasi(request.user, tarih, mevcut_tarih)
+            if hata:
+                hatalar.append(hata)
     if not yer:
         hatalar.append("Yapıldığı yer zorunludur.")
 
@@ -93,10 +122,19 @@ def faaliyet_liste(request):
         messages.error(request, "Bu kullanıcıya bağlı personel kaydı bulunamadı.")
         return redirect("index")
 
-    faaliyetler = Faaliyet.objects.filter(ogretmen=personel).prefetch_related(
-        "ders_saatleri", "ogrenciler"
+    from .services.toplu_rapor import eokul_ozeti
+
+    faaliyetler = list(
+        Faaliyet.objects.filter(ogretmen=personel).prefetch_related("ders_saatleri", "ogrenciler")
     )
-    return render(request, "faaliyet/faaliyet_liste.html", {"faaliyetler": faaliyetler})
+    ozet = eokul_ozeti(faaliyetler)
+    for f in faaliyetler:
+        f.eokul = ozet.get(f.pk)
+    return render(
+        request,
+        "faaliyet/faaliyet_liste.html",
+        {"faaliyetler": faaliyetler, **_tarih_siniri_ctx(request)},
+    )
 
 
 @login_required
@@ -108,6 +146,7 @@ def faaliyet_olustur(request):
 
     ctx = _ogrenci_verileri()
     ctx["faaliyet"] = None
+    ctx.update(_tarih_siniri_ctx(request))
 
     if request.method == "POST":
         konu, tarih, yer, aciklama, ders_saatleri, secili_ids, hatalar = _post_to_faaliyet(request)
@@ -178,10 +217,13 @@ def faaliyet_duzenle(request, pk):
 
     ctx = _ogrenci_verileri()
     ctx["faaliyet"] = faaliyet
+    ctx.update(_tarih_siniri_ctx(request, faaliyet.tarih))
     ctx["secili_ids"] = set(faaliyet.ogrenciler.values_list("pk", flat=True))
 
     if request.method == "POST":
-        konu, tarih, yer, aciklama, ders_saatleri, secili_ids, hatalar = _post_to_faaliyet(request)
+        konu, tarih, yer, aciklama, ders_saatleri, secili_ids, hatalar = _post_to_faaliyet(
+            request, mevcut_tarih=faaliyet.tarih
+        )
         if hatalar:
             for h in hatalar:
                 messages.error(request, h)
