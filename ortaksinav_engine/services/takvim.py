@@ -89,11 +89,24 @@ class TakvimService(BaseService):
                 rows.append(r)
         dfE = pd.DataFrame(rows)
 
+        # Seviyeye özel sabit sınavlar (örn. 10. sınıf TDE ayrı, 9/11/12 TDE ayrı
+        # oturumda) için ders, sabitlenen seviyelerde ayrı bir düğüme bölünür.
+        dfE, sabit_hazir, DUGUM_DERS = self._sabit_seviye_bol(
+            dfE, self.config.get("SABIT_SINAVLAR") or [], CIFT_OTURUMLU_DERSLER
+        )
+
         G, DERSLER, SUBE_DERS_MAP = self._build_graph(dfE)
 
         # Seviye bazli catisma gruplari: ayni gruptaki dersler ayni seviyede
-        # ayni slota duşemez → G'ye ek kenar ekle
-        catisma_gruplari = self.config.get("SEVIYE_CATISMA_GRUPLARI") or []
+        # ayni slota duşemez → G'ye ek kenar ekle.
+        # Seviyeye göre bölünmüş derslerin parçaları da gruba dahil edilir.
+        parcalar: dict[str, list[str]] = defaultdict(list)
+        for dugum, ders in DUGUM_DERS.items():
+            parcalar[ders].append(dugum)
+        catisma_gruplari = [
+            list(grup) + [p for d in grup for p in parcalar.get(d, [])]
+            for grup in (self.config.get("SEVIYE_CATISMA_GRUPLARI") or [])
+        ]
         kenар_sayisi = 0
         for grup in catisma_gruplari:
             # Her dersin hangi seviyelerde bulundugunu bul
@@ -161,69 +174,37 @@ class TakvimService(BaseService):
 
         # Sabit sinavlari slot endeksine donustur
         fixed_slots: dict[str, int] = {}
-        sabit_list = self.config.get("SABIT_SINAVLAR") or []
-        if sabit_list:
+        if sabit_hazir:
             from datetime import date as _date
             oturum_saatleri = self.config["OTURUM_SAATLERI"]
             baslangic = self.config["BASLANGIC_TARIH"]
             holidays  = self.config["HOLIDAYS"]
-            for ss in sabit_list:
-                ders_adi  = ss["ders"]
-                seviyeler = ss.get("seviyeler") or []  # [] → tüm seviyeler
-
-                # Çift oturumlu dersler DERSLER listesinde "(Yazılı)" ve "(Uygulama)"
-                # olarak ikiye bölündüğünden, sabit atama "(Yazılı)" varyantına yapılır.
-                if ders_adi in CIFT_OTURUMLU_DERSLER:
-                    ilp_ders_adi = ders_adi + " (Yazili)"
-                    self.log(f"  [Sabit] '{ders_adi}' çift oturumlu → Yazili oturumu sabitlenecek.")
-                else:
-                    ilp_ders_adi = ders_adi
-
+            for dugum, ss, seviyeler in sabit_hazir:
                 try:
                     tarih = _date.fromisoformat(ss["tarih"])
                     saat  = ss["saat"]
                     slot_in_day = oturum_saatleri.index(saat)
                 except (ValueError, IndexError) as exc:
-                    self.log(f"  [Sabit] '{ders_adi}' slot hesaplanamadı: {exc}")
+                    self.log(f"  [Sabit] '{dugum}' slot hesaplanamadı: {exc}")
                     continue
 
                 day_index = self._date_to_day_index(tarih, baslangic, holidays)
                 t_fixed = day_index * OTURUM_SAYISI_GUN + slot_in_day
-
-                # Seviye filtresi: belirtilmişse yalnızca o seviyelerde var olan dersler için uygula.
-                # SUBE_DERS_MAP anahtarları "9/A" biçiminde; ham ders_adi kullanılarak kontrol edilir.
-                # SUBE_DERS_MAP değerleri dfE'den gelir: çift oturumlu dersler orada
-                # "(Yazılı)"/"(Uygulama)" olarak genişletilmiştir.
-                # Bu yüzden varlık/seviye kontrolü ilp_ders_adi ile yapılmalı.
-                if ilp_ders_adi not in DERSLER:
-                    self.log(f"  [Sabit] '{ilp_ders_adi}' DERSLER'de yok, atlanıyor.")
-                    continue
-
-                if seviyeler:
-                    sev_strs = {str(s) for s in seviyeler}
-                    mevcut = any(
-                        sube.split("/")[0] in sev_strs and ilp_ders_adi in set(dlist)
-                        for sube, dlist in SUBE_DERS_MAP.items()
-                    )
-                    if not mevcut:
-                        self.log(f"  [Sabit] '{ilp_ders_adi}' belirlenen seviyelerde yok, atlanıyor.")
-                        continue
-                    sev_str = ",".join(str(s) for s in seviyeler)
-                    self.log(f"  [Sabit] {ilp_ders_adi} (seviye:{sev_str}) → gün {day_index+1}, slot {slot_in_day+1} (t={t_fixed})")
-                else:
-                    self.log(f"  [Sabit] {ilp_ders_adi} → gün {day_index+1}, slot {slot_in_day+1} (t={t_fixed})")
-
-                fixed_slots[ilp_ders_adi] = t_fixed
+                sev_str = ",".join(str(s) for s in seviyeler)
+                self.log(f"  [Sabit] {dugum} (seviye:{sev_str}) → gün {day_index+1}, slot {slot_in_day+1} (t={t_fixed})")
+                fixed_slots[dugum] = t_fixed
 
             # K_upper en az tüm sabit slotları kapsayacak kadar büyük olmalı
             if fixed_slots:
                 K_upper = max(K_upper, max(fixed_slots.values()) + 1)
 
         # Cift oturumlu ciftleri onceden hesapla – Faz-1 ve Faz-2'de kullanilir
+        # (Seviyeye göre bölünmüş parçalar da "... [10. sınıf] (Uygulama)" biçiminde
+        # olduğundan sonek üzerinden eşleştirilir.)
         pairs = [
-            (base + " (Uygulama)", base + " (Yazili)")
-            for base in CIFT_OTURUMLU_DERSLER
-            if base + " (Uygulama)" in DERSLER and base + " (Yazili)" in DERSLER
+            (d, d[: -len(" (Uygulama)")] + " (Yazili)")
+            for d in DERSLER
+            if d.endswith(" (Uygulama)") and d[: -len(" (Uygulama)")] + " (Yazili)" in DERSLER
         ]
         if pairs:
             self.log(f"  Cift oturumlu ayni-gun kisiti: {len(pairs)} cift (Faz-1 ve Faz-2).")
@@ -304,7 +285,7 @@ class TakvimService(BaseService):
                 "Saat": saat,
                 "Oturum": t,          # gecici; asagida yeniden numaralandirilacak
                 "GunIdx": day_index,
-                "Ders": d,
+                "Ders": DUGUM_DERS.get(d, d),
                 "Subeler": ", ".join(sorted(subeler)),
             })
 
@@ -405,6 +386,72 @@ class TakvimService(BaseService):
             if d.weekday() < 5 and d.date() not in holidays:
                 added += 1
         return d
+
+    def _sabit_seviye_bol(self, dfE: pd.DataFrame, sabit_list, cift_dersler):
+        """Sabit sınavları takvim düğümlerine eşler.
+
+        Seviye belirtilmiş bir sabit sınav, dersin yalnızca o seviyelerini sabitler:
+        ders o seviyelerde ayrı bir düğüme (örn. "TDE [10. sınıf]") bölünür, kalan
+        seviyeler normal ders olarak (GA ile ya da seviyesiz bir sabit kayıtla) planlanır.
+        Böylece aynı ders farklı seviyeler için farklı oturumlara sabitlenebilir.
+
+        Çift oturumlu derslerde sabit atama "(Yazili)" oturumuna yapılır; "(Uygulama)"
+        oturumu da aynı seviye gruplarına bölünür ki aynı-gün eşleşmesi korunsun
+        (düğüm adı "DERS [10. sınıf] (Yazili)" biçimindedir, sonek sonda kalır).
+
+        Dönüş: (dfE, [(düğüm, sabit_kayit, seviyeler)], {bölünmüş_düğüm: takvim_ders_adi})
+        """
+        dfE = dfE.copy()
+        hazir: list[tuple[str, dict, list[int]]] = []
+        dugum_ders: dict[str, str] = {}
+
+        gruplu: dict[str, list[dict]] = defaultdict(list)
+        for ss in sabit_list:
+            gruplu[ss["ders"]].append(ss)
+
+        for ders_adi, kayitlar in gruplu.items():
+            if ders_adi in cift_dersler:
+                self.log(f"  [Sabit] '{ders_adi}' çift oturumlu → Yazili oturumu sabitlenecek.")
+                sonekler = [" (Yazili)", " (Uygulama)"]  # ilki sabitlenir
+            else:
+                sonekler = [""]
+            sabit_ad = ders_adi + sonekler[0]
+
+            mevcut = {int(v) for v in dfE.loc[dfE["Ders"] == sabit_ad, "Seviye"]}
+            if not mevcut:
+                self.log(f"  [Sabit] '{sabit_ad}' takvime girecek dersler arasında yok, atlanıyor.")
+                continue
+
+            kalan = set(mevcut)
+            tum_seviyeler_kaydi = None
+            for ss in kayitlar:
+                istenen = {int(v) for v in (ss.get("seviyeler") or [])}
+                if not istenen:
+                    tum_seviyeler_kaydi = ss  # kalan tüm seviyeler için
+                    continue
+                grup = istenen & kalan
+                if not grup:
+                    self.log(
+                        f"  [Sabit] '{sabit_ad}' {sorted(istenen)}. sınıf seviyelerinde yok "
+                        "ya da başka bir sabit kayıtta, atlanıyor."
+                    )
+                    continue
+                kalan -= grup
+                if grup == mevcut:
+                    hazir.append((sabit_ad, ss, sorted(grup)))
+                    continue
+                etiket = f" [{','.join(str(v) for v in sorted(grup))}. sınıf]"
+                for sonek in sonekler:
+                    ad = ders_adi + sonek
+                    dugum = ders_adi + etiket + sonek
+                    dfE.loc[(dfE["Ders"] == ad) & dfE["Seviye"].isin(grup), "Ders"] = dugum
+                    dugum_ders[dugum] = ad
+                hazir.append((ders_adi + etiket + sonekler[0], ss, sorted(grup)))
+
+            if tum_seviyeler_kaydi and kalan:
+                hazir.append((sabit_ad, tum_seviyeler_kaydi, sorted(kalan)))
+
+        return dfE, hazir, dugum_ders
 
     @staticmethod
     def _build_graph(df_expanded: pd.DataFrame):

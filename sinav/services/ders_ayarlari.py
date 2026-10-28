@@ -84,3 +84,37 @@ def parse_ders_ayarlari_post(post_data) -> dict:
             pass
 
     return guncellemeler
+
+
+TUM_SEVIYELER = (9, 10, 11, 12)
+
+
+class SabitSinavCakismasi(ValueError):
+    """Aynı ders için seviyeleri örtüşen iki sabit sınav tanımlanamaz."""
+
+
+def sabit_sinav_ekle_veya_guncelle(liste: list, yeni: dict) -> bool:
+    """`yeni` sabit sınavı listeye ekler; True → mevcut kayıt güncellendi.
+
+    Aynı ders, sınıf seviyeleri örtüşmediği sürece birden çok kez eklenebilir
+    (örn. 10. sınıf TDE bir gün, 9/11/12 TDE başka gün). Seviyeleri birebir aynı
+    olan kayıt güncellenir; kısmen örtüşen kayıt `SabitSinavCakismasi` fırlatır.
+    Boş seviye listesi "tüm sınıflar" demektir.
+    """
+    yeni_sev = set(yeni.get("seviyeler") or TUM_SEVIYELER)
+    for i, ss in enumerate(liste):
+        if ss["ders_adi"] != yeni["ders_adi"]:
+            continue
+        mevcut_sev = set(ss.get("seviyeler") or TUM_SEVIYELER)
+        if mevcut_sev == yeni_sev:
+            liste[i] = yeni
+            return True
+        ortak = mevcut_sev & yeni_sev
+        if ortak:
+            sev = ", ".join(str(s) for s in sorted(ortak))
+            raise SabitSinavCakismasi(
+                f'"{yeni["ders_adi"]}" için {sev}. sınıf seviyesinde zaten bir sabit sınav var '
+                f'({ss["tarih"]} {ss["saat"]}). Önce onu silin ya da farklı seviyeler seçin.'
+            )
+    liste.append(yeni)
+    return False

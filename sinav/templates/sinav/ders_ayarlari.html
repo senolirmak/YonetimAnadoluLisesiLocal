@@ -533,8 +533,26 @@ function sabitEkle() {
   const seviyeler = [...document.querySelectorAll(".sabit-seviye:checked")]
                       .map(cb => parseInt(cb.value)).sort((a,b)=>a-b);
   if (!dersAdi || !tarih || !saat) { alert("Ders adı, tarih ve saat zorunludur."); return; }
-  const idx = sabitState.findIndex(s => s.ders_adi === dersAdi);
+  // Aynı ders, sınıf seviyeleri örtüşmediği sürece birden çok kez eklenebilir
+  // (örn. 10. sınıf TDE bir gün, 9/11/12 TDE başka gün). Boş seviye = tüm sınıflar.
+  // Sunucudaki karşılığı: sinav/services/ders_ayarlari.py: sabit_sinav_ekle_veya_guncelle
+  const TUM = [9, 10, 11, 12];
+  const sevSet = (liste) => new Set(liste && liste.length ? liste : TUM);
+  const yeniSev = sevSet(seviyeler);
   const yeni = { ders_adi: dersAdi, tarih, saat, seviyeler };
+  let idx = -1;
+  for (let i = 0; i < sabitState.length; i++) {
+    const ss = sabitState[i];
+    if (ss.ders_adi !== dersAdi) continue;
+    const mevcutSev = sevSet(ss.seviyeler);
+    const ortak = [...yeniSev].filter(v => mevcutSev.has(v)).sort((a, b) => a - b);
+    if (ortak.length === yeniSev.size && ortak.length === mevcutSev.size) { idx = i; break; }
+    if (ortak.length) {
+      alert(`"${dersAdi}" için ${ortak.join(", ")}. sınıf seviyesinde zaten bir sabit sınav var `
+            + `(${tarihGoster(ss.tarih)} ${ss.saat}). Önce onu silin ya da farklı seviyeler seçin.`);
+      return;
+    }
+  }
   if (idx >= 0) sabitState[idx] = yeni;
   else          sabitState.push(yeni);
   renderSabit();
