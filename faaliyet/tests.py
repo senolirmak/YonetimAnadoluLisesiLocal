@@ -7,9 +7,11 @@ from django.urls import reverse
 from devamsizlik.models import OgrenciDevamsizlik
 from ogrenci.models import Ogrenci
 from okul.models import DersSaatleri, Personel
+from okul.testing import zamani_dondur
 
 from .models import Faaliyet, FaaliyetDersSaati, FaaliyetEokulKaydi
 from .services.eokul import EokulIsaretHatasi, eokul_isaretle
+from .services.tarih_kurali import en_erken_tarih, tarih_hatasi
 from .services.toplu_rapor import (
     ogrenci_rapor_pdf,
     ogrenciye_gore_grupla,
@@ -266,6 +268,16 @@ class FaaliyetEokulTestCase(FaaliyetVerisiMixin, TestCase):
         self.assertContains(r, "✓ 1/1")
         self.assertContains(r, "0/2")
 
+    def test_ogretmen_listesinde_eokul_durumu(self):
+        eokul_isaretle(self.f2.pk, self.ogr1.pk, True)
+        eokul_isaretle(self.f2.pk, self.ogr2.pk, True)
+        eokul_isaretle(self.f3.pk, self.ogr1.pk, True)
+        self.client.force_login(self.ogretmen_user)
+        r = self.client.get(reverse("faaliyet:faaliyet_liste"))
+        self.assertContains(r, "✓ 2/2")  # f2: tümü işlendi
+        self.assertContains(r, ">1/2<")  # f3: kısmen
+        self.assertContains(r, ">0/1<")  # f1: hiç işlenmedi (ogr1 devamsız)
+
     def test_toplu_isaretleme_view(self):
         url = reverse("faaliyet:faaliyet_eokul_isaretle")
         self.client.force_login(self.admin)
@@ -290,3 +302,76 @@ class FaaliyetEokulTestCase(FaaliyetVerisiMixin, TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertFalse(FaaliyetEokulKaydi.objects.filter(faaliyet=self.f1).exists())
 
+
+
+class FaaliyetGeriyeDonukSinirTestCase(TestCase):
+    """Öğretmen en fazla 7 gün geriye dönük faaliyet işleyebilir; MY muaftır."""
+
+    BUGUN = date(2026, 10, 28)
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_superuser("admin", "a@a.com", "x")
+        cls.ogretmen_user = User.objects.create_user("ogr", password="x")
+        cls.personel = Personel.objects.create(
+            user=cls.ogretmen_user, kimlikno="11111111111", adi_soyadi="Ayşe Öğretmen"
+        )
+        Personel.objects.create(user=cls.admin, kimlikno="33333333333", adi_soyadi="Müdür Yrd")
+
+    def _gonder(self, user, tarih, url=None):
+        self.client.force_login(user)
+        with zamani_dondur(self.BUGUN, 10):
+            return self.client.post(
+                url or reverse("faaliyet:faaliyet_olustur"),
+                {"konu": "Gezi", "tarih": tarih.isoformat(), "yer": "Müze"},
+            )
+
+    def test_servis_siniri(self):
+        with zamani_dondur(self.BUGUN, 10):
+            self.assertEqual(en_erken_tarih(), date(2026, 10, 21))
+            self.assertIsNone(tarih_hatasi(self.ogretmen_user, date(2026, 10, 21)))
+            self.assertIsNotNone(tarih_hatasi(self.ogretmen_user, date(2026, 10, 20)))
+            self.assertIsNone(tarih_hatasi(self.admin, date(2026, 1, 1)))
+            # Kayıtlı tarih değiştirilmeden yapılan düzenleme engellenmez
+            eski = date(2026, 9, 1)
+            self.assertIsNone(tarih_hatasi(self.ogretmen_user, eski, mevcut_tarih=eski))
+
+    def test_ogretmen_sinir_icinde_kaydedebilir(self):
+        self._gonder(self.ogretmen_user, date(2026, 10, 21))
+        self._gonder(self.ogretmen_user, date(2026, 11, 3))  # ileri tarih serbest
+        self.assertEqual(Faaliyet.objects.count(), 2)
+
+    def test_ogretmen_eski_tarihe_kaydedemez(self):
+        r = self._gonder(self.ogretmen_user, date(2026, 10, 20))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "7 gün geriye dönük")
+        self.assertFalse(Faaliyet.objects.exists())
+
+    def test_mudur_yardimcisi_muaf(self):
+        self._gonder(self.admin, date(2026, 9, 1))
+        self.assertEqual(Faaliyet.objects.count(), 1)
+
+    def test_duzenlemede_tarih_eskiye_cekilemez_ama_korunabilir(self):
+        f = Faaliyet.objects.create(
+            konu="Eski", tarih=date(2026, 9, 1), yer="Okul", ogretmen=self.personel,
+            durum=Faaliyet.DURUM_REDDEDILDI,
+        )
+        url = reverse("faaliyet:faaliyet_duzenle", args=[f.pk])
+        self._gonder(self.ogretmen_user, date(2026, 9, 2), url=url)
+        f.refresh_from_db()
+        self.assertEqual(f.durum, Faaliyet.DURUM_REDDEDILDI)  # kaydedilmedi
+        self._gonder(self.ogretmen_user, date(2026, 9, 1), url=url)
+        f.refresh_from_db()
+        self.assertEqual(f.durum, Faaliyet.DURUM_BEKLEMEDE)
+
+    def test_ogretmen_bilgilendirilir(self):
+        self.client.force_login(self.ogretmen_user)
+        with zamani_dondur(self.BUGUN, 10):
+            form = self.client.get(reverse("faaliyet:faaliyet_olustur"))
+            liste = self.client.get(reverse("faaliyet:faaliyet_liste"))
+        self.assertContains(form, 'min="2026-10-21"')
+        self.assertContains(form, "21.10.2026")
+        self.assertContains(liste, "7 gün geriye dönük")
+        self.client.force_login(self.admin)
+        form = self.client.get(reverse("faaliyet:faaliyet_olustur"))
+        self.assertNotContains(form, "geriye dönük")

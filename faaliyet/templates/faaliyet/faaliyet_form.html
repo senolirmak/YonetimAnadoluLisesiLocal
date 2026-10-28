@@ -16,6 +16,14 @@
         <a href="{% url 'faaliyet:faaliyet_liste' %}" class="btn-cancel">← Listeye Dön</a>
     </div>
 
+    {% if tarih_siniri %}
+    <div class="msg-box msg-info">
+        <strong>Bilgi:</strong> Faaliyetleri en fazla <strong>{{ geriye_donuk_gun }} gün geriye dönük</strong>
+        işleyebilirsiniz. Seçebileceğiniz en eski tarih: <strong>{{ tarih_siniri|date:"d.m.Y" }}</strong>.
+        Daha eski bir faaliyet için müdür yardımcısına başvurun.
+    </div>
+    {% endif %}
+
     <form method="post" id="faaliyetForm">
         {% csrf_token %}
 
@@ -42,6 +50,7 @@
                             <div class="form-row" style="flex:1;">
                                 <label for="id_tarih">Tarih <span style="color:red;">*</span></label>
                                 <input type="date" id="id_tarih" name="tarih" required
+                                       {% if tarih_min %}min="{{ tarih_min|date:'Y-m-d' }}"{% endif %}
                                        value="{{ faaliyet.tarih|date:'Y-m-d'|default:'' }}">
                             </div>
                             <div class="form-row" style="flex:1;">
