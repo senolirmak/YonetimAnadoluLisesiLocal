@@ -372,19 +372,28 @@ class SabitSinavOnKontrolTestCase(TestCase):
         svc._log_fn = loglar.append
         return svc, loglar
 
-    def test_gunluk_kota_asiminda_hemen_durur(self):
-        # 9/A: 11.11'de MAT + TDE Yazılı sabit → TDE Uygulama da o gün olmalı → 3 sınav > 2
+    def test_uygulama_sigmazsa_baska_gune_planlanir(self):
+        # Sunucudaki durum: 11.11'de 9. sınıfın iki sabit sınavı (TDE Yazılı 08:50,
+        # MAT 10:30) var; TDE Uygulama o güne sığmaz (12:10 → günde 3 sınav).
         svc, loglar = self._calistir([
-            {"ders": "MATEMATİK", "tarih": "2026-11-11", "saat": "08:50", "seviyeler": [9]},
-            {"ders": "TÜRK DİLİ VE EDEBİYATI", "tarih": "2026-11-11", "saat": "10:30", "seviyeler": [9]},
+            {"ders": "TÜRK DİLİ VE EDEBİYATI", "tarih": "2026-11-11", "saat": "08:50", "seviyeler": [9]},
+            {"ders": "MATEMATİK", "tarih": "2026-11-11", "saat": "10:30", "seviyeler": [9]},
         ])
-        with self.assertRaisesRegex(RuntimeError, "Sabit sınavlar birlikte yerleştirilemiyor"):
-            svc.takvimolustur()
-        sorunlar = [m for m in loglar if "SABIT SINAV SORUNU" in m]
-        self.assertEqual(len(sorunlar), 1)
-        self.assertIn("(Uygulama)", sorunlar[0])
-        self.assertIn("9/A şubesi o gün günlük sınav sınırını (2) aşıyor", sorunlar[0])
+        svc.takvimolustur()
+
+        uyarilar = [m for m in loglar if "UYARI" in m]
+        self.assertEqual(len(uyarilar), 1)
+        self.assertIn("TÜRK DİLİ VE EDEBİYATI [9. sınıf] (Uygulama)", uyarilar[0])
+        self.assertIn("9/A şubesi o gün günlük sınav sınırını (2) aşıyor", uyarilar[0])
         self.assertFalse(any("Gun artirildi" in m for m in loglar))
+        self.assertTrue(any("Sabit sinavlar saglandi" in m for m in loglar))
+
+        satir = {
+            (r["Ders"], r["Subeler"]): (r["Tarih"], r["Saat"]) for r in svc._onizleme_kayitlar
+        }
+        self.assertEqual(satir[("TÜRK DİLİ VE EDEBİYATI (Yazili)", "9/A")], ("2026-11-11", "08:50"))
+        self.assertEqual(satir[("MATEMATİK", "9/A")], ("2026-11-11", "10:30"))
+        self.assertNotEqual(satir[("TÜRK DİLİ VE EDEBİYATI (Uygulama)", "9/A")][0], "2026-11-11")
 
     def test_ayni_oturumda_ortak_ogrenci(self):
         svc, loglar = self._calistir([
