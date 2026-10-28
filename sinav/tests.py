@@ -326,6 +326,28 @@ class SabitSinavTakvimUctanUcaTestCase(TestCase):
         self.assertFalse(any("sınıf]" in r["Ders"] for r in svc._onizleme_kayitlar))
 
 
+class SabitSinavMutasyonTestCase(SimpleTestCase):
+    """Çift oturumlu dersin Uygulama oturumu mutasyona uğrarken sabitlenmiş
+    Yazılı eşini başka güne sürüklememeli (sunucuda TDE sabit tarihinin
+    ezilmesinin sebebi buydu)."""
+
+    def test_mutasyon_sabit_esi_tasimaz(self):
+        svc = _service(OTURUM_SAYISI_GUN=3, MAX_SINAV_PER_GUN=2)
+        uyg, yaz = "TDE (Uygulama)", "TDE (Yazili)"
+        sube_dersler = {"9/A": [uyg, yaz], "9/B": [uyg, yaz], "10/A": ["MAT"]}
+        G, DERSLER, SUBE_DERS_MAP = _graph(sube_dersler)
+        fixed = {yaz: 7}  # 3. gün, 2. oturum
+        ctx = svc._ga_build_context(G, DERSLER, SUBE_DERS_MAP, fixed, [], [(uyg, yaz)], [])
+        K = 15
+        rng = random.Random(0)
+        placement = svc._ga_construct(ctx, K, 3, 2, rng)
+        self.assertIsNotNone(placement)
+        for _ in range(200):
+            svc._ga_mutate(ctx, placement, K, 3, 2, rng, mutation_rate=1.0)
+            self.assertEqual(placement[ctx["course_unit"][yaz]], 7)
+            self.assertEqual(placement[ctx["course_unit"][uyg]] // 3, 2)  # aynı gün
+
+
 class SabitSinavEklemeTestCase(SimpleTestCase):
     def test_ayni_ders_farkli_seviyelerle_eklenebilir(self):
         from sinav.services.ders_ayarlari import SabitSinavCakismasi, sabit_sinav_ekle_veya_guncelle
