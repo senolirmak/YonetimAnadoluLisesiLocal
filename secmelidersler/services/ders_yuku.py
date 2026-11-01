@@ -78,6 +78,9 @@ BRANS_PAYLASIM_ISTISNA_ORTAK_DERSLER = {
 }
 
 YONETICI_GOREV_TIPLERI = ["Okul Müdürü", "Müdür Yardımcısı"]
+# Kadrosu okulda olmayan (norm kadroyu doldurmayan) görev tipleri — "Mevcut"
+# öğretmen sayısına katılmaz (bkz. `mevcut_ogretmenler`).
+NORM_DISI_GOREV_TIPLERI = ["Görevlendirme", "Ücretli Öğretmen"]
 
 _NORM_ILK_ESIK = 6    # bu saatin altı: 0 norm
 _NORM_IKINCI_ESIK = 31   # [6, 31) aralığı: 1 norm
@@ -586,6 +589,9 @@ def mevcut_ogretmenler():
     ders yükünden düşülüyor; hem "1 mevcut öğretmen" hem de "yükten düşülen
     kişi" olarak sayılırlarsa aynı kişi iki farklı yönde norm hesabını
     etkilemiş (ve mevcut'u yanlış şişirmiş) olurdu.
+
+    Görevlendirme / Ücretli Öğretmen (`NORM_DISI_GOREV_TIPLERI`) da sayılmaz —
+    kadroları okulda olmadığından norm kadroyu doldurmazlar.
     """
     from okul.models import Personel
 
@@ -594,6 +600,7 @@ def mevcut_ogretmenler():
         Personel.objects.filter(durum__in=_mevcut_durumlar())
         .exclude(brans__isnull=True)
         .exclude(gorev_tipi__in=YONETICI_GOREV_TIPLERI)
+        .exclude(gorev_tipi__in=NORM_DISI_GOREV_TIPLERI)
         .order_by("brans_id", "adi_soyadi")
     )
     for p in qs:
