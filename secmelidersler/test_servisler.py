@@ -269,3 +269,26 @@ class TasdiknameTestCase(TestCase):
 
         self.ogr.refresh_from_db()
         self.assertFalse(self.ogr.aktif)
+
+
+class MevcutOgretmenlerTestCase(TestCase):
+    """Norm "Mevcut" sayımına Görevlendirme / Ücretli Öğretmen ve yöneticiler girmez."""
+
+    def test_norm_disi_gorev_tipleri_sayilmaz(self):
+        from okul.models import Brans
+        from okul.testing import personel_olustur
+        from secmelidersler.services.ders_yuku import mevcut_ogretmenler
+
+        brans = Brans.objects.create(ad="Matematik")
+        kadrolu = personel_olustur(brans=brans, gorev_tipi="Öğretmen")
+        izinli = personel_olustur(brans=brans, gorev_tipi="Öğretmen", durum="Analık İzinli")
+        disarida = [
+            personel_olustur(brans=brans, gorev_tipi=g)
+            for g in ("Görevlendirme", "Ücretli Öğretmen", "Müdür Yardımcısı")
+        ]
+
+        pkler = {p.pk for p in mevcut_ogretmenler().get(brans.pk, [])}
+
+        self.assertEqual(pkler, {kadrolu.pk, izinli.pk})
+        for p in disarida:
+            self.assertNotIn(p.pk, pkler)
