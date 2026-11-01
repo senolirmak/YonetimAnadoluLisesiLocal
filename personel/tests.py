@@ -75,3 +75,23 @@ class KayitVeOnayTestCase(TestCase):
             self.client.post(reverse("kayit"), {"tckimlikno": "00000000000"})
         self.assertEqual(self._kayit().status_code, 429)
         self.assertFalse(User.objects.filter(username="yeni_ogretmen").exists())
+
+
+class PersonelListesiGorevdeTestCase(TestCase):
+    """Personel listesinde yalnızca "Görevde" olan personel gösterilir."""
+
+    def test_gorevde_olmayanlar_listelenmez(self):
+        gorevde = personel_olustur(durum="Görevde")
+        digerleri = [
+            personel_olustur(durum=d) for d in ("Emekli", "Ayrıldı-Tayin", "Dış Görevde")
+        ]
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+
+        resp = self.client.get(reverse("personel_listesi"), {"q": "", "brans": "", "gorev_tipi": ""})
+
+        self.assertEqual(resp.status_code, 200)
+        pkler = {p.pk for p in resp.context["personeller"]}
+        self.assertIn(gorevde.pk, pkler)
+        for p in digerleri:
+            self.assertNotIn(p.pk, pkler)
+        self.assertEqual(resp.context["toplam"], 1)
