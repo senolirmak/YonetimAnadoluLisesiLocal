@@ -244,7 +244,13 @@ def ogretmen_program(request):
                 }
             )
 
-    tum_nobetci = NobetOgretmen.objects.select_related("personel").order_by("personel__adi_soyadi")
+    # Emekli/tayin/dış görev vb. personel hiçbir kartta görünmesin — yalnızca "Görevde"
+    # olanlar (bkz. PersonelQuerySet.gorevde).
+    tum_nobetci = (
+        NobetOgretmen.objects.select_related("personel")
+        .filter(personel__durum="Görevde")
+        .order_by("personel__adi_soyadi")
+    )
 
     derste = []
     ogretmenler_odasinda = []
