@@ -78,12 +78,12 @@ class KayitVeOnayTestCase(TestCase):
 
 
 class PersonelListesiGorevdeTestCase(TestCase):
-    """Personel listesinde yalnızca "Görevde" olan personel gösterilir."""
+    """Personel listesinde yalnızca "Görevde" ve "Dış Görevde" olan personel gösterilir."""
 
     def test_gorevde_olmayanlar_listelenmez(self):
-        gorevde = personel_olustur(durum="Görevde")
+        listelenenler = [personel_olustur(durum=d) for d in ("Görevde", "Dış Görevde")]
         digerleri = [
-            personel_olustur(durum=d) for d in ("Emekli", "Ayrıldı-Tayin", "Dış Görevde")
+            personel_olustur(durum=d) for d in ("Emekli", "Ayrıldı-Tayin", "Aylıksız İzinli")
         ]
         self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
 
@@ -91,7 +91,8 @@ class PersonelListesiGorevdeTestCase(TestCase):
 
         self.assertEqual(resp.status_code, 200)
         pkler = {p.pk for p in resp.context["personeller"]}
-        self.assertIn(gorevde.pk, pkler)
+        for p in listelenenler:
+            self.assertIn(p.pk, pkler)
         for p in digerleri:
             self.assertNotIn(p.pk, pkler)
-        self.assertEqual(resp.context["toplam"], 1)
+        self.assertEqual(resp.context["toplam"], 2)

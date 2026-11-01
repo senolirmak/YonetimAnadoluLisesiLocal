@@ -22,16 +22,19 @@ from .forms import (
 # ─────────────────────────────────────────────
 
 
+LISTELENEN_DURUMLAR = ("Görevde", "Dış Görevde")
+
+
 @mudur_yardimcisi_required
 def personel_listesi(request):
     q = request.GET.get("q", "").strip()
     brans = request.GET.get("brans", "").strip()
     gorev_tipi = request.GET.get("gorev_tipi", "").strip()
 
-    # Yalnızca "Görevde" olan personel listelenir; emekli/tayin/dış görev vb. personel
-    # okul/yonetim/personel sayfasında görülebilir (bkz. PersonelQuerySet.gorevde).
+    # Yalnızca "Görevde" ve "Dış Görevde" olan personel listelenir; emekli/tayin/izinli
+    # vb. personel okul/yonetim/personel sayfasında görülebilir.
     qs = (
-        NobetPersonel.objects.gorevde()
+        NobetPersonel.objects.filter(durum__in=LISTELENEN_DURUMLAR)
         .select_related("user", "ogretmen", "brans")
         .order_by("adi_soyadi")
     )
@@ -43,13 +46,13 @@ def personel_listesi(request):
         qs = qs.filter(gorev_tipi__iexact=gorev_tipi)
 
     brans_listesi = (
-        NobetPersonel.objects.gorevde().exclude(brans__isnull=True)
+        NobetPersonel.objects.filter(durum__in=LISTELENEN_DURUMLAR).exclude(brans__isnull=True)
         .values_list("brans__ad", flat=True)
         .distinct()
         .order_by("brans__ad")
     )
     gorev_tipi_listesi = (
-        NobetPersonel.objects.gorevde().exclude(gorev_tipi__isnull=True)
+        NobetPersonel.objects.filter(durum__in=LISTELENEN_DURUMLAR).exclude(gorev_tipi__isnull=True)
         .exclude(gorev_tipi="")
         .values_list("gorev_tipi", flat=True)
         .distinct()
