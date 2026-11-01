@@ -28,7 +28,13 @@ def personel_listesi(request):
     brans = request.GET.get("brans", "").strip()
     gorev_tipi = request.GET.get("gorev_tipi", "").strip()
 
-    qs = NobetPersonel.objects.select_related("user", "ogretmen", "brans").order_by("adi_soyadi")
+    # Yalnızca "Görevde" olan personel listelenir; emekli/tayin/dış görev vb. personel
+    # okul/yonetim/personel sayfasında görülebilir (bkz. PersonelQuerySet.gorevde).
+    qs = (
+        NobetPersonel.objects.gorevde()
+        .select_related("user", "ogretmen", "brans")
+        .order_by("adi_soyadi")
+    )
     if q:
         qs = qs.filter(adi_soyadi__icontains=q)
     if brans:
@@ -37,13 +43,13 @@ def personel_listesi(request):
         qs = qs.filter(gorev_tipi__iexact=gorev_tipi)
 
     brans_listesi = (
-        NobetPersonel.objects.exclude(brans__isnull=True)
+        NobetPersonel.objects.gorevde().exclude(brans__isnull=True)
         .values_list("brans__ad", flat=True)
         .distinct()
         .order_by("brans__ad")
     )
     gorev_tipi_listesi = (
-        NobetPersonel.objects.exclude(gorev_tipi__isnull=True)
+        NobetPersonel.objects.gorevde().exclude(gorev_tipi__isnull=True)
         .exclude(gorev_tipi="")
         .values_list("gorev_tipi", flat=True)
         .distinct()
