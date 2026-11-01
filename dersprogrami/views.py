@@ -9,7 +9,7 @@ from django.db.models import Count
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from nobet.models import NobetAtanamayan, NobetGecmisi, NobetOgretmen, NobetPersonel
+from nobet.models import NobetAtanamayan, NobetGecmisi, NobetPersonel
 from personeldevamsizlik.models import Devamsizlik
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
 from veriaktar.forms import DersProgramiImportForm
@@ -244,20 +244,23 @@ def ogretmen_program(request):
                 }
             )
 
-    # Emekli/tayin/dış görev vb. personel hiçbir kartta görünmesin — yalnızca "Görevde"
-    # olanlar (bkz. PersonelQuerySet.gorevde).
-    tum_nobetci = (
-        NobetOgretmen.objects.select_related("personel")
-        .filter(personel__durum="Görevde")
-        .order_by("personel__adi_soyadi")
+    # Listelenecek öğretmenler: "Görevde" olup ya NobetOgretmen kaydı ya da aktif ders
+    # programında dersi olan personel. NobetOgretmen kaydı yalnızca nöbet/personel içe
+    # aktarımında oluştuğundan (örn. o sırada izinde olan) dersi olan bir öğretmen bu
+    # kayıttan yoksun olabilir; yine de ekranda görünmelidir.
+    ders_programi_olan_ids = DersProgrami.objects.aktif().values_list("ogretmen_id", flat=True)
+    tum_ogretmenler = (
+        NobetPersonel.objects.gorevde()
+        .filter(Q(ogretmen__isnull=False) | Q(pk__in=ders_programi_olan_ids))
+        .distinct()
+        .order_by("adi_soyadi")
     )
 
     derste = []
     ogretmenler_odasinda = []
     derssiz = []
 
-    for nobetci in tum_nobetci:
-        p = nobetci.personel
+    for p in tum_ogretmenler:
         devamsiz = p.id in devamsiz_personel_ids
         atamalar = nobetci_atama_map.get(p.id, [])
 

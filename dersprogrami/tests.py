@@ -221,3 +221,30 @@ class OgretmenProgramGorevdeTestCase(TestCase):
         self.assertIn(gorevde.personel.pk, gosterilen)
         for o in ayrilanlar:
             self.assertNotIn(o.personel.pk, gosterilen)
+
+    def test_ders_programi_olan_ogretmen_nobet_kaydi_olmasa_da_listelenir(self):
+        from okul.testing import ders_programi_olustur, kullanici_olustur, personel_olustur
+
+        # NobetOgretmen kaydı yok ama aktif ders programında dersi var (2026-11-02 Pazartesi).
+        dersli = personel_olustur(durum="Görevde")
+        ders_programi_olustur(dersli, saat=1, gun="Monday")
+        izinli_dersli = personel_olustur(durum="Analık İzinli")
+        ders_programi_olustur(izinli_dersli, saat=2, gun="Monday")
+        # Ne dersi ne NobetOgretmen kaydı olan personel (örn. memur) listelenmez.
+        dersi_yok = personel_olustur(durum="Görevde")
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+
+        yanit = self.client.get(
+            reverse("ogretmen_program"), {"tarih": "2026-11-02", "ders_saati": "1"}
+        )
+
+        self.assertEqual(yanit.status_code, 200)
+        derste = {k["personel"].pk for k in yanit.context["derste"]}
+        gosterilen = derste | {
+            k["personel"].pk
+            for kart in ("ogretmenler_odasinda", "derssiz")
+            for k in yanit.context[kart]
+        }
+        self.assertIn(dersli.pk, derste)
+        self.assertNotIn(izinli_dersli.pk, gosterilen)
+        self.assertNotIn(dersi_yok.pk, gosterilen)
