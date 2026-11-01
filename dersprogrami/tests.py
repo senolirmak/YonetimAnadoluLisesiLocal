@@ -193,3 +193,31 @@ class DersProgramiListesiYetkiTestCase(TestCase):
             self, [reverse("dersprogrami_listesi")], ("ogretmen",),
             ("mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"),
         )
+
+
+class OgretmenProgramGorevdeTestCase(TestCase):
+    """Öğretmen durum sayfasında yalnızca "Görevde" olan personel listelenir."""
+
+    def test_gorevde_olmayanlar_listelenmez(self):
+        from okul.testing import kullanici_olustur, nobet_ogretmen_olustur, personel_olustur
+
+        gorevde = nobet_ogretmen_olustur(personel_olustur(durum="Görevde"))
+        ayrilanlar = [
+            nobet_ogretmen_olustur(personel_olustur(durum=d))
+            for d in ("Emekli", "Ayrıldı-Tayin", "Dış Görevde")
+        ]
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+
+        yanit = self.client.get(
+            reverse("ogretmen_program"), {"tarih": "2026-11-02", "ders_saati": ""}
+        )
+
+        self.assertEqual(yanit.status_code, 200)
+        gosterilen = {
+            k["personel"].pk
+            for kart in ("derste", "ogretmenler_odasinda", "derssiz")
+            for k in yanit.context[kart]
+        }
+        self.assertIn(gorevde.personel.pk, gosterilen)
+        for o in ayrilanlar:
+            self.assertNotIn(o.personel.pk, gosterilen)
