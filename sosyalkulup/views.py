@@ -1,25 +1,30 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.text import slugify
 
 from ogrenci.services.rehberlik import rehberlik_sinif_sube
 from okul.auth import is_ust_yonetici, ust_yonetici_required
-from okul.models import SinifSube
+from okul.models import OkulBilgi, SinifSube
 from okul.utils import get_aktif_egitim_yili
 from veriaktar.services.sosyalkulup_import_service import (
     SosyalKulupExcelHatasi,
     sosyal_kulupleri_ice_aktar,
 )
 
-from .models import SosyalKulup
+from .models import KulupUyelik, SosyalKulup
 from .services.kulup import (
     kulup_danismani_mi,
     kulup_danismanlari,
     kulup_ozetleri,
     kulup_uyeleri,
 )
+from .services.pdf_rapor import kulup_ogrenci_listesi_pdf
 from .services.uyelik import (
+    KulupGorevHatasi,
+    kulup_gorevlerini_kaydet,
     secilebilir_kulupler,
     sinif_kuluplerini_kaydet,
     sinif_ogrencileri,
@@ -139,12 +144,37 @@ def kulup_excel_yukle(request):
     )
 
 
-@login_required
-def kulup_ogrencileri(request, pk):
+def _kulup_ve_yil(request, pk):
+    """Kulübü ve aktif yılı döner; yalnızca üst yönetici ve kulübün bu yılki danışman
+    öğretmeni erişebilir."""
     kulup = get_object_or_404(SosyalKulup, pk=pk)
     egitim_yili = get_aktif_egitim_yili()
     if not (is_ust_yonetici(request.user) or kulup_danismani_mi(request.user, kulup, egitim_yili)):
         raise PermissionDenied
+    return kulup, egitim_yili
+
+
+@login_required
+def kulup_ogrencileri(request, pk):
+    kulup, egitim_yili = _kulup_ve_yil(request, pk)
+
+    if request.method == "POST" and egitim_yili is not None:
+        secimler = {}
+        for anahtar, deger in request.POST.items():
+            uyelik_id = anahtar.removeprefix("gorev_")
+            if anahtar.startswith("gorev_") and uyelik_id.isdigit():
+                secimler[int(uyelik_id)] = deger
+        try:
+            degisen = kulup_gorevlerini_kaydet(kulup, egitim_yili, secimler)
+        except KulupGorevHatasi as exc:
+            messages.error(request, f"{exc} Hiçbir değişiklik kaydedilmedi.")
+        else:
+            if degisen:
+                messages.success(request, f"Öğrenci görevleri kaydedildi ({degisen} değişiklik).")
+            else:
+                messages.info(request, "Değişiklik yapılmadı.")
+        return redirect(request.path)
+
     return render(
         request,
         "sosyalkulup/kulup_ogrencileri.html",
@@ -153,5 +183,25 @@ def kulup_ogrencileri(request, pk):
             "egitim_yili": egitim_yili,
             "danismanlar": kulup_danismanlari(kulup, egitim_yili),
             "uyelikler": kulup_uyeleri(kulup, egitim_yili),
+            "gorev_secenekleri": KulupUyelik.GOREV_CHOICES,
         },
     )
+
+
+@login_required
+def kulup_ogrencileri_pdf(request, pk):
+    kulup, egitim_yili = _kulup_ve_yil(request, pk)
+    if egitim_yili is None:
+        messages.error(request, "Aktif eğitim-öğretim yılı tanımlı değil.")
+        return redirect("sosyalkulup:kulup_ogrencileri", pk=pk)
+    pdf = kulup_ogrenci_listesi_pdf(
+        kulup,
+        egitim_yili,
+        kulup_danismanlari(kulup, egitim_yili),
+        list(kulup_uyeleri(kulup, egitim_yili)),
+        okul_adi=OkulBilgi.get().okul_adi,
+    )
+    dosya_adi = slugify(f"{kulup.ad} {egitim_yili} ogrenci listesi") or "kulup-ogrenci-listesi"
+    yanit = HttpResponse(pdf, content_type="application/pdf")
+    yanit["Content-Disposition"] = f'inline; filename="{dosya_adi}.pdf"'
+    return yanit
