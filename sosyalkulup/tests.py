@@ -221,3 +221,81 @@ class OgrenciKulupBelirleViewTests(TestCase):
         resp = self.client.post(self.url, {f"kulup_{self.ogr_9a.pk}": self.kulup.pk}, follow=True)
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(KulupUyelik.objects.exists())
+
+
+class OkulYonetimKulupKaydiTests(TestCase):
+    """okul/yonetim/ sayfasından sosyal kulüp tanımlama."""
+
+    def setUp(self):
+        self.client.force_login(kullanici_olustur(superuser=True))
+
+    def test_yonetim_sayfasinda_sosyal_kulupler_karti_var(self):
+        r = self.client.get(reverse("okul:yonetim_index"))
+        self.assertContains(r, "Sosyal Kulüpler")
+        self.assertContains(r, reverse("okul:yonetim_list", kwargs={"slug": "sosyal-kulup"}))
+
+    def test_kulup_eklenir(self):
+        r = self.client.post(
+            reverse("okul:yonetim_create", kwargs={"slug": "sosyal-kulup"}),
+            {"ad": "Satranç Kulübü", "aciklama": "", "aktif": "on"},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(SosyalKulup.objects.filter(ad="Satranç Kulübü", aktif=True).exists())
+
+    def test_danismani_olan_kulup_silinmez(self):
+        aktif_egitim_yili_olustur("2025-2026")
+        kulup = SosyalKulup.objects.create(ad="Satranç Kulübü")
+        KulupDanisman.objects.create(kulup=kulup, ogretmen=personel_olustur())
+        self.client.post(reverse("okul:yonetim_delete", kwargs={"slug": "sosyal-kulup", "pk": kulup.pk}))
+        self.assertTrue(SosyalKulup.objects.filter(pk=kulup.pk).exists())
+
+    def test_ogretmen_erisemez(self):
+        self.client.force_login(kullanici_olustur("ogretmen"))
+        r = self.client.get(reverse("okul:yonetim_list", kwargs={"slug": "sosyal-kulup"}))
+        self.assertNotEqual(r.status_code, 200)
+
+
+class DanismanOgretmenListesiTests(TestCase):
+    """Ana sayfa → Ders Programı İşlemleri → Sosyal Kulüp Danışman Öğretmenleri."""
+
+    def setUp(self):
+        self.yil = aktif_egitim_yili_olustur("2025-2026")
+        self.url = reverse("sosyalkulup:danisman_ogretmenler")
+
+    def test_ogretmen_kulupleriyle_gruplanir(self):
+        ogretmen = personel_olustur(adi_soyadi="Ayşe Yılmaz")
+        satranc = SosyalKulup.objects.create(ad="Satranç Kulübü")
+        tiyatro = SosyalKulup.objects.create(ad="Tiyatro Kulübü")
+        KulupDanisman.objects.create(kulup=satranc, ogretmen=ogretmen)
+        KulupDanisman.objects.create(kulup=tiyatro, ogretmen=ogretmen)
+
+        self.client.force_login(kullanici_olustur(superuser=True))
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        satirlar = r.context["satirlar"]
+        self.assertEqual(len(satirlar), 1)
+        self.assertEqual(satirlar[0]["ogretmen"], ogretmen)
+        self.assertEqual([k.ad for k in satirlar[0]["kulupler"]], ["Satranç Kulübü", "Tiyatro Kulübü"])
+
+    def test_sadece_aktif_yil_listelenir(self):
+        from okul.models import EgitimOgretimYili
+
+        eski = EgitimOgretimYili.objects.create(
+            egitim_yili="2024-2025", egitim_baslangic="2024-09-01", egitim_bitis="2025-06-30"
+        )
+        kulup = SosyalKulup.objects.create(ad="Satranç Kulübü")
+        KulupDanisman.objects.create(kulup=kulup, ogretmen=personel_olustur(), egitim_yili=eski)
+
+        self.client.force_login(kullanici_olustur(superuser=True))
+        r = self.client.get(self.url)
+        self.assertEqual(r.context["satirlar"], [])
+
+    def test_ana_sayfada_buton_var(self):
+        self.client.force_login(kullanici_olustur(superuser=True))
+        r = self.client.get(reverse("index"))
+        self.assertContains(r, self.url)
+
+    def test_ogretmen_erisemez(self):
+        self.client.force_login(kullanici_olustur("ogretmen"))
+        r = self.client.get(self.url)
+        self.assertNotEqual(r.status_code, 200)

@@ -6,6 +6,7 @@ app_name = "sosyalkulup"
 
 urlpatterns = [
     path("", views.kulup_listesi, name="kulup_listesi"),
+    path("danisman-ogretmenler/", views.danisman_ogretmenler, name="danisman_ogretmenler"),
     path("excel-yukle/", views.kulup_excel_yukle, name="kulup_excel_yukle"),
     path("kulup/<int:pk>/ogrenciler/", views.kulup_ogrencileri, name="kulup_ogrencileri"),
     path("kulup/<int:pk>/ogrenciler/pdf/", views.kulup_ogrencileri_pdf, name="kulup_ogrencileri_pdf"),

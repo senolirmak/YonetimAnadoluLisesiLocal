@@ -21,12 +21,26 @@ from django.shortcuts import get_object_or_404, redirect, render
 from main.forms import EgitimOgretimYiliForm, OkulDonemForm
 from okul.auth import mudur_yardimcisi_required
 from okul.forms import (
-    BransForm, DersHavuzuFullForm, DersSaatleriForm, PersonelForm, SinifSubeForm, SinifSubeYilForm,
+    BransForm,
+    DersHavuzuFullForm,
+    DersSaatleriForm,
+    PersonelForm,
+    SinifSubeForm,
+    SinifSubeYilForm,
 )
 from okul.models import (
-    Brans, DersHavuzu, DersSaatleri, EgitimOgretimYili, OgretmenlikAlanCizelgesi, OkulDonem,
-    Personel, SinifSube, SinifSubeYil,
+    Brans,
+    DersHavuzu,
+    DersSaatleri,
+    EgitimOgretimYili,
+    OgretmenlikAlanCizelgesi,
+    OkulDonem,
+    Personel,
+    SinifSube,
+    SinifSubeYil,
 )
+from sosyalkulup.forms import SosyalKulupForm
+from sosyalkulup.models import SosyalKulup
 
 REGISTRY = {
     "egitim-yili": {
@@ -115,6 +129,16 @@ REGISTRY = {
         "singular": "Branş",
         "list_fields": [
             ("ad", "Branş Adı"),
+        ],
+    },
+    "sosyal-kulup": {
+        "model": SosyalKulup,
+        "form": SosyalKulupForm,
+        "title": "Sosyal Kulüpler",
+        "singular": "Sosyal Kulüp",
+        "list_fields": [
+            ("ad", "Kulüp Adı"),
+            ("aktif", "Aktif"),
         ],
     },
 }

@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 
 from ogrenci.services.rehberlik import rehberlik_sinif_sube
-from okul.auth import is_ust_yonetici, ust_yonetici_required
+from okul.auth import is_ust_yonetici, ust_yonetici_required, yonetici_required
 from okul.models import OkulBilgi, SinifSube
 from okul.utils import get_aktif_egitim_yili
 from veriaktar.services.sosyalkulup_import_service import (
@@ -16,6 +16,7 @@ from veriaktar.services.sosyalkulup_import_service import (
 
 from .models import KulupUyelik, SosyalKulup
 from .services.kulup import (
+    danisman_ogretmen_listesi,
     kulup_danismani_mi,
     kulup_danismanlari,
     kulup_ozetleri,
@@ -118,6 +119,19 @@ def kulup_listesi(request):
         {
             "egitim_yili": egitim_yili,
             "kulupler": kulup_ozetleri(egitim_yili) if egitim_yili else [],
+        },
+    )
+
+
+@yonetici_required
+def danisman_ogretmenler(request):
+    egitim_yili = get_aktif_egitim_yili()
+    return render(
+        request,
+        "sosyalkulup/danisman_ogretmenler.html",
+        {
+            "egitim_yili": egitim_yili,
+            "satirlar": danisman_ogretmen_listesi(egitim_yili),
         },
     )
 
