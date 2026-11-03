@@ -175,3 +175,120 @@ class KulupSayfalariTests(TestCase):
         self.client.force_login(kullanici_olustur("ogretmen"))
         resp = self.client.get(reverse("gorevlerim"))
         self.assertNotContains(resp, "Sosyal Kulübüm")
+
+
+class KulupGorevleriTests(TestCase):
+    def setUp(self):
+        self.yil = aktif_egitim_yili_olustur("2025-2026")
+        self.kulup = SosyalKulup.objects.create(ad="Satranç Kulübü")
+        self.diger = SosyalKulup.objects.create(ad="Tiyatro Kulübü")
+        self.danisman_user = kullanici_olustur("ogretmen")
+        KulupDanisman.objects.create(kulup=self.kulup, ogretmen=personel_olustur(user=self.danisman_user))
+        self.u1 = KulupUyelik.objects.create(kulup=self.kulup, ogrenci=ogrenci_olustur(9, "A"))
+        self.u2 = KulupUyelik.objects.create(kulup=self.kulup, ogrenci=ogrenci_olustur(9, "B"))
+        self.baska = KulupUyelik.objects.create(kulup=self.diger, ogrenci=ogrenci_olustur(9, "C"))
+        self.url = reverse("sosyalkulup:kulup_ogrencileri", args=[self.kulup.pk])
+
+    def _gorevler(self):
+        return {u.pk: u.gorev for u in KulupUyelik.objects.all()}
+
+    def test_danisman_gorevleri_kaydeder(self):
+        self.client.force_login(self.danisman_user)
+        resp = self.client.post(self.url, {f"gorev_{self.u1.pk}": "baskan", f"gorev_{self.u2.pk}": "sekreter"})
+        self.assertRedirects(resp, self.url, fetch_redirect_response=False)
+        self.assertEqual(self._gorevler()[self.u1.pk], "baskan")
+        self.assertEqual(self._gorevler()[self.u2.pk], "sekreter")
+
+    def test_ayni_gorev_iki_ogrenciye_verilemez(self):
+        self.client.force_login(self.danisman_user)
+        resp = self.client.post(
+            self.url, {f"gorev_{self.u1.pk}": "baskan", f"gorev_{self.u2.pk}": "baskan"}, follow=True
+        )
+        self.assertContains(resp, "yalnızca bir öğrenciye")
+        self.assertEqual(set(self._gorevler().values()), {"uye"})
+
+    def test_mevcut_baskanla_cakisma_reddedilir(self):
+        self.u1.gorev = "baskan"
+        self.u1.save()
+        self.client.force_login(self.danisman_user)
+        self.client.post(self.url, {f"gorev_{self.u2.pk}": "baskan"})
+        self.assertEqual(self._gorevler()[self.u2.pk], "uye")
+
+    def test_gorevler_iki_ogrenci_arasinda_degistirilebilir(self):
+        self.u1.gorev = "baskan"
+        self.u1.save()
+        self.client.force_login(self.danisman_user)
+        self.client.post(self.url, {f"gorev_{self.u1.pk}": "uye", f"gorev_{self.u2.pk}": "baskan"})
+        self.assertEqual((self._gorevler()[self.u1.pk], self._gorevler()[self.u2.pk]), ("uye", "baskan"))
+
+    def test_baska_kulubun_uyeligi_degistirilemez(self):
+        self.client.force_login(self.danisman_user)
+        self.client.post(self.url, {f"gorev_{self.baska.pk}": "baskan"})
+        self.assertEqual(self._gorevler()[self.baska.pk], "uye")
+
+    def test_gecersiz_gorev_reddedilir(self):
+        self.client.force_login(self.danisman_user)
+        self.client.post(self.url, {f"gorev_{self.u1.pk}": "kral", f"gorev_{self.u2.pk}": "sayman"})
+        self.assertEqual(set(self._gorevler().values()), {"uye"})
+
+    def test_danisman_olmayan_ogretmen_kaydedemez(self):
+        self.client.force_login(kullanici_olustur("ogretmen"))
+        self.assertEqual(self.client.post(self.url, {f"gorev_{self.u1.pk}": "baskan"}).status_code, 403)
+        self.assertEqual(self._gorevler()[self.u1.pk], "uye")
+
+    def test_mudur_yardimcisi_kaydedebilir(self):
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+        self.client.post(self.url, {f"gorev_{self.u1.pk}": "sayman"})
+        self.assertEqual(self._gorevler()[self.u1.pk], "sayman")
+
+    def test_sayfada_gorev_secimi_gorunur(self):
+        self.client.force_login(self.danisman_user)
+        resp = self.client.get(self.url)
+        self.assertContains(resp, f'name="gorev_{self.u1.pk}"')
+        self.assertContains(resp, "Görevleri Kaydet")
+
+
+class KulupPdfTests(TestCase):
+    def setUp(self):
+        self.yil = aktif_egitim_yili_olustur("2025-2026")
+        self.kulup = SosyalKulup.objects.create(ad="Satranç Kulübü")
+        self.diger = SosyalKulup.objects.create(ad="Tiyatro Kulübü")
+        self.danisman_user = kullanici_olustur("ogretmen")
+        KulupDanisman.objects.create(
+            kulup=self.kulup, ogretmen=personel_olustur(user=self.danisman_user, adi_soyadi="Şule Örnekçi")
+        )
+        self.ogr = ogrenci_olustur(10, "B", adi="Çağrı", soyadi="Güneş")
+        KulupUyelik.objects.create(kulup=self.kulup, ogrenci=self.ogr, gorev="baskan")
+        self.url = reverse("sosyalkulup:kulup_ogrencileri_pdf", args=[self.kulup.pk])
+
+    def test_danisman_pdf_alir(self):
+        from pypdf import PdfReader
+
+        self.client.force_login(self.danisman_user)
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        metin = PdfReader(io.BytesIO(resp.content)).pages[0].extract_text()
+        for parca in ("Satranç Kulübü", "2025-2026", "Şule Örnekçi", "Çağrı Güneş", "10/B", "Başkan"):
+            self.assertIn(parca, metin)
+
+    def test_baska_kulubun_pdfi_alinamaz(self):
+        self.client.force_login(self.danisman_user)
+        url = reverse("sosyalkulup:kulup_ogrencileri_pdf", args=[self.diger.pk])
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_danisman_olmayan_ogretmen_pdf_alamaz(self):
+        self.client.force_login(kullanici_olustur("ogretmen"))
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_mudur_yardimcisi_bos_kulubun_pdfini_alir(self):
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+        url = reverse("sosyalkulup:kulup_ogrencileri_pdf", args=[self.diger.pk])
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_sayfada_pdf_dugmesi_var(self):
+        self.client.force_login(self.danisman_user)
+        resp = self.client.get(reverse("sosyalkulup:kulup_ogrencileri", args=[self.kulup.pk]))
+        self.assertContains(resp, self.url)

@@ -6,12 +6,19 @@
 <div class="container">
     <div class="flex-between mb-20">
         <h2 class="page-title">{{ kulup.ad }}</h2>
-        {% if is_tarih_degistirebilir %}
-        <a href="{% url 'sosyalkulup:kulup_listesi' %}" class="btn btn-secondary">Kulüp Listesi</a>
-        {% else %}
-        <a href="{% url 'gorevlerim' %}" class="btn btn-secondary">Görevlerim</a>
-        {% endif %}
+        <div style="display:flex; gap:.5rem;">
+            {% if egitim_yili %}
+            <a href="{% url 'sosyalkulup:kulup_ogrencileri_pdf' kulup.pk %}" target="_blank" class="btn btn-danger">PDF Raporu</a>
+            {% endif %}
+            {% if is_tarih_degistirebilir %}
+            <a href="{% url 'sosyalkulup:kulup_listesi' %}" class="btn btn-secondary">Kulüp Listesi</a>
+            {% else %}
+            <a href="{% url 'gorevlerim' %}" class="btn btn-secondary">Görevlerim</a>
+            {% endif %}
+        </div>
     </div>
+
+    {% include 'sosyalkulup/_mesajlar.html' %}
 
     {% if not egitim_yili %}
         <div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil.</div>
@@ -23,6 +30,8 @@
         &nbsp;·&nbsp; Öğrenci Sayısı: <strong>{{ uyelikler|length }}</strong>
     </div>
 
+    <form method="post">
+    {% csrf_token %}
     <div class="table-responsive">
         <table class="table">
             <thead>
@@ -41,7 +50,13 @@
                     <td>{{ u.ogrenci.sinifsube }}</td>
                     <td>{{ u.ogrenci.okulno }}</td>
                     <td>{{ u.ogrenci.adi }} {{ u.ogrenci.soyadi }}</td>
-                    <td>{{ u.get_gorev_display }}</td>
+                    <td>
+                        <select name="gorev_{{ u.pk }}">
+                            {% for deger, etiket in gorev_secenekleri %}
+                            <option value="{{ deger }}" {% if u.gorev == deger %}selected{% endif %}>{{ etiket }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="5" class="center">Bu kulübe henüz öğrenci kaydedilmemiş. Öğrenciler sınıf rehber öğretmenleri tarafından kulüplere atanır.</td></tr>
@@ -49,6 +64,11 @@
             </tbody>
         </table>
     </div>
+    {% if uyelikler %}
+    <p style="font-size:0.9em;color:#6c757d;">Başkan, Başkan Yardımcısı, Sekreter ve Sayman görevleri birer öğrenciye verilebilir.</p>
+    <button type="submit" class="btn btn-success">Görevleri Kaydet</button>
+    {% endif %}
+    </form>
     {% endif %}
 </div>
 {% endblock %}

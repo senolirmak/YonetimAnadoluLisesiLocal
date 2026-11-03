@@ -69,3 +69,53 @@ def sinif_kuluplerini_kaydet(sinif, sube, secimler, egitim_yili):
             uyelik.save(update_fields=["kulup", "gorev"])
             guncellenen += 1
     return eklenen, guncellenen, silinen
+
+
+class KulupGorevHatasi(ValueError):
+    pass
+
+
+@transaction.atomic
+def kulup_gorevlerini_kaydet(kulup, egitim_yili, secimler):
+    """Kulüp üyelerinin görevlerini toplu kaydeder. `secimler` = {uyelik_id: gorev}.
+
+    Yalnızca bu kulübün `egitim_yili` üyelikleri (aktif öğrenciler) işlenir; başka
+    üyelik id'leri yok sayılır. "Üye" dışındaki her görev kulüpte en fazla bir öğrencide
+    olabilir. Hata varsa `KulupGorevHatasi` fırlatılır ve hiçbir şey kaydedilmez.
+    Dönüş: değişen kayıt sayısı.
+    """
+    gecerli = dict(KulupUyelik.GOREV_CHOICES)
+    uyelikler = {
+        u.pk: u
+        for u in KulupUyelik.objects.filter(
+            kulup=kulup, egitim_yili=egitim_yili, ogrenci__aktif=True
+        ).select_related("ogrenci")
+    }
+
+    yeni = {pk: u.gorev for pk, u in uyelikler.items()}
+    for uyelik_id, gorev in secimler.items():
+        if uyelik_id not in uyelikler:
+            continue
+        if gorev not in gecerli:
+            raise KulupGorevHatasi("Geçersiz görev seçimi.")
+        yeni[uyelik_id] = gorev
+
+    sahipler = {}
+    for pk, gorev in yeni.items():
+        if gorev == KulupUyelik.GOREV_UYE:
+            continue
+        if gorev in sahipler:
+            raise KulupGorevHatasi(
+                f"'{gecerli[gorev]}' görevi yalnızca bir öğrenciye verilebilir "
+                f"({uyelikler[sahipler[gorev]].ogrenci} ve {uyelikler[pk].ogrenci})."
+            )
+        sahipler[gorev] = pk
+
+    degisen = 0
+    for pk, gorev in yeni.items():
+        u = uyelikler[pk]
+        if u.gorev != gorev:
+            u.gorev = gorev
+            u.save(update_fields=["gorev"])
+            degisen += 1
+    return degisen
