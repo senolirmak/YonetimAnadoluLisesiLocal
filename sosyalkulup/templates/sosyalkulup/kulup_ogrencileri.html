@@ -1,0 +1,54 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}{{ kulup.ad }} — Öğrenci Listesi{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">{{ kulup.ad }}</h2>
+        {% if is_tarih_degistirebilir %}
+        <a href="{% url 'sosyalkulup:kulup_listesi' %}" class="btn btn-secondary">Kulüp Listesi</a>
+        {% else %}
+        <a href="{% url 'gorevlerim' %}" class="btn btn-secondary">Görevlerim</a>
+        {% endif %}
+    </div>
+
+    {% if not egitim_yili %}
+        <div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil.</div>
+    {% else %}
+    <div class="filter-box" style="font-size:0.95em;color:#495057;">
+        Eğitim-Öğretim Yılı: <strong>{{ egitim_yili }}</strong> &nbsp;·&nbsp;
+        Danışman Öğretmen(ler):
+        <strong>{% for d in danismanlar %}{{ d.ogretmen.adi_soyadi }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</strong>
+        &nbsp;·&nbsp; Öğrenci Sayısı: <strong>{{ uyelikler|length }}</strong>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Sınıf/Şube</th>
+                    <th>Okul No</th>
+                    <th>Adı Soyadı</th>
+                    <th>Kulüpteki Görevi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in uyelikler %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ u.ogrenci.sinifsube }}</td>
+                    <td>{{ u.ogrenci.okulno }}</td>
+                    <td>{{ u.ogrenci.adi }} {{ u.ogrenci.soyadi }}</td>
+                    <td>{{ u.get_gorev_display }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="center">Bu kulübe henüz öğrenci kaydedilmemiş. Öğrenciler sınıf rehber öğretmenleri tarafından kulüplere atanır.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

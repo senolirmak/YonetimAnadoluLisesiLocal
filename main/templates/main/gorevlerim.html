@@ -61,7 +61,7 @@
 <div class="welcome-container">
     <h2 class="page-title page-title-mb">Görevlerim</h2>
     <p class="welcome-text">
-        Nöbet, ders doldurma, sınav gözetmenlik ve sorumluluk sınavı görevleriniz tek sayfada.
+        Nöbet, ders doldurma, sınav gözetmenlik, sorumluluk sınavı ve sosyal kulüp görevleriniz tek sayfada.
     </p>
 
     <div class="gorev-grid">
@@ -97,6 +97,16 @@
             {% endif %}
             <a href="{% url 'ogretmen_ders_doldurma' %}" class="btn btn-lg" style="background-color: #0d6efd; color: white;">Atanan / Atanamayan Dersler</a>
         </div>
+
+        {% if sosyal_kulupler %}
+        <div class="gorev-card">
+            <div class="gorev-card-title">Sosyal Kulübüm</div>
+            <p class="gorev-bos">Danışman öğretmeni olduğunuz kulüp(ler):</p>
+            {% for kulup in sosyal_kulupler %}
+            <a href="{% url 'sosyalkulup:kulup_ogrencileri' kulup.pk %}" class="btn btn-lg" style="background-color: #fd7e14; color: white; margin-bottom:6px;">{{ kulup.ad }} — Öğrenci Listesi</a>
+            {% endfor %}
+        </div>
+        {% endif %}
 
         {% if sinav_gozetim_var %}
         <div class="gorev-card">

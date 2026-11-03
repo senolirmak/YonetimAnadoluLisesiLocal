@@ -7,7 +7,6 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from dersprogrami.models import DersProgrami
 from okul.auth import is_yonetici, mudur_yardimcisi_required
 from okul.models import DersHavuzu, SinifSube
 from okul.utils import get_aktif_egitim_yili
@@ -15,6 +14,7 @@ from okul.utils import get_aktif_egitim_yili
 from .forms import OgrenciAdresForm, OgrenciAyrilmaForm, OgrenciDetayForm, OgrenciForm
 from .models import Ogrenci, OgrenciAdres, OgrenciAyrilma, OgrenciDetay, OgrenciMuaf
 from .services.aktiflik import aktifligi_guncelle
+from .services.rehberlik import rehberlik_sinif_sube
 
 
 def _gorunur_ogrenciler_ve_durum(ogrenciler):
@@ -53,24 +53,6 @@ def _gorunur_ogrenciler_ve_durum(ogrenciler):
         ogr.durum_etiketleri = etiketler
 
     return ogr_listesi
-
-
-def _rehberlik_sinif_sube(user):
-    """Öğretmenin 'REHBERLİK VE YÖNLENDİRME' dersine ait SinifSube nesnesini döner; yoksa None."""
-    try:
-        personel = user.personel
-    except Exception:
-        return None
-    ders = (
-        DersProgrami.objects.aktif()
-        .filter(
-            ogretmen=personel,
-            ders__ders_adi__iexact="REHBERLİK VE YÖNLENDİRME",
-        )
-        .select_related("sinif_sube", "ders")
-        .first()
-    )
-    return ders.sinif_sube if ders else None
 
 
 EXCEL_SUTUNLAR = [
@@ -218,7 +200,7 @@ def ogrenci_liste(request):
     # Yönetici olmayan (öğretmen ya da hiçbir gruba üye olmayan) kullanıcı yalnızca kendi
     # sınıf rehberliği sınıfını görebilir; varsayılan ret.
     if not is_yonetici(request.user):
-        ss = _rehberlik_sinif_sube(request.user)
+        ss = rehberlik_sinif_sube(request.user)
         if not ss:
             messages.error(
                 request, "Sınıf rehberliği atanmamış, öğrenci listesine erişiminiz bulunmamaktadır."
@@ -365,7 +347,7 @@ def ogrenci_detay_duzenle(request, pk):
     # Yönetici olmayan kullanıcı yalnızca kendi sınıf rehberliği sınıfındaki öğrenciyi
     # düzenleyebilir; varsayılan ret.
     if not is_yonetici(request.user):
-        ss = _rehberlik_sinif_sube(request.user)
+        ss = rehberlik_sinif_sube(request.user)
         if not ss or ogrenci.sinif != ss.sinif or ogrenci.sube.upper() != ss.sube.upper():
             raise PermissionDenied
 

@@ -304,6 +304,10 @@
                     <div class="menu-group-title">Öğrenci İşleri</div>
                     <div class="menu-button-group">
                         <a href="{% url 'ogrenci:ogrenci_liste' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Öğrenci Listesi</a>
+                        <a href="{% url 'sosyalkulup:ogrenci_kulup_belirle' %}" class="btn btn-lg" style="background-color: #fd7e14; color: white;">Öğrenci Sosyal Kulübünü Belirle</a>
+                        {% if is_tarih_degistirebilir %}
+                        <a href="{% url 'sosyalkulup:kulup_listesi' %}" class="btn btn-lg" style="background-color: #b45309; color: white;">Sosyal Kulüpler</a>
+                        {% endif %}
                         {% if is_tarih_degistirebilir %}
                         <a href="{% url 'ogrencinobet:nobetci_form' %}" class="btn btn-lg" style="background-color: #e83e8c; color: white;">Nöbetçi Öğrenci</a>
                         {% endif %}

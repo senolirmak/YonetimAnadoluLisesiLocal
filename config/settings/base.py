@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "senesonu",
     "yedekleme",
     "ebagiris",
+    "sosyalkulup",
 ]
 
 MIDDLEWARE = [

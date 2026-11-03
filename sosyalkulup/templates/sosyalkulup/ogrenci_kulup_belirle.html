@@ -1,0 +1,81 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Öğrenci Sosyal Kulübünü Belirle{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Öğrenci Sosyal Kulübünü Belirle</h2>
+    </div>
+
+    {% for message in messages %}
+        <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    {% if sinif_secimi %}
+    <form method="get" class="filter-box filter-form">
+        <label>Sınıf/Şube:</label>
+        <select name="sinif_sube">
+            <option value="">Seçiniz</option>
+            {% for ss in sinif_sube_secenekleri %}
+                <option value="{{ ss.pk }}" {% if sinif_sube and sinif_sube.pk == ss.pk %}selected{% endif %}>{{ ss }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Getir</button>
+    </form>
+    {% endif %}
+
+    {% if not egitim_yili %}
+        <div class="msg-box msg-error">
+            Aktif eğitim-öğretim yılı tanımlı değil. Okul Bilgisi'nden aktif yıl seçilmeden kulüp kaydı yapılamaz.
+        </div>
+    {% elif sinif_sube %}
+        <div class="filter-box" style="font-size:0.95em;color:#495057;">
+            Sınıf: <strong>{{ sinif_sube }}</strong> &nbsp;·&nbsp; Eğitim-Öğretim Yılı: <strong>{{ egitim_yili }}</strong>
+        </div>
+
+        {% if not kulupler %}
+            <div class="msg-box msg-info">Tanımlı aktif sosyal kulüp yok. Kulüpler yönetim panelinden eklenir.</div>
+        {% elif not satirlar %}
+            <div class="msg-box msg-info">Bu sınıfta aktif öğrenci bulunmuyor.</div>
+        {% else %}
+        <form method="post">
+            {% csrf_token %}
+            {% if sinif_secimi %}<input type="hidden" name="sinif_sube" value="{{ sinif_sube.pk }}">{% endif %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Okul No</th>
+                            <th>Adı Soyadı</th>
+                            <th>Sosyal Kulüp</th>
+                            <th>Kulüpteki Görevi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ogr, uyelik in satirlar %}
+                        <tr>
+                            <td>{{ ogr.okulno }}</td>
+                            <td>{{ ogr.adi }} {{ ogr.soyadi }}</td>
+                            <td>
+                                <select name="kulup_{{ ogr.pk }}" style="min-width:240px;">
+                                    <option value="">— Seçilmedi —</option>
+                                    {% for kulup in kulupler %}
+                                        <option value="{{ kulup.pk }}" {% if uyelik and uyelik.kulup_id == kulup.pk %}selected{% endif %}>{{ kulup.ad }}{% if not kulup.aktif %} (pasif){% endif %}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>{% if uyelik %}{{ uyelik.get_gorev_display }}{% else %}-{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" class="btn btn-success">Kaydet</button>
+        </form>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}
