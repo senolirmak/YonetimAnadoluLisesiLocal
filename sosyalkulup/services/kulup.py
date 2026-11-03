@@ -70,3 +70,24 @@ def kulup_ozetleri(egitim_yili):
         )
         .order_by("-aktif", "ad")
     )
+
+
+def danisman_ogretmen_listesi(egitim_yili):
+    """`egitim_yili` danışman öğretmenleri, her öğretmen için danışmanı olduğu kulüplerle.
+
+    Dönen liste: [{"ogretmen": Personel, "kulupler": [SosyalKulup, ...]}, ...]
+    (öğretmen adına göre sıralı).
+    """
+    if egitim_yili is None:
+        return []
+    kayitlar = (
+        KulupDanisman.objects.filter(egitim_yili=egitim_yili)
+        .select_related("ogretmen", "ogretmen__brans", "kulup")
+        .order_by("ogretmen__adi_soyadi", "ogretmen_id", "kulup__ad")
+    )
+    satirlar = []
+    for k in kayitlar:
+        if not satirlar or satirlar[-1]["ogretmen"].pk != k.ogretmen_id:
+            satirlar.append({"ogretmen": k.ogretmen, "kulupler": []})
+        satirlar[-1]["kulupler"].append(k.kulup)
+    return satirlar

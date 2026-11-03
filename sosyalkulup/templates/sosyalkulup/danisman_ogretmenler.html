@@ -1,0 +1,49 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Sosyal Kulüp Danışman Öğretmenleri{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Sosyal Kulüp Danışman Öğretmenleri</h2>
+        {% if is_tarih_degistirebilir %}
+        <a href="{% url 'sosyalkulup:kulup_listesi' %}" class="btn btn-secondary">Sosyal Kulüpler</a>
+        {% endif %}
+    </div>
+
+    {% if not egitim_yili %}
+        <div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil. Okul Bilgisi'nden aktif yılı seçin.</div>
+    {% else %}
+        <div class="filter-box" style="font-size:0.95em;color:#495057;">
+            Eğitim-Öğretim Yılı: <strong>{{ egitim_yili }}</strong>
+            &nbsp;·&nbsp; Danışman öğretmen sayısı: <strong>{{ satirlar|length }}</strong>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Danışman Öğretmen</th>
+                        <th>Branş</th>
+                        <th>Kulüp(ler)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in satirlar %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ s.ogretmen.adi_soyadi }}</td>
+                        <td>{{ s.ogretmen.brans|default:"-" }}</td>
+                        <td>
+                            {% for kulup in s.kulupler %}{{ kulup.ad }}{% if not kulup.aktif %} <span class="badge badge-light">Pasif</span>{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="center">Bu eğitim-öğretim yılı için danışman öğretmen ataması yok.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
