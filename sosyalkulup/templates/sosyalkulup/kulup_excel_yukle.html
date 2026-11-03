@@ -1,0 +1,44 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Sosyal Kulüpler — Excel Yükle{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Sosyal Kulüpler — Excel Yükle</h2>
+        <a href="{% url 'sosyalkulup:kulup_listesi' %}" class="btn btn-secondary">Kulüp Listesi</a>
+    </div>
+
+    {% include 'sosyalkulup/_mesajlar.html' %}
+
+    {% if sonuc %}
+        <div class="msg-box msg-success">
+            Aktarım tamamlandı ({{ egitim_yili }}): {{ sonuc.yeni_kulup }} yeni kulüp, {{ sonuc.mevcut_kulup }} mevcut kulüp;
+            {{ sonuc.danisman_atanan }} danışman atandı, {{ sonuc.danisman_kaldirilan }} danışman kaldırıldı.
+        </div>
+        {% if sonuc.bulunamayan_ogretmenler %}
+        <div class="msg-box msg-error">
+            Personel listesinde bulunamayan öğretmenler (atanmadı — adı personel kaydıyla aynı yazılmalı):
+            <ul style="margin:6px 0 0 0;padding-left:18px;">
+                {% for kulup, ad in sonuc.bulunamayan_ogretmenler %}<li>{{ ad }} — {{ kulup }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    {% endif %}
+
+    {% if not egitim_yili %}
+        <div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil. Okul Bilgisi'nden aktif yılı seçin.</div>
+    {% else %}
+    <div class="filter-box" style="font-size:0.95em;color:#495057;line-height:1.6;">
+        Danışman öğretmenler <strong>{{ egitim_yili }}</strong> eğitim-öğretim yılına kaydedilir.<br>
+        Beklenen sütunlar: <strong>Sıra No</strong> · <strong>Sosyal Kulüp</strong> · <strong>Danışman Öğretmen(1)</strong> · <strong>Danışman Öğretmen(2)</strong> …<br>
+        Dosyadaki her kulübün bu yılki danışman listesi dosyadakiyle değiştirilir; dosyada olmayan kulüplere dokunulmaz.
+    </div>
+    <form method="post" enctype="multipart/form-data" class="filter-box filter-form">
+        {% csrf_token %}
+        <input type="file" name="dosya" accept=".xlsx" required>
+        <button type="submit" class="btn btn-success">Yükle</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

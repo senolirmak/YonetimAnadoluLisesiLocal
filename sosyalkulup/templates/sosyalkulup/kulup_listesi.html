@@ -1,0 +1,53 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Okul Sosyal Kulüpleri{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flex-between mb-20">
+        <h2 class="page-title">Okul Sosyal Kulüpleri</h2>
+        <div style="display:flex; gap:.5rem;">
+            <a href="{% url 'sosyalkulup:ogrenci_kulup_belirle' %}" class="btn btn-secondary">Öğrenci Kulübü Belirle</a>
+            <a href="{% url 'sosyalkulup:kulup_excel_yukle' %}" class="btn btn-success">Excel Yükle</a>
+        </div>
+    </div>
+
+    {% include 'sosyalkulup/_mesajlar.html' %}
+
+    {% if not egitim_yili %}
+        <div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil. Okul Bilgisi'nden aktif yılı seçin.</div>
+    {% else %}
+        <div class="filter-box" style="font-size:0.95em;color:#495057;">
+            Eğitim-Öğretim Yılı: <strong>{{ egitim_yili }}</strong>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Kulüp</th>
+                        <th>Danışman Öğretmen(ler)</th>
+                        <th class="center">Öğrenci Sayısı</th>
+                        <th class="center">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for kulup in kulupler %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ kulup.ad }}{% if not kulup.aktif %} <span class="badge badge-light">Pasif</span>{% endif %}</td>
+                        <td>
+                            {% for d in kulup.yil_danismanlari %}{{ d.ogretmen.adi_soyadi }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}
+                        </td>
+                        <td class="center">{{ kulup.uye_sayisi }}</td>
+                        <td class="center"><a href="{% url 'sosyalkulup:kulup_ogrencileri' kulup.pk %}" class="btn btn-info">Öğrenci Listesi</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="center">Tanımlı kulüp yok. Excel Yükle ile kulüpleri ve danışman öğretmenleri aktarın.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

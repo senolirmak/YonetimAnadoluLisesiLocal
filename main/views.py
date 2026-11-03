@@ -12,6 +12,8 @@ from faaliyet.models import Faaliyet
 from main.utils import get_ogretmen_gorev_verileri
 from nobet.models import GunlukNobetCizelgesi, OkulBilgi
 from ogrencinobet.models import OgrenciNobetGorevi
+from okul.utils import get_aktif_egitim_yili
+from sosyalkulup.services.kulup import ogretmen_kulupleri
 
 
 @login_required
@@ -132,6 +134,7 @@ def gorevlerim(request):
         "main/gorevlerim.html",
         {
             "title": "Görevlerim",
+            "sosyal_kulupler": ogretmen_kulupleri(request.user, get_aktif_egitim_yili()),
             **gorev,
         },
     )
