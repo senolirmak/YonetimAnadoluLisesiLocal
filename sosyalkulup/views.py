@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 
-from ogrenci.services.rehberlik import rehberlik_sinif_sube
+from ogrenci.services.rehberlik import rehberlik_sinif_sube, sinif_rehber_ogretmeni
 from okul.auth import is_ust_yonetici, ust_yonetici_required, yonetici_required
 from okul.models import OkulBilgi, SinifSube
 from okul.utils import get_aktif_egitim_yili
@@ -22,11 +22,12 @@ from .services.kulup import (
     kulup_ozetleri,
     kulup_uyeleri,
 )
-from .services.pdf_rapor import kulup_ogrenci_listesi_pdf
+from .services.pdf_rapor import kulup_ogrenci_listesi_pdf, sinif_kulup_listesi_pdf
 from .services.uyelik import (
     KulupGorevHatasi,
     kulup_gorevlerini_kaydet,
     secilebilir_kulupler,
+    sinif_kulup_gruplari,
     sinif_kuluplerini_kaydet,
     sinif_ogrencileri,
     sinif_uyelikleri,
@@ -108,6 +109,38 @@ def ogrenci_kulup_belirle(request):
             ),
         },
     )
+
+
+@login_required
+def ogrenci_kulup_pdf(request):
+    """Sınıfın öğrencilerini kulüplerine göre gruplanmış (okul no sıralı) PDF olarak verir.
+    Yetki `ogrenci_kulup_belirle` ile aynıdır: rehber öğretmen kendi sınıfı, üst yönetici
+    ?sinif_sube=<pk> ile istediği sınıf."""
+    ss = _secili_sinif_sube(request)
+    egitim_yili = get_aktif_egitim_yili()
+    if ss is None or egitim_yili is None:
+        if ss is None and not is_ust_yonetici(request.user):
+            messages.error(
+                request, "Sınıf rehberliği atanmamış, öğrenci kulübü listesi alma yetkiniz bulunmamaktadır."
+            )
+            return redirect("index")
+        messages.error(request, "Sınıf seçilmedi ya da aktif eğitim-öğretim yılı tanımlı değil.")
+        return redirect("sosyalkulup:ogrenci_kulup_belirle")
+
+    gruplar, kulupsuzler = sinif_kulup_gruplari(ss.sinif, ss.sube, egitim_yili)
+    rehber = sinif_rehber_ogretmeni(ss)
+    pdf = sinif_kulup_listesi_pdf(
+        ss,
+        egitim_yili,
+        gruplar,
+        kulupsuzler,
+        rehber_adi=rehber.adi_soyadi if rehber else "",
+        okul_adi=OkulBilgi.get().okul_adi,
+    )
+    dosya_adi = slugify(f"{ss.sinif} {ss.sube} {egitim_yili} sosyal kulup listesi") or "sinif-kulup-listesi"
+    yanit = HttpResponse(pdf, content_type="application/pdf")
+    yanit["Content-Disposition"] = f'inline; filename="{dosya_adi}.pdf"'
+    return yanit
 
 
 @ust_yonetici_required

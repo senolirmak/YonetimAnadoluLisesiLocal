@@ -299,3 +299,94 @@ class DanismanOgretmenListesiTests(TestCase):
         self.client.force_login(kullanici_olustur("ogretmen"))
         r = self.client.get(self.url)
         self.assertNotEqual(r.status_code, 200)
+
+
+class SinifKulupPdfTests(TestCase):
+    """ogrenci-kulup/ sayfasından sınıfın kulüplere göre gruplanmış PDF listesi."""
+
+    url = reverse("sosyalkulup:ogrenci_kulup_pdf")
+
+    def setUp(self):
+        aktif_egitim_yili_olustur("2025-2026")
+        self.ss = sinif_sube_olustur(9, "A")
+        self.satranc = SosyalKulup.objects.create(ad="Satranç Kulübü")
+        self.tiyatro = SosyalKulup.objects.create(ad="Tiyatro Kulübü")
+        # Okul numaraları kayıt sırasından farklı: grup içinde okulno sırası beklenir.
+        self.o30 = ogrenci_olustur(9, "A", okulno=30, adi="Zeynep", soyadi="Öz")
+        self.o10 = ogrenci_olustur(9, "A", okulno=10, adi="Ali", soyadi="Çelik")
+        self.o20 = ogrenci_olustur(9, "A", okulno=20, adi="Ece", soyadi="Şahin")
+        self.o5 = ogrenci_olustur(9, "A", okulno=5, adi="Kaan", soyadi="Ünal")
+        self.kulupsuz = ogrenci_olustur(9, "A", okulno=40, adi="Mert", soyadi="Ilgaz")
+        self.baska = ogrenci_olustur(9, "B", okulno=1, adi="Başka", soyadi="Sınıf")
+        for o in (self.o30, self.o10, self.o20):
+            KulupUyelik.objects.create(ogrenci=o, kulup=self.tiyatro)
+        KulupUyelik.objects.create(ogrenci=self.o5, kulup=self.satranc, gorev="baskan")
+        KulupUyelik.objects.create(ogrenci=self.baska, kulup=self.satranc)
+
+        self.rehber = kullanici_olustur("ogretmen")
+        ders_programi_olustur(
+            personel_olustur(user=self.rehber, adi_soyadi="Rehber Öğretmen"),
+            1,
+            self.ss,
+            ders=ders_olustur("REHBERLİK VE YÖNLENDİRME"),
+        )
+
+    def test_gruplama_kulup_adina_ve_okul_no_sirasina_gore(self):
+        from okul.utils import get_aktif_egitim_yili
+
+        from .services.uyelik import sinif_kulup_gruplari
+
+        gruplar, kulupsuzler = sinif_kulup_gruplari(9, "A", get_aktif_egitim_yili())
+        self.assertEqual(
+            [(k.ad, [o.okulno for o, _ in uyeler]) for k, uyeler in gruplar],
+            [("Satranç Kulübü", [5]), ("Tiyatro Kulübü", [10, 20, 30])],
+        )
+        self.assertEqual(kulupsuzler, [self.kulupsuz])
+
+    def test_rehber_ogretmen_pdf_alir(self):
+        import io
+
+        from pypdf import PdfReader
+
+        self.client.force_login(self.rehber)
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        metin = PdfReader(io.BytesIO(resp.content)).pages[0].extract_text()
+        for parca in ("9/A", "2025-2026", "Rehber Öğretmen", "Satranç Kulübü", "Tiyatro Kulübü",
+                      "Kaan Ünal", "Başkan", "Kulüp Seçilmeyenler", "Mert Ilgaz"):
+            self.assertIn(parca, metin)
+        self.assertNotIn("Başka Sınıf", metin)
+        # Tiyatro grubunda okul no sırası: Ali (10) → Ece (20) → Zeynep (30)
+        self.assertLess(metin.index("Ali Çelik"), metin.index("Ece Şahin"))
+        self.assertLess(metin.index("Ece Şahin"), metin.index("Zeynep Öz"))
+
+    def test_rehber_ogretmen_baska_sinifin_pdfini_alamaz(self):
+        import io
+
+        from pypdf import PdfReader
+
+        ss_b = sinif_sube_olustur(9, "B")
+        self.client.force_login(self.rehber)
+        resp = self.client.get(self.url, {"sinif_sube": ss_b.pk})
+        metin = PdfReader(io.BytesIO(resp.content)).pages[0].extract_text()
+        self.assertIn("9/A", metin)
+        self.assertNotIn("Başka Sınıf", metin)
+
+    def test_rehberligi_olmayan_ogretmen_yonlendirilir(self):
+        self.client.force_login(kullanici_olustur("ogretmen"))
+        self.assertRedirects(self.client.get(self.url), reverse("index"), fetch_redirect_response=False)
+
+    def test_mudur_yardimcisi_sinif_secmeden_pdf_alamaz(self):
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+        resp = self.client.get(self.url)
+        self.assertRedirects(
+            resp, reverse("sosyalkulup:ogrenci_kulup_belirle"), fetch_redirect_response=False
+        )
+        resp = self.client.get(self.url, {"sinif_sube": self.ss.pk})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_sayfada_pdf_dugmesi_var(self):
+        self.client.force_login(self.rehber)
+        self.assertContains(self.client.get(reverse("sosyalkulup:ogrenci_kulup_belirle")), self.url)

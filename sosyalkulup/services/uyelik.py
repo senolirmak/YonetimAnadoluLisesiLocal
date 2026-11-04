@@ -23,6 +23,26 @@ def sinif_uyelikleri(sinif, sube, egitim_yili):
     }
 
 
+def sinif_kulup_gruplari(sinif, sube, egitim_yili):
+    """Sınıftaki aktif öğrencileri kulüplerine göre gruplar.
+
+    Dönüş: (gruplar, kulupsuzler)
+      gruplar    = [(SosyalKulup, [(Ogrenci, KulupUyelik), ...]), ...]  kulüp adına göre
+      kulupsuzler = [Ogrenci, ...]  kulüp seçilmemiş öğrenciler
+    Her grupta öğrenciler okul no sırasındadır.
+    """
+    uyelikler = sinif_uyelikleri(sinif, sube, egitim_yili)
+    gruplar, kulupsuzler = {}, []
+    for ogr in sinif_ogrencileri(sinif, sube):  # okulno sıralı
+        u = uyelikler.get(ogr.pk)
+        if u is None:
+            kulupsuzler.append(ogr)
+        else:
+            gruplar.setdefault(u.kulup, []).append((ogr, u))
+    sirali = sorted(gruplar.items(), key=lambda kv: (kv[0].ad, kv[0].pk))
+    return sirali, kulupsuzler
+
+
 def secilebilir_kulupler(mevcut_kulup_idleri=()):
     """Aktif kulüpler + öğrencinin zaten üye olduğu (sonradan pasife alınmış) kulüpler."""
     return SosyalKulup.objects.filter(Q(aktif=True) | Q(pk__in=list(mevcut_kulup_idleri)))
