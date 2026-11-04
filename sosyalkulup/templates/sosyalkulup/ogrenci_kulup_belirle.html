@@ -74,6 +74,8 @@
                 </table>
             </div>
             <button type="submit" class="btn btn-success">Kaydet</button>
+            <a href="{% url 'sosyalkulup:ogrenci_kulup_pdf' %}{% if sinif_secimi %}?sinif_sube={{ sinif_sube.pk }}{% endif %}"
+               class="btn btn-danger" target="_blank" rel="noopener" title="Kaydedilmiş seçimlerle oluşturulur">PDF Raporu</a>
         </form>
         {% endif %}
     {% endif %}

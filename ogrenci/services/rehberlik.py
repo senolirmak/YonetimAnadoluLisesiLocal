@@ -22,3 +22,14 @@ def rehberlik_sinif_sube(user):
         .first()
     )
     return ders.sinif_sube if ders else None
+
+
+def sinif_rehber_ogretmeni(sinif_sube):
+    """`sinif_sube`'nin sınıf rehber öğretmeni (Personel); yoksa None."""
+    ders = (
+        DersProgrami.objects.aktif()
+        .filter(sinif_sube=sinif_sube, ders__ders_adi__iexact=REHBERLIK_DERS_ADI)
+        .select_related("ogretmen")
+        .first()
+    )
+    return ders.ogretmen if ders else None
