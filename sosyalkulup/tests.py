@@ -361,6 +361,22 @@ class SinifKulupPdfTests(TestCase):
         self.assertLess(metin.index("Ali Çelik"), metin.index("Ece Şahin"))
         self.assertLess(metin.index("Ece Şahin"), metin.index("Zeynep Öz"))
 
+    def test_kalabalik_sinif_tek_sayfaya_sigar(self):
+        import io
+
+        from pypdf import PdfReader
+
+        kulupler = [SosyalKulup.objects.create(ad=f"Kulüp {i:02d}") for i in range(15)]
+        for i in range(40):
+            o = ogrenci_olustur(9, "A", okulno=100 + i, adi=f"Uzunisimli{i}", soyadi="Öğrencisoyadı")
+            KulupUyelik.objects.create(ogrenci=o, kulup=kulupler[i % 15])
+        self.client.force_login(self.rehber)
+        okuyucu = PdfReader(io.BytesIO(self.client.get(self.url).content))
+        self.assertEqual(len(okuyucu.pages), 1)
+        metin = okuyucu.pages[0].extract_text()
+        self.assertIn("Kulüp 14", metin)
+        self.assertIn("Uzunisimli39", metin)
+
     def test_rehber_ogretmen_baska_sinifin_pdfini_alamaz(self):
         import io
 

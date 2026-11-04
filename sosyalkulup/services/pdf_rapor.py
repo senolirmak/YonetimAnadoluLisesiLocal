@@ -11,7 +11,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepInFrame, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 def _fontlar():
@@ -118,99 +118,105 @@ def kulup_ogrenci_listesi_pdf(kulup, egitim_yili, danismanlar, uyelikler, okul_a
 
 def sinif_kulup_listesi_pdf(sinif_sube, egitim_yili, gruplar, kulupsuzler, rehber_adi="", okul_adi=""):
     """Bir sınıfın öğrencilerini kulüplerine göre gruplanmış (her grup okul no sıralı)
-    A4 dikey PDF olarak üretir; bytes döner. `gruplar`/`kulupsuzler` için bkz.
-    `services.uyelik.sinif_kulup_gruplari`."""
+    tek sayfalık A4 dikey PDF olarak üretir; bytes döner. `gruplar`/`kulupsuzler` için
+    bkz. `services.uyelik.sinif_kulup_gruplari`.
+
+    Sıkı bir düzen kullanılır (tek tablo, kulüp adları ara başlık satırı); yine de
+    sığmazsa içerik orantılı küçültülerek tek sayfaya sığdırılır."""
     font, font_kalin = _fontlar()
-    stil = ParagraphStyle("normal", fontName=font, fontSize=10, leading=13)
-    baslik = ParagraphStyle("baslik", parent=stil, fontName=font_kalin, fontSize=13, leading=17, alignment=1)
+    stil = ParagraphStyle("normal", fontName=font, fontSize=9, leading=11)
+    baslik = ParagraphStyle("baslik", parent=stil, fontName=font_kalin, fontSize=12, leading=15, alignment=1)
     alt_baslik = ParagraphStyle("alt", parent=stil, alignment=1)
-    grup_baslik = ParagraphStyle("grup", parent=stil, fontName=font_kalin, fontSize=11, leading=14)
-    hucre = ParagraphStyle("hucre", parent=stil, fontSize=9.5, leading=12)
 
     toplam = sum(len(uyeler) for _, uyeler in gruplar) + len(kulupsuzler)
     icerik = []
     if okul_adi:
         icerik.append(Paragraph(escape(okul_adi), baslik))
     icerik += [
-        Paragraph(f"{escape(egitim_yili)} Eğitim-Öğretim Yılı", alt_baslik),
-        Spacer(1, 4),
-        Paragraph(f"{escape(sinif_sube)} Sınıfı — Öğrenci Sosyal Kulüp Listesi", baslik),
-        Spacer(1, 8),
+        Paragraph(
+            f"{escape(egitim_yili)} Eğitim-Öğretim Yılı — "
+            f"{escape(sinif_sube)} Sınıfı Öğrenci Sosyal Kulüp Listesi",
+            baslik,
+        ),
+        Spacer(1, 3),
         Paragraph(
             f"<font name='{font_kalin}'>Sınıf Rehber Öğretmeni:</font> {escape(rehber_adi or '-')}"
             f" &nbsp;&nbsp; <font name='{font_kalin}'>Öğrenci Sayısı:</font> {toplam}"
             f" &nbsp;&nbsp; <font name='{font_kalin}'>Kulüp Seçmeyen:</font> {len(kulupsuzler)}",
-            stil,
+            alt_baslik,
         ),
-        Spacer(1, 6),
+        Spacer(1, 5),
     ]
 
-    tablo_stili = TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), font),
-        ("FONTNAME", (0, 0), (-1, 0), font_kalin),
-        ("FONTSIZE", (0, 0), (-1, -1), 9.5),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.88, 0.88, 0.88)),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (0, 0), (1, -1), "CENTER"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.Color(0.96, 0.96, 0.96)]),
-    ])
-    sutunlar = [1 * cm, 2.4 * cm, 9.2 * cm, 4.4 * cm]
+    # Tek tablo: her kulüp için bir ara başlık satırı, altında üyeleri.
+    satirlar = [["#", "Okul No", "Adı Soyadı", "Kulüpteki Görevi"]]
+    grup_satirlari = []
 
-    def _grup(ad, satirlar):
-        icerik.append(Spacer(1, 6))
-        icerik.append(Paragraph(f"{escape(ad)} ({len(satirlar)} öğrenci)", grup_baslik))
-        icerik.append(Spacer(1, 3))
-        tablo = Table(
-            [["#", "Okul No", "Adı Soyadı", "Kulüpteki Görevi"]] + satirlar,
-            colWidths=sutunlar,
-            repeatRows=1,
-        )
-        tablo.setStyle(tablo_stili)
-        icerik.append(tablo)
+    def _grup(ad, uyeler):
+        grup_satirlari.append(len(satirlar))
+        satirlar.append([f"{ad} ({len(uyeler)} öğrenci)", "", "", ""])
+        for i, (o, gorev) in enumerate(uyeler, 1):
+            satirlar.append([str(i), str(o.okulno), f"{o.adi} {o.soyadi}", gorev])
 
     for kulup, uyeler in gruplar:
-        _grup(kulup.ad, [
-            [str(i), str(o.okulno), Paragraph(escape(f"{o.adi} {o.soyadi}"), hucre), u.get_gorev_display()]
-            for i, (o, u) in enumerate(uyeler, 1)
-        ])
+        _grup(kulup.ad, [(o, u.get_gorev_display()) for o, u in uyeler])
     if kulupsuzler:
-        _grup("Kulüp Seçilmeyenler", [
-            [str(i), str(o.okulno), Paragraph(escape(f"{o.adi} {o.soyadi}"), hucre), "-"]
-            for i, o in enumerate(kulupsuzler, 1)
-        ])
-    if not gruplar and not kulupsuzler:
-        icerik.append(Paragraph("Bu sınıfta aktif öğrenci bulunmuyor.", stil))
+        _grup("Kulüp Seçilmeyenler", [(o, "-") for o in kulupsuzler])
+    if len(satirlar) == 1:
+        satirlar.append(["", "", "Bu sınıfta aktif öğrenci bulunmuyor.", ""])
 
-    icerik.append(Spacer(1, 1.2 * cm))
-    imza_stili = ParagraphStyle("imza", parent=alt_baslik)
-    imza = Table(
+    komutlar = [
+        ("FONTNAME", (0, 0), (-1, -1), font),
+        ("FONTNAME", (0, 0), (-1, 0), font_kalin),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("LEADING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.80, 0.80, 0.80)),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (1, -1), "CENTER"),
+    ]
+    for r in grup_satirlari:
+        komutlar += [
+            ("SPAN", (0, r), (-1, r)),
+            ("FONTNAME", (0, r), (-1, r), font_kalin),
+            ("ALIGN", (0, r), (-1, r), "LEFT"),
+            ("BACKGROUND", (0, r), (-1, r), colors.Color(0.92, 0.92, 0.92)),
+        ]
+    tablo = Table(satirlar, colWidths=[1 * cm, 2 * cm, 9.5 * cm, 4.5 * cm])
+    tablo.setStyle(TableStyle(komutlar))
+    icerik.append(tablo)
+
+    icerik.append(Spacer(1, 0.8 * cm))
+    icerik.append(Table(
         [
-            ["", Paragraph(escape(rehber_adi or ""), imza_stili)],
-            ["", Paragraph("Sınıf Rehber Öğretmeni", imza_stili)],
-            ["", Paragraph("İmza", imza_stili)],
+            ["", Paragraph(escape(rehber_adi or ""), alt_baslik)],
+            ["", Paragraph("Sınıf Rehber Öğretmeni", alt_baslik)],
+            ["", Paragraph("İmza", alt_baslik)],
         ],
         colWidths=[10 * cm, 7 * cm],
-    )
-    icerik.append(imza)
+    ))
 
     tarih = timezone.localdate().strftime("%d.%m.%Y")
 
     def _sayfa_alti(canvas, doc):
         canvas.saveState()
         canvas.setFont(font, 8)
-        canvas.drawString(2 * cm, 1.2 * cm, f"Düzenlenme tarihi: {tarih}")
-        canvas.drawRightString(A4[0] - 2 * cm, 1.2 * cm, f"Sayfa {doc.page}")
+        canvas.drawString(2 * cm, 0.9 * cm, f"Düzenlenme tarihi: {tarih}")
         canvas.restoreState()
 
     tampon = io.BytesIO()
-    SimpleDocTemplate(
+    doc = SimpleDocTemplate(
         tampon,
         pagesize=A4,
         leftMargin=2 * cm,
         rightMargin=2 * cm,
-        topMargin=1.8 * cm,
-        bottomMargin=2 * cm,
+        topMargin=1.2 * cm,
+        bottomMargin=1.4 * cm,
         title=f"{sinif_sube} Sosyal Kulüp Listesi",
-    ).build(icerik, onFirstPage=_sayfa_alti, onLaterPages=_sayfa_alti)
+    )
+    # Çerçevenin iç boşluğu (6pt × 2) düşülür; sığmayan içerik orantılı küçültülür.
+    sayfa = KeepInFrame(doc.width - 12, doc.height - 12, icerik, mode="shrink")
+    doc.build([sayfa], onFirstPage=_sayfa_alti)
     return tampon.getvalue()
