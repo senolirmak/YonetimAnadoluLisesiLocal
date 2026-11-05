@@ -11,6 +11,7 @@ from sinav.views_ogretmen import (
     sinav_oturum_istatistik,
     sinav_salon_yoklama,
     sinif_oturma_plani,
+    sinif_oturma_plani_pdf,
 )
 from sorumluluk.views import ogretmen_sorumluluk_gorevleri
 from okul.views import okul_ayarlari
@@ -37,4 +38,5 @@ urlpatterns = [
     path("sinav/ogrenci-sinav-takvimi/", ogretmen_ogrenci_sinav_takvimi, name="ogretmen_ogrenci_sinav_takvimi"),
     path("okul-ayarlari/", okul_ayarlari, name="okul_ayarlari"),
     path("sinif/oturma-plani/", sinif_oturma_plani, name="sinif_oturma_plani"),
+    path("sinif/oturma-plani/pdf/", sinif_oturma_plani_pdf, name="sinif_oturma_plani_pdf"),
 ]

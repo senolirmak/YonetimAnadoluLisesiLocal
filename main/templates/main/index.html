@@ -306,6 +306,7 @@
                     <div class="menu-button-group">
                         <a href="{% url 'ogrenci:ogrenci_liste' %}" class="btn btn-lg" style="background-color: #20c997; color: white;">Öğrenci Listesi</a>
                         <a href="{% url 'sosyalkulup:ogrenci_kulup_belirle' %}" class="btn btn-lg" style="background-color: #fd7e14; color: white;">Öğrenci Sosyal Kulübünü Belirle</a>
+                        <a href="{% url 'sinif_oturma_plani' %}?sec=1" class="btn btn-lg" style="background-color: #4f46e5; color: white;">Sınıf Oturma Planları</a>
                         {% if is_tarih_degistirebilir %}
                         <a href="{% url 'sosyalkulup:kulup_listesi' %}" class="btn btn-lg" style="background-color: #b45309; color: white;">Sosyal Kulüpler</a>
                         {% endif %}
@@ -331,7 +332,7 @@
                         <a href="{% url 'sinif_oturma_plani' %}"
                            style="background:#16a34a;color:#fff;text-decoration:none;font-size:.82rem;font-weight:600;
                                   padding:.3rem .9rem;border-radius:6px;white-space:nowrap;">
-                          Oturma Planı
+                          Oturma Planını Düzenle
                         </a>
                     </div>
                     {% endif %}
