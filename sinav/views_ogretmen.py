@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
+from ogrenci.services.rehberlik import rehberlik_dersi_q
 from okul.utils import get_aktif_egitim_yili
 from main.utils import _ogretmen_menu_gorumu
 from sinav.services.gozetim_erisim import (
@@ -856,8 +857,8 @@ def ogretmen_ogrenci_sinav_takvimi(request):
     rehberlik_ders = (
         DersProgrami.objects.aktif()
         .filter(
+            rehberlik_dersi_q(),
             ogretmen=personel,
-            ders__ders_adi__iexact="rehberlik ve yönlendirme",
         )
         .select_related("sinif_sube")
         .first()
