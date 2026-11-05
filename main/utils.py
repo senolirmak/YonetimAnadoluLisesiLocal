@@ -46,8 +46,7 @@ def get_ogretmen_gorev_verileri(user, today):
     main/views.py:index() ve main/views.py:gorevlerim() tarafından ortak kullanılır.
     """
     from django.db.models import Q
-    from dersprogrami.models import DersProgrami
-    from ogrenci.services.rehberlik import rehberlik_dersi_q
+    from ogrenci.services.rehberlik import rehberlik_sinif_sube as rehberlik_sinif_sube_bul
     from nobet.models import NobetGecmisi, NobetGorevi
 
     _gruplar = set(user.groups.values_list("name", flat=True))
@@ -59,17 +58,9 @@ def get_ogretmen_gorev_verileri(user, today):
     ogretmen_nobetleri = []
     atanan_dersler = []
     if personel_bagli:
-        rehberlik_ders = (
-            DersProgrami.objects.aktif()
-            .filter(
-                rehberlik_dersi_q(),
-                ogretmen=user.personel,
-            )
-            .select_related("sinif_sube", "ders")
-            .first()
-        )
-        if rehberlik_ders and rehberlik_ders.sinif_sube:
-            rehberlik_sinif_sube = str(rehberlik_ders.sinif_sube)
+        rehber_sinifi = rehberlik_sinif_sube_bul(user)
+        if rehber_sinifi:
+            rehberlik_sinif_sube = str(rehber_sinifi)
 
         try:
             nobet_ogretmen = user.personel.ogretmen

@@ -642,3 +642,55 @@ class OgretmenlikAlanCizelgesi(models.Model):
 
     def __str__(self):
         return f"{self.brans} — {self.mezunokul}"
+
+
+class SinifRehberOgretmeni(models.Model):
+    """Bir sınıf/şubenin belirli bir eğitim-öğretim yılındaki sınıf rehber öğretmeni.
+
+    Rehber öğretmen bilgisinin tek kaynağıdır (oturma planı, sosyal kulüp, öğrenci
+    listesi yetkileri buradan okunur). Haftalık ders programındaki "REHBERLİK VE
+    YÖNLENDİRME" dersi yalnızca öneri olarak kullanılır; öneri yönetici onayıyla
+    bu tabloya işlenir (bkz. ogrenci/services/rehberlik.py).
+    """
+
+    egitim_yili = models.ForeignKey(
+        EgitimOgretimYili,
+        on_delete=models.CASCADE,
+        related_name="sinif_rehberleri",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    sinif_sube = models.ForeignKey(
+        SinifSube,
+        on_delete=models.CASCADE,
+        related_name="rehber_ogretmenleri",
+        verbose_name="Sınıf/Şube",
+    )
+    personel = models.ForeignKey(
+        Personel,
+        on_delete=models.CASCADE,
+        related_name="sinif_rehberlikleri",
+        verbose_name="Rehber Öğretmen",
+    )
+    guncelleme = models.DateTimeField(auto_now=True, verbose_name="Son Güncelleme")
+    guncelleyen = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Güncelleyen",
+    )
+
+    class Meta:
+        db_table = "okul_sinif_rehber_ogretmeni"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["egitim_yili", "sinif_sube"], name="sinif_rehber_yil_sinif_tekil"
+            ),
+        ]
+        ordering = ["sinif_sube__sinif", "sinif_sube__sube"]
+        verbose_name = "Sınıf Rehber Öğretmeni"
+        verbose_name_plural = "Sınıf Rehber Öğretmenleri"
+
+    def __str__(self):
+        return f"{self.sinif_sube} — {self.personel}"

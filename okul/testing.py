@@ -136,6 +136,18 @@ def aktif_egitim_yili_olustur(egitim_yili="2025-2026"):
     return yil
 
 
+def sinif_rehberi_ata(personel, sinif_sube, egitim_yili=None):
+    """`personel`'i `sinif_sube`'nin rehber öğretmeni olarak kaydeder (okul.SinifRehberOgretmeni).
+    Yıl verilmezse aktif yıl, o da yoksa yeni bir aktif yıl kullanılır."""
+    from okul.models import SinifRehberOgretmeni
+    from okul.utils import get_aktif_egitim_yili
+
+    yil = egitim_yili or get_aktif_egitim_yili() or aktif_egitim_yili_olustur()
+    return SinifRehberOgretmeni.objects.update_or_create(
+        egitim_yili=yil, sinif_sube=sinif_sube, defaults={"personel": personel}
+    )[0]
+
+
 def ders_olustur(ders_adi=None, **kwargs):
     from okul.models import DersHavuzu
 

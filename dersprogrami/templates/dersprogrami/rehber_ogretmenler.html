@@ -1,59 +1,40 @@
 {% extends "layouts/base.html" %}
-{% load static okul_extras %}
+{% load static %}
 
 {% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
 <style>
-    .rehber-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.9em;
-    }
-    .rehber-table th {
-        background: #198754;
-        color: white;
-        padding: 9px 12px;
-        text-align: center;
-        font-weight: 600;
-        white-space: nowrap;
-    }
-    .rehber-table th.col-left { text-align: left; }
-    .rehber-table td {
-        padding: 8px 12px;
-        border-bottom: 1px solid #dee2e6;
-        vertical-align: middle;
-        text-align: center;
-    }
-    .rehber-table td.col-left { text-align: left; }
-    .rehber-table tbody tr:nth-child(even) { background: #f8f9fa; }
-    .rehber-table tbody tr:hover { background: #e8f5e9; }
-    .sinif-badge {
-        display: inline-block;
-        padding: 3px 10px;
-        border-radius: 12px;
-        background: #d1fae5;
-        color: #065f46;
-        font-weight: 700;
-        font-size: 0.92em;
-        min-width: 48px;
-    }
-    .ders-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 8px;
-        background: #dbeafe;
-        color: #1e40af;
-        font-size: 0.82em;
-        font-weight: 600;
-    }
-    .empty-cell { color: #adb5bd; }
+    .rehber-table { width:100%; border-collapse:collapse; font-size:0.9em; }
+    .rehber-table th { background:#198754; color:#fff; padding:9px 12px; text-align:left; font-weight:600; white-space:nowrap; }
+    .rehber-table td { padding:8px 12px; border-bottom:1px solid #dee2e6; vertical-align:middle; }
+    .rehber-table tbody tr:nth-child(even) { background:#f8f9fa; }
+    .sinif-badge { display:inline-block; padding:3px 10px; border-radius:12px; background:#d1fae5; color:#065f46;
+                   font-weight:700; font-size:0.92em; min-width:48px; text-align:center; }
+    .saat { display:block; color:#6c757d; font-size:0.8em; }
+    .durum { display:inline-block; padding:2px 9px; border-radius:10px; font-size:0.8em; font-weight:600; white-space:nowrap; }
+    .durum-uyumlu { background:#d1fae5; color:#065f46; }
+    .durum-farkli { background:#fef3c7; color:#92400e; }
+    .durum-atanmamis { background:#fee2e2; color:#991b1b; }
+    .durum-oneri_yok { background:#f3f4f6; color:#6b7280; }
+    .durum-elle { background:#dbeafe; color:#1e40af; }
+    .bos { color:#adb5bd; }
+    .islem-form { display:inline-flex; gap:4px; align-items:center; margin:2px 0; }
+    .islem-form select { max-width:200px; padding:3px 4px; font-size:0.85em; }
+    .kucuk-btn { padding:3px 9px; font-size:0.8em; border-radius:5px; border:1px solid transparent; cursor:pointer; font-weight:600; }
+    .btn-oneri { background:#198754; color:#fff; }
+    .btn-kaydet { background:#0d6efd; color:#fff; }
+    .btn-kaldir { background:#fff; color:#b91c1c; border-color:#fca5a5; }
+    .mesaj { margin-bottom:12px; padding:.7rem 1rem; border-radius:6px; font-size:.9rem; }
+    .mesaj-basari { background:#d1fae5; border:1px solid #6ee7b7; color:#065f46; }
+    .mesaj-hata { background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; }
+    .mesaj-bilgi { background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; }
 </style>
 
 <div class="container">
     <div class="mb-20">
-        <h2 class="page-title mb-20">{{ title }}</h2>
+        <h2 class="page-title mb-20">{{ title }}{% if egitim_yili %} — {{ egitim_yili }}{% endif %}</h2>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
             <a href="{% url 'ogretmen_program' %}" class="btn btn-secondary">Öğretmen Durum Bilgisi</a>
             <a href="{% url 'haftalik_ders_programi' %}" class="btn btn-secondary">Öğretmen Ders Programı</a>
@@ -61,57 +42,113 @@
         <hr class="hr-divider">
     </div>
 
-    {% if not rehberlik_ders %}
-    <div class="card">
-        <div class="card-header bg-danger">Ders Bulunamadı</div>
-        <div style="padding:20px; color:#721c24;">
-            Ders havuzunda <strong>REHBERLİK VE YÖNLENDİRME</strong> dersi bulunamadı.
-            Ders programı verisinin yüklenmiş olduğundan emin olun.
-        </div>
-    </div>
-    {% elif not rows %}
-    <div class="card">
-        <div class="card-header bg-warning">Kayıt Yok</div>
-        <div style="padding:20px;">
-            Aktif ders programında <strong>{{ rehberlik_ders.ders_adi }}</strong> dersi atanmış öğretmen bulunamadı.
-        </div>
+    {% for msg in messages %}
+    <div class="mesaj {% if msg.tags == 'error' %}mesaj-hata{% else %}mesaj-basari{% endif %}">{{ msg }}</div>
+    {% endfor %}
+
+    {% if not egitim_yili %}
+    <div class="mesaj mesaj-hata">
+        Aktif eğitim-öğretim yılı tanımlı değil. Önce Okul Bilgisi'nden aktif yılı belirleyin.
     </div>
     {% else %}
+
+    <div class="mesaj mesaj-bilgi">
+        Sınıf rehber öğretmenleri bu tabloda tutulur; oturma planı, sosyal kulüp ve öğrenci listesi
+        yetkileri buradan okunur. <strong>Ders Programı Önerisi</strong> sütunu, aktif haftalık ders
+        programında o sınıfa "Rehberlik ve Yönlendirme" dersini veren öğretmeni gösterir; öneri
+        kabul edilmedikçe tabloya işlenmez.
+        {% if atanmamis_sayisi %}<br><strong>{{ atanmamis_sayisi }} sınıfın rehber öğretmeni henüz kaydedilmemiş.</strong>{% endif %}
+    </div>
+
+    {% if duzenleyebilir and toplu_kabul_sayisi %}
+    <form method="post" style="margin-bottom:14px;"
+          onsubmit="return confirm('Rehber öğretmeni kaydedilmemiş {{ toplu_kabul_sayisi }} sınıfa ders programındaki öneri işlenecek. Devam edilsin mi?');">
+        {% csrf_token %}
+        <input type="hidden" name="islem" value="toplu_kabul">
+        <button type="submit" class="btn btn-success">
+            Ders Programı Önerilerini Kabul Et ({{ toplu_kabul_sayisi }} sınıf)
+        </button>
+        <span style="font-size:.8rem; color:#6c757d; margin-left:6px;">
+            Yalnızca rehberi kaydedilmemiş ve tek önerisi olan sınıflara uygulanır; mevcut kayıtlar değişmez.
+        </span>
+    </form>
+    {% endif %}
+
     <div class="card">
-        <div class="card-header bg-primary" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>Rehberlik Dersi Öğretmenleri — Aktif Program</span>
-            <small style="opacity:.85;">Toplam {{ rows|length }} sınıf</small>
-        </div>
         <div style="overflow-x:auto;">
             <table class="rehber-table">
                 <thead>
                     <tr>
-                        <th class="col-left" style="width:220px;">Adı Soyadı</th>
-                        <th class="col-left" style="width:140px;">Branşı</th>
                         <th style="width:80px;">Sınıf/Şube</th>
-                        {% for gun in gunler %}
-                        <th>{{ gun_tr|get_item:gun|default:gun }}</th>
-                        {% endfor %}
+                        <th>Kayıtlı Rehber Öğretmen</th>
+                        <th>Ders Programı Önerisi</th>
+                        <th>Durum</th>
+                        {% if duzenleyebilir %}<th>İşlem</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
-                    {% for row in rows %}
+                    {% for s in satirlar %}
                     <tr>
-                        <td class="col-left"><strong>{{ row.ogretmen.adi_soyadi }}</strong></td>
-                        <td class="col-left" style="color:#6c757d; font-size:0.88em;">{{ row.ogretmen.brans }}</td>
-                        <td><span class="sinif-badge">{{ row.sinif_sube }}</span></td>
-                        {% for gun in gunler %}
+                        <td><span class="sinif-badge">{{ s.sinif_sube }}</span></td>
                         <td>
-                            {% with deger=row.gunler|get_item:gun %}
-                            {% if deger %}
-                                <span class="ders-badge">{{ deger }}</span>
-                            {% else %}
-                                <span class="empty-cell">—</span>
-                            {% endif %}
-                            {% endwith %}
+                            {% if s.kayit %}
+                                <strong>{{ s.kayit.personel.adi_soyadi }}</strong>
+                                <span class="saat">{{ s.kayit.personel.brans|default:"" }}</span>
+                            {% else %}<span class="bos">—</span>{% endif %}
                         </td>
-                        {% endfor %}
+                        <td>
+                            {% for o in s.oneriler %}
+                                <div>{{ o.personel.adi_soyadi }}<span class="saat">{{ o.saatler|join:", " }}</span></div>
+                            {% empty %}<span class="bos">—</span>{% endfor %}
+                        </td>
+                        <td>
+                            <span class="durum durum-{{ s.durum }}">
+                                {% if s.durum == "uyumlu" %}Ders programıyla uyumlu
+                                {% elif s.durum == "farkli" %}Öneriden farklı
+                                {% elif s.durum == "atanmamis" %}Kaydedilmemiş
+                                {% elif s.durum == "elle" %}Elle girildi
+                                {% else %}Öneri yok{% endif %}
+                            </span>
+                        </td>
+                        {% if duzenleyebilir %}
+                        <td>
+                            {% for o in s.oneriler %}
+                            {% if not s.kayit or s.kayit.personel_id != o.personel.pk %}
+                            <form method="post" class="islem-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="islem" value="ata">
+                                <input type="hidden" name="sinif_sube" value="{{ s.sinif_sube.pk }}">
+                                <input type="hidden" name="personel" value="{{ o.personel.pk }}">
+                                <button type="submit" class="kucuk-btn btn-oneri">Öneriyi kabul et{% if s.oneriler|length > 1 %}: {{ o.personel.adi_soyadi }}{% endif %}</button>
+                            </form><br>
+                            {% endif %}
+                            {% endfor %}
+                            <form method="post" class="islem-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="islem" value="ata">
+                                <input type="hidden" name="sinif_sube" value="{{ s.sinif_sube.pk }}">
+                                <select name="personel" required aria-label="{{ s.sinif_sube }} rehber öğretmeni">
+                                    <option value="">Öğretmen seçin…</option>
+                                    {% for p in personeller %}
+                                    <option value="{{ p.pk }}" {% if s.kayit and s.kayit.personel_id == p.pk %}selected{% endif %}>{{ p.adi_soyadi }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="kucuk-btn btn-kaydet">Kaydet</button>
+                            </form>
+                            {% if s.kayit %}
+                            <form method="post" class="islem-form"
+                                  onsubmit="return confirm('{{ s.sinif_sube }} sınıfının rehber öğretmeni kaydı kaldırılsın mı?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="islem" value="kaldir">
+                                <input type="hidden" name="sinif_sube" value="{{ s.sinif_sube.pk }}">
+                                <button type="submit" class="kucuk-btn btn-kaldir">Kaldır</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                        {% endif %}
                     </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="bos" style="text-align:center;">Tanımlı sınıf bulunamadı.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

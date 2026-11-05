@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
-from ogrenci.services.rehberlik import rehberlik_dersi_q
+from ogrenci.services.rehberlik import rehberlik_sinif_sube
 from okul.utils import get_aktif_egitim_yili
 from main.utils import _ogretmen_menu_gorumu
 from sinav.services.gozetim_erisim import (
@@ -854,23 +854,14 @@ def ogretmen_ogrenci_sinav_takvimi(request):
             "hata": "Kullanıcınıza bağlı öğretmen kaydı bulunamadı.",
         })
 
-    rehberlik_ders = (
-        DersProgrami.objects.aktif()
-        .filter(
-            rehberlik_dersi_q(),
-            ogretmen=personel,
-        )
-        .select_related("sinif_sube")
-        .first()
-    )
-
-    if not (rehberlik_ders and rehberlik_ders.sinif_sube):
+    rehber_sinifi = rehberlik_sinif_sube(request.user)
+    if rehber_sinifi is None:
         return render(request, "sinav/ogretmen_ogrenci_sinav_takvimi.html", {
             "title": "Öğrenci Sınav Takvimi",
-            "hata": "Ders programınızda rehberlik sınıfı bulunamadı.",
+            "hata": "Size atanmış bir sınıf rehberliği bulunamadı.",
         })
 
-    sinif_sube_str = str(rehberlik_ders.sinif_sube)
+    sinif_sube_str = str(rehber_sinifi)
 
     from sorumluluk.models import SorumluOturmaPlani, SorumluSinav, salon_choices
 
