@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import AktifVeriKonfigurasyonu, OgretmenlikAlanCizelgesi, OkulYonetici, VeriAktarimGecmisi
+from .models import (
+    AktifVeriKonfigurasyonu,
+    OgretmenlikAlanCizelgesi,
+    OkulYonetici,
+    SinifRehberOgretmeni,
+    VeriAktarimGecmisi,
+)
 
 
 @admin.register(OkulYonetici)
@@ -42,3 +48,11 @@ class OgretmenlikAlanCizelgesiAdmin(admin.ModelAdmin):
     list_filter = ("brans",)
     search_fields = ("brans", "mezunokul", "dersler")
     ordering = ("sira_no", "brans", "mezunokul")
+
+
+@admin.register(SinifRehberOgretmeni)
+class SinifRehberOgretmeniAdmin(admin.ModelAdmin):
+    list_display = ("sinif_sube", "personel", "egitim_yili", "guncelleme", "guncelleyen")
+    list_filter = ("egitim_yili",)
+    search_fields = ("personel__adi_soyadi",)
+    readonly_fields = ("guncelleme", "guncelleyen")

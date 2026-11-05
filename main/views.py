@@ -12,6 +12,7 @@ from faaliyet.models import Faaliyet
 from main.utils import get_ogretmen_gorev_verileri
 from nobet.models import GunlukNobetCizelgesi, OkulBilgi
 from ogrencinobet.models import OgrenciNobetGorevi
+from okul.auth import is_ust_yonetici
 from okul.utils import get_aktif_egitim_yili
 from sosyalkulup.services.kulup import ogretmen_kulupleri
 
@@ -96,11 +97,18 @@ def index(request):
         .order_by("ogrenci__sinif", "ogrenci__sube", "ogrenci__okulno")
     )
 
+    rehber_atanmamis_sayisi = 0
+    if is_ust_yonetici(request.user):
+        from ogrenci.services.rehberlik import atanmamis_sinif_sayisi
+
+        rehber_atanmamis_sayisi = atanmamis_sinif_sayisi(get_aktif_egitim_yili())
+
     return render(
         request,
         "main/index.html",
         {
             "title": "Anasayfa",
+            "rehber_atanmamis_sayisi": rehber_atanmamis_sayisi,
             "okul_bilgi": okul_bilgi,
             "gunun_nobetci_ogrencileri": gunun_nobetci_ogrencileri,
             "gunun_nobetci_ogretmenleri": gunun_nobetci_ogretmenleri,

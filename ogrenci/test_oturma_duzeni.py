@@ -12,6 +12,7 @@ from okul.testing import (
     kullanici_olustur,
     ogrenci_olustur,
     personel_olustur,
+    sinif_rehberi_ata,
     sinif_sube_olustur,
 )
 
@@ -26,11 +27,7 @@ class OturmaDuzeniTemel(TestCase):
         self.yabanci = ogrenci_olustur(9, "B")
 
         self.rehber = kullanici_olustur("ogretmen")
-        personel = personel_olustur(user=self.rehber)
-        ders_programi_olustur(
-            personel, 1, sinif_sube=self.sinif,
-            ders=ders_olustur("Rehberlik ve Yönlendirme"),
-        )
+        sinif_rehberi_ata(personel_olustur(user=self.rehber), self.sinif)
         self.ogretmen = kullanici_olustur("ogretmen")
         personel_olustur(user=self.ogretmen)
 
@@ -205,21 +202,24 @@ class PdfTestCase(OturmaDuzeniTemel):
         self.assertNotContains(self.client.get(sayfa, {"sinif_sube": self.sinif.pk}), "PDF Al")
 
 
-class GercekDersAdiTestCase(TestCase):
-    """Ders adı veritabanında e-Okul/varsayılan veriyle aynı biçimde (noktalı büyük İ)
-    kayıtlıyken de rehber öğretmen tanınmalı."""
+class TabloKaynakTestCase(TestCase):
+    """Rehber öğretmen yalnızca SinifRehberOgretmeni tablosundan okunur."""
 
-    def test_buyuk_harfli_ders_adiyla_rehber_tanınır(self):
+    def test_ders_programi_tek_basina_rehber_yapmaz(self):
         aktif_egitim_yili_olustur()
         sinif = sinif_sube_olustur(11, "C")
-        rehber = kullanici_olustur("ogretmen")
+        ogretmen = kullanici_olustur("ogretmen")
         ders_programi_olustur(
-            personel_olustur(user=rehber), 2, sinif_sube=sinif,
+            personel_olustur(user=ogretmen), 2, sinif_sube=sinif,
             ders=ders_olustur("REHBERLİK VE YÖNLENDİRME"),
         )
-        self.assertEqual(od.rehber_sinifi(rehber), sinif)
-        self.assertTrue(od.duzenleyebilir_mi(rehber, sinif))
-        self.assertEqual(od.sinif_rehberi(sinif), rehber.personel)
+        self.assertIsNone(od.rehber_sinifi(ogretmen))
+        self.assertFalse(od.duzenleyebilir_mi(ogretmen, sinif))
+
+        sinif_rehberi_ata(ogretmen.personel, sinif)
+        self.assertEqual(od.rehber_sinifi(ogretmen), sinif)
+        self.assertTrue(od.duzenleyebilir_mi(ogretmen, sinif))
+        self.assertEqual(od.sinif_rehberi(sinif), ogretmen.personel)
 
 
 class PdfButonuTestCase(OturmaDuzeniTemel):

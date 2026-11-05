@@ -15,10 +15,10 @@ from okul.models import SinifSubeYil
 from okul.testing import (
     aktif_egitim_yili_olustur,
     ders_olustur,
-    ders_programi_olustur,
     kullanici_olustur,
     ogrenci_olustur,
     personel_olustur,
+    sinif_rehberi_ata,
     sinif_sube_olustur,
 )
 
@@ -53,10 +53,7 @@ class OgrenciListeTestCase(TestCase):
 
     def _rehber_ogretmen(self, sinif_sube):
         user = kullanici_olustur("ogretmen")
-        personel = personel_olustur(user=user)
-        ders_programi_olustur(
-            personel, 1, sinif_sube, ders=ders_olustur("REHBERLİK VE YÖNLENDİRME")
-        )
+        sinif_rehberi_ata(personel_olustur(user=user), sinif_sube)
         return user
 
     def test_yonetici_tum_ogrencileri_ve_pasifleri_etiketle_gorur(self):

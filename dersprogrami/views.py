@@ -752,15 +752,15 @@ def haftalik_ders_programi(request):
         except Exception:
             nobet_gorevleri = []
 
-        # Rehberlik ve Yönlendirme dersi verdiği sınıflar
+        # Sınıf rehber öğretmenliği (okul.SinifRehberOgretmeni, aktif yıl)
+        from okul.models import SinifRehberOgretmeni
+        from okul.utils import get_aktif_egitim_yili
+
         rehberlik_siniflari = list(
-            DersProgrami.objects.aktif().filter(
-                ogretmen=secilen_personel,
-                ders__ders_adi__icontains="rehberlik",
-                sinif_sube__isnull=False,
+            SinifRehberOgretmeni.objects.filter(
+                personel=secilen_personel, egitim_yili=get_aktif_egitim_yili()
             )
             .values_list("sinif_sube__sinif", "sinif_sube__sube")
-            .distinct()
             .order_by("sinif_sube__sinif", "sinif_sube__sube")
         )
 
@@ -794,56 +794,55 @@ def haftalik_ders_programi(request):
 
 @yonetici_required
 def rehber_ogretmenler(request):
-    from okul.models import DersHavuzu
+    """Sınıf rehber öğretmenleri tablosu (okul.SinifRehberOgretmeni).
 
-    GUNLER_SIRALAMA = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    GUN_TR = {
-        "Monday": "Pazartesi",
-        "Tuesday": "Salı",
-        "Wednesday": "Çarşamba",
-        "Thursday": "Perşembe",
-        "Friday": "Cuma",
-    }
+    Yöneticiler görüntüler; müdür yardımcısı/okul müdürü ders programından gelen
+    öneriyi kabul eder, rehberi değiştirir ya da kaldırır.
+    """
+    from django.shortcuts import get_object_or_404
 
-    # Aranan metin büyük harfle yazılır: PostgreSQL UPPER() C/en_US locale'inde
-    # "i" → "I" yapar ve "REHBERLİK" (İ) ile eşleşmez; büyük harf her locale'de sabit kalır.
-    rehberlik_ders = (
-        DersHavuzu.objects.filter(ders_adi="REHBERLİK VE YÖNLENDİRME").first()
-        or DersHavuzu.objects.filter(ders_adi__icontains="REHBERLİK").first()
+    from ogrenci.services import rehberlik as rh
+    from okul.models import Personel, SinifSube
+    from okul.utils import get_aktif_egitim_yili
+
+    egitim_yili = get_aktif_egitim_yili()
+    duzenleyebilir = is_ust_yonetici(request.user)
+
+    if request.method == "POST":
+        if not duzenleyebilir:
+            raise PermissionDenied
+        if egitim_yili is None:
+            messages.error(request, "Aktif eğitim-öğretim yılı tanımlı değil.")
+            return redirect("rehber_ogretmenler")
+        islem = request.POST.get("islem")
+        if islem == "toplu_kabul":
+            sayi = rh.onerileri_toplu_kabul_et(egitim_yili, request.user)
+            messages.success(request, f"{sayi} sınıfa ders programındaki rehber öğretmen işlendi.")
+        else:
+            ss = get_object_or_404(SinifSube, pk=request.POST.get("sinif_sube"))
+            if islem == "ata":
+                personel = get_object_or_404(Personel.objects.aktif(), pk=request.POST.get("personel"))
+                rh.rehber_ata(ss, personel, egitim_yili, request.user)
+                messages.success(request, f"{ss} sınıfının rehber öğretmeni: {personel.adi_soyadi}")
+            elif islem == "kaldir":
+                rh.rehber_kaldir(ss, egitim_yili)
+                messages.success(request, f"{ss} sınıfının rehber öğretmeni kaydı kaldırıldı.")
+            else:
+                messages.error(request, "Geçersiz işlem.")
+        return redirect("rehber_ogretmenler")
+
+    satirlar = rh.rehber_tablosu(egitim_yili) if egitim_yili else []
+    toplu_kabul_sayisi = sum(
+        1 for s in satirlar if s["durum"] == rh.ATANMAMIS and len(s["oneriler"]) == 1
     )
-
-    rows = []
-    if rehberlik_ders:
-        kayitlar = (
-            DersProgrami.objects.aktif()
-            .filter(ders=rehberlik_ders, sinif_sube__isnull=False)
-            .select_related("ogretmen", "sinif_sube", "ders_saati")
-            .order_by("sinif_sube__sinif", "sinif_sube__sube", "ogretmen__adi_soyadi")
-        )
-
-        pivot = {}
-        for k in kayitlar:
-            key = (k.ogretmen_id, k.sinif_sube_id)
-            if key not in pivot:
-                pivot[key] = {
-                    "ogretmen": k.ogretmen,
-                    "sinif_sube": k.sinif_sube,
-                    "gunler": {g: "" for g in GUNLER_SIRALAMA},
-                }
-            saat_str = f"{k.ders_saati.derssaati_no}. Ders" if k.ders_saati else "-"
-            pivot[key]["gunler"][k.gun] = saat_str
-
-        rows = sorted(
-            pivot.values(),
-            key=lambda r: (r["sinif_sube"].sinif, r["sinif_sube"].sube),
-        )
-
     context = {
         "title": "Sınıf Rehber Öğretmenleri",
-        "rows": rows,
-        "gunler": GUNLER_SIRALAMA,
-        "gun_tr": GUN_TR,
-        "rehberlik_ders": rehberlik_ders,
+        "egitim_yili": egitim_yili,
+        "satirlar": satirlar,
+        "duzenleyebilir": duzenleyebilir,
+        "personeller": Personel.objects.aktif().order_by("adi_soyadi") if duzenleyebilir else [],
+        "toplu_kabul_sayisi": toplu_kabul_sayisi,
+        "atanmamis_sayisi": sum(1 for s in satirlar if s["kayit"] is None),
     }
     return render(request, "dersprogrami/rehber_ogretmenler.html", context)
 

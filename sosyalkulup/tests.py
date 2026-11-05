@@ -6,11 +6,10 @@ from django.urls import reverse
 from okul.models import OkulBilgi
 from okul.testing import (
     aktif_egitim_yili_olustur,
-    ders_olustur,
-    ders_programi_olustur,
     kullanici_olustur,
     ogrenci_olustur,
     personel_olustur,
+    sinif_rehberi_ata,
     sinif_sube_olustur,
 )
 
@@ -160,9 +159,7 @@ class OgrenciKulupBelirleViewTests(TestCase):
 
     def _rehber_ogretmen(self, sinif_sube):
         user = kullanici_olustur("ogretmen")
-        ders_programi_olustur(
-            personel_olustur(user=user), 1, sinif_sube, ders=ders_olustur("REHBERLİK VE YÖNLENDİRME")
-        )
+        sinif_rehberi_ata(personel_olustur(user=user), sinif_sube)
         return user
 
     def test_rehber_ogretmen_kendi_sinifini_gorur(self):
@@ -216,8 +213,9 @@ class OgrenciKulupBelirleViewTests(TestCase):
         self.assertFalse(KulupUyelik.objects.exists())
 
     def test_aktif_yil_yoksa_kayit_yapilmaz(self):
+        rehber = self._rehber_ogretmen(self.ss_9a)
         OkulBilgi.objects.update(okul_egtyil=None)
-        self.client.force_login(self._rehber_ogretmen(self.ss_9a))
+        self.client.force_login(rehber)
         resp = self.client.post(self.url, {f"kulup_{self.ogr_9a.pk}": self.kulup.pk}, follow=True)
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(KulupUyelik.objects.exists())
@@ -324,12 +322,7 @@ class SinifKulupPdfTests(TestCase):
         KulupUyelik.objects.create(ogrenci=self.baska, kulup=self.satranc)
 
         self.rehber = kullanici_olustur("ogretmen")
-        ders_programi_olustur(
-            personel_olustur(user=self.rehber, adi_soyadi="Rehber Öğretmen"),
-            1,
-            self.ss,
-            ders=ders_olustur("REHBERLİK VE YÖNLENDİRME"),
-        )
+        sinif_rehberi_ata(personel_olustur(user=self.rehber, adi_soyadi="Rehber Öğretmen"), self.ss)
 
     def test_gruplama_kulup_adina_ve_okul_no_sirasina_gore(self):
         from okul.utils import get_aktif_egitim_yili

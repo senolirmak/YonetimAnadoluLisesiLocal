@@ -202,6 +202,12 @@
                         <a href="{% url 'rehber_ogretmenler' %}" class="btn btn-lg" style="background-color: #198754; color: white;">Sınıf Rehber Öğretmenleri</a>
                         <a href="{% url 'sosyalkulup:danisman_ogretmenler' %}" class="btn btn-lg" style="background-color: #b45309; color: white;">Sosyal Kulüp Danışman Öğretmenleri</a>
                     </div>
+                    {% if rehber_atanmamis_sayisi %}
+                    <div style="margin-top:10px;padding:10px 12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;font-size:0.9em;color:#92400e;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <span><strong>{{ rehber_atanmamis_sayisi }} sınıfın</strong> rehber öğretmeni kaydedilmemiş. Rehber öğretmenler oturma planı, sosyal kulüp ve öğrenci listesi işlemlerini bu kayıt olmadan yapamaz.</span>
+                        <a href="{% url 'rehber_ogretmenler' %}" style="background:#d97706;color:#fff;text-decoration:none;font-size:.82rem;font-weight:600;padding:.3rem .9rem;border-radius:6px;white-space:nowrap;">Rehber Öğretmenleri Belirle</a>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endif %}
 
