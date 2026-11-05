@@ -13,11 +13,6 @@
     {% if not sinif_sec %}
     <a href="{% url 'sinif_oturma_plani' %}?sec=1" class="ust-link">Diğer Sınıflar</a>
     {% endif %}
-    {% if duzenleyebilir and plan_var %}
-    <a href="{% url 'sinif_oturma_plani_pdf' %}?sinif_sube={{ sinif_sube.pk }}" target="_blank"
-       class="ust-link" style="margin-left:auto;background:#dc2626;color:#fff;padding:.3rem .9rem;border-radius:6px;font-weight:600;"
-       title="Kaydedilmiş oturma planının PDF'i">PDF Al</a>
-    {% endif %}
   </div>
 
   <h2 class="page-title">{{ title }}</h2>
@@ -136,7 +131,22 @@
         <div style="margin-top:1.25rem;display:flex;gap:.75rem;align-items:center;">
           <button type="submit" class="btn btn-primary">Oturma Düzenini Kaydet</button>
           <button type="button" onclick="duzeniBosalt()" class="sifirla-dugme">Düzeni Sıfırla</button>
+          {% if plan_var %}
+          <a href="{% url 'sinif_oturma_plani_pdf' %}?sinif_sube={{ sinif_sube.pk }}" target="_blank"
+             class="pdf-dugme" title="Kaydedilmiş oturma planının PDF'i">PDF Al</a>
+          {% else %}
+          <span class="pdf-dugme pdf-dugme-pasif" title="PDF almak için önce oturma düzenini kaydedin">PDF Al</span>
+          {% endif %}
         </div>
+        {% if not plan_var %}
+        <div style="margin-top:.5rem;font-size:.8rem;color:#6b7280;">
+          PDF raporu, oturma düzeni kaydedildikten sonra alınabilir.
+        </div>
+        {% else %}
+        <div style="margin-top:.5rem;font-size:.8rem;color:#6b7280;">
+          PDF, en son kaydedilen düzeni gösterir; değişiklik yaptıysanız önce kaydedin.
+        </div>
+        {% endif %}
         {% endif %}
       </form>
     </div>
@@ -169,6 +179,9 @@
          letter-spacing:.1em;padding:.4rem;border-radius:5px;margin-bottom:.75rem; }
 .grup-baslik { grid-column:span 2;text-align:center;font-size:.72rem;font-weight:700;
                color:#374151;background:#f3f4f6;border-radius:4px;padding:3px 0; }
+.pdf-dugme { background:#dc2626;color:#fff;padding:.4rem 1rem;border-radius:6px;font-size:.85rem;
+              font-weight:600;text-decoration:none; }
+.pdf-dugme-pasif { background:#e5e7eb;color:#9ca3af;cursor:not-allowed; }
 .sifirla-dugme { background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:.4rem 1rem;
                  border-radius:6px;font-size:.85rem;cursor:pointer;font-weight:600; }
 /* [sıra-no] [koltuk][koltuk] [koridor] [koltuk][koltuk] [koridor] [koltuk][koltuk] */
