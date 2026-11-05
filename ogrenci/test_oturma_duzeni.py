@@ -220,3 +220,19 @@ class GercekDersAdiTestCase(TestCase):
         self.assertEqual(od.rehber_sinifi(rehber), sinif)
         self.assertTrue(od.duzenleyebilir_mi(rehber, sinif))
         self.assertEqual(od.sinif_rehberi(sinif), rehber.personel)
+
+
+class PdfButonuTestCase(OturmaDuzeniTemel):
+    url = reverse("sinif_oturma_plani")
+    pdf_url = reverse("sinif_oturma_plani_pdf")
+
+    def test_plan_yokken_rehbere_neden_pasif_oldugu_soylenir(self):
+        self.client.force_login(self.rehber)
+        r = self.client.get(self.url)
+        self.assertContains(r, "kaydedildikten sonra alınabilir")
+        self.assertNotContains(r, self.pdf_url)
+
+    def test_plan_varken_rehber_pdf_baglantisini_gorur(self):
+        od.oturma_duzeni_kaydet(self.sinif, self.yil, self.rehber, {(1, 1): self.ogr1.pk})
+        self.client.force_login(self.rehber)
+        self.assertContains(self.client.get(self.url), f"{self.pdf_url}?sinif_sube={self.sinif.pk}")
