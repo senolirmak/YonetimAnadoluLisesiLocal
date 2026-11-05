@@ -741,117 +741,100 @@ def ogretmen_yoklama_raporum(request):
 
 @login_required
 def sinif_oturma_plani(request):
-    """Rehber öğretmenin sınıfının kalıcı oturma düzenini görüntüler ve kaydeder."""
-    from ogrenci.models import Ogrenci, SinifOturmaDuzeni
+    """Sınıf oturma planı.
+
+    Giriş yapmış herkes istediği sınıfın planını salt okunur görür; sınıfın rehber
+    öğretmeni (ve superuser) planı oluşturup değiştirebilir. `?sinif_sube=` yoksa
+    rehber öğretmen doğrudan kendi sınıfına, diğerleri sınıf seçim ekranına düşer.
+    """
+    from ogrenci.services import oturma_duzeni as od
     from okul.models import SinifSube
-    from django.contrib import messages as _messages
 
     user = request.user
-
-    if not user.is_superuser:
-        if not hasattr(user, "personel"):
-            raise PermissionDenied
-        rehberlik_qs = DersProgrami.objects.aktif().filter(
-            ogretmen=user.personel,
-            ders__ders_adi__iexact="rehberlik ve yönlendirme",
-        ).select_related("sinif_sube")
-        if not rehberlik_qs.exists():
-            raise PermissionDenied
-
-    sinif_sube_id = request.GET.get("sinif_sube") or request.POST.get("sinif_sube")
-
-    if user.is_superuser and sinif_sube_id:
-        sinif_sube = get_object_or_404(SinifSube, pk=sinif_sube_id)
-    elif user.is_superuser:
-        tum_sinif_subeler = SinifSube.objects.all().order_by("sinif", "sube")
-        return render(request, "sinav/sinif_oturma_plani.html", {
-            "title": "Sınıf Oturma Planı",
-            "sinif_sec": True,
-            "tum_sinif_subeler": tum_sinif_subeler,
-        })
-    else:
-        rehberlik_ders = rehberlik_qs.first()
-        sinif_sube = rehberlik_ders.sinif_sube
-        if not sinif_sube:
-            raise PermissionDenied
-
-    ogrenciler = list(
-        Ogrenci.objects.filter(sinif=sinif_sube.sinif, sube=sinif_sube.sube, aktif=True)
-        .order_by("soyadi", "adi")
-    )
-
-    N_GRUP  = 3
-    N_KOLON_PER_GRUP = 2
-    N_KOLON = N_GRUP * N_KOLON_PER_GRUP
-    N_SIRA  = 6
-
     aktif_yil = get_aktif_egitim_yili()
+    rehber_sinifi = od.rehber_sinifi(user)
+    sinif_sube_id = request.POST.get("sinif_sube") or request.GET.get("sinif_sube")
+
+    if sinif_sube_id:
+        sinif_sube = get_object_or_404(SinifSube, pk=sinif_sube_id)
+    elif rehber_sinifi and request.method == "GET" and "sec" not in request.GET:
+        sinif_sube = rehber_sinifi
+    else:
+        if request.method == "POST":
+            raise PermissionDenied
+        return render(request, "sinav/sinif_oturma_plani.html", {
+            "title": "Sınıf Oturma Planları",
+            "sinif_sec": True,
+            "siniflar": od.secilebilir_siniflar(aktif_yil),
+            "rehber_sinifi": rehber_sinifi,
+        })
+
+    duzenleyebilir = od.duzenleyebilir_mi(user, sinif_sube)
 
     if request.method == "POST":
-        SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube, egitim_yili=aktif_yil).delete()
-        yeni_kayitlar = []
-        for sira in range(1, N_SIRA + 1):
-            for kolon in range(1, N_KOLON + 1):
-                deger = request.POST.get(f"koltuk_{sira}_{kolon}", "").strip()
-                if deger:
-                    try:
-                        ogr_pk = int(deger)
-                        yeni_kayitlar.append(
-                            SinifOturmaDuzeni(
-                                sinif_sube=sinif_sube,
-                                ogrenci_id=ogr_pk,
-                                sira_no=sira,
-                                kolon_no=kolon,
-                                guncelleyen=user,
-                                egitim_yili=aktif_yil,
-                            )
-                        )
-                    except (ValueError, TypeError):
-                        pass
-        SinifOturmaDuzeni.objects.bulk_create(yeni_kayitlar)
-        _messages.success(request, f"{sinif_sube} sınıfının oturma düzeni kaydedildi.")
-        qs = f"?sinif_sube={sinif_sube.pk}" if user.is_superuser else ""
-        return redirect(f"{request.path}{qs}")
+        if not duzenleyebilir:
+            raise PermissionDenied
+        try:
+            od.oturma_duzeni_kaydet(sinif_sube, aktif_yil, user, od.koltuklari_oku(request.POST))
+        except ValueError as e:
+            messages.error(request, str(e))
+        else:
+            messages.success(request, f"{sinif_sube} sınıfının oturma düzeni kaydedildi.")
+        return redirect(f"{request.path}?sinif_sube={sinif_sube.pk}")
 
-    mevcut = {
-        (d.sira_no, d.kolon_no): d.ogrenci
-        for d in SinifOturmaDuzeni.objects.filter(sinif_sube=sinif_sube, egitim_yili=aktif_yil)
-        .select_related("ogrenci")
-    }
-
-    grid = []
-    for sira in range(1, N_SIRA + 1):
-        satir_gruplar = []
-        for grup in range(1, N_GRUP + 1):
-            hucreler = []
-            for k in range(1, N_KOLON_PER_GRUP + 1):
-                kolon_no = (grup - 1) * N_KOLON_PER_GRUP + k
-                hucreler.append({
-                    "ogr":    mevcut.get((sira, kolon_no)),
-                    "sira":   sira,
-                    "kolon":  kolon_no,
-                })
-            satir_gruplar.append(hucreler)
-        grid.append(satir_gruplar)
-
-    yerlesmis_pkler = {ogr.pk for ogr in mevcut.values()}
-    yerlestirilmemis = [o for o in ogrenciler if o.pk not in yerlesmis_pkler]
+    grid, yerlesmis_pkler = od.oturma_grid(sinif_sube, aktif_yil)
+    yerlestirilmemis = [o for o in od.sinif_ogrencileri(sinif_sube) if o.pk not in yerlesmis_pkler]
 
     return render(request, "sinav/sinif_oturma_plani.html", {
-        "title":              f"Sınıf Oturma Planı – {sinif_sube}",
-        "sinif_sube":         sinif_sube,
-        "grid":               grid,
-        "n_grup":             N_GRUP,
-        "n_kolon_per_grup":   N_KOLON_PER_GRUP,
-        "n_kolon":            N_KOLON,
-        "n_sira":             N_SIRA,
-        "sira_range":         range(1, N_SIRA + 1),
-        "grup_range":         range(1, N_GRUP + 1),
-        "kolon_per_grup_range": range(1, N_KOLON_PER_GRUP + 1),
-        "ogrenciler":         ogrenciler,
-        "yerlestirilmemis":   yerlestirilmemis,
-        "sinif_sec":          False,
+        "title":            f"Sınıf Oturma Planı – {sinif_sube}",
+        "sinif_sube":       sinif_sube,
+        "grid":             grid,
+        "plan_var":         bool(yerlesmis_pkler),
+        "yerlestirilmemis": yerlestirilmemis,
+        "duzenleyebilir":   duzenleyebilir,
+        "rehber_sinifi":    rehber_sinifi,
+        "sinif_sec":        False,
     })
+
+
+@login_required
+def sinif_oturma_plani_pdf(request):
+    """Sınıf oturma planını PDF olarak verir. Yalnızca sınıfın rehber öğretmeni (ve
+    superuser) alabilir; `?sinif_sube=` verilmezse rehber öğretmenin kendi sınıfı."""
+    from django.http import HttpResponse
+    from django.utils.text import slugify
+
+    from ogrenci.services import oturma_duzeni as od
+    from ogrenci.services.oturma_pdf import oturma_plani_pdf
+    from okul.models import OkulBilgi, SinifSube
+
+    sinif_sube_id = request.GET.get("sinif_sube")
+    if sinif_sube_id:
+        sinif_sube = get_object_or_404(SinifSube, pk=sinif_sube_id)
+    else:
+        sinif_sube = od.rehber_sinifi(request.user)
+    if sinif_sube is None or not od.duzenleyebilir_mi(request.user, sinif_sube):
+        raise PermissionDenied
+
+    aktif_yil = get_aktif_egitim_yili()
+    grid, yerlesmis_pkler = od.oturma_grid(sinif_sube, aktif_yil)
+    yerlestirilmemis = sorted(
+        (o for o in od.sinif_ogrencileri(sinif_sube) if o.pk not in yerlesmis_pkler),
+        key=lambda o: o.okulno,
+    )
+    rehber = od.sinif_rehberi(sinif_sube)
+    pdf = oturma_plani_pdf(
+        sinif_sube,
+        aktif_yil,
+        grid,
+        yerlestirilmemis,
+        rehber_adi=rehber.adi_soyadi if rehber else "",
+        okul_adi=OkulBilgi.get().okul_adi or "",
+    )
+    dosya_adi = slugify(f"{sinif_sube.sinif} {sinif_sube.sube} oturma plani") or "oturma-plani"
+    yanit = HttpResponse(pdf, content_type="application/pdf")
+    yanit["Content-Disposition"] = f'inline; filename="{dosya_adi}.pdf"'
+    return yanit
 
 
 # ─────────────────────────────────────────────────────────
