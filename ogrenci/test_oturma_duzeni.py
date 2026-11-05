@@ -203,3 +203,20 @@ class PdfTestCase(OturmaDuzeniTemel):
         self.assertContains(self.client.get(sayfa), "PDF Al")
         self.client.force_login(self.ogretmen)
         self.assertNotContains(self.client.get(sayfa, {"sinif_sube": self.sinif.pk}), "PDF Al")
+
+
+class GercekDersAdiTestCase(TestCase):
+    """Ders adı veritabanında e-Okul/varsayılan veriyle aynı biçimde (noktalı büyük İ)
+    kayıtlıyken de rehber öğretmen tanınmalı."""
+
+    def test_buyuk_harfli_ders_adiyla_rehber_tanınır(self):
+        aktif_egitim_yili_olustur()
+        sinif = sinif_sube_olustur(11, "C")
+        rehber = kullanici_olustur("ogretmen")
+        ders_programi_olustur(
+            personel_olustur(user=rehber), 2, sinif_sube=sinif,
+            ders=ders_olustur("REHBERLİK VE YÖNLENDİRME"),
+        )
+        self.assertEqual(od.rehber_sinifi(rehber), sinif)
+        self.assertTrue(od.duzenleyebilir_mi(rehber, sinif))
+        self.assertEqual(od.sinif_rehberi(sinif), rehber.personel)

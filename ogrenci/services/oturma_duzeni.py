@@ -6,8 +6,8 @@ rehber öğretmeni (ve superuser) planı oluşturup değiştirebilir.
 
 from django.db import transaction
 
-from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci, SinifOturmaDuzeni
+from ogrenci.services.rehberlik import rehberlik_sinif_sube, sinif_rehber_ogretmeni
 from okul.models import SinifSube
 
 # Sınıf yerleşimi: 3 grup × 2 koltuk, 6 sıra
@@ -18,31 +18,13 @@ N_SIRA = 6
 
 
 def rehber_sinifi(user):
-    """Kullanıcının rehber öğretmeni olduğu SinifSube; yoksa None.
-
-    Ana sayfadaki rehberlik kutusuyla (main/utils.py) aynı sorguyu kullanır.
-    """
-    personel = getattr(user, "personel", None)
-    if personel is None:
-        return None
-    ders = (
-        DersProgrami.objects.aktif()
-        .filter(ogretmen=personel, ders__ders_adi__iexact="rehberlik ve yönlendirme")
-        .select_related("sinif_sube")
-        .first()
-    )
-    return ders.sinif_sube if ders else None
+    """Kullanıcının rehber öğretmeni olduğu SinifSube; yoksa None."""
+    return rehberlik_sinif_sube(user)
 
 
 def sinif_rehberi(sinif_sube):
     """Sınıfın rehber öğretmeni (Personel); yoksa None."""
-    ders = (
-        DersProgrami.objects.aktif()
-        .filter(sinif_sube=sinif_sube, ders__ders_adi__iexact="rehberlik ve yönlendirme")
-        .select_related("ogretmen")
-        .first()
-    )
-    return ders.ogretmen if ders else None
+    return sinif_rehber_ogretmeni(sinif_sube)
 
 
 def duzenleyebilir_mi(user, sinif_sube):
