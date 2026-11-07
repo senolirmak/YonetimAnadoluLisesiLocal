@@ -2,6 +2,7 @@ from django.urls import path
 
 from main import views as main_views
 from nobet import views as nobet_views
+from okul.views import okul_ayarlari
 from sinav.views_ogretmen import (
     ogretmen_gozetim_sinif_listesi,
     ogretmen_ogrenci_sinav_takvimi,
@@ -14,7 +15,6 @@ from sinav.views_ogretmen import (
     sinif_oturma_plani_pdf,
 )
 from sorumluluk.views import ogretmen_sorumluluk_gorevleri
-from okul.views import okul_ayarlari
 
 urlpatterns = [
     path("", main_views.index, name="index"),
