@@ -1,0 +1,33 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Devamsızlık ve Nöbet İşlemleri</h2>
+    <p class="welcome-text">
+        {{ ozet.tarih|date:"j F Y, l" }} — günün özeti. İşlemler için soldaki menüyü kullanın.
+    </p>
+
+    <div class="dn-grid">
+        <div class="dn-kart" style="--renk:#17a2b8;">
+            <div class="dn-kart-baslik">Bugün Devamsız Personel</div>
+            <div class="dn-sayi">{{ ozet.devamsiz_personel }}</div>
+            {% if is_mudur_yardimcisi %}<a href="{% url 'devamsizlik_list' %}">Devamsızlık kayıtları →</a>{% endif %}
+        </div>
+        <div class="dn-kart" style="--renk:#198754;">
+            <div class="dn-kart-baslik">Bugün Atanan Ders</div>
+            <div class="dn-sayi">{{ ozet.atanan_ders }}</div>
+            <a href="{% url 'nobet_ders_doldurma' %}">Ders doldurma listesi →</a>
+        </div>
+        <div class="dn-kart" style="--renk:#dc3545;">
+            <div class="dn-kart-baslik">Bugün Atanamayan Ders</div>
+            <div class="dn-sayi">{{ ozet.atanamayan_ders }}</div>
+            <a href="{% url 'nobet_ders_doldurma' %}">Ders doldurma listesi →</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

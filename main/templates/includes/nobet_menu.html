@@ -1,0 +1,20 @@
+{# Yönetici "Devamsızlık ve Nöbet İşlemleri" sol menüsü — veri: main.context_processors.yan_menu #}
+{% with s=nobet_menu.aktif_sayfa %}
+<nav class="gm-menu" aria-label="Devamsızlık ve Nöbet İşlemleri menüsü">
+    <a href="{% url 'devamsizlik_nobet_islemleri' %}" style="--renk:#417690;" class="gm-ozet{% if s == 'devamsizlik_nobet_islemleri' %} aktif{% endif %}">Devamsızlık ve Nöbet</a>
+
+    <div class="gm-baslik">Günlük İşlemler</div>
+    {% if is_mudur_yardimcisi %}
+    <a href="{% url 'devamsizlik_list' %}" style="--renk:#17a2b8;"{% if s == 'devamsizlik_list' %} class="aktif"{% endif %}>1. Devamsızlık İşlemleri</a>
+    {% endif %}
+    <a href="{% url 'nobet_dagitim' %}" style="--renk:#20c997;"{% if s == 'nobet_dagitim' %} class="aktif"{% endif %}>2. Haftalık Nöbet Listesi</a>
+    <a href="{% url 'gunun_nobetcileri' %}" style="--renk:#ffc107; --yazi:#212529; --aktif-yazi:#8a6100;"{% if s == 'gunun_nobetcileri' %} class="aktif"{% endif %}>3. Günün Nöbetçileri</a>
+    <a href="{% url 'nobet_ders_doldurma' %}" style="--renk:#198754;"{% if s == 'nobet_ders_doldurma' %} class="aktif"{% endif %}>4. Ders Doldurma Listesi</a>
+
+    <div class="gm-baslik">Raporlar</div>
+    {% if is_mudur_yardimcisi %}
+    <a href="{% url 'nobetci_ders_doldurma_istatistik' %}" style="--renk:#343a40;"{% if s == 'nobetci_ders_doldurma_istatistik' %} class="aktif"{% endif %}>Ders Doldurma İstatistikleri</a>
+    {% endif %}
+    <a href="{% url 'nobet_gorevi_listesi' %}" style="--renk:#6c757d;"{% if s == 'nobet_gorevi_listesi' %} class="aktif"{% endif %}>Nöbet Görevi Listesi</a>
+</nav>
+{% endwith %}

@@ -1,0 +1,25 @@
+{# Yönetici "Ders Programı İşlemleri" sol menüsü — veri: main.context_processors.yan_menu #}
+{% with s=ders_programi_menu.aktif_sayfa %}
+<nav class="gm-menu" aria-label="Ders Programı İşlemleri menüsü">
+    <a href="{% url 'ders_programi_islemleri' %}" style="--renk:#417690;" class="gm-ozet{% if s == 'ders_programi_islemleri' %} aktif{% endif %}">Ders Programı İşlemleri</a>
+
+    <div class="gm-baslik">Programlar</div>
+    <a href="{% url 'dersprogrami_listesi' %}" style="--renk:#e83e8c;"{% if s == 'dersprogrami_listesi' %} class="aktif"{% endif %}>Ders Programı Listesi</a>
+    <a href="{% url 'haftalik_ders_programi' %}" style="--renk:#6610f2;"{% if s == 'haftalik_ders_programi' %} class="aktif"{% endif %}>Öğretmen Ders Programı</a>
+    <a href="{% url 'ogretmen_program' %}" style="--renk:#6f42c1;"{% if s == 'ogretmen_program' %} class="aktif"{% endif %}>Öğretmen Durum Bilgisi</a>
+    {% if is_tarih_degistirebilir %}
+    <a href="{% url 'sinif_program' %}" style="--renk:#17a2b8;"{% if s == 'sinif_program' %} class="aktif"{% endif %}>Sınıf Durum Bilgisi</a>
+    {% endif %}
+    <a href="{% url 'sinif_ogretmenleri' %}" style="--renk:#20c997;"{% if s == 'sinif_ogretmenleri' %} class="aktif"{% endif %}>Sınıfta Ders Listesi</a>
+    {% if is_tarih_degistirebilir %}
+    <a href="{% url 'fet_kopru' %}" style="--renk:#fd7e14;"{% if s == 'fet_kopru' %} class="aktif"{% endif %}>FET Köprüsü</a>
+    {% endif %}
+
+    <div class="gm-baslik">Ders Defteri</div>
+    <a href="{% url 'dersdefteri:ders_listesi' %}" style="--renk:#0d6efd;"{% if s == 'dersdefteri:ders_listesi' %} class="aktif"{% endif %}>Ders Defteri</a>
+
+    <div class="gm-baslik">Görevlendirmeler</div>
+    <a href="{% url 'rehber_ogretmenler' %}" style="--renk:#198754;"{% if s == 'rehber_ogretmenler' %} class="aktif"{% endif %}>Sınıf Rehber Öğretmenleri</a>
+    <a href="{% url 'sosyalkulup:danisman_ogretmenler' %}" style="--renk:#b45309;"{% if s == 'sosyalkulup:danisman_ogretmenler' %} class="aktif"{% endif %}>Sosyal Kulüp Danışman Öğretmenleri</a>
+</nav>
+{% endwith %}

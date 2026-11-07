@@ -1,0 +1,37 @@
+{# "Öğrenci İşleri" sol menüsü — veri: main.context_processors.yan_menu #}
+{% with s=ogrenci_menu.aktif_sayfa %}
+<nav class="gm-menu" aria-label="Öğrenci İşleri menüsü">
+    <a href="{% url 'ogrenci_islemleri' %}" style="--renk:#417690;" class="gm-ozet{% if s == 'ogrenci_islemleri' %} aktif{% endif %}">Öğrenci İşleri</a>
+
+    <div class="gm-baslik">Öğrenci Bilgileri</div>
+    {% if is_yonetici or ogrenci_menu.rehber_sinifi_var %}{# yönetici değilse yalnızca kendi rehberlik sınıfı #}
+    <a href="{% url 'ogrenci:ogrenci_liste' %}" style="--renk:#20c997;"{% if s == 'ogrenci:ogrenci_liste' %} class="aktif"{% endif %}>Öğrenci Listesi</a>
+    {% endif %}
+    {% if is_mudur_yardimcisi %}
+    <a href="{% url 'ogrenci:sureksiz_devamsiz_listesi' %}" style="--renk:#dc3545;"{% if s == 'ogrenci:sureksiz_devamsiz_listesi' %} class="aktif"{% endif %}>Öğrenci Özel Durumları</a>
+    <a href="{% url 'ogrenci:ayrilma_listesi' %}" style="--renk:#7f1d1d;"{% if s == 'ogrenci:ayrilma_listesi' %} class="aktif"{% endif %}>Okuldan Ayrılma Bilgileri</a>
+    {% endif %}
+
+    <div class="gm-baslik">Sınıf ve Kulüp</div>
+    <a href="{% url 'sinif_oturma_plani' %}?sec=1" style="--renk:#4f46e5;"{% if s == 'sinif_oturma_plani' %} class="aktif"{% endif %}>Sınıf Oturma Planları</a>
+    {% if is_tarih_degistirebilir or ogrenci_menu.rehber_sinifi_var %}
+    <a href="{% url 'sosyalkulup:ogrenci_kulup_belirle' %}" style="--renk:#fd7e14;"{% if s == 'sosyalkulup:ogrenci_kulup_belirle' %} class="aktif"{% endif %}>Öğrenci Sosyal Kulübünü Belirle</a>
+    {% endif %}
+    {% if is_tarih_degistirebilir %}
+    <a href="{% url 'sosyalkulup:kulup_listesi' %}" style="--renk:#b45309;"{% if s == 'sosyalkulup:kulup_listesi' %} class="aktif"{% endif %}>Sosyal Kulüpler</a>
+    {% endif %}
+
+    {% if is_tarih_degistirebilir %}
+    <div class="gm-baslik">Yoklama ve Nöbet</div>
+    <a href="{% url 'ogrencinobet:nobetci_form' %}" style="--renk:#e83e8c;"{% if s == 'ogrencinobet:nobetci_form' %} class="aktif"{% endif %}>Nöbetçi Öğrenci</a>
+    {% if is_mudur_yardimcisi %}{# sayfa yalnızca müdür yardımcısına açık #}
+    <a href="{% url 'devamsizlik:ogrenci_devamsizlik_listesi' %}" style="--renk:#6610f2;"{% if s == 'devamsizlik:ogrenci_devamsizlik_listesi' %} class="aktif"{% endif %}>Öğrenci Yoklama Kayıtları</a>
+    {% endif %}
+    <a href="{% url 'devamsizlik:ogrenci_devamsizlik_pdf' %}" style="--renk:#dc3545;"{% if s == 'devamsizlik:ogrenci_devamsizlik_pdf' %} class="aktif"{% endif %}>Yoklama PDF Raporu</a>
+    {% endif %}
+
+    <div class="gm-baslik">Faaliyetler</div>
+    <a href="{% url 'faaliyet:faaliyet_liste' %}" style="--renk:#fd7e14;"{% if s == 'faaliyet:faaliyet_liste' %} class="aktif"{% endif %}>Faaliyetlerim</a>
+    <a href="{% url 'faaliyet:faaliyet_olustur' %}" style="--renk:#e83e8c;"{% if s == 'faaliyet:faaliyet_olustur' %} class="aktif"{% endif %}>Yeni Faaliyet</a>
+</nav>
+{% endwith %}

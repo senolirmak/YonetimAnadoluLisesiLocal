@@ -2,12 +2,13 @@
 {% block title %}Sınav Medya Yönetimi{% endblock %}
 
 {% block nav %}
+{% if not sinav_menu %}{# sol menü açıkken bağlantı ve rozet Ortak Sınav alt menüsünde #}
 <nav class="sinav-nav">
   <span style="color:#e8f0f5; font-size:1rem; font-weight:700; letter-spacing:.03em;">
     🎬 Sınav Medya Yönetimi
   </span>
   <div class="sinav-nav-sag">
-    <a href="{% url 'index' %}" class="sinav-nav-geri">&#8592; Okul Yönetimine Dön</a>
+    {% if is_mudur_yardimcisi %}<a href="{% url 'sinav_islemleri' %}" class="sinav-nav-geri">&#8592; Sınav İşlemlerine Dön</a>{% else %}<a href="{% url 'index' %}" class="sinav-nav-geri">&#8592; Okul Yönetimine Dön</a>{% endif %}
     {% if aktif_sinav %}
       <span class="sinav-badge">
         {{ aktif_sinav.egitim_ogretim_yili }} &nbsp;|&nbsp;
@@ -19,6 +20,7 @@
     {% endif %}
   </div>
 </nav>
+{% endif %}
 {% endblock %}
 
 {% block sinav_content %}

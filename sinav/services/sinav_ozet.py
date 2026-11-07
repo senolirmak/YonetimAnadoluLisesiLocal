@@ -96,3 +96,28 @@ def gozetmen_ozeti_hesapla(aktif_uretim) -> tuple[list[dict], dict]:
     gozetmenler.sort(key=lambda g: g["ad"])
 
     return gozetmenler, siniflistesi_map
+
+
+def aktif_uretim():
+    """Aktif ortak sınavın PDF raporlarında kullanılan (aktif) takvim üretimi; yoksa None."""
+    return TakvimUretim.objects.filter(sinav__aktif=True, aktif=True).first()
+
+
+def sinav_islemleri_ozeti() -> dict:
+    """Sınav İşlemleri giriş sayfası için kısa özet: aktif ortak sınav, takvimdeki
+    sınav sayısı ve tarih aralığı, arşivlenmemiş sorumluluk sınavı sayısı."""
+    from sorumluluk.models import SorumluSinav
+
+    aktif = SinavBilgisi.objects.filter(aktif=True).first()
+    uretim = aktif_uretim() if aktif else None
+    baslangic = bitis = None
+    if uretim:
+        baslangic, bitis = sinav_takvim_araliklari([aktif]).get(aktif.pk, (None, None))
+    return {
+        "aktif_sinav": aktif,
+        "takvim_var": uretim is not None,
+        "takvim_sinav_sayisi": Takvim.objects.filter(uretim=uretim).count() if uretim else 0,
+        "takvim_baslangic": baslangic,
+        "takvim_bitis": bitis,
+        "sorumluluk_sayisi": SorumluSinav.objects.filter(arsivlendi=False).count(),
+    }

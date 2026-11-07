@@ -70,6 +70,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "main.context_processors.kullanici_rol",
                 "main.context_processors.yerel_ca_bilgisi",
+                "main.context_processors.yan_menu",
             ],
         },
     },

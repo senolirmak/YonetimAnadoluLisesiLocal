@@ -138,9 +138,24 @@ class ViewTestCase(OturmaDuzeniTemel):
         self.assertContains(r, "Bu sınıfa ait olmayan")
         self.assertFalse(SinifOturmaDuzeni.objects.exists())
 
-    def test_ana_sayfada_buton_herkese_gorunur(self):
+    def test_sinif_listesi_plan_gorunurken_de_durur(self):
         self.client.force_login(self.ogretmen)
-        self.assertContains(self.client.get(reverse("index")), "Sınıf Oturma Planları")
+        r = self.client.get(self.url, {"sinif_sube": self.sinif.pk})
+        self.assertIn(self.sinif, [s["sinif_sube"] for s in r.context["siniflar"]])
+        self.assertContains(r, f'href="?sinif_sube={self.diger_sinif.pk}"')
+        self.assertContains(r, " op-sube-secili\"", count=1)
+
+    def test_secim_yokken_secim_notu_gorunur(self):
+        self.client.force_login(self.ogretmen)
+        r = self.client.get(self.url + "?sec=1")
+        self.assertContains(r, "soldan bir sınıf/şube seçin")
+        self.assertNotContains(r, " op-sube-secili\"")
+
+    def test_ogrenci_isleri_menusunde_baglanti_herkese_gorunur(self):
+        # Ana sayfadaki "Öğrenci İşleri" düğmesi bu sayfayı açar; bağlantı sol menüdedir.
+        self.client.force_login(self.ogretmen)
+        self.assertContains(self.client.get(reverse("index")), reverse("ogrenci_islemleri"))
+        self.assertContains(self.client.get(reverse("ogrenci_islemleri")), "Sınıf Oturma Planları")
 
 
 class PdfTestCase(OturmaDuzeniTemel):

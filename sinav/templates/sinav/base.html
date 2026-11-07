@@ -202,6 +202,7 @@
 {% endblock %}
 
 {% block nav %}
+{% if not sinav_menu %}{# sol menü açıkken Ortak Sınav menüsü içerikte, sol menünün yanında #}
 <nav class="sinav-nav">
 
   <div class="sinav-dropdown">
@@ -222,7 +223,7 @@
   </div>
 
   <div class="sinav-nav-sag">
-    <a href="{% url 'index' %}" class="sinav-nav-geri">&#8592; Okul Yönetimine Dön</a>
+    {% if is_mudur_yardimcisi %}<a href="{% url 'sinav_islemleri' %}" class="sinav-nav-geri">&#8592; Sınav İşlemlerine Dön</a>{% else %}<a href="{% url 'index' %}" class="sinav-nav-geri">&#8592; Okul Yönetimine Dön</a>{% endif %}
     {% if aktif_sinav %}
       <span class="sinav-badge">
         {{ aktif_sinav.egitim_ogretim_yili }} &nbsp;|&nbsp;
@@ -235,9 +236,61 @@
   </div>
 
 </nav>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% if sinav_menu %}
+<style>
+  .sn-duzen { display:flex; gap:1.25rem; align-items:flex-start; }
+  .sn-yan { flex:0 0 200px; position:sticky; top:20px; margin-top:2rem; }
+  .sn-altmenu { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:.5rem .6rem .3rem;
+                box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .sn-altmenu-baslik { font-size:.75rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+                       color:#417690; padding:.35rem .15rem .45rem; }
+  .sn-altmenu hr { border:none; border-top:1px solid #e5e7eb; margin:.15rem 0 .45rem; }
+  .sn-rozet { margin:0 0 .55rem; text-align:center; white-space:normal; line-height:1.5; display:block;
+              border-radius:8px; }
+  .sn-rozet > span { white-space:nowrap; }
+  .sinav-badge.yok.sn-rozet { background:#f3f4f6; color:#6b7280; }
+  .sn-icerik { flex:1; min-width:0; }
+  .sn-icerik .sinav-container { max-width:1100px; margin:2rem 0; padding:0; }
+  @media (max-width: 900px) {
+    .sn-duzen { flex-direction:column; align-items:stretch; }
+    .sn-yan { position:static; flex-basis:auto; }
+  }
+</style>
+{% with v=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+<div class="sn-duzen">
+  <aside class="sn-yan" aria-label="Ortak Sınav menüsü">
+    <nav class="sn-altmenu gm-butonlu">
+      <div class="sn-altmenu-baslik">Ortak Sınav</div>
+      {% if aktif_sinav %}
+      <span class="sinav-badge sn-rozet">
+        <span>{{ aktif_sinav.egitim_ogretim_yili }}</span> &nbsp;|&nbsp;
+        <span>{{ aktif_sinav.get_donem_display }}</span> &nbsp;|&nbsp;
+        <span>{{ aktif_sinav.get_sinav_adi_display }}</span>
+      </span>
+      {% else %}
+      <span class="sinav-badge yok sn-rozet">Aktif sınav seçilmedi</span>
+      {% endif %}
+      <a href="{% url 'sinav:index' %}" style="--renk:#417690;"{% if ns == 'sinav' and v == 'index' %} class="aktif"{% endif %}>Ana Sayfa</a>
+      <a href="{% url 'sinav:sinav_bilgisi_listesi' %}" style="--renk:#4f46e5;"{% if ns == 'sinav' and v == 'sinav_bilgisi_listesi' %} class="aktif"{% endif %}>Sınav Bilgileri</a>
+      <hr>
+      <a href="{% url 'sinav:ders_ayarlari' %}" style="--renk:#6366f1;"{% if ns == 'sinav' and v == 'ders_ayarlari' %} class="aktif"{% endif %}>Ders Ayarları</a>
+      <a href="{% url 'sinav:takvim_sayfasi' %}" style="--renk:#0891b2;"{% if ns == 'sinav' and v == 'takvim_sayfasi' %} class="aktif"{% endif %}>Takvim (GA)</a>
+      <a href="{% url 'sinav:takvim_gecmisi' %}" style="--renk:#0f766e;"{% if ns == 'sinav' and v == 'takvim_gecmisi' %} class="aktif"{% endif %}>Üretimden Raporla</a>
+      <a href="{% url 'sinavmedia:yonetim' %}" style="--renk:#7c3aed;"{% if ns == 'sinavmedia' %} class="aktif"{% endif %}>Sınav Medya Yönetimi</a>
+      <hr>
+      <a href="{% url 'sinav:ogrenci_yonetim' %}" style="--renk:#20c997;"{% if ns == 'sinav' and v == 'ogrenci_yonetim' %} class="aktif"{% endif %}>Öğrenci Listesi</a>
+      <a href="{% url 'sinav:veri_yukle_sayfasi' %}" style="--renk:#6c757d;"{% if ns == 'sinav' and v == 'veri_yukle_sayfasi' %} class="aktif"{% endif %}>Veri Yükle</a>
+      <hr>
+      <a href="{% url 'sinav:mazeret_listesi' %}" style="--renk:#dc3545;"{% if ns == 'sinav' and v|slice:":8" == 'mazeret_' %} class="aktif"{% endif %}>Mazeret Sınavı</a>
+    </nav>
+  </aside>
+  <div class="sn-icerik">
+{% endwith %}
+{% endif %}
 <div class="sinav-container">
   {% if messages %}
   <ul class="messages">
@@ -248,6 +301,10 @@
   {% endif %}
   {% block sinav_content %}{% endblock %}
 </div>
+{% if sinav_menu %}
+  </div>{# sn-icerik #}
+</div>{# sn-duzen #}
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

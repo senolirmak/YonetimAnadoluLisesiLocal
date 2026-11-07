@@ -1,0 +1,44 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Ders Programı İşlemleri</h2>
+    <p class="welcome-text">
+        {% if ozet.uygulama_tarihi %}
+        Aktif ders programı: {{ ozet.uygulama_tarihi|date:"j F Y" }} tarihli program. İşlemler için soldaki menüyü kullanın.
+        {% else %}
+        Henüz aktif bir ders programı yok. İşlemler için soldaki menüyü kullanın.
+        {% endif %}
+    </p>
+
+    <div class="dn-grid">
+        <div class="dn-kart" style="--renk:#6610f2;">
+            <div class="dn-kart-baslik">Programdaki Öğretmen</div>
+            <div class="dn-sayi">{{ ozet.ogretmen_sayisi }}</div>
+            <a href="{% url 'ogretmen_program' %}">Öğretmen durum bilgisi →</a>
+        </div>
+        <div class="dn-kart" style="--renk:#20c997;">
+            <div class="dn-kart-baslik">Sınıf / Şube</div>
+            <div class="dn-sayi">{{ ozet.sinif_sube_sayisi }}</div>
+            <a href="{% url 'sinif_ogretmenleri' %}">Sınıfta ders listesi →</a>
+        </div>
+        <div class="dn-kart" style="--renk:#e83e8c;">
+            <div class="dn-kart-baslik">Haftalık Ders Saati</div>
+            <div class="dn-sayi">{{ ozet.ders_saati_sayisi }}</div>
+            <a href="{% url 'dersprogrami_listesi' %}">Ders programı listesi →</a>
+        </div>
+    </div>
+
+    {% if rehber_atanmamis_sayisi %}
+    <div class="dn-uyari">
+        <span><strong>{{ rehber_atanmamis_sayisi }} sınıfın</strong> rehber öğretmeni kaydedilmemiş. Rehber öğretmenler oturma planı, sosyal kulüp ve öğrenci listesi işlemlerini bu kayıt olmadan yapamaz.</span>
+        <a href="{% url 'rehber_ogretmenler' %}">Rehber Öğretmenleri Belirle</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

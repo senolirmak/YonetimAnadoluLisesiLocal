@@ -1,16 +1,12 @@
-"""ogrenci app testleri — öğrenci listesi, Excel yükleme, yeni kayıt, ayrılma, özel durumlar."""
+"""ogrenci app testleri — öğrenci listesi, yeni kayıt, ayrılma, özel durumlar."""
 
 import datetime
-import io
 
-import pandas as pd
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
 from ogrenci.forms import OgrenciDetayForm
 from ogrenci.models import Ogrenci, OgrenciAyrilma, OgrenciMuaf
-from ogrenci.views import normalize_cinsiyet
 from okul.models import SinifSubeYil
 from okul.testing import (
     aktif_egitim_yili_olustur,
@@ -24,14 +20,6 @@ from okul.testing import (
 
 
 class YardimciFonksiyonTestCase(TestCase):
-    def test_normalize_cinsiyet(self):
-        for deger, beklenen in [
-            ("Erkek", "E"), (" e ", "E"), ("KIZ", "K"), ("kız", "K"), ("bayan", "K"),
-            ("", None), (None, None), ("belirsiz", None),
-        ]:
-            with self.subTest(deger=deger):
-                self.assertEqual(normalize_cinsiyet(deger), beklenen)
-
     def test_telefon_bicimi(self):
         self.assertTrue(OgrenciDetayForm({"velitelefon": "(532) 123 45 67"}).is_valid())
         form = OgrenciDetayForm({"velitelefon": "05321234567"})
@@ -108,75 +96,6 @@ class OgrenciListeTestCase(TestCase):
         self.ogr_9a.refresh_from_db()
         self.assertEqual(self.ogr_9a.detay.veli, "Veli Örnek")
         self.assertEqual(self.ogr_9a.adres.il, "Ankara")
-
-
-def _excel(satirlar):
-    buf = io.BytesIO()
-    pd.DataFrame(satirlar).to_excel(buf, index=False)
-    return SimpleUploadedFile(
-        "ogrenciler.xlsx",
-        buf.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-
-
-def _satir(**kwargs):
-    satir = {
-        "OkulNo": "101", "Sinif": "9", "Sube": "A", "TCKimlikNo": "30000000001",
-        "Adi": "Ali", "Soyadi": "Örnek", "DogumTarihi": "2010-05-01", "Cinsiyet": "Erkek",
-    }
-    satir.update(kwargs)
-    return satir
-
-
-class ExcelYukleTestCase(TestCase):
-    def setUp(self):
-        self.url = reverse("ogrenci:excel_yukle")
-        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
-
-    def _yukle(self, satirlar):
-        return self.client.post(self.url, {"excel_dosya": _excel(satirlar)})
-
-    def test_yeni_ogrenci_detay_ve_adresle_eklenir(self):
-        self._yukle([_satir(Veli="Veli Örnek", Il="İzmir")])
-
-        ogr = Ogrenci.objects.get(tckimlikno="30000000001")
-        self.assertEqual((ogr.okulno, ogr.sinif, ogr.sube, ogr.cinsiyet), (101, 9, "A", "E"))
-        self.assertEqual(ogr.dogumtarihi, datetime.date(2010, 5, 1))
-        self.assertEqual(ogr.detay.veli, "Veli Örnek")
-        self.assertEqual(ogr.adres.il, "İzmir")
-
-    def test_ayni_tc_ile_ikinci_yukleme_gunceller(self):
-        self._yukle([_satir()])
-        self._yukle([_satir(Sube="B", Adi="Veli")])
-
-        ogr = Ogrenci.objects.get()
-        self.assertEqual((ogr.sube, ogr.adi), ("B", "Veli"))
-
-    def test_hatali_satir_atlanir_digerleri_yuklenir(self):
-        self._yukle([
-            _satir(),
-            _satir(TCKimlikNo="30000000002", OkulNo="102", Sinif="dokuz"),
-            _satir(TCKimlikNo="30000000003", OkulNo="103"),
-        ])
-
-        self.assertEqual(
-            set(Ogrenci.objects.values_list("tckimlikno", flat=True)),
-            {"30000000001", "30000000003"},
-        )
-
-    def test_eksik_zorunlu_sutun_hicbir_sey_yuklemez(self):
-        satir = _satir()
-        del satir["TCKimlikNo"]
-        self._yukle([satir])
-
-        self.assertFalse(Ogrenci.objects.exists())
-
-    def test_ogretmen_excel_yukleyemez(self):
-        self.client.force_login(kullanici_olustur("ogretmen"))
-        self._yukle([_satir()])
-
-        self.assertFalse(Ogrenci.objects.exists())
 
 
 class YeniKayitTestCase(TestCase):

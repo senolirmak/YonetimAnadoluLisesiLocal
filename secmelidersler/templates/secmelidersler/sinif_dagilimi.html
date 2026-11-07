@@ -80,11 +80,13 @@
               padding:.4rem 1rem;border-radius:6px;text-decoration:none;font-size:.85rem;font-weight:600;">
       ← Seçmeli Dersler
     </a>
+    {% if not secmeli_menu %}
     <a href="{% url 'index' %}"
        style="display:inline-flex;align-items:center;gap:.5rem;background:#417690;color:#fff;
               padding:.4rem 1rem;border-radius:6px;text-decoration:none;font-size:.85rem;font-weight:600;">
       <i class="fas fa-home"></i> Ana Sayfa
     </a>
+    {% endif %}
     <select onchange="if(this.value){window.location.search='?yil='+this.value;}else{window.location.search='';}"
             style="padding:6px 10px; border:1px solid #dee2e6; border-radius:4px; font-size:0.88em;">
       {% for y in tum_yillar %}

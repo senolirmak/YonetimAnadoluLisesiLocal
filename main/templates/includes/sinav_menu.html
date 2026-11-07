@@ -1,0 +1,17 @@
+{# Müdür yardımcısı "Sınav İşlemleri" sol menüsü — veri: main.context_processors.yan_menu #}
+{% with s=sinav_menu.aktif_sayfa %}
+<nav class="gm-menu" aria-label="Sınav İşlemleri menüsü">
+    <a href="{% url 'sinav_islemleri' %}" style="--renk:#417690;" class="gm-ozet{% if s == 'sinav_islemleri' %} aktif{% endif %}">Sınav İşlemleri</a>
+
+    <div class="gm-baslik">Modüller</div>
+    <a href="{% url 'sinav:index' %}" style="--renk:#4f46e5;"{% if s == 'sinav:index' %} class="aktif"{% endif %}>Ortak Sınav Yönetimi</a>
+    <a href="{% url 'sorumluluk:sinav_liste' %}" style="--renk:#0f766e;"{% if s == 'sorumluluk:sinav_liste' %} class="aktif"{% endif %}>Sorumluluk Sınavı</a>
+
+    <div class="gm-baslik">Sorgu ve Raporlar</div>
+    <a href="{% url 'sinav:ogrenci_sinav_yeri' %}" style="--renk:#7c3aed;"{% if s == 'sinav:ogrenci_sinav_yeri' %} class="aktif"{% endif %}>Öğrenci Sınav Yeri Sorgula</a>
+    {% if sinav_menu.sinav_aktif_var %}
+    <a href="{% url 'sinav_oturum_istatistik' %}" style="--renk:#6366f1;"{% if s == 'sinav_oturum_istatistik' %} class="aktif"{% endif %}>Sınav Oturum İstatistikleri</a>
+    <a href="{% url 'sinav:sinav_yoklama_raporu' %}" style="--renk:#0891b2;"{% if s == 'sinav:sinav_yoklama_raporu' %} class="aktif"{% endif %}>Sınav Yoklama Raporu</a>
+    {% endif %}
+</nav>
+{% endwith %}

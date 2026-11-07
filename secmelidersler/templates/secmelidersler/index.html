@@ -99,6 +99,7 @@
         zorunlu ders çizelgesini bu bölümden yönetebilirsiniz.
     </p>
 
+    {% if not secmeli_menu %}{# sol menü açıkken bu bağlantılar menüde #}
     <div style="display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; margin-bottom:1.2rem;">
         <a href="{% url 'index' %}"
            style="display:inline-flex; align-items:center; gap:.5rem; background:#6c757d; color:#fff;
@@ -111,6 +112,7 @@
             <i class="fas fa-user-graduate"></i> Öğrenci Ders Planlaması
         </a>
     </div>
+    {% endif %}
 
     <div class="hub-grid">
 

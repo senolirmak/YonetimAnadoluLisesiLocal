@@ -1,0 +1,43 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Sınav İşlemleri</h2>
+    <p class="welcome-text">
+        Ortak sınav, sorumluluk sınavı ve sınav raporları. İşlemler için soldaki menüyü kullanın.
+    </p>
+
+    <div class="dn-grid">
+        <div class="dn-kart" style="--renk:#4f46e5;">
+            <div class="dn-kart-baslik">Aktif Ortak Sınav</div>
+            {% if ozet.aktif_sinav %}
+            <div class="dn-metin">{{ ozet.aktif_sinav }}</div>
+            {% else %}
+            <div class="dn-metin dn-soluk">Aktif sınav seçilmedi</div>
+            {% endif %}
+            <a href="{% url 'sinav:index' %}">Ortak Sınav Yönetimi →</a>
+        </div>
+        <div class="dn-kart" style="--renk:#0891b2;">
+            <div class="dn-kart-baslik">Takvimdeki Sınav</div>
+            {% if ozet.takvim_var %}
+            <div class="dn-sayi">{{ ozet.takvim_sinav_sayisi }}</div>
+            {% if ozet.takvim_baslangic %}
+            <div class="dn-alt">{{ ozet.takvim_baslangic|date:"j F" }} – {{ ozet.takvim_bitis|date:"j F Y" }}</div>
+            {% endif %}
+            {% else %}
+            <div class="dn-metin dn-soluk">Aktif takvim yok</div>
+            {% endif %}
+        </div>
+        <div class="dn-kart" style="--renk:#0f766e;">
+            <div class="dn-kart-baslik">Sorumluluk Sınavları</div>
+            <div class="dn-sayi">{{ ozet.sorumluluk_sayisi }}</div>
+            <a href="{% url 'sorumluluk:sinav_liste' %}">Sorumluluk Sınavı →</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

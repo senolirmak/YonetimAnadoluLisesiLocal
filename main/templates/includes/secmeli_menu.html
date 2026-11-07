@@ -1,0 +1,27 @@
+{# Müdür yardımcısı "Seçmeli Dersler" sol menüsü — veri: main.context_processors.yan_menu #}
+{% with s=secmeli_menu.aktif_sayfa %}
+<nav class="gm-menu" aria-label="Seçmeli Dersler menüsü">
+    <a href="{% url 'secmeli_index' %}" style="--renk:#0891b2;" class="gm-ozet{% if s == 'secmeli_index' %} aktif{% endif %}">Seçmeli Dersler</a>
+
+    <div class="gm-baslik">Öğrenci Planlaması</div>
+    <a href="{% url 'ogrdrs_listesi' %}" style="--renk:#0e7490;"{% if s == 'ogrdrs_listesi' %} class="aktif"{% endif %}>Öğrenci Seçmeli Dersleri</a>
+    <a href="{% url 'ogrenci:yeni_kayit_hub' 9 %}" style="--renk:#16a34a;"{% if s == 'ogrenci:yeni_kayit_hub' %} class="aktif"{% endif %}>Yeni Kayıt (9. Sınıf)</a>
+    <a href="{% url 'secmeli_sinif_dagilimi' %}" style="--renk:#b45309;"{% if s == 'secmeli_sinif_dagilimi' %} class="aktif"{% endif %}>Sınıf Dağılımı Planı</a>
+
+    <div class="gm-baslik">Ders Tanımları</div>
+    <a href="{% url 'secmeli_sinif_toplam_saat' %}" style="--renk:#e67e22;"{% if s == 'secmeli_sinif_toplam_saat' %} class="aktif"{% endif %}>Toplam Ders Saati</a>
+    <a href="{% url 'secmeli_ortak_ders_listesi' %}" style="--renk:#417690;"{% if s == 'secmeli_ortak_ders_listesi' %} class="aktif"{% endif %}>Zorunlu (Ortak) Dersler</a>
+    <a href="{% url 'secmeli_grup_listesi' %}" style="--renk:#6f42c1;"{% if s == 'secmeli_grup_listesi' %} class="aktif"{% endif %}>Seçmeli Ders Grupları</a>
+    <a href="{% url 'secmeli_alan_listesi' %}" style="--renk:#0e7490;"{% if s == 'secmeli_alan_listesi' %} class="aktif"{% endif %}>Alan Tanımları (11–12)</a>
+    <a href="{% url 'ortak_havuz_listesi' %}" style="--renk:#2d5469;"{% if s == 'ortak_havuz_listesi' %} class="aktif"{% endif %}>Ortak Ders Havuzu</a>
+    <a href="{% url 'secmeli_havuz_listesi' %}" style="--renk:#7c3aed;"{% if s == 'secmeli_havuz_listesi' %} class="aktif"{% endif %}>Seçmeli Ders Havuzu</a>
+
+    <div class="gm-baslik">Raporlar</div>
+    <a href="{% url 'secmeli_ders_yuku' %}" style="--renk:#c2410c;"{% if s == 'secmeli_ders_yuku' %} class="aktif"{% endif %}>Branş Bazlı Ders Yükü</a>
+
+    <div class="gm-baslik">Öğrenci Durumu</div>
+    <a href="{% url 'ortalama_listesi' %}" style="--renk:#0f766e;"{% if s == 'ortalama_listesi' %} class="aktif"{% endif %}>Dönem Ağırlıklı Ortalamalar</a>
+    <a href="{% url 'sinif_tekrari_listesi' %}" style="--renk:#b45309;"{% if s == 'sinif_tekrari_listesi' %} class="aktif"{% endif %}>Sınıf Tekrarı</a>
+    <a href="{% url 'tasdikname_listesi' %}" style="--renk:#7c2d12;"{% if s == 'tasdikname_listesi' %} class="aktif"{% endif %}>Tasdikname</a>
+</nav>
+{% endwith %}

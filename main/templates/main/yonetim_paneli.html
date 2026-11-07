@@ -1,0 +1,38 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Yönetim Paneli</h2>
+    <p class="welcome-text">
+        Okul yapılandırması, personel, veri aktarımı, yedekleme ve faaliyet onayları. İşlemler için soldaki menüyü kullanın.
+    </p>
+
+    <div class="dn-grid">
+        <div class="dn-kart" style="--renk:#fd7e14;">
+            <div class="dn-kart-baslik">Bekleyen Faaliyet Onayı</div>
+            <div class="dn-sayi">{{ bekleyen_faaliyet }}</div>
+            <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}">Faaliyet onayları →</a>
+        </div>
+        <div class="dn-kart" style="--renk:#6f42c1;">
+            <div class="dn-kart-baslik">Görevdeki Personel</div>
+            <div class="dn-sayi">{{ gorevde_personel }}</div>
+            <a href="{% url 'personel_listesi' %}">Personel listesi →</a>
+        </div>
+        <div class="dn-kart" style="--renk:#7f1d1d;">
+            <div class="dn-kart-baslik">Son Veritabanı Yedeği</div>
+            {% if son_yedek %}
+            <div class="dn-metin">{{ son_yedek.olusturma_tarihi|date:"j F Y, H:i" }}</div>
+            <div class="dn-alt">Toplam {{ yedek_sayisi }} yedek</div>
+            {% else %}
+            <div class="dn-metin dn-soluk">Henüz yedek alınmamış</div>
+            {% endif %}
+            <a href="{% url 'yedekleme:yedek_listesi' %}">Veritabanı yedekleri →</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

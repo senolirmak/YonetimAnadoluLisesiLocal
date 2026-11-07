@@ -1,0 +1,31 @@
+{# Öğretmen görev sayfalarında soldaki kalıcı menü — veri: main.context_processors.yan_menu #}
+{% with s=gorev_menu.aktif_sayfa %}
+<nav class="gm-menu" aria-label="Görevlerim menüsü">
+    <a href="{% url 'gorevlerim' %}" style="--renk:#4f46e5;" class="gm-ozet{% if s == 'gorevlerim' %} aktif{% endif %}">Görevlerim</a>
+
+    <div class="gm-baslik">Ders ve Nöbet</div>
+    <a href="{% url 'haftalik_ders_programi' %}" style="--renk:#6610f2;"{% if s == 'haftalik_ders_programi' %} class="aktif"{% endif %}>Ders Programım</a>
+    <a href="{% url 'ogretmen_haftalik_nobet' %}" style="--renk:#20c997;"{% if s == 'ogretmen_haftalik_nobet' %} class="aktif"{% endif %}>Haftalık Nöbet Listesi</a>
+    <a href="{% url 'ogretmen_ders_doldurma' %}" style="--renk:#0d6efd;"{% if s == 'ogretmen_ders_doldurma' %} class="aktif"{% endif %}>Atanan / Atanamayan Dersler</a>
+
+    {% if gorev_menu.sinav_gozetim_var or gorev_menu.sorumluluk_gorev_var or gorev_menu.sorumluluk_takvim_var %}
+    <div class="gm-baslik">Sınavlar</div>
+    {% if gorev_menu.sinav_gozetim_var %}
+    <a href="{% url 'ogretmen_sinav_gozetim' %}" style="--renk:#4f46e5;"{% if s == 'ogretmen_sinav_gozetim' %} class="aktif"{% endif %}>Sınav Gözetim Listem</a>
+    {% endif %}
+    {% if gorev_menu.sorumluluk_gorev_var %}
+    <a href="{% url 'ogretmen_sorumluluk_gorevleri' %}" style="--renk:#0f766e;"{% if s == 'ogretmen_sorumluluk_gorevleri' %} class="aktif"{% endif %}>Sorumluluk Görevlerim</a>
+    {% endif %}
+    {% if gorev_menu.sorumluluk_takvim_var %}
+    <a href="{% url 'ogretmen_ogrenci_sinav_takvimi' %}" style="--renk:#7c3aed;"{% if s == 'ogretmen_ogrenci_sinav_takvimi' %} class="aktif"{% endif %}>Rehberlik Sınıfım Sınav Takvimi</a>
+    {% endif %}
+    {% endif %}
+
+    {% if gorev_menu.sosyal_kulupler %}
+    <div class="gm-baslik">Sosyal Kulübüm</div>
+    {% for kulup in gorev_menu.sosyal_kulupler %}
+    <a href="{% url 'sosyalkulup:kulup_ogrencileri' kulup.pk %}" style="--renk:#fd7e14;"{% if s == 'sosyalkulup:kulup_ogrencileri' and gorev_menu.aktif_pk == kulup.pk %} class="aktif"{% endif %}>{{ kulup.ad }} — Öğrenci Listesi</a>
+    {% endfor %}
+    {% endif %}
+</nav>
+{% endwith %}

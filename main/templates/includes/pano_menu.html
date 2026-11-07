@@ -1,0 +1,23 @@
+{# "Bilgi Panosu" sol menüsü — veri: main.context_processors.yan_menu #}
+{% with g=pano_menu.goster %}
+<nav class="gm-menu" aria-label="Bilgi Panosu menüsü">
+    <a href="{% url 'bilgi_panosu' %}" style="--renk:#417690;" class="gm-ozet">Bilgi Panosu</a>
+
+    <div class="gm-baslik">Önizleme</div>
+    <a href="{% url 'bilgi_panosu' %}?goster=pano" style="--renk:#343a40;"{% if g == 'pano' %} class="aktif"{% endif %}>Pano Görünümü</a>
+    <a href="{% url 'bilgi_panosu' %}?goster=etkinlikler" style="--renk:#7c3aed;"{% if g == 'etkinlikler' %} class="aktif"{% endif %}>Etkinlikler</a>
+
+    <div class="gm-baslik">Tam Ekran (yeni sekme)</div>
+    <a href="{% url 'pano:index' %}" target="_blank" rel="noopener" style="--renk:#495057;">Pano Görünümü ↗</a>
+    <a href="{% url 'pano:kiosk' %}" target="_blank" rel="noopener" style="--renk:#6c757d;">Kiosk Modu ↗</a>
+
+    {% if user.is_staff %}
+    <div class="gm-baslik">İçerik (Yönetici Paneli)</div>
+    <a href="{% url 'admin:pano_duyuru_changelist' %}" style="--renk:#0d6efd;">Pano Duyuruları</a>
+    <a href="{% url 'admin:pano_etkinlik_changelist' %}" style="--renk:#6610f2;">Etkinlikler</a>
+    <a href="{% url 'admin:pano_medyaicerik_changelist' %}" style="--renk:#e83e8c;">Medya İçerikleri</a>
+    <a href="{% url 'admin:pano_derssaati_changelist' %}" style="--renk:#20c997;">Ders Saatleri</a>
+    <a href="{% url 'admin:pano_kioskayar_changelist' %}" style="--renk:#6c757d;">Kiosk Ayarları</a>
+    {% endif %}
+</nav>
+{% endwith %}
