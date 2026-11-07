@@ -243,7 +243,6 @@ def secmeli_ders_pdf(buffer, ogrenci, gelecek_sinif,
     )
 
     n_parallel = max(len(ortak_rows), len(secmeli_rows))
-    n_data     = n_parallel + 1          # +1: açıklama satırı
     acik_row   = n_parallel + 2          # table_data indeksi (2 başlık + n_parallel)
 
     # Tablo satırları inşa et

@@ -27,7 +27,9 @@ from secmelidersler.services.pdf_rapor import secmeli_ders_pdf
 from .forms import OgrenciSecmeliDersForm
 from .models import OgrenciSecmeliDers, OgrenciZorunluDers
 
-_GELECEK = lambda sinif: sinif + 1
+
+def _GELECEK(sinif):
+    return sinif + 1
 
 
 def _yf(qs, aktif_yil, alan="egitim_yili"):

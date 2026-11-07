@@ -320,7 +320,6 @@ def secmeli_grup_ders_listesi(request, grup_pk):
     grup_adlari = {d.ders_adi for d in grup_dersleri}
 
     havuz_dersler = list(SecmeliDersHavuzu.objects.all())
-    havuz_adlari = {h.ders_adi for h in havuz_dersler}
     havuz_map = {h.ders_adi: h for h in havuz_dersler}
 
     sag_kart = []
@@ -1246,7 +1245,9 @@ def _excel_satirlari_oku(dosya):
 
 def _sutun_indeksleri_bul(baslik_satiri):
     """Başlık satırından okulno ve a_ortalama sütun indekslerini bulur."""
-    normalize = lambda s: str(s).strip().lower().replace(" ", "_").replace("ı", "i").replace("ö", "o").replace("ü", "u")
+    def normalize(s):
+        return str(s).strip().lower().replace(" ", "_").replace("ı", "i").replace("ö", "o").replace("ü", "u")
+
     basliklar = [normalize(h) for h in baslik_satiri]
     okulno_idx = a_ort_idx = None
     for i, h in enumerate(basliklar):

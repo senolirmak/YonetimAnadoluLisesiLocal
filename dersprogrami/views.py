@@ -17,7 +17,6 @@ from nobet.models import NobetAtanamayan, NobetGecmisi, NobetPersonel
 from okul.auth import (
     is_ust_yonetici,
     ust_yonetici_required,
-    yonetici_required,
 )
 from personeldevamsizlik.models import Devamsizlik
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
@@ -536,7 +535,6 @@ def sinif_ogretmenleri(request):
 
     secilen_sinif = None
     ogretmen_listesi = []
-    ogretmen_no = 0
 
     if form.is_valid():
         secilen_sinif = form.cleaned_data.get("sinif_sube")

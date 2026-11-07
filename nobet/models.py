@@ -35,9 +35,9 @@ class NobetYerleri(models.Model):
 
 # SinifSube → okul app'ine taşındı. Backward-compat:
 # NobetPersonel → okul app'ine Personel adıyla taşındı. Backward-compat:
-from okul.models import (
-    Personel,  # noqa: F401, E402
-    SinifSube,  # noqa: F401, E402
+from okul.models import (  # noqa: E402 — geriye dönük uyumluluk, bilerek burada
+    Personel,  # noqa: F401
+    SinifSube,  # noqa: F401
 )
 from okul.models import Personel as NobetPersonel  # noqa: F401, E402
 

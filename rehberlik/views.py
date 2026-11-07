@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from nobet.models import NobetPersonel
 from ogrenci.models import Ogrenci
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 from .models import Gorusme
 
@@ -15,9 +16,6 @@ from .models import Gorusme
 
 def _rehber_mi(user):
     return user.is_superuser or user.groups.filter(name="rehber_ogretmen").exists()
-
-
-from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 def _personel(request):

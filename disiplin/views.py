@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 from okul.models import SinifSube
 
 from .models import DisiplinGorusme
@@ -25,9 +26,6 @@ def _disiplin_mi(user):
         or user.groups.filter(name="disiplin_kurulu").exists()
         or _mudur_yardimcisi_mi(user)
     )
-
-
-from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 def _personel(request):

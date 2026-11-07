@@ -321,7 +321,7 @@ class MazeretILPService(BaseService):
         for t in range(K - 1):
             prob += y[t] >= y[t + 1]
 
-        status = prob.solve(PULP_CBC_CMD(
+        prob.solve(PULP_CBC_CMD(
             msg=0,
             timeLimit=self.config.get("TIME_LIMIT", 60),
         ))

@@ -11,6 +11,7 @@ from django.views.decorators.http import require_POST
 from dersprogrami.models import DersProgrami
 from devamsizlik.models import OgrenciDevamsizlik
 from ogrenci.models import Ogrenci
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 from .models import Faaliyet, FaaliyetDersSaati
 from .services.tarih_kurali import GERIYE_DONUK_GUN, en_erken_tarih, sinirdan_muaf_mi, tarih_hatasi
@@ -25,9 +26,6 @@ def _personel(request):
         return request.user.personel
     except Exception:
         return None
-
-
-from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 def _ogrenci_verileri():
