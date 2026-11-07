@@ -1054,9 +1054,9 @@ def ogretmen_gorev_ozeti(request):
 def ogretmen_sorumluluk_gorevleri(request):
     from django.core.exceptions import PermissionDenied
 
-    from main.utils import _ogretmen_menu_gorumu
+    from okul.auth import is_ogretmen_menu
 
-    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+    if not (request.user.is_superuser or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     personel = getattr(request.user, "personel", None)

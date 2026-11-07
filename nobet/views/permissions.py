@@ -1,69 +1,38 @@
-from functools import wraps
+"""nobet view'larının yetki adları — mantık yok, hepsi okul.auth'tan gelir.
 
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
+Bu modül, nobet.views.* ve `nobet.views` paketinin eski adlarla içe aktardığı
+yetki yardımcılarını korumak için durur. Yeni kodda doğrudan `okul.auth`
+kullanın.
+"""
 
 from okul.auth import (
-    _UST_YONETIM_GRUPLARI,
+    UST_YONETIM_GRUPLARI,
+    YONETICI_GRUPLARI,
+    MudurYardimcisiMixin,
     is_mudur_yardimcisi,
     is_ust_yonetici,
+    is_yonetici,
+    mudur_yardimcisi_required,
+    ust_yonetici_required,
+    yonetici_required,
 )
-from okul.auth import (
-    ust_yonetici_required as ust_yonetici_required,  # yeniden dışa aktarma (nobet.views.*)
-)
 
-# Eski ad; başka modüller bu adla içe aktarır
-TARIH_DEGISTIREBILIR_GRUPLAR = _UST_YONETIM_GRUPLARI
+# Eski adlar
+YONETICI_GRUPLAR = YONETICI_GRUPLARI
+TARIH_DEGISTIREBILIR_GRUPLAR = UST_YONETIM_GRUPLARI
+is_tarih_degistirebilir = is_ust_yonetici
+mudur_required = ust_yonetici_required
 
-YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-
-
-def is_yonetici(user):
-    return user.is_superuser or user.groups.filter(name__in=YONETICI_GRUPLAR).exists()
-
-
-def is_tarih_degistirebilir(user):
-    return is_ust_yonetici(user)
-
-
-def mudur_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapper(request, *args, **kwargs):
-        if not is_tarih_degistirebilir(request.user):
-            raise PermissionDenied
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
-
-
-def mudur_yardimcisi_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapper(request, *args, **kwargs):
-        if not is_mudur_yardimcisi(request.user):
-            raise PermissionDenied
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
-
-
-def yonetici_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapper(request, *args, **kwargs):
-        if not is_yonetici(request.user):
-            raise PermissionDenied
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
-
-
-class MudurYardimcisiMixin(LoginRequiredMixin):
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return self.handle_no_permission()
-        if not is_mudur_yardimcisi(request.user):
-            raise PermissionDenied
-        return super().dispatch(request, *args, **kwargs)
+__all__ = [
+    "YONETICI_GRUPLAR",
+    "TARIH_DEGISTIREBILIR_GRUPLAR",
+    "MudurYardimcisiMixin",
+    "is_mudur_yardimcisi",
+    "is_tarih_degistirebilir",
+    "is_ust_yonetici",
+    "is_yonetici",
+    "mudur_required",
+    "mudur_yardimcisi_required",
+    "ust_yonetici_required",
+    "yonetici_required",
+]

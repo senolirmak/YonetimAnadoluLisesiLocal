@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from okul.auth import is_yonetici, mudur_yardimcisi_required
+from okul.auth import is_ust_yonetici, is_yonetici, mudur_yardimcisi_required
 from okul.models import DersHavuzu, SinifSube
 from okul.utils import get_aktif_egitim_yili
 
@@ -106,9 +106,7 @@ def ogrenci_liste(request):
 @login_required
 def sureksiz_devamsiz_listesi(request):
     """Öğrenci özel durumları: sürekli devamsız yönetimi."""
-    from okul.auth import is_mudur_yardimcisi as _mudur_mi
-    gruplar = set(request.user.groups.values_list("name", flat=True))
-    yetkili = request.user.is_superuser or _mudur_mi(request.user) or "okul_muduru" in gruplar
+    yetkili = is_ust_yonetici(request.user)
     if not yetkili:
         raise PermissionDenied
 
@@ -186,9 +184,7 @@ def sureksiz_devamsiz_listesi(request):
 @require_POST
 def sureksiz_devamsiz_toggle(request, pk):
     """Tek öğrencinin sureksiz_devamsiz bayrağını tersine çevirir (AJAX)."""
-    from okul.auth import is_mudur_yardimcisi as _mudur_mi
-    gruplar = set(request.user.groups.values_list("name", flat=True))
-    yetkili = request.user.is_superuser or _mudur_mi(request.user) or "okul_muduru" in gruplar
+    yetkili = is_ust_yonetici(request.user)
     if not yetkili:
         return JsonResponse({"ok": False, "hata": "Yetkisiz"}, status=403)
 
@@ -238,9 +234,7 @@ def ogrenci_detay_duzenle(request, pk):
 @login_required
 def ogrenci_muaf_duzenle(request, pk):
     """Öğrencinin muaf olduğu dersleri (per-ders) düzenler."""
-    from okul.auth import is_mudur_yardimcisi as _mudur_mi
-    gruplar = set(request.user.groups.values_list("name", flat=True))
-    yetkili = request.user.is_superuser or _mudur_mi(request.user) or "okul_muduru" in gruplar
+    yetkili = is_ust_yonetici(request.user)
     if not yetkili:
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied

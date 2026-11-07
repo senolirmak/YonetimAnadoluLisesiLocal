@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci
+from okul.auth import is_disiplin_kurulu
 from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 from okul.models import SinifSube
 
@@ -21,11 +22,7 @@ from .models import DisiplinGorusme
 def _disiplin_mi(user):
     # Müdür yardımcısı için okul.auth kontrolü kullanılır: pasife alınmış (okul_yonetici
     # profili aktif değil) müdür yardımcısı disiplin kayıtlarına erişemez.
-    return (
-        user.is_superuser
-        or user.groups.filter(name="disiplin_kurulu").exists()
-        or _mudur_yardimcisi_mi(user)
-    )
+    return is_disiplin_kurulu(user) or _mudur_yardimcisi_mi(user)
 
 
 def _personel(request):
