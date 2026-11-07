@@ -9,16 +9,22 @@ sinif_raporu_pdf   – A4 sınıf listesi: her salon için bir A4 sayfası (öğ
 from pathlib import Path
 
 from reportlab.lib import colors
+from reportlab.lib.fonts import addMapping
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.lib.fonts import addMapping
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
-    BaseDocTemplate, Frame, PageBreak, PageTemplate,
-    Paragraph, Spacer, Table, TableStyle, KeepTogether,
+    BaseDocTemplate,
+    Frame,
+    PageBreak,
+    PageTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
 )
 
 # ---------------------------------------------------------------------------
@@ -251,7 +257,6 @@ def oturum_plani_pdf(salon_grids: dict, out_path: str, baslik: str, okul,
 # ---------------------------------------------------------------------------
 
 import re as _re
-
 
 # ---------------------------------------------------------------------------
 # 3. SINAV TAKVİMİ PDF (öğrenciler için tek sayfa)

@@ -1,25 +1,47 @@
 from django.contrib import messages
 from django.db.models import Count, Max, Value
-from django.urls import reverse
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from okul.auth import mudur_yardimcisi_required
-
-from .forms import AlanForm, OrtakDersHavuzuForm, SecmeliDersForm, SecmeliDersGrubuForm, SecmeliDersHavuzuForm, SinifSeviyeToplamSaatForm
-from .models import (
-    Alan, AlanDers, AlanSubeAtama, NormKadroArsivi, OgrenciOrtalama, OgrenciSinifTekrari,
-    OgrenciTasdikname,
-    OrtakDers, OrtakDersHavuzu,
-    SecmeliDers, SecmeliDersBransPaylasimi, SecmeliDersGrubu, SecmeliDersHavuzu,
-    SecmeliDersSubeBolunmesi,
-    SinifSeviyeToplamSaat, YoneticiZorunluDersYuku,
-    get_aktif_egitim_yili, get_toplam_saat,
-)
 from okul.models import Brans, EgitimOgretimYili
-from .services import donem_kopyala, ders_yuku
-from .services.ders_dagilimi import baskin_egitim_yili, plan_sinif_dagilimi, plan_sinif_dagilimi_gecmis
+
+from .forms import (
+    AlanForm,
+    OrtakDersHavuzuForm,
+    SecmeliDersForm,
+    SecmeliDersGrubuForm,
+    SecmeliDersHavuzuForm,
+    SinifSeviyeToplamSaatForm,
+)
+from .models import (
+    Alan,
+    AlanDers,
+    AlanSubeAtama,
+    NormKadroArsivi,
+    OgrenciOrtalama,
+    OgrenciSinifTekrari,
+    OgrenciTasdikname,
+    OrtakDers,
+    OrtakDersHavuzu,
+    SecmeliDers,
+    SecmeliDersBransPaylasimi,
+    SecmeliDersGrubu,
+    SecmeliDersHavuzu,
+    SecmeliDersSubeBolunmesi,
+    SinifSeviyeToplamSaat,
+    YoneticiZorunluDersYuku,
+    get_aktif_egitim_yili,
+    get_toplam_saat,
+)
+from .services import ders_yuku, donem_kopyala
+from .services.ders_dagilimi import (
+    baskin_egitim_yili,
+    plan_sinif_dagilimi,
+    plan_sinif_dagilimi_gecmis,
+)
 
 _SINIFLAR = [9, 10, 11, 12]
 
@@ -1205,7 +1227,10 @@ def _excel_satirlari_oku(dosya):
         satirlar = [[c.value for c in row] for row in ws.iter_rows()]
         wb.close()
     elif adi.endswith(".xls"):
-        import xlrd, tempfile, os
+        import os
+        import tempfile
+
+        import xlrd
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xls")
         for chunk in dosya.chunks():
             tmp.write(chunk)

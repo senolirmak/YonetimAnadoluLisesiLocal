@@ -7,8 +7,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
-from okul.models import SinifSube
 from ogrenci.models import Ogrenci
+from okul.models import SinifSube
 
 from .models import DisiplinGorusme
 
@@ -61,7 +61,6 @@ def gorusme_liste(request):
 
     personel = _personel(request)
 
-    from django.db.models import Q
 
     # disiplin_kurulu üyeleri kendi kayıtlarını görür (gizliler dahil)
     # mudur_yardimcisi gizli olmayanları + kendi personel kaydıyla oluşturduklarını görür

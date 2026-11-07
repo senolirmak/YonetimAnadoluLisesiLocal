@@ -1,8 +1,9 @@
-from django import forms
-from datetime import date
 import re
+from datetime import date
 
-from .models import SinavBilgisi, MazeretSinav
+from django import forms
+
+from .models import MazeretSinav, SinavBilgisi
 
 
 class SinavBilgisiForm(forms.ModelForm):

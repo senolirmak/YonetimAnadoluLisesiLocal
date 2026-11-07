@@ -20,22 +20,20 @@ import re
 from datetime import time, timedelta
 from typing import List, Tuple
 
-from django.db.models import Subquery, OuterRef, Q
+from django.db.models import OuterRef, Q, Subquery
 
 from ogrenci.models import Ogrenci, OgrenciMuaf
 from okul.utils import get_aktif_egitim_yili
-
 from sinav.models import (
-    MazeretSinav,
-    MazeretGun,
+    MazeretBelgeTeslim,
+    MazeretOgrenci,
     MazeretOturum,
     MazeretOturumDers,
-    MazeretOgrenci,
-    MazeretBelgeTeslim,
-    TakvimUretim,
-    Takvim,
+    MazeretSinav,
     OturmaPlani,
     SinavSalonYoklama,
+    Takvim,
+    TakvimUretim,
 )
 
 _SINAV_TURU_RE = re.compile(r'^(.*?)\s+\((Yazili|Uygulama)\)$')

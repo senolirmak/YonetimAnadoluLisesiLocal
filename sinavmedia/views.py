@@ -44,7 +44,8 @@ def yonetim(request):
     if not _mudur_yardimcisi_mi(request.user):
         raise Http404
 
-    from sinav.models import SinavBilgisi, TakvimUretim as TU
+    from sinav.models import SinavBilgisi
+    from sinav.models import TakvimUretim as TU
     aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
 
     if not aktif_sinav:

@@ -8,6 +8,7 @@ from django.db.models import Count
 from django.shortcuts import render
 from django.utils import timezone
 
+from main.utils import _DAYS_MAP, _GUN_TR, _TR_GUNLER, _ogretmen_menu_gorumu
 from nobet.models import (
     GunlukNobetCizelgesi,
     NobetAtanamayan,
@@ -17,8 +18,6 @@ from nobet.models import (
     NobetPersonel,
 )
 from personeldevamsizlik.models import Devamsizlik
-from main.utils import _ogretmen_menu_gorumu, _DAYS_MAP, _GUN_TR, _TR_GUNLER
-
 
 # ─────────────────────────────────────────────
 # Öğretmen — Haftalık Nöbet Listesi (salt okunur)

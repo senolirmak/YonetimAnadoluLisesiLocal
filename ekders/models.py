@@ -1,6 +1,5 @@
 from datetime import timedelta
 from decimal import Decimal
-from math import floor
 
 from django.contrib.auth import get_user_model
 from django.db import models

@@ -1,4 +1,3 @@
-from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
 
@@ -35,10 +34,11 @@ class NobetYerleri(models.Model):
 
 
 # SinifSube → okul app'ine taşındı. Backward-compat:
-from okul.models import SinifSube  # noqa: F401, E402
-
 # NobetPersonel → okul app'ine Personel adıyla taşındı. Backward-compat:
-from okul.models import Personel  # noqa: F401, E402
+from okul.models import (
+    Personel,  # noqa: F401, E402
+    SinifSube,  # noqa: F401, E402
+)
 from okul.models import Personel as NobetPersonel  # noqa: F401, E402
 
 
@@ -216,7 +216,6 @@ class GunlukNobetCizelgesi(models.Model):
 # OkulBilgi, OkulDonem, EgitimOgretimYili → okul app'ine taşındı.
 # Mevcut import'ların kırılmaması için backward-compat takma adlar:
 from okul.models import EgitimOgretimYili, OkulBilgi, OkulDonem  # noqa: F401, E402
-
 
 MAZERET_SALON_CHOICES = [
     ("Mazeret1", "Mazeret1"),

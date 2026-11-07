@@ -1,6 +1,5 @@
 from django.db import models
 
-
 SALON_KAPASITESI = 30
 
 

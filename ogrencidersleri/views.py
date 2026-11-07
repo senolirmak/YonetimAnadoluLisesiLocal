@@ -7,12 +7,20 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from ogrenci.models import Ogrenci
 from okul.auth import mudur_yardimcisi_required
 from okul.models import OkulBilgi
-from ogrenci.models import Ogrenci
 from secmelidersler.models import (
-    Alan, AlanDers, OgrenciSinifTekrari, OgrenciTasdikname, OrtakDers, SecmeliDersGrubu,
-    get_toplam_saat, get_toplam_saat_map, get_aktif_egitim_yili, _VARSAYILAN_TOPLAM_SAAT,
+    _VARSAYILAN_TOPLAM_SAAT,
+    Alan,
+    AlanDers,
+    OgrenciSinifTekrari,
+    OgrenciTasdikname,
+    OrtakDers,
+    SecmeliDersGrubu,
+    get_aktif_egitim_yili,
+    get_toplam_saat,
+    get_toplam_saat_map,
 )
 from secmelidersler.services.pdf_rapor import secmeli_ders_pdf
 

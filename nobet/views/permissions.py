@@ -4,12 +4,17 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 
-from okul.auth import (  # noqa: F401 — re-export
-    _UST_YONETIM_GRUPLARI as TARIH_DEGISTIREBILIR_GRUPLAR,
+from okul.auth import (
+    _UST_YONETIM_GRUPLARI,
     is_mudur_yardimcisi,
     is_ust_yonetici,
-    ust_yonetici_required,
 )
+from okul.auth import (
+    ust_yonetici_required as ust_yonetici_required,  # yeniden dışa aktarma (nobet.views.*)
+)
+
+# Eski ad; başka modüller bu adla içe aktarır
+TARIH_DEGISTIREBILIR_GRUPLAR = _UST_YONETIM_GRUPLARI
 
 YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
 

@@ -23,7 +23,9 @@ OturmaPlani-first mantığı:
 
 from __future__ import annotations
 
-from datetime import date as _date, datetime as _dt, timedelta as _td
+from datetime import date as _date
+from datetime import datetime as _dt
+from datetime import timedelta as _td
 from typing import Any
 
 from sinav.models import OturmaPlani

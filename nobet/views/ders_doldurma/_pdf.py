@@ -14,6 +14,7 @@ from reportlab.platypus import Paragraph, TableStyle
 
 from okul.auth import yonetici_required
 from personeldevamsizlik.models import Devamsizlik
+
 from ...models import NobetGecmisi, NobetPersonel
 from ...services.pdf_rapor import NobetPDFReport
 from ..dagitim import _gun_adi_tr

@@ -9,9 +9,9 @@ from sorumluluk.models import (
     SALON_KAPASITESI,
     SorumluGozetmen,
     SorumluKomisyonUyesi,
+    SorumlulukSalon,
     SorumluOgrenci,
     SorumluOturmaPlani,
-    SorumlulukSalon,
     SorumluSinav,
     SorumluTakvim,
 )

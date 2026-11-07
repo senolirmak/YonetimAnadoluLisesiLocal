@@ -1,8 +1,15 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from django.db.models import Sum, Value
-from django.db.models.functions import Coalesce
-from .models import Alan, AlanDers, OrtakDersHavuzu, SecmeliDers, SecmeliDersGrubu, SecmeliDersHavuzu, SinifSeviyeToplamSaat
+
+from .models import (
+    Alan,
+    AlanDers,
+    OrtakDersHavuzu,
+    SecmeliDers,
+    SecmeliDersGrubu,
+    SecmeliDersHavuzu,
+    SinifSeviyeToplamSaat,
+)
 
 
 class SinifSeviyeToplamSaatForm(forms.ModelForm):

@@ -1,19 +1,31 @@
-import io
 from collections import defaultdict
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether, PageBreak, HRFlowable
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase.pdfmetrics import registerFontFamily
-from reportlab.lib.fonts import addMapping
 
 from django.conf import settings
+from reportlab.lib import colors
+from reportlab.lib.fonts import addMapping
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import (
+    HRFlowable,
+    KeepTogether,
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from sorumluluk.models import (
-    SorumluOturmaPlani, SorumluKomisyonUyesi, SorumluGozetmen, SorumluTakvim, salon_choices,
+    SorumluGozetmen,
+    SorumluKomisyonUyesi,
+    SorumluOturmaPlani,
+    SorumluTakvim,
+    salon_choices,
 )
 
 # --- Times New Roman — <b> etiketleri de normal ağırlıkta çizilir ---
@@ -444,7 +456,6 @@ def rapor_pdf_uret(buf, sinav, okul, oturumlar_veri, imza_sirkusu=False):
 
 def gorevlendirme_pdf_uret(buf, sinav, okul):
     """Her oturum için komisyon üyeleri ve gözetmen atamalarını listeleyen PDF üretir."""
-    from itertools import groupby
 
     W, _ = A4
     LR = 1.5 * cm

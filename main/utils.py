@@ -46,8 +46,9 @@ def get_ogretmen_gorev_verileri(user, today):
     main/views.py:index() ve main/views.py:gorevlerim() tarafından ortak kullanılır.
     """
     from django.db.models import Q
-    from ogrenci.services.rehberlik import rehberlik_sinif_sube as rehberlik_sinif_sube_bul
+
     from nobet.models import NobetGecmisi, NobetGorevi
+    from ogrenci.services.rehberlik import rehberlik_sinif_sube as rehberlik_sinif_sube_bul
 
     _gruplar = set(user.groups.values_list("name", flat=True))
     _yonetici_gruplar = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
@@ -95,7 +96,11 @@ def get_ogretmen_gorev_verileri(user, today):
         try:
             from sinav.models import (
                 OturmaPlani as _OturmaPlani,
+            )
+            from sinav.models import (
                 SinavBilgisi as _SinavBilgisi,
+            )
+            from sinav.models import (
                 TakvimUretim as _TakvimUretim,
             )
             _personel = user.personel
@@ -124,7 +129,8 @@ def get_ogretmen_gorev_verileri(user, today):
     sorumluluk_gorev_var = False
     if hasattr(user, "personel") and user.personel:
         try:
-            from sorumluluk.models import SorumluGozetmen as _SGZ, SorumluKomisyonUyesi as _SKU
+            from sorumluluk.models import SorumluGozetmen as _SGZ
+            from sorumluluk.models import SorumluKomisyonUyesi as _SKU
             _p = user.personel
             sorumluluk_gorev_var = (
                 _SKU.objects.filter(Q(uye1=_p) | Q(uye2=_p), sinav__arsivlendi=False).exists()

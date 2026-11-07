@@ -20,7 +20,6 @@ from .models import (
     SinifSube,
 )
 
-
 # ──────────────────────────────────────────────
 # EgitimOgretimYili Form — çakışma kontrolü
 # ──────────────────────────────────────────────

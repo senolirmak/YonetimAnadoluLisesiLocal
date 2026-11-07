@@ -595,7 +595,12 @@ class SubeDersGuncelleTestCase(TestCase):
     def setUp(self):
         from dersprogrami.models import DersProgrami
         from okul.models import (
-            DersHavuzu, EgitimOgretimYili, OkulBilgi, Personel, SinifSube, SinifSubeYil,
+            DersHavuzu,
+            EgitimOgretimYili,
+            OkulBilgi,
+            Personel,
+            SinifSube,
+            SinifSubeYil,
         )
 
         yil = EgitimOgretimYili.objects.create(

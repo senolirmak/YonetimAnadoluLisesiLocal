@@ -7,8 +7,6 @@ Diğer app'ler bu modellere FK ile bağlanır; kendi içlerinde kopya tanımlama
 
 from django.contrib.auth.models import User
 from django.db import models
-from django.utils import timezone
-
 
 # ---------------------------------------------------------------------------
 # Takvim modelleri

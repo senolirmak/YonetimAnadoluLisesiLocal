@@ -405,7 +405,6 @@ class TakvimService(BaseService):
     @staticmethod
     def _date_to_day_index(tarih, baslangic: datetime, holidays: set) -> int:
         """Verilen tarihin is-gunu endeksini hesaplar (baslangic=0)."""
-        from datetime import date as _date
         # Baslangic gununun tarihini bul (tatil/hafta sonu atlayarak)
         cur = baslangic
         while cur.weekday() >= 5 or cur.date() in holidays:
