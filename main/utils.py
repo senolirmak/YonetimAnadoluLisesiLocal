@@ -1,22 +1,4 @@
-def _only_ogretmen(user):
-    """Sadece ogretmen grubunda olup yönetici gruplarında olmayan kullanıcı."""
-    if user.is_superuser:
-        return False
-    gruplar = set(user.groups.values_list("name", flat=True))
-    yonetici = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-    return "ogretmen" in gruplar and not (gruplar & yonetici)
-
-
-def _ogretmen_menu_gorumu(user):
-    """ogretmen + rehber_ogretmen + disiplin_kurulu → nöbet okuma sayfalarına erişim."""
-    if user.is_superuser:
-        return False
-    gruplar = set(user.groups.values_list("name", flat=True))
-    ust_yonetici = {"mudur_yardimcisi", "okul_muduru"}
-    return bool(gruplar & {"ogretmen", "rehber_ogretmen", "disiplin_kurulu"}) and not (
-        gruplar & ust_yonetici
-    )
-
+from okul.auth import is_salt_ogretmen
 
 _DAYS_MAP = {
     0: "Monday",
@@ -50,10 +32,7 @@ def get_ogretmen_gorev_verileri(user, today):
     from nobet.models import NobetGecmisi, NobetGorevi
     from ogrenci.services.rehberlik import rehberlik_sinif_sube as rehberlik_sinif_sube_bul
 
-    _gruplar = set(user.groups.values_list("name", flat=True))
-    _yonetici_gruplar = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-    _salt_ogretmen = not user.is_superuser and "ogretmen" in _gruplar and not bool(_gruplar & _yonetici_gruplar)
-    personel_bagli = _salt_ogretmen and hasattr(user, "personel")
+    personel_bagli = is_salt_ogretmen(user) and hasattr(user, "personel")
 
     rehberlik_sinif_sube = None
     ogretmen_nobetleri = []

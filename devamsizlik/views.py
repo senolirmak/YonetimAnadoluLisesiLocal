@@ -12,16 +12,10 @@ from django.utils import timezone
 from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci
 from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
+from okul.auth import is_ust_yonetici
 from okul.utils import get_aktif_egitim_yili
 
 from .models import OgrenciDevamsizlik
-
-
-def _ust_yonetici_mi(user):
-    return (
-        user.is_superuser
-        or user.groups.filter(name__in=["mudur_yardimcisi", "okul_muduru"]).exists()
-    )
 
 
 def _parse_tarih(tarih_str, varsayilan=None):
@@ -62,9 +56,9 @@ def ogretmen_devamsizlik(request, ders_saati=None):
     simdi = timezone.localtime().time()
 
     # Ogretmen grubu yalnızca bugünü görebilir
-    from main.utils import _only_ogretmen
+    from okul.auth import is_salt_ogretmen
 
-    if _only_ogretmen(request.user):
+    if is_salt_ogretmen(request.user):
         secili_tarih = bugun
     else:
         secili_tarih = _parse_tarih(request.GET.get("tarih", ""), bugun)
@@ -487,7 +481,7 @@ def _build_pdf(qs, tarih_bas, tarih_bit, secili_sinifler, okul_adi=""):
 
 @login_required
 def ogrenci_devamsizlik_pdf(request):
-    if not _ust_yonetici_mi(request.user):
+    if not is_ust_yonetici(request.user):
         messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
         return redirect("index")
 

@@ -134,6 +134,14 @@ Tüm rol/izin kontrolleri tek merkezden gelir — app'lerde tekrarlanmaz:
 - `is_mudur_yardimcisi` / `mudur_yardimcisi_required` / `MudurYardimcisiMixin` — yalnızca müdür yardımcısı grubu (+ aktif `okul_yonetici` profili).
 - `is_yonetici` / `yonetici_required` — `ogretmen` hariç tüm yönetici grupları (`mudur_yardimcisi`, `okul_muduru`, `rehber_ogretmen`, `disiplin_kurulu`).
 - `is_ust_yonetici` / `ust_yonetici_required` / `UstYoneticiMixin` — yalnızca `mudur_yardimcisi` ve `okul_muduru` (planlama modüllerinde: nöbet, ders doldurma, sınav yönetimi, haftalık program).
+- `is_rehber_ogretmen`, `is_disiplin_kurulu`, `is_salt_ogretmen` (yalnızca `ogretmen` grubu),
+  `is_ogretmen_menu` (öğretmen görev sayfalarını kullananlar). Grup adları yalnızca buradaki
+  kümelerde (`UST_YONETIM_GRUPLARI`, `YONETICI_GRUPLARI`, `OGRETMEN_MENU_GRUPLARI`,
+  `PERSONEL_GRUPLARI`) geçer.
+- Bütün kurallar `rol_bayraklari(user)` içindedir; tekil kontroller ve şablonlara giden rol
+  bayrakları (`main.context_processors.kullanici_rol`) ondan türetilir. Pasife alınmış
+  `OkulYonetici` profili müdür yardımcısı / üst yönetici yetkisini kaybeder (yönetici kalır).
+  `nobet/views/permissions.py` yalnızca eski adları sunan uyumluluk modülüdür, mantık içermez.
 
 Django grupları (`mudur_yardimcisi`, `okul_muduru`, `rehber_ogretmen`, `disiplin_kurulu`, `ogretmen`)
 `kullanici_gruplari_olustur` komutuyla oluşturulur; her rolün yetki kapsamı için README'deki

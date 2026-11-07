@@ -8,7 +8,7 @@ from django.db.models import Count
 from django.shortcuts import render
 from django.utils import timezone
 
-from main.utils import _DAYS_MAP, _GUN_TR, _TR_GUNLER, _ogretmen_menu_gorumu
+from main.utils import _DAYS_MAP, _GUN_TR, _TR_GUNLER
 from nobet.models import (
     GunlukNobetCizelgesi,
     NobetAtanamayan,
@@ -17,6 +17,7 @@ from nobet.models import (
     NobetIstatistik,
     NobetPersonel,
 )
+from okul.auth import is_mudur_yardimcisi, is_ogretmen_menu
 from personeldevamsizlik.models import Devamsizlik
 
 # ─────────────────────────────────────────────
@@ -25,7 +26,7 @@ from personeldevamsizlik.models import Devamsizlik
 
 @login_required
 def ogretmen_haftalik_nobet(request):
-    if not (request.user.is_superuser or request.user.groups.filter(name="mudur_yardimcisi").exists() or _ogretmen_menu_gorumu(request.user)):
+    if not (is_mudur_yardimcisi(request.user) or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     # Distinct uygulama tarihleri (tebliğ tarihleri), sıralı. Arşivlenmiş (geçmiş
@@ -115,7 +116,7 @@ def ogretmen_haftalik_nobet(request):
 
 @login_required
 def ogretmen_gunun_nobetcileri(request):
-    if not (request.user.is_superuser or request.user.groups.filter(name="mudur_yardimcisi").exists() or _ogretmen_menu_gorumu(request.user)):
+    if not (is_mudur_yardimcisi(request.user) or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     target_date = timezone.localdate()
@@ -204,7 +205,7 @@ def ogretmen_gunun_nobetcileri(request):
 
 @login_required
 def ogretmen_ders_doldurma(request):
-    if not (request.user.is_superuser or request.user.groups.filter(name="mudur_yardimcisi").exists() or _ogretmen_menu_gorumu(request.user)):
+    if not (is_mudur_yardimcisi(request.user) or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     target_date = timezone.localdate()
@@ -275,11 +276,7 @@ def ogretmen_ders_doldurma(request):
 
 @login_required
 def nobetci_ders_doldurma_istatistik(request):
-    if not (
-        request.user.is_superuser
-        or request.user.groups.filter(name="mudur_yardimcisi").exists()
-        or _ogretmen_menu_gorumu(request.user)
-    ):
+    if not (is_mudur_yardimcisi(request.user) or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     # ── Aktif nöbet tarifesi ──────────────────────────────────────

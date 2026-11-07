@@ -10,8 +10,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
-from main.utils import _ogretmen_menu_gorumu
 from ogrenci.services.rehberlik import rehberlik_sinif_sube
+from okul.auth import is_ogretmen_menu, is_ust_yonetici
 from okul.utils import get_aktif_egitim_yili
 from sinav.services.gozetim_erisim import (
     kontrolden_muaf_mi,
@@ -30,7 +30,7 @@ def ogretmen_sinav_gozetim(request):
     preview_id = request.GET.get("preview_ogretmen_id", "").strip()
     if not preview_id.isdigit():
         preview_id = ""
-    if not is_admin and not _ogretmen_menu_gorumu(request.user):
+    if not is_admin and not is_ogretmen_menu(request.user):
         raise PermissionDenied
 
     is_preview = bool(preview_id and is_admin)
@@ -223,7 +223,7 @@ def ogretmen_sinav_gozetim(request):
 @login_required
 def ogretmen_sinav_medya(request):
     is_admin = request.user.is_staff or request.user.is_superuser
-    if not (is_admin or _ogretmen_menu_gorumu(request.user)):
+    if not (is_admin or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     from django.urls import reverse
@@ -349,7 +349,7 @@ def ogretmen_sinav_medya(request):
 
 @login_required
 def ogretmen_gozetim_sinif_listesi(request):
-    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+    if not (request.user.is_superuser or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     from okul.models import SinifSube
@@ -423,13 +423,7 @@ def ogretmen_gozetim_sinif_listesi(request):
 
 @login_required
 def sinav_salon_yoklama(request):
-    gruplar = set(request.user.groups.values_list("name", flat=True))
-    if not (
-        request.user.is_superuser
-        or "mudur_yardimcisi" in gruplar
-        or "okul_muduru" in gruplar
-        or _ogretmen_menu_gorumu(request.user)
-    ):
+    if not (is_ust_yonetici(request.user) or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     from sinav.models import OturmaPlani, SinavBilgisi, SinavSalonYoklama, TakvimUretim
@@ -644,7 +638,7 @@ def sinav_oturum_istatistik(request):
 
 @login_required
 def ogretmen_yoklama_raporum(request):
-    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+    if not (request.user.is_superuser or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     from ortaksinav_engine.utils import normalize_sube_cell
@@ -845,7 +839,7 @@ def sinif_oturma_plani_pdf(request):
 
 @login_required
 def ogretmen_ogrenci_sinav_takvimi(request):
-    if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
+    if not (request.user.is_superuser or is_ogretmen_menu(request.user)):
         raise PermissionDenied
 
     personel = getattr(request.user, "personel", None)

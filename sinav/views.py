@@ -1748,11 +1748,9 @@ def _sinav_sorgu_izni(user):
     """mudur_yardimcisi, okul_muduru, ogretmen ve benzeri tüm okul personeline izin verir."""
     if user.is_superuser or user.is_staff:
         return True
-    gruplar = set(user.groups.values_list("name", flat=True))
-    return bool(gruplar & {
-        "mudur_yardimcisi", "okul_muduru",
-        "ogretmen", "rehber_ogretmen", "disiplin_kurulu",
-    })
+    from okul.auth import PERSONEL_GRUPLARI
+
+    return user.groups.filter(name__in=PERSONEL_GRUPLARI).exists()
 
 
 @login_required
