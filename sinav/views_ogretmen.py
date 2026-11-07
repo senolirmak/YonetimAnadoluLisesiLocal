@@ -745,8 +745,10 @@ def sinif_oturma_plani(request):
     """Sınıf oturma planı.
 
     Giriş yapmış herkes istediği sınıfın planını salt okunur görür; sınıfın rehber
-    öğretmeni (ve superuser) planı oluşturup değiştirebilir. `?sinif_sube=` yoksa
-    rehber öğretmen doğrudan kendi sınıfına, diğerleri sınıf seçim ekranına düşer.
+    öğretmeni (ve superuser) planı oluşturup değiştirebilir. Sayfanın solunda
+    sınıf/şube listesi, sağında seçili sınıfın planı durur. `?sinif_sube=` yoksa
+    rehber öğretmen doğrudan kendi sınıfına düşer; diğerlerinde (ve `?sec=1` ile)
+    hiçbir sınıf seçili olmaz, sağ tarafta seçim notu görünür.
     """
     from ogrenci.services import oturma_duzeni as od
     from okul.models import SinifSube
@@ -795,6 +797,8 @@ def sinif_oturma_plani(request):
         "duzenleyebilir":   duzenleyebilir,
         "rehber_sinifi":    rehber_sinifi,
         "sinif_sec":        False,
+        # Sayfanın solundaki sınıf/şube listesi plan görünürken de durur
+        "siniflar":         od.secilebilir_siniflar(aktif_yil),
     })
 
 

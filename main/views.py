@@ -12,7 +12,12 @@ from faaliyet.models import Faaliyet
 from main.utils import get_ogretmen_gorev_verileri
 from nobet.models import GunlukNobetCizelgesi, OkulBilgi
 from ogrencinobet.models import OgrenciNobetGorevi
-from okul.auth import is_ust_yonetici
+from okul.auth import (
+    is_ust_yonetici,
+    mudur_yardimcisi_required,
+    ust_yonetici_required,
+    yonetici_required,
+)
 from okul.utils import get_aktif_egitim_yili
 from sosyalkulup.services.kulup import ogretmen_kulupleri
 
@@ -103,12 +108,16 @@ def index(request):
 
         rehber_atanmamis_sayisi = atanmamis_sinif_sayisi(get_aktif_egitim_yili())
 
+    from okul.services.personel_ozet import aktif_personel_ozeti
+
     return render(
         request,
         "main/index.html",
         {
             "title": "Anasayfa",
             "rehber_atanmamis_sayisi": rehber_atanmamis_sayisi,
+            "personel_ozeti": aktif_personel_ozeti(today),
+            "ana_menu_veri": _gorev,  # sol ana menünün koşulları (includes/ana_menu.html)
             "okul_bilgi": okul_bilgi,
             "gunun_nobetci_ogrencileri": gunun_nobetci_ogrencileri,
             "gunun_nobetci_ogretmenleri": gunun_nobetci_ogretmenleri,
@@ -144,6 +153,116 @@ def gorevlerim(request):
             "title": "Görevlerim",
             "sosyal_kulupler": ogretmen_kulupleri(request.user, get_aktif_egitim_yili()),
             **gorev,
+        },
+    )
+
+
+@ust_yonetici_required
+def devamsizlik_nobet_islemleri(request):
+    """Yöneticiler için Devamsızlık ve Nöbet İşlemleri giriş sayfası (sol menü + günün özeti)."""
+    from nobet.services.gunluk_ozet import gunluk_ozet
+
+    return render(
+        request,
+        "main/devamsizlik_nobet_islemleri.html",
+        {"title": "Devamsızlık ve Nöbet İşlemleri", "ozet": gunluk_ozet(timezone.localdate())},
+    )
+
+
+@yonetici_required
+def ders_programi_islemleri(request):
+    """Yöneticiler için Ders Programı İşlemleri giriş sayfası (sol menü + program özeti)."""
+    from dersprogrami.services.ozet import ders_programi_ozeti
+
+    rehber_atanmamis_sayisi = 0
+    if is_ust_yonetici(request.user):
+        from ogrenci.services.rehberlik import atanmamis_sinif_sayisi
+
+        rehber_atanmamis_sayisi = atanmamis_sinif_sayisi(get_aktif_egitim_yili())
+
+    return render(
+        request,
+        "main/ders_programi_islemleri.html",
+        {
+            "title": "Ders Programı İşlemleri",
+            "ozet": ders_programi_ozeti(),
+            "rehber_atanmamis_sayisi": rehber_atanmamis_sayisi,
+        },
+    )
+
+
+@login_required
+def ogrenci_islemleri(request):
+    """Öğrenci İşleri giriş sayfası (sol menü + günün özeti); tüm kullanıcılara açıktır."""
+    from ogrenci.services.ozet import ogrenci_ozeti
+    from ogrenci.services.rehberlik import rehberlik_sinif_sube
+
+    return render(
+        request,
+        "main/ogrenci_islemleri.html",
+        {
+            "title": "Öğrenci İşleri",
+            "ozet": ogrenci_ozeti(timezone.localdate()),
+            "rehberlik_sinifi": rehberlik_sinif_sube(request.user),
+        },
+    )
+
+
+@mudur_yardimcisi_required
+def sinav_islemleri(request):
+    """Müdür yardımcısı için Sınav İşlemleri giriş sayfası (sol menü + sınav özeti)."""
+    from sinav.services.sinav_ozet import sinav_islemleri_ozeti
+
+    return render(
+        request,
+        "main/sinav_islemleri.html",
+        {"title": "Sınav İşlemleri", "ozet": sinav_islemleri_ozeti()},
+    )
+
+
+@mudur_yardimcisi_required
+def yonetim_paneli(request):
+    """Müdür yardımcısı için Yönetim Paneli giriş sayfası (sol menü + kısa özet)."""
+    from okul.services.personel_ozet import aktif_personel_ozeti
+    from yedekleme.services.yedek_servisi import yedekleri_listele
+
+    yedekler = yedekleri_listele()
+    return render(
+        request,
+        "main/yonetim_paneli.html",
+        {
+            "title": "Yönetim Paneli",
+            "bekleyen_faaliyet": Faaliyet.objects.filter(durum=Faaliyet.DURUM_BEKLEMEDE).count(),
+            "gorevde_personel": aktif_personel_ozeti(timezone.localdate())["toplam"]["toplam"],
+            "son_yedek": yedekler[0] if yedekler else None,
+            "yedek_sayisi": len(yedekler),
+        },
+    )
+
+
+# Bilgi Panosu önizlemesinde gösterilebilen pano ekranları (iframe ile aynı
+# kökenden yüklenir; kiosk modu iframe'e izin vermediği için yalnızca tam ekran açılır)
+PANO_ONIZLEMELERI = {"pano": "pano:index", "etkinlikler": "pano:etkinlikler"}
+
+
+@ust_yonetici_required
+def bilgi_panosu(request):
+    """Bilgi Panosu giriş sayfası: sol menü + seçili pano ekranının canlı önizlemesi."""
+    from django.urls import reverse
+
+    from pano.services.ozet import pano_ozeti
+
+    goster = request.GET.get("goster")
+    if goster not in PANO_ONIZLEMELERI:
+        goster = "pano"
+    return render(
+        request,
+        "main/bilgi_panosu.html",
+        {
+            "title": "Bilgi Panosu",
+            "goster": goster,
+            "onizleme_url": reverse(PANO_ONIZLEMELERI[goster]),
+            "ozet": pano_ozeti(),
         },
     )
 

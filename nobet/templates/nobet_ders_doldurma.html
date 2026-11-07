@@ -9,10 +9,12 @@
     <div class="mb-20">
         <h2 class="page-title mb-20">{{ title }}</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
-            <a href="{% url 'devamsizlik_list' %}" class="btn btn-info">1. Devamsızlık</a>
+            {% if not nobet_menu %}{# sol menü açıkken bu bağlantılar menüde #}
+            {% if is_mudur_yardimcisi %}<a href="{% url 'devamsizlik_list' %}" class="btn btn-info">1. Devamsızlık</a>{% endif %}
             <a href="{% url 'nobet_dagitim' %}" class="btn btn-primary">2. Haftalık Nöbet</a>
             <a href="{% url 'gunun_nobetcileri' %}" class="btn btn-warning">3. Günün Nöbetçileri</a>
             <a href="{% url 'nobet_ders_doldurma' %}" class="btn btn-success">4. Ders Doldurma</a>
+            {% endif %}
         </div>
 
         {% if messages %}

@@ -288,9 +288,12 @@ class DanismanOgretmenListesiTests(TestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.context["satirlar"], [])
 
-    def test_ana_sayfada_buton_var(self):
+    def test_ders_programi_menusunde_baglanti_var(self):
+        # Ana sayfadaki "Ders Programı İşlemleri" düğmesi bu sayfayı açar; bağlantı
+        # oradaki sol menüdedir.
         self.client.force_login(kullanici_olustur(superuser=True))
-        r = self.client.get(reverse("index"))
+        self.assertContains(self.client.get(reverse("index")), reverse("ders_programi_islemleri"))
+        r = self.client.get(reverse("ders_programi_islemleri"))
         self.assertContains(r, self.url)
 
     def test_ogretmen_erisemez(self):

@@ -1,0 +1,81 @@
+{% comment %}
+Ana menü: ana sayfanın ve kendi menüsü olmayan sayfaların sol menüsü.
+Rol bayrakları main.context_processors.kullanici_rol'den; görev verileri (`ana_menu_veri`)
+ana sayfada view'dan, diğer sayfalarda main.context_processors.yan_menu'den gelir.
+{% endcomment %}
+{% with v=ana_menu_veri s=ana_menu_aktif %}
+<nav class="gm-menu" aria-label="Ana menü">
+    {% if is_ogretmen_menu %}
+    <a href="{% url 'gorevlerim' %}" style="--renk:#4f46e5;">Görevlerim</a>
+    {% endif %}
+    {% if is_mudur_yardimcisi %}
+    <a href="{% url 'yonetim_paneli' %}" style="--renk:#417690;">Yönetim Paneli{% if bekleyen_faaliyet_sayisi > 0 %} <span class="gm-sayac" title="Bekleyen faaliyet onayı">{{ bekleyen_faaliyet_sayisi }}</span>{% endif %}</a>
+    {% endif %}
+    {# Müdür yardımcısı bu rapora Sınav İşlemleri menüsünden ulaşır; okul müdürünün o menüsü yok #}
+    {% if is_tarih_degistirebilir and v.sinav_aktif_var and not is_mudur_yardimcisi %}
+    <a href="{% url 'sinav:sinav_yoklama_raporu' %}" style="--renk:#0891b2;">Sınav Yoklama Listeleri</a>
+    {% endif %}
+
+    {% if is_tarih_degistirebilir %}
+    <a href="{% url 'devamsizlik_nobet_islemleri' %}" style="--renk:#20c997;">Devamsızlık ve Nöbet İşlemleri</a>
+    {% else %}
+    {% if is_mudur_yardimcisi %}
+    <a href="{% url 'devamsizlik_list' %}" style="--renk:#17a2b8;">Devamsızlık İşlemleri</a>
+    {% endif %}
+    {% if is_ogretmen_menu %}
+    <a href="{% url 'ogretmen_haftalik_nobet' %}" style="--renk:#20c997;">Haftalık Nöbet Listesi</a>
+    <a href="{% url 'ogretmen_gunun_nobetcileri' %}" style="--renk:#ffc107; --yazi:#212529;"{% if s == 'ogretmen_gunun_nobetcileri' %} class="aktif"{% endif %}>Günün Nöbetçileri</a>
+    <a href="{% url 'ogretmen_ders_doldurma' %}" style="--renk:#17a2b8;">Atanan / Atanamayan Dersler</a>
+    {% elif is_yonetici %}{# bu sayfalar yalnızca yöneticilere açık #}
+    <a href="{% url 'nobet_dagitim' %}" style="--renk:#20c997;">Haftalık Nöbet Listesi</a>
+    <a href="{% url 'gunun_nobetcileri' %}" style="--renk:#ffc107; --yazi:#212529;">Günün Nöbetçileri</a>
+    <a href="{% url 'nobet_ders_doldurma' %}" style="--renk:#17a2b8;">Ders Doldurma Listesi</a>
+    {% endif %}
+    {% endif %}
+
+    {% if is_yonetici %}
+    <a href="{% url 'ders_programi_islemleri' %}" style="--renk:#6610f2;">Ders Programı İşlemleri</a>
+    {% endif %}
+    {% if is_ogretmen and v.personel_bagli %}
+    <a href="{% url 'devamsizlik:ogretmen_devamsizlik' %}" style="--renk:#e83e8c;"{% if s == 'devamsizlik:ogretmen_devamsizlik' %} class="aktif"{% endif %}>Yoklama Gir</a>
+    <a href="{% url 'haftalik_ders_programi' %}" style="--renk:#6610f2;">Ders Programım</a>
+    <a href="{% url 'dersdefteri:ders_listesi' %}" style="--renk:#0d6efd;"{% if s == 'dersdefteri:ders_listesi' %} class="aktif"{% endif %}>Ders Defterim</a>
+    {% endif %}
+
+    <a href="{% url 'ogrenci_islemleri' %}" style="--renk:#0d6efd;">Öğrenci İşleri</a>
+    {% if is_mudur_yardimcisi %}
+    <a href="{% url 'secmeli_index' %}" style="--renk:#0891b2;">Seçmeli Dersler</a>
+    <a href="{% url 'sinav_islemleri' %}" style="--renk:#4f46e5;">Sınav İşlemleri</a>
+    {% endif %}
+    {% if is_ogretmen_menu and v.sinav_aktif_var or is_ogretmen_menu and v.sorumluluk_gorev_var %}
+    {% if v.sinav_gozetim_var %}
+    <a href="{% url 'ogretmen_sinav_gozetim' %}" style="--renk:#0d6efd;">Sınav Gözetim Listem</a>
+    {% endif %}
+    {% if v.sinav_aktif_var %}
+    <a href="{% url 'sinav_oturum_istatistik' %}" style="--renk:#6366f1;">Sınav Oturum İstatistikleri</a>
+    <a href="{% url 'sinav:ogrenci_sinav_yeri' %}" style="--renk:#7c3aed;">Öğrenci Sınav Yeri Sorgula</a>
+    {% endif %}
+    {% if v.sorumluluk_gorev_var %}
+    <a href="{% url 'ogretmen_sorumluluk_gorevleri' %}" style="--renk:#0f766e;">Sınav Görevlerim</a>
+    {% endif %}
+    {% if v.sorumluluk_takvim_var %}
+    <a href="{% url 'ogretmen_ogrenci_sinav_takvimi' %}" style="--renk:#7c3aed;">Öğrenci Sınav Takvimi</a>
+    {% endif %}
+    {% endif %}
+
+    {% if is_mudur_yardimcisi %}
+    <a href="{% url 'ogretmen_kullanici_listesi' %}" style="--renk:#343a40;"{% if s == 'ogretmen_kullanici_listesi' %} class="aktif"{% endif %}>Öğretmen Kullanıcıları</a>
+    <a href="{% url 'duyuru_listesi' %}" style="--renk:#fd7e14;"{% if s == 'duyuru_listesi' %} class="aktif"{% endif %}>Duyuru İşlemleri</a>
+    {% endif %}
+    {% if is_tarih_degistirebilir %}
+    <a href="{% url 'bilgi_panosu' %}" style="--renk:#495057;">Bilgi Panosu</a>
+    <a href="{% url 'muduriyetcagri:gorusme_liste' %}" style="--renk:#343a40;"{% if s == 'muduriyetcagri:gorusme_liste' %} class="aktif"{% endif %}>Müdüriyet Görüşmeleri</a>
+    {% endif %}
+    {% if is_rehber_ogretmen or is_mudur_yardimcisi %}
+    <a href="{% url 'rehberlik:gorusme_liste' %}" style="--renk:#6f42c1;"{% if s == 'rehberlik:gorusme_liste' %} class="aktif"{% endif %}>Rehberlik Görüşmeleri</a>
+    {% endif %}
+    {% if is_disiplin_kurulu or is_mudur_yardimcisi %}
+    <a href="{% url 'disiplin:gorusme_liste' %}" style="--renk:#7f1d1d;"{% if s == 'disiplin:gorusme_liste' %} class="aktif"{% endif %}>Disiplin Kurulu Görüşmeleri</a>
+    {% endif %}
+</nav>
+{% endwith %}

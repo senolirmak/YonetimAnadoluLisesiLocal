@@ -14,7 +14,9 @@
     {% block nav %}{% endblock %}
 
     <main class="content">
+        {% if yan_menu %}{% include 'includes/yan_menu_stil.html' %}<div class="gm-duzen">{% include yan_menu %}<div class="gm-icerik">{% endif %}
         {% block content %}{% endblock %}
+        {% if yan_menu %}</div></div>{% endif %}
     </main>
 
     {% include 'includes/footer.html' %}

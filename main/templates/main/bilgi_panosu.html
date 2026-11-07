@@ -1,0 +1,63 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .bp-onizleme { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden;
+                   background: #111; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+    /* Pano 1920x1080 ekran için tasarlanmıştır; önizleme bu boyutta çizilip kutuya ölçeklenir */
+    .bp-onizleme iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+                          border: 0; transform-origin: 0 0; }
+    .bp-ust { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+              flex-wrap: wrap; margin-bottom: 10px; }
+    .bp-ust a { font-size: .9em; color: #417690; text-decoration: none; font-weight: 600; }
+</style>
+
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Bilgi Panosu</h2>
+
+    <div class="dn-grid" style="margin-bottom:20px;">
+        <div class="dn-kart" style="--renk:#0d6efd;">
+            <div class="dn-kart-baslik">Yayındaki Duyuru</div>
+            <div class="dn-sayi">{{ ozet.yayindaki_duyuru }}</div>
+        </div>
+        <div class="dn-kart" style="--renk:#6610f2;">
+            <div class="dn-kart-baslik">Bugün ve Sonraki Etkinlik</div>
+            <div class="dn-sayi">{{ ozet.yaklasan_etkinlik }}</div>
+        </div>
+        <div class="dn-kart" style="--renk:#e83e8c;">
+            <div class="dn-kart-baslik">Aktif Medya</div>
+            <div class="dn-sayi">{{ ozet.aktif_medya }}</div>
+        </div>
+        <div class="dn-kart" style="--renk:#6c757d;">
+            <div class="dn-kart-baslik">Kiosk Döngüsü</div>
+            {% if ozet.kiosk %}
+            <div class="dn-metin">Pano {{ ozet.kiosk.ana_sayfa_sure }} sn{% if ozet.kiosk.etkinlik_sayfasi %} · Etkinlik {{ ozet.kiosk.etkinlik_sure }} sn{% endif %}</div>
+            {% else %}
+            <div class="dn-metin dn-soluk">Varsayılan ayarlar</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bp-ust">
+        <strong>{% if goster == 'etkinlikler' %}Etkinlikler{% else %}Pano Görünümü{% endif %} — canlı önizleme</strong>
+        <a href="{{ onizleme_url }}" target="_blank" rel="noopener">Tam ekranda aç ↗</a>
+    </div>
+    <div class="bp-onizleme" id="bp-onizleme">
+        <iframe src="{{ onizleme_url }}" title="Pano önizlemesi" loading="lazy"></iframe>
+    </div>
+</div>
+
+<script>
+(function () {
+    var kutu = document.getElementById("bp-onizleme");
+    var cerceve = kutu.querySelector("iframe");
+    function olcekle() { cerceve.style.transform = "scale(" + (kutu.clientWidth / 1920) + ")"; }
+    olcekle();
+    window.addEventListener("resize", olcekle);
+})();
+</script>
+{% endblock %}

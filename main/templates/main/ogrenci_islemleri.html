@@ -1,0 +1,43 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Öğrenci İşleri</h2>
+    <p class="welcome-text">
+        {{ ozet.tarih|date:"j F Y, l" }} — günün özeti. İşlemler için soldaki menüyü kullanın.
+    </p>
+
+    <div class="dn-grid">
+        <div class="dn-kart" style="--renk:#20c997;">
+            <div class="dn-kart-baslik">Aktif Öğrenci</div>
+            <div class="dn-sayi">{{ ozet.aktif_ogrenci }}</div>
+            {% if is_yonetici or rehberlik_sinifi %}<a href="{% url 'ogrenci:ogrenci_liste' %}">Öğrenci listesi →</a>{% endif %}
+        </div>
+        <div class="dn-kart" style="--renk:#6610f2;">
+            <div class="dn-kart-baslik">Bugün Yoklamada Devamsız</div>
+            <div class="dn-sayi">{{ ozet.devamsiz_ogrenci }}</div>
+            {% if is_mudur_yardimcisi %}<a href="{% url 'devamsizlik:ogrenci_devamsizlik_listesi' %}">Yoklama kayıtları →</a>{% endif %}
+        </div>
+        <div class="dn-kart" style="--renk:#e83e8c;">
+            <div class="dn-kart-baslik">Bugün Nöbetçi Öğrenci</div>
+            <div class="dn-sayi">{{ ozet.nobetci_ogrenci }}</div>
+            {% if is_tarih_degistirebilir %}<a href="{% url 'ogrencinobet:nobetci_form' %}">Nöbetçi öğrenci →</a>{% endif %}
+        </div>
+    </div>
+
+    {% if rehberlik_sinifi %}
+    <div class="dn-uyari dn-bilgi">
+        <span><strong>Sınıf Rehber Öğretmenliği:</strong> {{ rehberlik_sinifi }}</span>
+        <a href="{% url 'sinif_oturma_plani' %}">Oturma Planını Düzenle</a>
+    </div>
+    {% endif %}
+    <div class="dn-not">
+        Sınıf Rehber Öğretmenliği göreviniz varsa Öğrenci bilgilerinden özellikle iletişim bilgilerini güncelleme/ekleme yaptığınız için teşekkür ederim.
+    </div>
+</div>
+{% endblock %}

@@ -6,16 +6,38 @@
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
 
-<div class="container">
+<div class="container op-sayfa">
 
-  <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:14px;">
-    <a href="{% url 'index' %}" class="ust-link">← Ana Sayfaya Dön</a>
-    {% if not sinif_sec %}
-    <a href="{% url 'sinif_oturma_plani' %}?sec=1" class="ust-link">Diğer Sınıflar</a>
-    {% endif %}
-  </div>
+  <h2 class="page-title">Sınıf Oturma Planları</h2>
 
-  <h2 class="page-title">{{ title }}</h2>
+  <div class="op-duzen">
+
+  {# ── Sol: Sınıf/Şube listesi (seviyelere göre) ── #}
+  <aside class="op-siniflar" aria-label="Sınıf/Şubeler">
+    <div class="liste-baslik">Sınıf / Şubeler</div>
+    {% regroup siniflar by sinif_sube.sinif as seviyeler %}
+    {% for seviye in seviyeler %}
+    <div class="op-seviye">{{ seviye.grouper }}. Sınıflar</div>
+    <div class="op-subeler">
+      {% for s in seviye.list %}
+      <a href="?sinif_sube={{ s.sinif_sube.pk }}"
+         class="op-sube{% if not s.plan_var %} op-sube-bos{% endif %}{% if rehber_sinifi and s.sinif_sube.pk == rehber_sinifi.pk %} op-sube-rehber{% endif %}{% if sinif_sube and s.sinif_sube.pk == sinif_sube.pk %} op-sube-secili{% endif %}"
+         title="{% if rehber_sinifi and s.sinif_sube.pk == rehber_sinifi.pk %}Rehber öğretmeni olduğunuz sınıf — {% endif %}{% if s.plan_var %}Oturma planı var{% else %}Oturma planı henüz oluşturulmamış{% endif %}">
+        {{ s.sinif_sube }}
+      </a>
+      {% endfor %}
+    </div>
+    {% empty %}
+    <p class="bos-not">Tanımlı sınıf bulunamadı.</p>
+    {% endfor %}
+    <div class="op-lejant">
+      {% if rehber_sinifi %}<div><span class="op-nokta op-nokta-rehber"></span>Rehberi olduğunuz sınıf</div>{% endif %}
+      <div><span class="op-nokta op-nokta-bos"></span>Planı henüz yok</div>
+    </div>
+  </aside>
+
+  {# ── Sağ: Seçili sınıfın oturma planı ── #}
+  <div class="op-icerik">
 
   {% if messages %}
     {% for msg in messages %}
@@ -23,31 +45,19 @@
     {% endfor %}
   {% endif %}
 
-  {# ── Sınıf seçim ekranı ── #}
   {% if sinif_sec %}
-  {% if rehber_sinifi %}
-  <p style="font-size:.9rem;">
-    Rehber öğretmeni olduğunuz sınıf:
-    <a href="?sinif_sube={{ rehber_sinifi.pk }}" class="sinif-dugme sinif-dugme-rehber">{{ rehber_sinifi }} — Düzenle</a>
-  </p>
-  {% endif %}
-  <p style="color:#6b7280;font-size:.9rem;">Oturma planını görüntülemek istediğiniz sınıfı seçin:</p>
-  <div style="display:flex;flex-wrap:wrap;gap:.6rem;">
-    {% for s in siniflar %}
-    <a href="?sinif_sube={{ s.sinif_sube.pk }}"
-       class="sinif-dugme {% if not s.plan_var %}sinif-dugme-bos{% endif %}"
-       title="{% if s.plan_var %}Oturma planı var{% else %}Oturma planı henüz oluşturulmamış{% endif %}">
-      {{ s.sinif_sube }}
-    </a>
-    {% empty %}
-    <p style="color:#9ca3af;">Tanımlı sınıf bulunamadı.</p>
-    {% endfor %}
+  <div class="op-secim-notu">
+    Oturma planını görüntülemek için soldan bir sınıf/şube seçin.
+    {% if rehber_sinifi %}
+    <div style="margin-top:.75rem;">
+      <a href="?sinif_sube={{ rehber_sinifi.pk }}" class="sinif-dugme sinif-dugme-rehber">{{ rehber_sinifi }} — Kendi sınıfımı düzenle</a>
+    </div>
+    {% endif %}
   </div>
-  <p style="color:#9ca3af;font-size:.78rem;margin-top:.75rem;">
-    Soluk renkli sınıfların oturma planı henüz rehber öğretmeni tarafından oluşturulmamıştır.
-  </p>
 
   {% else %}
+
+  <h3 class="op-sinif-baslik">{{ sinif_sube }} Oturma Planı</h3>
 
   {% if not duzenleyebilir %}
   <div class="mesaj mesaj-bilgi">
@@ -154,10 +164,36 @@
   {% endif %}
 
   {% endif %}{# sinif_sec #}
+  </div>{# op-icerik #}
+  </div>{# op-duzen #}
 </div>
 
 <style>
-.ust-link { display:inline-flex;align-items:center;gap:.3rem;color:#6366f1;font-size:.85rem;text-decoration:none; }
+.op-sayfa { text-align:left; }
+.op-duzen { display:flex; gap:1.25rem; align-items:flex-start; }
+.op-siniflar { flex:0 0 150px; position:sticky; top:20px; background:#fff; border:1px solid #e5e7eb;
+               border-radius:8px; padding:.75rem .6rem; max-height:calc(100vh - 40px); overflow-y:auto; }
+.op-seviye { font-size:.72rem; font-weight:700; color:#374151; margin:.6rem 0 .3rem; }
+.op-subeler { display:flex; flex-wrap:wrap; gap:4px; }
+.op-sube { display:inline-block; min-width:40px; text-align:center; padding:.3rem .4rem; border-radius:5px;
+           background:#6366f1; color:#fff; font-size:.78rem; font-weight:600; text-decoration:none;
+           border:2px solid transparent; }
+.op-sube:hover { filter:brightness(1.1); }
+.op-sube-bos { background:#c7d2fe; color:#3730a3; }
+.op-sube-rehber { background:#16a34a; color:#fff; }
+.op-sube-secili { border-color:#111827; box-shadow:0 0 0 2px #fde68a; }
+.op-lejant { margin-top:.9rem; font-size:.7rem; color:#6b7280; display:flex; flex-direction:column; gap:.25rem; }
+.op-nokta { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:.35rem; vertical-align:middle; }
+.op-nokta-rehber { background:#16a34a; }
+.op-nokta-bos { background:#c7d2fe; }
+.op-icerik { flex:1; min-width:0; }
+.op-secim-notu { padding:2rem 1.25rem; border:2px dashed #e5e7eb; border-radius:8px; color:#6b7280;
+                 font-size:.95rem; text-align:center; }
+.op-sinif-baslik { font-size:1.05rem; font-weight:700; color:#1f2937; margin:0 0 .75rem; }
+@media (max-width: 900px) {
+  .op-duzen { flex-direction:column; align-items:stretch; }
+  .op-siniflar { position:static; flex-basis:auto; max-height:none; }
+}
 .mesaj { margin-bottom:12px;padding:.7rem 1rem;border-radius:6px;font-size:.9rem; }
 .mesaj-basari { background:#d1fae5;border:1px solid #6ee7b7;color:#065f46; }
 .mesaj-hata { background:#fee2e2;border:1px solid #fca5a5;color:#991b1b; }
