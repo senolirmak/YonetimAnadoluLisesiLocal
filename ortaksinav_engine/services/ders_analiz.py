@@ -19,9 +19,8 @@ class DersAnalizService(BaseService):
 
     def subeders_guncelle(self, sinav=None):
         self.log("\nSubeDers guncelleniyor...")
-        from okul.models import SinifSube
         from dersprogrami.models import DersProgrami
-        from okul.models import DersHavuzu
+        from okul.models import DersHavuzu, SinifSube
         from sinav.models import SubeDers
 
         # Yalnızca güncel (arşivlenmemiş, aktif tarihli) ders programı kullanılır;

@@ -52,6 +52,7 @@ def salon_gozetmen_bul(tarih, saat_veya_ders_saati, ss_map: dict) -> dict:
     atanmış en eski kayıt (en küçük pk) seçilir.
     """
     from datetime import datetime as _dt
+
     from dersprogrami.models import DersProgrami
     from okul.models import DersSaatleri as _DS
 

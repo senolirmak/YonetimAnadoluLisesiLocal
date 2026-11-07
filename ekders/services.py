@@ -120,8 +120,6 @@ def donem_hesapla(donem):
 
     islem_sayisi = 0
     for pazartesi in haftalar:
-        pazar = pazartesi + timedelta(days=6)
-
         for personel in personeller:
             uygulama = _son_uygulama_tarihi(personel, pazartesi)
             if uygulama is None:

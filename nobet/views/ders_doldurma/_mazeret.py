@@ -1,7 +1,7 @@
 """
 Mazeret salon context — template'e gönderilecek veriyi hazırlar.
 """
-from ...models import MazeretSalonGorevi, NobetGorevi, MAZERET_DERSLER
+from ...models import MAZERET_DERSLER, MazeretSalonGorevi, NobetGorevi
 
 
 def mazeret_ctx(target_date, gorev_date, day_name_en, absent_teacher_ids):

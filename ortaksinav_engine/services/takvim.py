@@ -48,8 +48,7 @@ class TakvimService(BaseService):
         self.log("\nGA ile sinav takvimi olusturuluyor...")
         from django.db.models import F as _F
 
-        from sinav.models import SinavBilgisi, SubeDers
-        aktif_sinav = SinavBilgisi.objects.filter(aktif=True).first()
+        from sinav.models import SubeDers
         # FK alanlar için string değerler: ders__ders_adi, sube__sube (harf)
         records = list(
             SubeDers.objects
@@ -405,7 +404,6 @@ class TakvimService(BaseService):
     @staticmethod
     def _date_to_day_index(tarih, baslangic: datetime, holidays: set) -> int:
         """Verilen tarihin is-gunu endeksini hesaplar (baslangic=0)."""
-        from datetime import date as _date
         # Baslangic gununun tarihini bul (tatil/hafta sonu atlayarak)
         cur = baslangic
         while cur.weekday() >= 5 or cur.date() in holidays:

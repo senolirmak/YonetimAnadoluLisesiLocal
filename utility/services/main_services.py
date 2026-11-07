@@ -367,7 +367,7 @@ class EOkulVeriAktar:
                     DersProgrami.objects.filter(uygulama_tarihi__in=dates_to_delete).delete()
 
                 # 2. Map'leri hazırla
-                from okul.models import DersSaatleri, DersHavuzu
+                from okul.models import DersHavuzu, DersSaatleri
                 personel_map = {p.adi_soyadi: p for p in NobetPersonel.objects.all()}
                 sinif_sube_map = {(ss.sinif, ss.sube): ss for ss in SinifSube.objects.all()}
                 ders_saati_map = {ds.derssaati_no: ds for ds in DersSaatleri.objects.all()}

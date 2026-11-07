@@ -372,7 +372,7 @@ class Command(BaseCommand):
             for ders_adi, saat, _ in od:
                 self.stdout.write(f"    {ders_adi}: {saat} saat")
 
-            self.stdout.write(f"  Seçmeli dersler:")
+            self.stdout.write("  Seçmeli dersler:")
             for grup_adi in _GRUP_SIRALI:
                 ders_listesi = secmeli.get(grup_adi, [])
                 sinif_dersleri = [(dn, s[sinif]) for dn, s in ders_listesi if sinif in s]

@@ -1,7 +1,6 @@
 from collections import defaultdict
 from datetime import date as dt_date
 from datetime import datetime
-from datetime import time as dt_time
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,16 +10,15 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
+from main.utils import _ogretmen_menu_gorumu
 from ogrenci.services.rehberlik import rehberlik_sinif_sube
 from okul.utils import get_aktif_egitim_yili
-from main.utils import _ogretmen_menu_gorumu
 from sinav.services.gozetim_erisim import (
     kontrolden_muaf_mi,
     salon_gozetim_erisimi,
     sinif_listesi_erisimi,
 )
 from sinav.services.gozetim_erisim import nobetci_gozetim_slotlari as _nobetci_gozetim_slotlari
-
 
 # ─────────────────────────────────────────────
 # Öğretmen — Sınav Gözetim Listesi
@@ -40,8 +38,8 @@ def ogretmen_sinav_gozetim(request):
     from sinav.utils import AdminOverride, slot_listesi_aktif_isle
     force_aktif = is_preview and AdminOverride.is_active(request)
 
-    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani
-    from sinav.utils import onceki_ders_saati, salon_goster, slot_aktif_mi
+    from sinav.models import OturmaPlani, SinavBilgisi, TakvimUretim
+    from sinav.utils import salon_goster
 
     if preview_id and is_admin:
         from okul.models import Personel as _Personel
@@ -121,7 +119,6 @@ def ogretmen_sinav_gozetim(request):
             })
 
     if aktif_uretim and gozetim_slotlari:
-        from sinav.models import Takvim as _Takvim
         from sinavmedia.models import SinavMedia as _SM
 
         uygulama_map = {}
@@ -229,10 +226,10 @@ def ogretmen_sinav_medya(request):
     if not (is_admin or _ogretmen_menu_gorumu(request.user)):
         raise PermissionDenied
 
-    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani
-    from sinavmedia.models import SinavMedia
     from django.urls import reverse
 
+    from sinav.models import OturmaPlani, SinavBilgisi, TakvimUretim
+    from sinavmedia.models import SinavMedia
     from sinavmedia.services.erisim import oynatma_acik_mi
 
     preview_id = request.GET.get("preview_ogretmen_id", "").strip()
@@ -356,7 +353,7 @@ def ogretmen_gozetim_sinif_listesi(request):
         raise PermissionDenied
 
     from okul.models import SinifSube
-    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani
+    from sinav.models import OturmaPlani, SinavBilgisi, TakvimUretim
     from sinav.utils import gozetmen_bul, onceki_ders_saati
 
     tarih_str = request.GET.get("tarih", "")
@@ -435,7 +432,7 @@ def sinav_salon_yoklama(request):
     ):
         raise PermissionDenied
 
-    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani, SinavSalonYoklama
+    from sinav.models import OturmaPlani, SinavBilgisi, SinavSalonYoklama, TakvimUretim
 
     tarih_str = request.GET.get("tarih", "")
     saat      = request.GET.get("saat", "")
@@ -566,7 +563,7 @@ def sinav_salon_yoklama(request):
 
 @login_required
 def sinav_oturum_istatistik(request):
-    from sinav.models import SinavBilgisi, TakvimUretim, OturmaPlani
+    from sinav.models import OturmaPlani, SinavBilgisi, TakvimUretim
 
     aktif_sinav  = SinavBilgisi.objects.filter(aktif=True).first()
     aktif_uretim = (
@@ -650,8 +647,8 @@ def ogretmen_yoklama_raporum(request):
     if not (request.user.is_superuser or _ogretmen_menu_gorumu(request.user)):
         raise PermissionDenied
 
-    from sinav.models import SinavBilgisi, TakvimUretim, Takvim, SinavSalonYoklama
     from ortaksinav_engine.utils import normalize_sube_cell
+    from sinav.models import SinavBilgisi, SinavSalonYoklama, Takvim, TakvimUretim
 
     personel = getattr(request.user, "personel", None)
     if not personel:
@@ -867,7 +864,7 @@ def ogretmen_ogrenci_sinav_takvimi(request):
 
     sinif_sube_str = str(rehber_sinifi)
 
-    from sorumluluk.models import SorumluOturmaPlani, SorumluSinav, salon_choices
+    from sorumluluk.models import SorumluOturmaPlani, salon_choices
 
     _SALON_LABEL = dict(salon_choices())
     _AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",

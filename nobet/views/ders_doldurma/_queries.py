@@ -13,8 +13,8 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from personeldevamsizlik.models import Devamsizlik
-from ...models import NobetAtanamayan, NobetGecmisi, NobetGorevi
 
+from ...models import NobetAtanamayan, NobetGecmisi, NobetGorevi
 
 DAYS_MAP = {
     0: "Monday",

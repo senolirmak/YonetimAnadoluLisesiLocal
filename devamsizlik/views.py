@@ -11,12 +11,10 @@ from django.utils import timezone
 
 from dersprogrami.models import DersProgrami
 from ogrenci.models import Ogrenci
+from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 from okul.utils import get_aktif_egitim_yili
 
 from .models import OgrenciDevamsizlik
-
-
-from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
 
 
 def _ust_yonetici_mi(user):
@@ -349,6 +347,8 @@ def ogrenci_devamsizlik_listesi(request):
 def _build_pdf(qs, tarih_bas, tarih_bit, secili_sinifler, okul_adi=""):
     from io import BytesIO
 
+    # Türkçe karakter desteği için DejaVu fontları
+    from django.conf import settings as _settings
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
@@ -356,9 +356,6 @@ def _build_pdf(qs, tarih_bas, tarih_bit, secili_sinifler, okul_adi=""):
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-
-    # Türkçe karakter desteği için DejaVu fontları
-    from django.conf import settings as _settings
     _fonts_dir = _settings.BASE_DIR / "static" / "fonts"
     font_normal = "Helvetica"
     font_bold = "Helvetica-Bold"

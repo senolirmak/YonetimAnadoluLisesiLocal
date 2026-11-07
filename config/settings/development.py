@@ -25,5 +25,5 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 # Bu klasör .gitignore'dadır ve GitHub'a hiç gitmez; sadece fiziksel olarak
 # diskte bulunduğunda etkinleşir, böylece development.py başka bir makinede
 # (devtools klasörü olmadan) sorunsuz çalışmaya devam eder.
-if (BASE_DIR / "devtools").is_dir():
-    INSTALLED_APPS += ["devtools"]
+if (BASE_DIR / "devtools").is_dir():  # noqa: F405 — base.py'den (import *)
+    INSTALLED_APPS += ["devtools"]  # noqa: F405

@@ -15,8 +15,14 @@ from datetime import date, time, timedelta
 
 import networkx as nx
 from pulp import (
-    LpProblem, LpVariable, LpBinary, lpSum,
-    LpMinimize, PULP_CBC_CMD, value, LpStatusOptimal,
+    PULP_CBC_CMD,
+    LpBinary,
+    LpMinimize,
+    LpProblem,
+    LpStatusOptimal,
+    LpVariable,
+    lpSum,
+    value,
 )
 
 from ortaksinav_engine.services.base import BaseService
@@ -72,14 +78,18 @@ class MazeretILPService(BaseService):
         ILP ile mazeret takvimini oluşturur/günceller.
         Mevcut MazeretGun/Oturum/OturumDers kayıtları tamamen silinip yeniden yazılır.
         """
-        from sinav.models import (
-            MazeretGun, MazeretOturum, MazeretOturumDers, MazeretOgrenci,
-            TakvimUretim, Takvim,
-        )
         from django.db.models import Q
 
         from ogrenci.models import Ogrenci, OgrenciMuaf
         from okul.utils import get_aktif_egitim_yili
+        from sinav.models import (
+            MazeretGun,
+            MazeretOgrenci,
+            MazeretOturum,
+            MazeretOturumDers,
+            Takvim,
+            TakvimUretim,
+        )
 
         # Oturum saatlerini belirle
         if oturum_saatleri_str:
@@ -311,7 +321,7 @@ class MazeretILPService(BaseService):
         for t in range(K - 1):
             prob += y[t] >= y[t + 1]
 
-        status = prob.solve(PULP_CBC_CMD(
+        prob.solve(PULP_CBC_CMD(
             msg=0,
             timeLimit=self.config.get("TIME_LIMIT", 60),
         ))

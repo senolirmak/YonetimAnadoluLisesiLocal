@@ -6,19 +6,26 @@ oturum_plani_pdf   – Oturma planı: her salon için bir A4 sayfası (koltuk ı
 sinif_raporu_pdf   – A4 sınıf listesi: her salon için bir A4 sayfası (öğrenci tablosu)
 """
 
+import re as _re
 from pathlib import Path
 
 from reportlab.lib import colors
+from reportlab.lib.fonts import addMapping
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.lib.fonts import addMapping
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
-    BaseDocTemplate, Frame, PageBreak, PageTemplate,
-    Paragraph, Spacer, Table, TableStyle, KeepTogether,
+    BaseDocTemplate,
+    Frame,
+    PageBreak,
+    PageTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
 )
 
 # ---------------------------------------------------------------------------
@@ -93,7 +100,6 @@ def oturum_plani_pdf(salon_grids: dict, out_path: str, baslik: str, okul,
     story = []
     h_st = _header_style(size=10, bold=False)
     h_sub_st = _header_style(size=9, bold=False)
-    l_st = _left_style(size=8)
 
     for salon_idx, (salon_adi, grid) in enumerate(salon_grids.items()):
         if salon_idx > 0:
@@ -249,8 +255,6 @@ def oturum_plani_pdf(salon_grids: dict, out_path: str, baslik: str, okul,
 # ---------------------------------------------------------------------------
 # 2. A4 SINIF LİSTESİ PDF (şube bazlı — Excel ile aynı mantık)
 # ---------------------------------------------------------------------------
-
-import re as _re
 
 
 # ---------------------------------------------------------------------------
@@ -432,7 +436,6 @@ def sinav_takvimi_pdf(out, okul, aktif_uretim, hazirlayan_user=None, goster_sube
 
     # ── İmza / Onay bölümü ──
     mudur = (okul.okul_muduru or "") if okul else ""
-    yil_str = yil.split("-")[0] if "-" in (yil or "") else (yil or "")
 
     from okul.models import OkulYonetici
     mudur_yrd_obj = None
@@ -698,7 +701,6 @@ def mazeret_ilan_pdf(oturumlar_veri: list, out, okul, mazeret) -> None:
 
     h_okul  = ParagraphStyle("iho", fontName="DejaVuSans-Bold", fontSize=13, leading=16, alignment=1)
     h_sub   = ParagraphStyle("ihs", fontName="DejaVuSans",      fontSize=9,  leading=12, alignment=1)
-    h_bas   = ParagraphStyle("ihb", fontName="DejaVuSans-Bold", fontSize=12, leading=15, alignment=1)
     cell_st = ParagraphStyle("ic",  fontName="DejaVuSans",      fontSize=8,  leading=11, alignment=0)
     ctr_st  = ParagraphStyle("ict", fontName="DejaVuSans",      fontSize=8,  leading=10, alignment=1)
 
@@ -834,7 +836,6 @@ def sinif_raporu_pdf(tarih, saat, oturum, out_path: str, okul, aktif_uretim, sin
     if not qs.exists():
         return
 
-    tarih_str = str(tarih)
     saat_str  = str(saat)
 
     # OturmaPlani.salon ("Salon-9_A") → SinifSube.salon ("Salon 9/A") eşleme tablosu

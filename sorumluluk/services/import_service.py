@@ -394,14 +394,14 @@ def sorumluluk_excel_aktar(dosya_yolu: str, sinav: SorumluSinav) -> dict:
                 sube=veri["sube"],
             )
             toplam_ogrenci += 1
-            
+
             ogr_dersler = []
             for ders_adi, onceki_sinif in veri["dersler"]:
                 hd = havuz_dict.get((ders_adi, onceki_sinif))
                 if hd:
                     ogr_dersler.append(SorumluDers(ogrenci=ogr, havuz_dersi=hd))
                     toplam_ders += 1
-            
+
             if ogr_dersler:
                 SorumluDers.objects.bulk_create(ogr_dersler, ignore_conflicts=True)
 

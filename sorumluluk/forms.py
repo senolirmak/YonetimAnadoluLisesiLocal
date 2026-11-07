@@ -1,14 +1,13 @@
 from django import forms
 
-from okul.models import Brans, EgitimOgretimYili, DersSaatleri, Personel
+from okul.models import Brans, DersSaatleri, EgitimOgretimYili, Personel
 from sorumluluk.models import (
-    DONEM_TURU_CHOICES,
     SorumluDers,
     SorumluDersHavuzu,
     SorumluDersKatalogu,
     SorumluGorevMuafPersonel,
-    SorumluOgrenci,
     SorumlulukSalon,
+    SorumluOgrenci,
     SorumluSinav,
 )
 

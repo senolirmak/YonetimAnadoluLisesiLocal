@@ -48,8 +48,7 @@ class VeriImportService(BaseService):
         Mevcut SinifSube ve DersHavuzu setlerini döndürür.
         DB-first modelde fark yoktur; geriye dönük uyumluluk için korundu.
         """
-        from okul.models import SinifSube
-        from okul.models import DersHavuzu
+        from okul.models import DersHavuzu, SinifSube
         mevcut_ss = set(SinifSube.objects.values_list("sinif", "sube"))
         mevcut_dh = set(DersHavuzu.objects.values_list("ders_adi", flat=True))
         return mevcut_ss, mevcut_dh
@@ -62,9 +61,9 @@ class VeriImportService(BaseService):
         """DB'deki kaynak verilerin varlığını doğrular."""
         self.log("\nVeri durumu kontrol ediliyor...")
 
-        from okul.models import SinifSube
         from dersprogrami.models import DersProgrami
         from ogrenci.models import Ogrenci as OgrenciModel
+        from okul.models import SinifSube
 
         ss_count  = SinifSube.objects.count()
         dp_count  = DersProgrami.objects.aktif().count()

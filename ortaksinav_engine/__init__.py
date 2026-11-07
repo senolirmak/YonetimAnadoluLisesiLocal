@@ -7,10 +7,12 @@ Her fonksiyon CONFIG'i inject ederek ilgili servisi cagirir.
 """
 
 from ortaksinav_engine.config import CONFIG
-from ortaksinav_engine.services.veri_import import VeriImportService
 from ortaksinav_engine.services.ders_analiz import DersAnalizService
-from ortaksinav_engine.services.takvim import TakvimService
 from ortaksinav_engine.services.oturma import OturmaPlanService
+from ortaksinav_engine.services.takvim import TakvimService
+from ortaksinav_engine.services.veri_import import VeriImportService
+
+
 def temel_verileri_olustur():
     """DersHavuzu + SinifSube: DB'de olmayan kayitlari ekler."""
     VeriImportService(CONFIG).temel_verileri_olustur()

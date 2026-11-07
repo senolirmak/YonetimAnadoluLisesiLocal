@@ -122,6 +122,7 @@ def gozetmen_bul(aktif_sinav, tarih, saat: str, sinifsube: str) -> str | None:
     Eşleşme bulunamazsa None döner.
     """
     from datetime import time as dt_time
+
     from dersprogrami.models import DersProgrami
 
     onceki_saat = onceki_ders_saati(saat)

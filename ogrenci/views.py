@@ -250,7 +250,7 @@ def ogrenci_muaf_duzenle(request, pk):
     # Aktif sınavdan, öğrencinin sınıf/şubesine ait ders havuzunu çek; yoksa tüm DersHavuzu
     try:
         from ortaksinav_engine.utils import normalize_sube_cell
-        from sinav.models import TakvimUretim, Takvim
+        from sinav.models import Takvim, TakvimUretim
 
         aktif_uretim = TakvimUretim.objects.filter(aktif=True).first()
         if aktif_uretim:

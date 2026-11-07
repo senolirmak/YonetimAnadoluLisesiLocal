@@ -2,9 +2,11 @@
 # Geriye dönük uyumluluk: nobet/views/__init__.py aynı import yollarını kullanmaya devam eder.
 
 from ._pdf import (
-    generate_pdf_bytes as _generate_pdf_bytes,
     download_ders_doldurma_pdf,
     download_ders_doldurma_png,
+)
+from ._pdf import (
+    generate_pdf_bytes as _generate_pdf_bytes,
 )
 from .view import nobet_ders_doldurma
 

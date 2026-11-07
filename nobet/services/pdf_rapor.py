@@ -1,6 +1,5 @@
 import os
 from datetime import timedelta
-from io import BytesIO
 
 from django.conf import settings
 from reportlab.lib import colors
@@ -8,7 +7,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table
 
 
 def get_report_header_info(target_date):

@@ -11,7 +11,7 @@ from okul.models import DersHavuzu
 
 @ust_yonetici_required
 def ders_havuzu_ayarlari(request):
-    from django.db.models import Case, When, IntegerField
+    from django.db.models import Case, IntegerField, When
     dersler = DersHavuzu.objects.annotate(
         sort_key=Case(
             When(sinav_yapilmayacak=True, then=0),
@@ -53,9 +53,9 @@ def ders_havuzu_ayarlari_kaydet(request):
 def okul_ayarlari(request):
     from django.core.exceptions import PermissionDenied
     from django.shortcuts import get_object_or_404
-    from nobet.models import OkulBilgi, EgitimOgretimYili, OkulDonem
-    from main.forms import EgitimOgretimYiliForm, OkulBilgiAyarForm, OkulDonemForm
 
+    from main.forms import EgitimOgretimYiliForm, OkulBilgiAyarForm, OkulDonemForm
+    from nobet.models import EgitimOgretimYili, OkulBilgi, OkulDonem
     from okul.auth import is_mudur_yardimcisi
 
     if not is_mudur_yardimcisi(request.user):

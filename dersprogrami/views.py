@@ -10,23 +10,20 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from nobet.models import NobetAtanamayan, NobetGecmisi, NobetPersonel
+
+# ─────────────────────────────────────────────
+# Yetki yardımcıları
+# ─────────────────────────────────────────────
+from okul.auth import (
+    is_ust_yonetici,
+    ust_yonetici_required,
+)
 from personeldevamsizlik.models import Devamsizlik
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
 from veriaktar.forms import DersProgramiImportForm
 
 from .forms import FetSonucYukleForm, SinifSubeSecimForm
 from .models import DersProgrami
-
-# ─────────────────────────────────────────────
-# Yetki yardımcıları
-# ─────────────────────────────────────────────
-
-from okul.auth import (  # noqa: E402
-    _UST_YONETIM_GRUPLARI as TARIH_DEGISTIREBILIR_GRUPLAR,
-    is_ust_yonetici,
-    ust_yonetici_required,
-    yonetici_required,
-)
 
 YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
 
@@ -533,13 +530,11 @@ def sinif_program(request):
 
 @yonetici_required
 def sinif_ogretmenleri(request):
-    from collections import defaultdict
 
     form = SinifSubeSecimForm(request.GET or None)
 
     secilen_sinif = None
     ogretmen_listesi = []
-    ogretmen_no = 0
 
     if form.is_valid():
         secilen_sinif = form.cleaned_data.get("sinif_sube")

@@ -13,7 +13,6 @@ from utility.services.main_services import IstatistikService
 
 from ..forms import NobetDagitimForm
 from ..models import GunlukNobetCizelgesi, NobetGorevi, NobetOgretmen
-from ..services.pdf_rapor import get_report_header_info as _get_report_header_info
 from .permissions import (
     is_ust_yonetici,
     is_yonetici,

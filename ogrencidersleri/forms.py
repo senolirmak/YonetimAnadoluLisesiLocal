@@ -2,7 +2,7 @@ from django import forms
 from django.db.models import Sum, Value
 from django.db.models.functions import Coalesce
 
-from secmelidersler.models import OrtakDers, SecmeliDers, SecmeliDersGrubu, get_toplam_saat
+from secmelidersler.models import OrtakDers, SecmeliDersGrubu, get_toplam_saat
 
 from .models import OgrenciSecmeliDers
 

@@ -127,5 +127,5 @@ class Command(BaseCommand):
             ))
         else:
             self.stdout.write(self.style.WARNING(
-                f"Önizleme tamamlandı. Uygulamak için --kaydet bayrağını ekleyin."
+                "Önizleme tamamlandı. Uygulamak için --kaydet bayrağını ekleyin."
             ))

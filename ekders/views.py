@@ -3,10 +3,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from ekders.forms import EkDersDonemiForm, EkDersOnayForm, OgretmenEkDersForm, TatilForm
-from ekders.models import EkDersDonemi, EkDersOnay, OgretmenEkDers, Tatil
-from ekders.services import donem_hesapla, donem_ozet_listesi, personel_ozet
+from ekders.models import EkDersDonemi, OgretmenEkDers, Tatil
+from ekders.services import donem_hesapla
 from okul.auth import ust_yonetici_required
-
 
 # ── Dönem Listesi ────────────────────────────────────────────────────────────
 
