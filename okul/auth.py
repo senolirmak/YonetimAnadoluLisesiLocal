@@ -28,10 +28,9 @@ Kullanım (template / context kontrolü):
 
 from functools import wraps
 
-from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import redirect
 
 
 def is_mudur_yardimcisi(user) -> bool:
@@ -66,7 +65,7 @@ def mudur_yardimcisi_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect(settings.LOGIN_URL)
+            return redirect_to_login(request.get_full_path())
         if not is_mudur_yardimcisi(request.user):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
@@ -88,7 +87,7 @@ def yonetici_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect(settings.LOGIN_URL)
+            return redirect_to_login(request.get_full_path())
         if not is_yonetici(request.user):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
@@ -134,7 +133,7 @@ def ust_yonetici_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect(settings.LOGIN_URL)
+            return redirect_to_login(request.get_full_path())
         if not is_ust_yonetici(request.user):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)

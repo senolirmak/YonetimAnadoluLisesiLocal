@@ -1,6 +1,5 @@
 from collections import defaultdict
 from datetime import datetime, time
-from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -10,13 +9,11 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from nobet.models import NobetAtanamayan, NobetGecmisi, NobetPersonel
-
-# ─────────────────────────────────────────────
-# Yetki yardımcıları
-# ─────────────────────────────────────────────
 from okul.auth import (
     is_ust_yonetici,
+    is_yonetici,
     ust_yonetici_required,
+    yonetici_required,
 )
 from personeldevamsizlik.models import Devamsizlik
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
@@ -24,39 +21,6 @@ from veriaktar.forms import DersProgramiImportForm
 
 from .forms import FetSonucYukleForm, SinifSubeSecimForm
 from .models import DersProgrami
-
-YONETICI_GRUPLAR = {"mudur_yardimcisi", "okul_muduru", "rehber_ogretmen", "disiplin_kurulu"}
-
-
-def _is_yonetici(user):
-    return user.is_superuser or user.groups.filter(name__in=YONETICI_GRUPLAR).exists()
-
-
-def _is_tarih_degistirebilir(user):
-    return is_ust_yonetici(user)
-
-
-def yonetici_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapper(request, *args, **kwargs):
-        if not _is_yonetici(request.user):
-            raise PermissionDenied
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
-
-
-def mudur_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapper(request, *args, **kwargs):
-        if not _is_tarih_degistirebilir(request.user):
-            raise PermissionDenied
-        return view_func(request, *args, **kwargs)
-
-    return wrapper
-
 
 # ─────────────────────────────────────────────
 # MultipleTeacherDersProxy — şablon yardımcısı
@@ -140,7 +104,7 @@ def ogretmen_program(request):
 
     now = timezone.localtime()
     current_clock = now.time()
-    tarih_degistirebilir = _is_tarih_degistirebilir(request.user)
+    tarih_degistirebilir = is_ust_yonetici(request.user)
 
     secilen_tarih = None
     secilen_ders_saati = None
@@ -308,7 +272,7 @@ def ogretmen_program(request):
 # ─────────────────────────────────────────────
 
 
-@mudur_required
+@ust_yonetici_required
 def sinif_program(request):
     from collections import defaultdict
 
@@ -672,7 +636,7 @@ def haftalik_ders_programi(request):
 
     from .models import GUNLER
 
-    is_yonetici = _is_yonetici(request.user)
+    yonetici_mi = is_yonetici(request.user)
 
     secilen_personel = None
     tum_ogretmenler = None
@@ -680,7 +644,7 @@ def haftalik_ders_programi(request):
     # Görevde olmayan (izinli, emekli, tayin vb.) personelin güncel ders programı
     # olmaz — seçim listesinde de, URL'deki ?ogretmen= ile doğrudan erişimde de
     # yalnızca görevdeki personel dikkate alınır (bkz. PersonelQuerySet.gorevde).
-    if is_yonetici:
+    if yonetici_mi:
         tum_ogretmenler = NobetPersonel.objects.gorevde().select_related("brans").order_by("adi_soyadi")
         ogretmen_id = request.GET.get("ogretmen", "").strip()
         if ogretmen_id:
@@ -768,7 +732,7 @@ def haftalik_ders_programi(request):
 
     context = {
         "title": "Haftalık Ders Programı",
-        "is_yonetici": is_yonetici,
+        "is_yonetici": yonetici_mi,
         "tum_ogretmenler": tum_ogretmenler,
         "secilen_personel": secilen_personel,
         "secilen_ogretmen_id": str(secilen_personel.pk) if secilen_personel else "",
