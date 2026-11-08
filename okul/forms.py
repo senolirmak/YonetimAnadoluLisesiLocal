@@ -1,7 +1,15 @@
 # -*- coding: utf-8 -*-
 from django import forms
 
-from okul.models import Brans, DersHavuzu, DersSaatleri, Personel, SinifSube, SinifSubeYil
+from okul.models import (
+    Brans,
+    DersHavuzu,
+    DersSaatleri,
+    Personel,
+    SinifSeviyesiSorumlusu,
+    SinifSube,
+    SinifSubeYil,
+)
 
 
 class BransForm(forms.ModelForm):
@@ -85,3 +93,35 @@ class PersonelForm(forms.ModelForm):
             "sabit_nobet": "Sabit Nöbet",
             "user": "Bağlı Kullanıcı Hesabı",
         }
+
+
+class SinifSeviyesiSorumlusuForm(forms.ModelForm):
+    """Müdür yardımcısının sorumlu olduğu sınıf seviyesi (okul/yonetim/)."""
+
+    class Meta:
+        model = SinifSeviyesiSorumlusu
+        fields = ["egitim_yili", "sinif", "personel"]
+        labels = {
+            "egitim_yili": "Eğitim-Öğretim Yılı",
+            "sinif": "Sınıf Seviyesi",
+            "personel": "Sorumlu Müdür Yardımcısı",
+        }
+
+    def __init__(self, *args, **kwargs):
+        from okul.utils import get_aktif_egitim_yili
+
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.fields["egitim_yili"].initial = get_aktif_egitim_yili()
+        # Okulda tanımlı sınıf seviyeleri (Sınıf/Şubeler'den)
+        seviyeler = sorted(set(SinifSube.objects.values_list("sinif", flat=True))) or [9, 10, 11, 12]
+        if self.instance.pk and self.instance.sinif not in seviyeler:
+            seviyeler = sorted({*seviyeler, self.instance.sinif})
+        self.fields["sinif"] = forms.TypedChoiceField(
+            choices=[(s, f"{s}. sınıflar") for s in seviyeler], coerce=int, label="Sınıf Seviyesi",
+        )
+        # Yeni atamada yalnızca görevdeki müdür yardımcıları; düzenlemede mevcut kişi korunur
+        secenekler = Personel.objects.gorevde().filter(gorev_tipi="Müdür Yardımcısı")
+        if self.instance.pk:
+            secenekler = secenekler | Personel.objects.filter(pk=self.instance.personel_id)
+        self.fields["personel"].queryset = secenekler.distinct().order_by("adi_soyadi")

@@ -25,6 +25,7 @@ from okul.forms import (
     DersHavuzuFullForm,
     DersSaatleriForm,
     PersonelForm,
+    SinifSeviyesiSorumlusuForm,
     SinifSubeForm,
     SinifSubeYilForm,
 )
@@ -36,6 +37,7 @@ from okul.models import (
     OgretmenlikAlanCizelgesi,
     OkulDonem,
     Personel,
+    SinifSeviyesiSorumlusu,
     SinifSube,
     SinifSubeYil,
 )
@@ -79,6 +81,19 @@ REGISTRY = {
         "group_by": "sinif",
         "group_order": ["sube"],
         "group_label": "Sınıf",
+    },
+    "seviye-sorumlusu": {
+        "model": SinifSeviyesiSorumlusu,
+        "form": SinifSeviyesiSorumlusuForm,
+        "title": "Sınıf Seviyesi Sorumluları",
+        "singular": "Sınıf Seviyesi Sorumlusu",
+        "list_fields": [
+            ("seviye_adi", "Sınıf Seviyesi"),
+            ("personel", "Sorumlu Müdür Yardımcısı"),
+        ],
+        "group_by": "egitim_yili",
+        "group_order": ["sinif"],
+        "group_label": "Eğitim-Öğretim Yılı",
     },
     "ders-havuzu": {
         "model": DersHavuzu,
