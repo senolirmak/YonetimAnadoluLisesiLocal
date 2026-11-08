@@ -11,6 +11,7 @@ from kurul.models import Kurul, KurulTuru, KurulUyesi
 from kurul.services.katalog import katalog_bossa_yukle
 from kurul.services.kurulum import acilmamis_turler, yil_kurulumu
 from kurul.services.pdf_rapor import gorevlendirme_listesi_pdf
+from kurul.services.toplanti import personel_toplantilari
 from kurul.services.uyelik import (
     gorev_yuku,
     onerilen_baskan,
@@ -254,5 +255,6 @@ def gorevlerim(request):
         "title": "Kurul ve Komisyon Görevlerim",
         "egitim_yili": yil,
         "uyelikler": personel_uyelikleri(personel, yil),
+        "toplantilar": personel_toplantilari(personel, yil),
         "personel_bagli": personel is not None,
     })

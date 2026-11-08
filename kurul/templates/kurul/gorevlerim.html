@@ -19,7 +19,7 @@
         <tbody>
         {% for u in uyelikler %}
         <tr>
-            <td><strong>{{ u.kurul.ad }}</strong></td>
+            <td><strong>{{ u.kurul.ad }}</strong><br><a href="{% url 'kurul:toplantilar' u.kurul.pk %}" style="font-size:.85em;">Toplantılar</a></td>
             <td>{{ u.get_gorev_display }}{% if not u.asil %} (yedek){% endif %}</td>
             <td style="font-size:.85em;">{{ u.kurul.tur.mevzuat_dayanagi }}</td>
             <td style="font-size:.85em;">{{ u.kurul.tur.toplanma|truncatechars:160 }}</td>
@@ -30,6 +30,16 @@
         </tbody>
     </table>
     </div>
+    <h3 style="font-size:1.05em;margin-top:20px;">Yaklaşan Toplantılarım</h3>
+    <div class="table-responsive"><table class="table">
+        <thead><tr><th>Tarih</th><th>Saat</th><th>Kurul</th><th>Yer</th></tr></thead>
+        <tbody>
+        {% for t in toplantilar %}
+        <tr><td>{{ t.tarih|date:"d.m.Y l" }}</td><td>{{ t.saat|time:"H:i" }}</td>
+            <td><a href="{% url 'kurul:toplanti_detay' t.pk %}">{{ t.kurul.ad }} — {{ t.no }}. toplantı</a></td><td>{{ t.yer }}</td></tr>
+        {% empty %}<tr><td colspan="4" class="text-muted">Yaklaşan toplantı yok.</td></tr>{% endfor %}
+        </tbody>
+    </table></div>
     {% endif %}
 </div>
 {% endblock %}

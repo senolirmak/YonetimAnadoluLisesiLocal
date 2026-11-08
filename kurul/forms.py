@@ -1,6 +1,6 @@
 from django import forms
 
-from kurul.models import KurulUyesi, KurulYapiKalemi
+from kurul.models import Karar, KurulUyesi, KurulYapiKalemi, Toplanti
 from ogrenci.models import Ogrenci
 from okul.models import Personel
 
@@ -106,3 +106,43 @@ class KurulYapiFormu(forms.Form):
             s["kalem"]: {"asil": [v.get(a) for a in s["asil"]], "yedek": [v.get(a) for a in s["yedek"]]}
             for s in self.kalemler
         }
+
+
+class ToplantiForm(forms.ModelForm):
+    class Meta:
+        model = Toplanti
+        fields = ["tarih", "saat", "yer", "tur", "aciklama"]
+        widgets = {
+            "tarih": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "saat": forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
+            "aciklama": forms.Textarea(attrs={"rows": 2}),
+        }
+        help_texts = {
+            "tur": "Olağan toplantılar en az 5 gün önceden duyurulur (Eğitim Kurulları ve Zümreleri Yönergesi).",
+        }
+
+
+class KararForm(forms.ModelForm):
+    class Meta:
+        model = Karar
+        fields = ["gundem_maddesi", "metin", "oylama", "kabul", "ret", "cekimser", "sorumlu", "termin"]
+        widgets = {
+            "metin": forms.Textarea(attrs={"rows": 3}),
+            "termin": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        }
+
+    def __init__(self, toplanti, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["gundem_maddesi"].queryset = toplanti.gundem.all()
+        self.fields["gundem_maddesi"].label_from_instance = lambda m: f"{m.sira}. {m.baslik}"
+        self.fields["sorumlu"].queryset = Personel.objects.gorevde().order_by("adi_soyadi")
+        for ad in ("kabul", "ret", "cekimser"):
+            self.fields[ad].widget.attrs["min"] = 0
+
+    def clean(self):
+        veri = super().clean()
+        if veri.get("oylama") == Karar.OYLAMA_OYCOKLUGU and veri.get("kabul") is None:
+            self.add_error("kabul", "Oy çokluğu kararlarında kabul oyu sayısını girin.")
+        if veri.get("oylama") == Karar.OYLAMA_OYBIRLIGI:
+            veri["kabul"] = veri["ret"] = veri["cekimser"] = None
+        return veri
