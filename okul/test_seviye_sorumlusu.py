@@ -61,6 +61,58 @@ class SinifSeviyesiSorumlusuTests(TestCase):
         self.assertContains(resp, self.myrd2.adi_soyadi)
         self.assertContains(resp, "2025-2026")
 
-    def test_yalnizca_mudur_yardimcisi_yonetir(self):
-        self.client.force_login(kullanici_olustur("okul_muduru"))
+    def test_okul_yonetiminde_ders_yuku_karti(self):
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+        resp = self.client.get(reverse("okul:yonetim_index"))
+        self.assertContains(resp, "Branş Bazlı Ders Yükü")
+        self.assertContains(resp, f'{reverse("secmeli_ders_yuku")}?yil={self.yil.pk}')
+        self.assertEqual(resp.context["ders_yuku_ozeti"]["brans"], 0)
+
+    def test_ust_yonetici_yonetir(self):
+        self.client.force_login(kullanici_olustur("ogretmen"))
         self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(kullanici_olustur("okul_muduru"))
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_okul_muduru_okul_yonetiminde(self):
+        self.client.force_login(kullanici_olustur("okul_muduru"))
+        resp = self.client.get(reverse("okul:yonetim_index"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context["yan_menu"], "includes/yonetim_menu.html")
+        self.assertEqual(resp.context["yonetim_menu"]["aktif_sayfa"], "okul:yonetim_index")
+        self.assertContains(resp, reverse("kurul:index"))
+        for kapali in ("yonetim_paneli", "okul_ayarlari", "yedekleme:yedek_listesi", "personel_listesi",
+                       "veriaktar_ana"):
+            self.assertNotContains(resp, f'href="{reverse(kapali)}"')
+        self.assertContains(resp, "Görüntüle")
+
+        # Branş Bazlı Ders Yükü: kart görünür, rapor salt okunur açılır
+        rapor = f'{reverse("secmeli_ders_yuku")}?yil={self.yil.pk}'
+        self.assertContains(resp, "Branş Bazlı Ders Yükü")
+        self.assertContains(resp, rapor)
+        resp = self.client.get(rapor)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.context["duzenleyebilir"])
+        self.assertEqual(resp.context["yan_menu"], "includes/yonetim_menu.html")
+        self.assertEqual(resp.context["yonetim_menu"]["aktif_sayfa"], "okul:yonetim_index")
+        self.assertNotContains(resp, reverse("secmeli_norm_kadro_arsivle"))
+        self.assertNotContains(resp, reverse("secmeli_alan_sube_atama"))
+        self.assertEqual(self.client.post(reverse("secmeli_norm_kadro_arsivle"), {"yil": self.yil.pk}).status_code, 403)
+        self.assertEqual(self.client.get(reverse("secmeli_alan_sube_atama")).status_code, 403)
+
+        # Salt okunur: liste açılır, ekleme/düzenleme/silme kapalı
+        kayit = SinifSeviyesiSorumlusu.objects.create(egitim_yili=self.yil, sinif=9, personel=self.myrd1)
+        resp = self.client.get(self.url)
+        self.assertContains(resp, self.myrd1.adi_soyadi)
+        self.assertNotContains(resp, reverse("okul:yonetim_create", args=["seviye-sorumlusu"]))
+        self.assertNotContains(resp, reverse("okul:yonetim_update", args=["seviye-sorumlusu", kayit.pk]))
+        for url in (reverse("okul:yonetim_create", args=["seviye-sorumlusu"]),
+                    reverse("okul:yonetim_update", args=["seviye-sorumlusu", kayit.pk]),
+                    reverse("okul:yonetim_delete", args=["seviye-sorumlusu", kayit.pk])):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 403)
+                self.assertEqual(self.client.post(url, {}).status_code, 403)
+        self.assertTrue(SinifSeviyesiSorumlusu.objects.filter(pk=kayit.pk).exists())
+        resp = self.client.get(reverse("index"))
+        self.assertContains(resp, reverse("okul:yonetim_index"))
+        self.assertContains(resp, reverse("kurul:index"))

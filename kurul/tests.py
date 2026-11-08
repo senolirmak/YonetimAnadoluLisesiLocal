@@ -186,11 +186,44 @@ class KurulViewTests(TestCase):
         self.myrd = kullanici_olustur("mudur_yardimcisi")
         personel_olustur(user=self.myrd)
 
-    def test_yonetim_sayfalari_yalnizca_mudur_yardimcisina(self):
-        for grup in ("ogretmen", "okul_muduru", "rehber_ogretmen"):
+    def test_yonetim_sayfalari_yalnizca_ust_yoneticiye(self):
+        for grup in ("ogretmen", "rehber_ogretmen", "disiplin_kurulu"):
             with self.subTest(grup=grup):
                 self.client.force_login(kullanici_olustur(grup))
                 self.assertEqual(self.client.get(reverse("kurul:index")).status_code, 403)
+
+    def test_okul_muduru_kurullari_yalnizca_goruntuler(self):
+        katalogu_yukle()
+        yil_kurulumu(self.yil)
+        kurul = Kurul.objects.get(tur__kod="kantin-denetleme-komisyonu")
+        mudur = kullanici_olustur("okul_muduru")
+        self.client.force_login(mudur)
+        for ad in ("kurul:index", "kurul:katalog", "kurul:gorev_yuku", "kurul:toplanti_takvimi"):
+            with self.subTest(sayfa=ad):
+                resp = self.client.get(reverse(ad))
+                self.assertEqual(resp.status_code, 200)
+                self.assertEqual(resp.context["yan_menu"], "includes/yonetim_menu.html")
+                self.assertContains(resp, reverse("okul:yonetim_index"))
+                self.assertNotContains(resp, f'href="{reverse("yonetim_paneli")}"')
+                self.assertNotContains(resp, f'href="{reverse("personel_listesi")}"')
+        self.assertTrue(self.client.get(reverse("kurul:gorevlendirme_pdf")).content.startswith(b"%PDF"))
+
+        url = reverse("kurul:kurul_detay", args=[kurul.pk])
+        resp = self.client.get(url)
+        self.assertFalse(resp.context["duzenleyebilir"])
+        self.assertNotContains(resp, 'name="islem"')
+        p = personel_olustur()
+        resp = self.client.post(url, {"islem": "uye_ekle", "uye_turu": "personel", "personel": p.pk, "gorev": "uye"})
+        self.assertEqual(resp.status_code, 403)
+        self.assertFalse(kurul.uyeler.filter(personel=p).exists())
+        for ad, arg in (("kurul:yil_kurulumu", None), ("kurul:tur_tamamla", kurul.tur.kod),
+                        ("kurul:kurul_ac", kurul.tur.kod)):
+            with self.subTest(islem=ad):
+                self.assertEqual(self.client.post(reverse(ad, args=[arg] if arg else [])).status_code, 403)
+
+        resp = self.client.get(reverse("kurul:toplantilar", args=[kurul.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.context["yonetebilir"])
 
     def test_ilk_acilista_katalog_yuklenir_ve_menu_gorunur(self):
         self.client.force_login(self.myrd)

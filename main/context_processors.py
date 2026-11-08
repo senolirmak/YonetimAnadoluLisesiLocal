@@ -10,7 +10,7 @@ def kullanici_rol(request):
     """Tüm template'lerde kullanıcı rol bilgilerini erişilebilir kılar (kurallar: okul.auth)."""
     b = rol_bayraklari(request.user)
     bekleyen_faaliyet = 0
-    if b["mudur_yardimcisi"]:
+    if b["ust_yonetici"]:  # faaliyeti müdür yardımcısı ya da okul müdürü onaylar
         from faaliyet.models import Faaliyet
 
         bekleyen_faaliyet = Faaliyet.objects.filter(durum=Faaliyet.DURUM_BEKLEMEDE).count()
@@ -18,6 +18,7 @@ def kullanici_rol(request):
         "is_mudur_yardimcisi": b["mudur_yardimcisi"],
         "is_yonetici": b["yonetici"],
         "is_tarih_degistirebilir": b["ust_yonetici"],
+        "is_ust_yonetici": b["ust_yonetici"],
         "bekleyen_faaliyet_sayisi": bekleyen_faaliyet,
         "is_rehber_ogretmen": b["rehber_ogretmen"],
         "is_disiplin_kurulu": b["disiplin_kurulu"],
@@ -153,6 +154,15 @@ SINAV_MENUSU_MODULLERI = {
 # tam ekran medya oynatıcısı.
 SINAV_MENUSU_HARIC = {"sinavmedia:oynat"}
 
+# Faaliyet onay/rapor sayfaları: müdür yardımcısında Yönetim Paneli menüsüyle,
+# okul müdüründe Öğrenci İşleri menüsüyle gösterilir.
+FAALIYET_ONAY_SAYFALARI = {
+    "faaliyet:faaliyet_onay_listesi",
+    "faaliyet:faaliyet_yonetim_listesi",
+    "faaliyet:faaliyet_toplu_rapor",
+    "faaliyet:faaliyet_ogrenci_rapor",
+}
+
 # Müdür yardımcısı "Yönetim Paneli" menüsünün gösterildiği sayfalar...
 YONETIM_MENUSU_SAYFALARI = {
     "yonetim_paneli",
@@ -161,10 +171,7 @@ YONETIM_MENUSU_SAYFALARI = {
     "personel_duzenle",
     "personel_sil",
     "veriaktar_ana",
-    "faaliyet:faaliyet_onay_listesi",
-    "faaliyet:faaliyet_yonetim_listesi",
-    "faaliyet:faaliyet_toplu_rapor",
-    "faaliyet:faaliyet_ogrenci_rapor",
+    *FAALIYET_ONAY_SAYFALARI,
 }
 
 # ...ve bütün sayfalarında menünün kalıcı olduğu bölümler (URL ad alanı → menüde
@@ -332,6 +339,8 @@ UST_SAYFA = {
         "sosyalkulup:kulup_excel_yukle": "sosyalkulup:kulup_listesi",
         "sosyalkulup:kulup_ogrencileri": "sosyalkulup:kulup_listesi",
         "faaliyet:faaliyet_detay": "faaliyet:faaliyet_liste",
+        "faaliyet:faaliyet_toplu_rapor": "faaliyet:faaliyet_yonetim_listesi",
+        "faaliyet:faaliyet_ogrenci_rapor": "faaliyet:faaliyet_yonetim_listesi",
         "faaliyet:faaliyet_duzenle": "faaliyet:faaliyet_liste",
         "faaliyet:faaliyet_sil": "faaliyet:faaliyet_liste",
         "faaliyet:faaliyet_devamsizlik": "faaliyet:faaliyet_liste",
@@ -411,12 +420,22 @@ def yan_menu(request):
     ):
         from okul.auth import is_mudur_yardimcisi
 
-        if is_mudur_yardimcisi(request.user):
+        mudur_acik = sayfa in YONETIM_MENUSU_OKUL_SAYFALARI or eslesme.namespace == "kurul"
+        if is_mudur_yardimcisi(request.user) or (mudur_acik and _is_ust_yonetici(request.user)):
             return {
                 "yan_menu": "includes/yonetim_menu.html",
                 "yonetim_menu": {
                     "aktif_sayfa": sayfa if sayfa in ("kurul:gorev_yuku", "kurul:katalog", "kurul:toplanti_takvimi") else (yonetim_koku or aktif("yonetim")),
                 },
+            }
+    if sayfa == "secmeli_ders_yuku" and _is_ust_yonetici(request.user):
+        from okul.auth import is_mudur_yardimcisi
+
+        if not is_mudur_yardimcisi(request.user):
+            # Okul müdürü bu rapora Okul Yönetimi'nden gelir (seçmeli menüsü yok)
+            return {
+                "yan_menu": "includes/yonetim_menu.html",
+                "yonetim_menu": {"aktif_sayfa": "okul:yonetim_index"},
             }
     if (
         getattr(eslesme.func, "__module__", "").startswith(SECMELI_MENUSU_UYGULAMALARI)
@@ -437,7 +456,9 @@ def yan_menu(request):
             "yan_menu": "includes/pano_menu.html",
             "pano_menu": {"goster": request.GET.get("goster") or "pano"},
         }
-    if sayfa in OGRENCI_MENUSU_SAYFALARI:
+    if sayfa in OGRENCI_MENUSU_SAYFALARI or (
+        sayfa in FAALIYET_ONAY_SAYFALARI and _is_ust_yonetici(request.user)
+    ):
         return {
             "yan_menu": "includes/ogrenci_menu.html",
             "ogrenci_menu": {

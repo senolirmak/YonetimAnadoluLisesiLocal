@@ -19,7 +19,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 
 from main.forms import EgitimOgretimYiliForm, OkulDonemForm
-from okul.auth import mudur_yardimcisi_required
+from okul.auth import mudur_yardimcisi_required, ust_yonetici_required
 from okul.forms import (
     BransForm,
     DersHavuzuFullForm,
@@ -166,7 +166,7 @@ def _entry(slug):
     return entry
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def yonetim_index(request):
     kartlar = [
         {
@@ -179,10 +179,18 @@ def yonetim_index(request):
         }
         for slug, entry in REGISTRY.items()
     ]
-    return render(request, "okul/yonetim/index.html", {"kartlar": kartlar})
+    from okul.utils import get_aktif_egitim_yili
+    from secmelidersler.services import ders_yuku
+
+    yil = get_aktif_egitim_yili()
+    return render(request, "okul/yonetim/index.html", {
+        "kartlar": kartlar,
+        "ders_yuku_yili": yil,
+        "ders_yuku_ozeti": ders_yuku.ozet(yil),
+    })
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def yonetim_list(request, slug):
     entry = _entry(slug)
     group_by = entry.get("group_by")

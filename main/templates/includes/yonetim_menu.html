@@ -1,20 +1,33 @@
-{# Müdür yardımcısı "Yönetim Paneli" sol menüsü — veri: main.context_processors.yan_menu #}
+{% comment %}
+"Yönetim Paneli" sol menüsü — veri: main.context_processors.yan_menu.
+Müdür yardımcısı hepsini görür; okul müdürü yalnızca Okul Yönetimi (CRUD) ve Kurullar'ı.
+{% endcomment %}
 {% with s=yonetim_menu.aktif_sayfa %}
 <nav class="gm-menu" aria-label="Yönetim Paneli menüsü">
+    {% if is_mudur_yardimcisi %}
     <a href="{% url 'yonetim_paneli' %}" style="--renk:#417690;" class="gm-ozet{% if s == 'yonetim_paneli' %} aktif{% endif %}">Yönetim Paneli</a>
+    {% endif %}
 
     <div class="gm-baslik">Sistem</div>
+    {% if is_mudur_yardimcisi %}
     <a href="/admin/" style="--renk:#0d6efd;">Yönetici Paneline Git</a>
     <a href="{% url 'okul_ayarlari' %}" style="--renk:#495057;"{% if s == 'okul_ayarlari' %} class="aktif"{% endif %}>Okul Yapılandırması</a>
+    {% endif %}
     <a href="{% url 'okul:yonetim_index' %}" style="--renk:#417690;"{% if s == 'okul:yonetim_index' %} class="aktif"{% endif %}>Okul Yönetimi (CRUD)</a>
+    {% if is_mudur_yardimcisi %}
     <a href="{% url 'yedekleme:yedek_listesi' %}" style="--renk:#7f1d1d;"{% if s == 'yedekleme:yedek_listesi' %} class="aktif"{% endif %}>Veritabanı Yedekleri</a>
     {% if is_tarih_degistirebilir %}
     <a href="{% url 'senesonu:gecis_listesi' %}" style="--renk:#b45309;"{% if s == 'senesonu:gecis_listesi' %} class="aktif"{% endif %}>Sene Sonu Geçişleri</a>
     {% endif %}
 
+    {% endif %}
+
+    {% if is_mudur_yardimcisi %}
     <div class="gm-baslik">Personel ve Veri</div>
     <a href="{% url 'personel_listesi' %}" style="--renk:#6f42c1;"{% if s == 'personel_listesi' %} class="aktif"{% endif %}>Personel Listesi</a>
     <a href="{% url 'veriaktar_ana' %}" style="--renk:#0d6efd;"{% if s == 'veriaktar_ana' %} class="aktif"{% endif %}>e-Okul Veri Aktar</a>
+
+    {% endif %}
 
     <div class="gm-baslik">Kurullar</div>
     <a href="{% url 'kurul:index' %}" style="--renk:#0f766e;"{% if s == 'kurul:index' %} class="aktif"{% endif %}>Kurul ve Komisyonlar</a>
@@ -23,8 +36,10 @@
     <a href="{% url 'kurul:toplanti_takvimi' %}" style="--renk:#0369a1;"{% if s == 'kurul:toplanti_takvimi' %} class="aktif"{% endif %}>Toplantı Takvimi</a>
     <a href="{% url 'kurul:gorevlendirme_pdf' %}" target="_blank" rel="noopener" style="--renk:#475569;">Görevlendirme Listesi (PDF) ↗</a>
 
+    {% if is_mudur_yardimcisi %}
     <div class="gm-baslik">Faaliyetler</div>
     <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" style="--renk:#fd7e14;"{% if s == 'faaliyet:faaliyet_onay_listesi' %} class="aktif"{% endif %}>Faaliyet Onayları{% if bekleyen_faaliyet_sayisi %} <span class="gm-sayac">{{ bekleyen_faaliyet_sayisi }}</span>{% endif %}</a>
     <a href="{% url 'faaliyet:faaliyet_yonetim_listesi' %}" style="--renk:#e67e22;"{% if s == 'faaliyet:faaliyet_yonetim_listesi' %} class="aktif"{% endif %}>Tüm Faaliyetler</a>
+    {% endif %}
 </nav>
 {% endwith %}

@@ -100,7 +100,7 @@
             <span style="font-size:0.88em;display:flex;align-items:center;gap:14px;">
                 {{ g.faaliyetler|length }} faaliyet
                 <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-weight:600;">
-                    <input type="checkbox" class="eokul-tumu" style="width:18px;height:18px;cursor:pointer;">
+                    <input type="checkbox" class="eokul-tumu" style="width:18px;height:18px;cursor:pointer;"{% if not eokul_isaretleyebilir %} disabled{% endif %}>
                     Tümü e-Okul'a işlendi
                 </label>
             </span>
@@ -128,7 +128,7 @@
                         <td class="center">
                             <input type="checkbox" class="eokul-kutu" style="width:18px;height:18px;cursor:pointer;"
                                    data-faaliyet="{{ satir.faaliyet.pk }}" data-ogrenci="{{ g.ogr.pk }}"
-                                   title="e-Okul'a işlendi" {% if satir.eokul %}checked{% endif %}>
+                                   title="e-Okul'a işlendi" {% if satir.eokul %}checked{% endif %}{% if not eokul_isaretleyebilir %} disabled{% endif %}>
                         </td>
                     </tr>
                     {% endfor %}

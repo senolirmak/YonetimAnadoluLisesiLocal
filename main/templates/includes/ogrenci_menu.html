@@ -33,5 +33,9 @@
     <div class="gm-baslik">Faaliyetler</div>
     <a href="{% url 'faaliyet:faaliyet_liste' %}" style="--renk:#fd7e14;"{% if s == 'faaliyet:faaliyet_liste' %} class="aktif"{% endif %}>Faaliyetlerim</a>
     <a href="{% url 'faaliyet:faaliyet_olustur' %}" style="--renk:#e83e8c;"{% if s == 'faaliyet:faaliyet_olustur' %} class="aktif"{% endif %}>Yeni Faaliyet</a>
+    {% if is_ust_yonetici and not is_mudur_yardimcisi %}{# müdür yardımcısında Yönetim Paneli menüsünde #}
+    <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" style="--renk:#dc3545;"{% if s == 'faaliyet:faaliyet_onay_listesi' %} class="aktif"{% endif %}>Faaliyet Onayları{% if bekleyen_faaliyet_sayisi %} <span class="gm-sayac">{{ bekleyen_faaliyet_sayisi }}</span>{% endif %}</a>
+    <a href="{% url 'faaliyet:faaliyet_yonetim_listesi' %}" style="--renk:#e67e22;"{% if s == 'faaliyet:faaliyet_yonetim_listesi' %} class="aktif"{% endif %}>Tüm Faaliyetler ve Raporlar</a>
+    {% endif %}
 </nav>
 {% endwith %}

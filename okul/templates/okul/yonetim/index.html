@@ -16,9 +16,23 @@
     <div class="ay-kart ay-kart-half">
       <div class="ay-baslik">{{ k.title }}</div>
       <p style="color:#6b7280;font-size:.9rem;margin:0 0 1rem;">{{ k.count }} kayıt</p>
-      <a class="btn-kaydet" href="{% url 'okul:yonetim_list' slug=k.slug %}">Yönet</a>
+      <a class="btn-kaydet" href="{% url 'okul:yonetim_list' slug=k.slug %}">{% if is_mudur_yardimcisi %}Yönet{% else %}Görüntüle{% endif %}</a>
     </div>
     {% endfor %}
+    <div class="ay-kart ay-kart-half" style="flex-grow:0;flex-basis:calc((100% - 3rem) / 3);">
+      <div class="ay-baslik">Branş Bazlı Ders Yükü</div>
+      {% if ders_yuku_ozeti %}
+      <p style="color:#6b7280;font-size:.9rem;margin:0 0 1rem;">
+        {{ ders_yuku_yili }} · {{ ders_yuku_ozeti.brans }} branş · {{ ders_yuku_ozeti.toplam_saat }} saat ·
+        norm {{ ders_yuku_ozeti.norm_kadro }} öğretmen
+        {% if ders_yuku_ozeti.eksik %}· <span style="color:#b91c1c;">{{ ders_yuku_ozeti.eksik }} eksik</span>{% endif %}
+        {% if ders_yuku_ozeti.fazla %}· <span style="color:#b45309;">{{ ders_yuku_ozeti.fazla }} fazla</span>{% endif %}
+      </p>
+      <a class="btn-kaydet" href="{% url 'secmeli_ders_yuku' %}?yil={{ ders_yuku_yili.pk }}">Görüntüle</a>
+      {% else %}
+      <p style="color:#6b7280;font-size:.9rem;margin:0 0 1rem;">Aktif eğitim-öğretim yılı tanımlı değil.</p>
+      {% endif %}
+    </div>
   </div>
 </div>
 {% endblock %}

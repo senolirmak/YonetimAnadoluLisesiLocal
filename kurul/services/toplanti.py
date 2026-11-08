@@ -26,7 +26,8 @@ def _personel(user):
 
 
 def toplanti_yonetebilir(user, kurul) -> bool:
-    """Müdür yardımcısı ya da kurulun başkanı/raportörü toplantı yönetir."""
+    """Müdür yardımcısı ya da kurulun başkanı/raportörü toplantı yönetir.
+    Okul müdürü toplantıları görür ve kararları onaylar (bkz. onaylayabilir)."""
     if is_mudur_yardimcisi(user):
         return True
     personel = _personel(user)
