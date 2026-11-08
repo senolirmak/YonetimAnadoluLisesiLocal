@@ -62,6 +62,9 @@ GOREV_MENUSU_SAYFALARI = {
     # Atanan / Atanamayan Dersler sayfasından açılan istatistik
     "nobetci_ders_doldurma_istatistik",
     "kurul:gorevlerim",
+    # Başkan/raportör öğretmenlerin kurul toplantı sayfaları
+    "kurul:toplantilar",
+    "kurul:toplanti_detay",
 }
 
 # Yönetici "Devamsızlık ve Nöbet İşlemleri" menüsünün gösterildiği sayfalar
@@ -297,6 +300,8 @@ UST_SAYFA = {
         "ogretmen_yoklama_raporum": "ogretmen_sinav_gozetim",
         "ogretmen_sinav_medya": "ogretmen_sinav_gozetim",
         "nobetci_ders_doldurma_istatistik": "ogretmen_ders_doldurma",
+        "kurul:toplantilar": "kurul:gorevlerim",
+        "kurul:toplanti_detay": "kurul:gorevlerim",
     },
     "nobet": {
         "devamsizlik_create": "devamsizlik_list",
@@ -410,7 +415,7 @@ def yan_menu(request):
             return {
                 "yan_menu": "includes/yonetim_menu.html",
                 "yonetim_menu": {
-                    "aktif_sayfa": sayfa if sayfa in ("kurul:gorev_yuku", "kurul:katalog") else (yonetim_koku or aktif("yonetim")),
+                    "aktif_sayfa": sayfa if sayfa in ("kurul:gorev_yuku", "kurul:katalog", "kurul:toplanti_takvimi") else (yonetim_koku or aktif("yonetim")),
                 },
             }
     if (

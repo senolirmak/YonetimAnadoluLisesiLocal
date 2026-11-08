@@ -33,7 +33,8 @@
         "yedek_sayisi": 0,
         "otomatik": true
       }
-    ]
+    ],
+    "gundem_onerileri": "Bir önceki toplantıda alınan kararlar\nBakanlık kararları, mevzuat değişiklikleri, MEBBİS, e-Okul ve e-Pansiyon uygulamaları\nStratejik planlama, toplam kalite yönetimi ve okul gelişim yönetim ekibi çalışmaları\nÖğrencilerin başarı, devam-devamsızlık, ödül ve disiplin durumları; okul birincisinin tespiti\nPersonel ve öğrenci kılık ve kıyafeti\nİstenen başarı düzeyine ulaşamayan öğrencilerin yetiştirilmesi için yapılacak çalışmalar\nDestekleme ve yetiştirme kursları ihtiyacının tespiti ve verimliliği\nYerel, ulusal ve uluslararası sınav ve yarışmalar\nAtatürkçülükle ilgili konuların derslerde işlenişi ve öğretim programlarının uygulanması\nDers kitabı, eğitim aracı ve bireysel öğrenme materyalleri\nZümre toplantıları, yıllık planlar, ders planları ve BEP'ler\nOkul rehberlik hizmetleri\nBilimsel, sosyal, kültürel, sanatsal ve sportif etkinlikler, geziler, öğrenci kulüpleri ve sosyal sorumluluk programı\nTamamlanmış ve planlanan projeler\nKardeş okul uygulamaları\nDeğerler eğitimi çalışmaları\nFaaliyet gösterecek öğrenci kulüplerinin belirlenmesi\nSınıf/şube rehber öğretmenleri ile kulüp danışman öğretmenlerinin belirlenmesi\nKurul ve komisyonlara öğretmen seçimi ve görev dağılımı\nNöbet uygulamalarıyla ilgili esaslar\nOkul aile birliği ve veli toplantıları\nOkul çevre ilişkileri ve kurum kültürü çalışmaları\nTürkçenin doğru, güzel ve etkili kullanılması\nÇocuk haklarına ilişkin uygulamalar\nHizmet içi eğitim ihtiyaçlarının belirlenmesi\nMezunların izlenmesi\nİş sağlığı ve güvenliği\nDenetim ve rehberlik çalışmaları\nBilişim araçlarının eğitim ortamlarında kullanılmasına ilişkin usul ve esaslar\nOkul sağlığı hizmetleri"
   },
   {
     "kod": "sube-ogretmenler-kurulu",
@@ -69,7 +70,8 @@
         "yedek_sayisi": 0,
         "otomatik": true
       }
-    ]
+    ],
+    "gundem_onerileri": "Bir önceki toplantıda alınan kararlar\nÖğrencilerin başarı durumlarının incelenmesi ve başarıyı artırıcı önlemler\nDerslerin öğretim programlarıyla uyumlu olarak yürütülmesi\nKaynaştırma/bütünleştirme yoluyla eğitim alan öğrenciler için alınacak tedbirler\nAtölye, laboratuvar ve diğer birimlerden güvenli şekilde yararlanma ve planlama\nOkul çevre işbirliği\nBilimsel, sosyal, kültürel, sanatsal ve sportif etkinlikler, geziler, kulüp ve sosyal sorumluluk çalışmaları\nÖğrencilerde girişimcilik bilinci kazandırılmasına yönelik çalışmalar\nÖğrencilerin kişilik ve sosyal gelişimi, sağlığı ve dengeli beslenmesi\nOkul sağlığı çalışmaları\nDeğerler eğitimi çalışmaları\nİş sağlığı ve güvenliği tedbirleri doğrultusunda eğitim-öğretimin planlanması"
   },
   {
     "kod": "zumre-ogretmenler-kurulu",
@@ -105,7 +107,8 @@
         "yedek_sayisi": 0,
         "otomatik": true
       }
-    ]
+    ],
+    "gundem_onerileri": "Bir önceki toplantıda alınan kararlar\nPlanlamaların mevzuata, okulun kuruluş amacına ve öğretim programına uygun yapılması\nAtatürkçülük konuları; öğretim programlarının incelenmesi, yıllık ve ders planları\nÖğretim yöntem ve teknikleri; okul temelli faaliyetlerin planlanması\nBEP'ler ve farklılaştırılmış uygulamalar\nZümre içi ders ziyaretleri ve diğer zümrelerle işbirliği\nAkademik çalışmaların ve teknolojik gelişmelerin izlenmesi\nGirişimcilik, araştırma-geliştirme ve tasarım becerileri\nAraç-gereç ihtiyacı; laboratuvar, kütüphane, atölye vb. ortamların etkin kullanımı\nDeney, proje, gezi ve okul dışı öğrenme ortamlarının planlanması\nOrtak sınavlar sonrası başarı analizi ve eksik kazanımlar için eylem planı\nOkul geneli ortak yazılı sınav ve mazeret sınavı sorularının hazırlanması\nUlusal ve uluslararası sınav/yarışma sonuçlarının değerlendirilmesi\nUygulamalı derslerin değerlendirme ölçütleri\nProje ve performans çalışmalarının belirlenmesi ve ölçekleri\nİş sağlığı ve güvenliği tedbirlerinin değerlendirilmesi\nÜst düzey düşünme ile sosyal ve duygusal becerilere yönelik planlama\nDeğerlerin örtük öğrenme yoluyla eğitim süreçlerine yansıtılması\nÖnleme, müdahale ve yönlendirme komisyonunda yürütülecek çalışmalar\nDisiplinler arası çalışmaların planlanması ve takvimi\nÇoklu okuryazarlık ve öğrencilerin çok yönlü gelişimi\nSosyal sorumluluk programı kapsamında ders bazında faaliyetler\nFaaliyetler için araç, gereç ve mali kaynak ihtiyacı"
   },
   {
     "kod": "zumre-baskanlari-kurulu",
@@ -141,7 +144,8 @@
         "yedek_sayisi": 0,
         "otomatik": true
       }
-    ]
+    ],
+    "gundem_onerileri": "Bir önceki toplantıda alınan kararlar\nEğitim ve öğretimin planlanması\nZümre ve alanlar arası işbirliği\nÖğrenci başarısının artırılması için alınacak tedbirler\nÖğretim programlarındaki ortak hedeflere ulaşılması\nÖğrenme güçlüğü çekilen konular ve alınacak önlemler\nOkul düzeyinde ortak yazılı sınavlar, beceri sınavları ve sınav analizleri\nİş sağlığı ve güvenliği\nDeğerlerin öğretimine yönelik çalışmalar ve eylem planları\nÖnleme, müdahale ve yönlendirme komisyonunda yürütülecek çalışmalar\nÖğrenci merkezli ve bireysel farklılıkları gözeten planlama\nDisiplinler arası yaklaşım\nSosyal sorumluluk programı kapsamındaki faaliyetler\nZümrelerin araç, gereç ve mali kaynak ihtiyaçlarının okul yönetimine bildirilmesi\nUlusal ve uluslararası yarışma sonuçlarının değerlendirilmesi ve eylem planı\nDers planlarının öğretim programlarının amaç ve kazanımlarına göre hazırlanması"
   },
   {
     "kod": "odul-disiplin-kurulu",
@@ -195,7 +199,8 @@
         "yedek_sayisi": 1,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "onur-kurulu",
@@ -240,7 +245,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "onleme-mudahale-komisyonu",
@@ -294,7 +300,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "rehberlik-yurutme-komisyonu",
@@ -384,7 +391,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "sosyal-etkinlikler-kurulu",
@@ -438,7 +446,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "eser-inceleme-secme-kurulu",
@@ -483,7 +492,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "toren-kutlama-komisyonu",
@@ -528,7 +538,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "okul-spor-kulubu-yonetim-kurulu",
@@ -582,7 +593,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "okul-secim-kurulu",
@@ -618,7 +630,8 @@
         "yedek_sayisi": 2,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "sandik-kurulu",
@@ -663,7 +676,8 @@
         "yedek_sayisi": 3,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "oab-denetleme-kurulu",
@@ -699,7 +713,8 @@
         "yedek_sayisi": 1,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "kontenjan-belirleme-komisyonu",
@@ -735,7 +750,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "satin-alma-komisyonu",
@@ -780,7 +796,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "muayene-kabul-komisyonu",
@@ -825,7 +842,8 @@
         "yedek_sayisi": 3,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "ihale-komisyonu",
@@ -879,7 +897,8 @@
         "yedek_sayisi": 1,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "deger-tespit-komisyonu",
@@ -924,7 +943,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "tasinir-sayim-kurulu",
@@ -969,7 +989,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "tasinir-dusum-komisyonu",
@@ -1005,7 +1026,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "kantin-denetleme-komisyonu",
@@ -1059,7 +1081,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "kutuphane-secim-komisyonu",
@@ -1140,7 +1163,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "web-yayin-komisyonu",
@@ -1185,7 +1209,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "okul-gelisim-yonetim-ekibi",
@@ -1275,7 +1300,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "isg-kurulu",
@@ -1347,7 +1373,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "yangin-ekipleri",
@@ -1446,7 +1473,8 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   },
   {
     "kod": "siddeti-onleme-ekibi",
@@ -1500,6 +1528,7 @@
         "yedek_sayisi": 0,
         "otomatik": false
       }
-    ]
+    ],
+    "gundem_onerileri": ""
   }
 ]

@@ -1,0 +1,29 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .tp-durum { display: inline-block; font-size: .78em; font-weight: 700; padding: 2px 9px; border-radius: 12px; }
+    .tp-taslak { background: #f3f4f6; color: #374151; } .tp-duyuruldu { background: #dbeafe; color: #1e40af; }
+    .tp-yapildi { background: #fef3c7; color: #92400e; } .tp-onaylandi { background: #dcfce7; color: #166534; }
+    .tp-iptal { background: #fee2e2; color: #991b1b; }
+    .tk-baslik { font-size: 1.05em; margin: 20px 0 8px; }
+</style>
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Kurul Toplantı Takvimi</h2>
+    {% if not egitim_yili %}<div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil.</div>{% else %}
+    <div class="dn-grid">
+        <div class="dn-kart" style="--renk:#2563eb;"><div class="dn-kart-baslik">Yaklaşan Toplantı</div><div class="dn-sayi">{{ yaklasan|length }}</div></div>
+        <div class="dn-kart" style="--renk:#d97706;"><div class="dn-kart-baslik">Müdür Onayı Bekleyen</div><div class="dn-sayi">{{ onay_bekleyen|length }}</div></div>
+    </div>
+    {% with liste=onay_bekleyen %}{% if liste %}<h3 class="tk-baslik">Onay Bekleyenler</h3>{% include "kurul/_toplanti_tablosu.html" %}{% endif %}{% endwith %}
+    <h3 class="tk-baslik">Yaklaşan Toplantılar</h3>
+    {% with liste=yaklasan %}{% include "kurul/_toplanti_tablosu.html" %}{% endwith %}
+    <h3 class="tk-baslik">Geçmiş ve İptal Edilenler</h3>
+    {% with liste=gecmis %}{% include "kurul/_toplanti_tablosu.html" %}{% endwith %}
+    {% endif %}
+</div>
+{% endblock %}

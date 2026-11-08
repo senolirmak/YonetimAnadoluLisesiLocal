@@ -27,6 +27,8 @@
     <h2 class="page-title page-title-mb">{{ kurul.ad }}</h2>
     <p style="color:#6b7280;margin-top:-6px;">{{ kurul.egitim_yili }} eğitim-öğretim yılı
         {% if kurul.tur.kapsam != "okul" %} · <a href="{% url 'kurul:tur_detay' kurul.tur.kod %}">Bu türün bütün kurulları</a>{% endif %}
+        · <a href="{% url 'kurul:toplantilar' kurul.pk %}"><strong>Toplantılar</strong></a>
+        · <a href="{% url 'kurul:karar_defteri' kurul.pk %}" target="_blank" rel="noopener">Karar defteri (PDF) ↗</a>
         {% if doluluk.gereken %} · Seçimle doldurulan yerler: <strong>{{ doluluk.dolu }}/{{ doluluk.gereken }}</strong> asil{% endif %}</p>
     {% include "kurul/_mesajlar.html" %}
     {% with tur=kurul.tur %}{% include "kurul/_tur_bilgi.html" %}{% endwith %}

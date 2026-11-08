@@ -85,6 +85,11 @@ class KurulTuru(models.Model):
         help_text="Öğrenci kişisel verisi içeren işler (disiplin, onur kurulu). Bu uygulamada "
         "yalnızca üyelik tutulur; karar içerikleri ilgili uygulamada kalır.",
     )
+    gundem_onerileri = models.TextField(
+        blank=True, verbose_name="Gündem Önerileri",
+        help_text="Mevzuatta bu kurulun görüşeceği konular; her satır bir öneri. Toplantı "
+        "gündemi hazırlanırken listeden seçilir.",
+    )
     son_dogrulama = models.DateField(
         null=True, blank=True, verbose_name="Son Doğrulama",
         help_text="Bilgilerin resmî mevzuat metniyle en son karşılaştırıldığı tarih.",
@@ -100,6 +105,10 @@ class KurulTuru(models.Model):
 
     def __str__(self):
         return self.ad
+
+    @property
+    def gundem_onerisi_listesi(self):
+        return [s.strip() for s in self.gundem_onerileri.splitlines() if s.strip()]
 
 
 class KurulYapiKalemi(models.Model):
@@ -318,3 +327,195 @@ class KurulUyesi(models.Model):
         dolu = sum([bool(self.personel_id), bool(self.ogrenci_id), bool(self.dis_uye.strip())])
         if dolu != 1:
             raise ValidationError("Üye olarak personel, öğrenci ya da dış üye unvanından yalnızca biri girilmeli.")
+
+
+# ── 2. aşama: toplantılar ────────────────────────────────────────────────────
+
+class Toplanti(models.Model):
+    """Bir kurulun toplantısı. Durum akışı: taslak → duyuruldu → yapıldı → onaylandı
+    (iptal her aşamada). Onaylanan toplantı düzenlenemez (Eğitim Kurulları ve Zümreleri
+    Yönergesi: kararlar müdür onayından sonra uygulanır)."""
+
+    TUR_OLAGAN = "olagan"
+    TUR_OLAGANUSTU = "olaganustu"
+    TUR_CHOICES = ((TUR_OLAGAN, "Olağan"), (TUR_OLAGANUSTU, "Olağanüstü"))
+
+    DURUM_TASLAK = "taslak"
+    DURUM_DUYURULDU = "duyuruldu"
+    DURUM_YAPILDI = "yapildi"
+    DURUM_ONAYLANDI = "onaylandi"
+    DURUM_IPTAL = "iptal"
+    DURUM_CHOICES = (
+        (DURUM_TASLAK, "Taslak"),
+        (DURUM_DUYURULDU, "Duyuruldu"),
+        (DURUM_YAPILDI, "Yapıldı (onay bekliyor)"),
+        (DURUM_ONAYLANDI, "Onaylandı"),
+        (DURUM_IPTAL, "İptal"),
+    )
+
+    # Yönergeye göre tarih, yer ve gündem en az bu kadar gün önce duyurulur
+    DUYURU_ASGARI_GUN = 5
+
+    kurul = models.ForeignKey(Kurul, on_delete=models.CASCADE, related_name="toplantilar", verbose_name="Kurul")
+    no = models.PositiveSmallIntegerField(verbose_name="Toplantı No")
+    tarih = models.DateField(verbose_name="Tarih")
+    saat = models.TimeField(verbose_name="Saat")
+    yer = models.CharField(max_length=150, verbose_name="Yer")
+    tur = models.CharField(max_length=12, choices=TUR_CHOICES, default=TUR_OLAGAN, verbose_name="Türü")
+    durum = models.CharField(max_length=12, choices=DURUM_CHOICES, default=DURUM_TASLAK, verbose_name="Durum")
+    duyuru_tarihi = models.DateField(null=True, blank=True, verbose_name="Duyuru Tarihi")
+    aciklama = models.TextField(blank=True, verbose_name="Açıklama")
+    onaylayan = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        verbose_name="Onaylayan",
+    )
+    onay_tarihi = models.DateField(null=True, blank=True, verbose_name="Onay Tarihi")
+    olusturan = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        verbose_name="Oluşturan",
+    )
+    olusturma = models.DateTimeField(auto_now_add=True, verbose_name="Oluşturulma")
+
+    class Meta:
+        db_table = "kurul_toplanti"
+        verbose_name = "Toplantı"
+        verbose_name_plural = "Toplantılar"
+        ordering = ["tarih", "saat"]
+        constraints = [
+            models.UniqueConstraint(fields=["kurul", "no"], name="kurul_toplanti_no_tekil"),
+        ]
+
+    def __str__(self):
+        return f"{self.kurul} — {self.no}. toplantı ({self.tarih:%d.%m.%Y})"
+
+    @property
+    def duzenlenebilir(self):
+        return self.durum in (self.DURUM_TASLAK, self.DURUM_DUYURULDU, self.DURUM_YAPILDI)
+
+    @property
+    def duyuru_gun_farki(self):
+        """Duyuru ile toplantı arasındaki gün sayısı (duyurulmadıysa None)."""
+        if not self.duyuru_tarihi:
+            return None
+        return (self.tarih - self.duyuru_tarihi).days
+
+    @property
+    def duyuru_suresi_yetersiz(self):
+        """Olağan toplantı 5 günden kısa sürede duyurulduysa True (yönerge uyarısı)."""
+        fark = self.duyuru_gun_farki
+        return self.tur == self.TUR_OLAGAN and fark is not None and fark < self.DUYURU_ASGARI_GUN
+
+
+class GundemMaddesi(models.Model):
+    toplanti = models.ForeignKey(Toplanti, on_delete=models.CASCADE, related_name="gundem", verbose_name="Toplantı")
+    sira = models.PositiveSmallIntegerField(verbose_name="Sıra")
+    baslik = models.CharField(max_length=300, verbose_name="Gündem Maddesi")
+    gorusme = models.TextField(blank=True, verbose_name="Görüşme Özeti")
+    onceki_kararlar = models.BooleanField(
+        default=False, verbose_name="Önceki Kararlar Maddesi",
+        help_text="Bir önceki toplantıda alınan kararların değerlendirildiği madde (otomatik eklenir).",
+    )
+
+    class Meta:
+        db_table = "kurul_gundem_maddesi"
+        verbose_name = "Gündem Maddesi"
+        verbose_name_plural = "Gündem Maddeleri"
+        ordering = ["toplanti", "sira"]
+
+    def __str__(self):
+        return f"{self.sira}. {self.baslik}"
+
+
+class Katilim(models.Model):
+    DURUM_KATILDI = "katildi"
+    DURUM_MAZERETLI = "mazeretli"
+    DURUM_KATILMADI = "katilmadi"
+    DURUM_CHOICES = (
+        (DURUM_KATILDI, "Katıldı"),
+        (DURUM_MAZERETLI, "Mazeretli"),
+        (DURUM_KATILMADI, "Katılmadı"),
+    )
+
+    toplanti = models.ForeignKey(Toplanti, on_delete=models.CASCADE, related_name="katilimlar", verbose_name="Toplantı")
+    uye = models.ForeignKey(
+        KurulUyesi, on_delete=models.SET_NULL, null=True, blank=True, related_name="katilimlar",
+        verbose_name="Üye",
+    )
+    # Üye sonradan kuruldan çıkarılsa da tutanak bozulmasın diye toplantı anındaki bilgi
+    ad = models.CharField(max_length=200, verbose_name="Adı / Unvanı")
+    gorev = models.CharField(max_length=200, blank=True, verbose_name="Görevi")
+    asil = models.BooleanField(default=True, verbose_name="Asil")
+    durum = models.CharField(max_length=10, choices=DURUM_CHOICES, default=DURUM_KATILDI, verbose_name="Durum")
+    aciklama = models.CharField(max_length=200, blank=True, verbose_name="Açıklama")
+
+    class Meta:
+        db_table = "kurul_katilim"
+        verbose_name = "Katılım"
+        verbose_name_plural = "Katılımlar"
+        ordering = ["toplanti", "-asil", "id"]
+
+    def __str__(self):
+        return f"{self.ad} — {self.get_durum_display()}"
+
+
+class Karar(models.Model):
+    OYLAMA_OYBIRLIGI = "oybirligi"
+    OYLAMA_OYCOKLUGU = "oycoklugu"
+    OYLAMA_CHOICES = ((OYLAMA_OYBIRLIGI, "Oy birliği"), (OYLAMA_OYCOKLUGU, "Oy çokluğu"))
+
+    TAKIP_BEKLIYOR = "bekliyor"
+    TAKIP_DEVAM = "devam"
+    TAKIP_TAMAM = "tamamlandi"
+    TAKIP_CHOICES = (
+        (TAKIP_BEKLIYOR, "Bekliyor"),
+        (TAKIP_DEVAM, "Devam ediyor"),
+        (TAKIP_TAMAM, "Tamamlandı"),
+    )
+
+    toplanti = models.ForeignKey(Toplanti, on_delete=models.CASCADE, related_name="kararlar", verbose_name="Toplantı")
+    gundem_maddesi = models.ForeignKey(
+        GundemMaddesi, on_delete=models.SET_NULL, null=True, blank=True, related_name="kararlar",
+        verbose_name="Gündem Maddesi",
+    )
+    no = models.PositiveSmallIntegerField(verbose_name="Karar No")
+    metin = models.TextField(verbose_name="Karar")
+    oylama = models.CharField(max_length=10, choices=OYLAMA_CHOICES, default=OYLAMA_OYBIRLIGI, verbose_name="Oylama")
+    kabul = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Kabul")
+    ret = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Ret")
+    cekimser = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Çekimser")
+    sorumlu = models.ForeignKey(
+        "okul.Personel", on_delete=models.SET_NULL, null=True, blank=True, related_name="kurul_kararlari",
+        verbose_name="Sorumlu",
+    )
+    termin = models.DateField(null=True, blank=True, verbose_name="Termin")
+    takip_durumu = models.CharField(max_length=12, choices=TAKIP_CHOICES, default=TAKIP_BEKLIYOR,
+                                    verbose_name="Takip Durumu")
+    takip_notu = models.CharField(max_length=300, blank=True, verbose_name="Takip Notu")
+
+    class Meta:
+        db_table = "kurul_karar"
+        verbose_name = "Karar"
+        verbose_name_plural = "Kararlar"
+        ordering = ["toplanti", "no"]
+        constraints = [
+            models.UniqueConstraint(fields=["toplanti", "no"], name="kurul_karar_no_tekil"),
+        ]
+
+    def __str__(self):
+        return f"Karar {self.no}: {self.metin[:60]}"
+
+    @property
+    def oylama_metni(self):
+        if self.oylama == self.OYLAMA_OYCOKLUGU and self.kabul is not None:
+            parca = [f"{self.kabul} kabul"]
+            if self.ret:
+                parca.append(f"{self.ret} ret")
+            if self.cekimser:
+                parca.append(f"{self.cekimser} çekimser")
+            return "Oy çokluğu (" + ", ".join(parca) + ")"
+        return self.get_oylama_display()
+
+    def clean(self):
+        super().clean()
+        if self.oylama == self.OYLAMA_OYCOKLUGU and self.kabul is None:
+            raise ValidationError({"kabul": "Oy çokluğu kararlarında kabul oyu sayısını girin."})

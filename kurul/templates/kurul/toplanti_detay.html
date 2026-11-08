@@ -1,0 +1,193 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .tp-bolum { margin-top: 22px; }
+    .tp-bolum h3 { font-size: 1.05em; color: #1f2937; border-bottom: 2px solid #e9ecef; padding-bottom: 6px; margin-bottom: 10px; }
+    .tp-durum { display: inline-block; font-size: .8em; font-weight: 700; padding: 3px 10px; border-radius: 12px; }
+    .tp-taslak { background: #f3f4f6; color: #374151; } .tp-duyuruldu { background: #dbeafe; color: #1e40af; }
+    .tp-yapildi { background: #fef3c7; color: #92400e; } .tp-onaylandi { background: #dcfce7; color: #166534; }
+    .tp-iptal { background: #fee2e2; color: #991b1b; }
+    .tp-dugmeler { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+    .tp-dugmeler form { margin: 0; }
+    .tp-btn { border: 0; border-radius: 6px; padding: 7px 12px; font-weight: 600; cursor: pointer; color: #fff; text-decoration: none; font-size: .9em; display: inline-block; }
+    .tp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 14px; align-items: end; }
+    .tp-grid label { display: block; font-size: .85em; font-weight: 600; color: #374151; margin-bottom: 3px; }
+    .tp-grid input, .tp-grid select, .tp-grid textarea { width: 100%; padding: 6px; box-sizing: border-box; }
+    .tp-satir-form { display: inline-flex; gap: 4px; margin: 0; }
+    .tp-kucuk { border: 0; background: #e5e7eb; border-radius: 4px; padding: 2px 8px; cursor: pointer; }
+    .tp-gundem li { padding: 4px 0; }
+    .tp-oneriler { columns: 2; font-size: .88em; margin: 6px 0 10px; }
+    .tp-oneriler label { display: block; break-inside: avoid; margin-bottom: 3px; }
+    textarea.tp-gorusme { width: 100%; box-sizing: border-box; padding: 6px; }
+    .errorlist { color: #b91c1c; font-size: .82em; margin: 2px 0 0; padding-left: 16px; }
+</style>
+
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">{{ kurul.ad }} — {{ toplanti.no }}. Toplantı</h2>
+    <p style="color:#6b7280;margin-top:-6px;">
+        {{ toplanti.tarih|date:"j F Y, l" }} · {{ toplanti.saat|time:"H:i" }} · {{ toplanti.yer }} · {{ toplanti.get_tur_display }}
+        · <span class="tp-durum tp-{{ toplanti.durum }}">{{ toplanti.get_durum_display }}</span>
+        · <a href="{% url 'kurul:toplantilar' kurul.pk %}">Bütün toplantılar</a>
+    </p>
+    {% include "kurul/_mesajlar.html" %}
+
+    {% if toplanti.duyuru_tarihi %}
+    <p style="font-size:.88em;{% if toplanti.duyuru_suresi_yetersiz %}color:#b45309;{% else %}color:#6b7280;{% endif %}">
+        Duyuru: {{ toplanti.duyuru_tarihi|date:"d.m.Y" }} ({{ toplanti.duyuru_gun_farki }} gün önce)
+        {% if toplanti.duyuru_suresi_yetersiz %} — olağan toplantılar en az 5 gün önceden duyurulmalıdır.{% endif %}</p>
+    {% endif %}
+    {% if toplanti.durum == "onaylandi" %}
+    <p style="font-size:.88em;color:#166534;">Onay: {{ toplanti.onay_tarihi|date:"d.m.Y" }}{% if toplanti.onaylayan %} — {{ toplanti.onaylayan.get_full_name|default:toplanti.onaylayan.username }}{% endif %}. Onaylanan toplantı düzenlenemez; karar takibi güncellenebilir.</p>
+    {% endif %}
+
+    <div class="tp-dugmeler">
+        <a class="tp-btn" style="background:#475569;" href="{% url 'kurul:toplanti_duyuru_pdf' toplanti.pk %}" target="_blank" rel="noopener">Duyuru / Gündem (PDF)</a>
+        <a class="tp-btn" style="background:#334155;" href="{% url 'kurul:toplanti_tutanak_pdf' toplanti.pk %}" target="_blank" rel="noopener">Tutanak (PDF)</a>
+        <a class="tp-btn" style="background:#64748b;" href="{% url 'kurul:karar_defteri' kurul.pk %}" target="_blank" rel="noopener">Karar Defteri (PDF)</a>
+        {% if takip_edebilir %}
+            {% if toplanti.durum == "taslak" %}
+            <form method="post">{% csrf_token %}<input type="hidden" name="islem" value="duyur"><button class="tp-btn" style="background:#2563eb;">Duyuruldu Olarak İşaretle</button></form>
+            {% endif %}
+            {% if toplanti.durum == "taslak" or toplanti.durum == "duyuruldu" %}
+            <form method="post">{% csrf_token %}<input type="hidden" name="islem" value="yapildi"><button class="tp-btn" style="background:#d97706;">Toplantı Yapıldı</button></form>
+            <form method="post" onsubmit="return confirm('Toplantı iptal edilsin mi?');">{% csrf_token %}<input type="hidden" name="islem" value="iptal"><button class="tp-btn" style="background:#dc2626;">İptal Et</button></form>
+            {% endif %}
+        {% endif %}
+        {% if onaylayabilir %}
+            {% if toplanti.durum == "yapildi" %}
+            <form method="post" onsubmit="return confirm('Kararlar onaylansın mı? Onaylanan toplantı düzenlenemez.');">{% csrf_token %}<input type="hidden" name="islem" value="onayla"><button class="tp-btn" style="background:#16a34a;">Müdür Onayı Ver</button></form>
+            {% elif toplanti.durum == "onaylandi" %}
+            <form method="post">{% csrf_token %}<input type="hidden" name="islem" value="onayi_kaldir"><button class="tp-btn" style="background:#9ca3af;">Onayı Kaldır</button></form>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    {% if yonetebilir %}
+    <div class="tp-bolum">
+        <h3>Toplantı Bilgileri</h3>
+        <form method="post" class="filter-box">{% csrf_token %}<input type="hidden" name="islem" value="bilgi">
+            <div class="tp-grid">
+                {% for alan in bilgi_formu %}<div><label for="{{ alan.id_for_label }}">{{ alan.label }}</label>{{ alan }}{{ alan.errors }}</div>{% endfor %}
+                <div><button type="submit" class="btn btn-primary">Kaydet</button></div>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if gizli %}
+    <div class="dn-not" style="margin-top:18px;">Bu kurul öğrenci kişisel verisi içeren işler yürütür; bu uygulamada yalnızca toplantı tarihi, yeri ve katılım tutulur. Görüşme ve kararlar ilgili kayıtta tutulur.</div>
+    {% else %}
+    <div class="tp-bolum">
+        <h3>Gündem</h3>
+        <ol class="tp-gundem" style="padding-left:0;list-style:none;">
+        {% for m in gundem %}
+            <li>
+                <strong>{{ m.sira }}.</strong> {{ m.baslik }}
+                {% if yonetebilir %}
+                <form method="post" class="tp-satir-form">{% csrf_token %}<input type="hidden" name="madde" value="{{ m.pk }}">
+                    <button class="tp-kucuk" name="islem" value="gundem_yukari" title="Yukarı">↑</button>
+                    <button class="tp-kucuk" name="islem" value="gundem_asagi" title="Aşağı">↓</button>
+                    <button class="tp-kucuk" name="islem" value="gundem_sil" title="Sil" onclick="return confirm('Gündem maddesi silinsin mi?');">✕</button>
+                </form>
+                {% endif %}
+            </li>
+        {% empty %}<li class="text-muted">Gündem maddesi yok.</li>{% endfor %}
+        </ol>
+        {% if yonetebilir %}
+        <form method="post" class="filter-box">{% csrf_token %}<input type="hidden" name="islem" value="gundem_ekle">
+            {% if oneriler %}
+            <div style="font-size:.85em;font-weight:600;color:#374151;">Mevzuattaki gündem konuları (seçin):</div>
+            <div class="tp-oneriler">{% for o in oneriler %}<label><input type="checkbox" name="oneri" value="{{ o }}"> {{ o }}</label>{% endfor %}</div>
+            {% endif %}
+            <div class="tp-grid"><div style="grid-column:span 2;"><label>Yeni gündem maddesi</label><input type="text" name="baslik" maxlength="300"></div>
+                <div><button type="submit" class="btn btn-primary">Gündeme Ekle</button></div></div>
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="tp-bolum">
+        <h3>Görüşmeler</h3>
+        <form method="post">{% csrf_token %}<input type="hidden" name="islem" value="gorusme">
+        {% for m in gundem %}
+            <div style="margin-bottom:10px;">
+                <div style="font-weight:600;">{{ m.sira }}. {{ m.baslik }}</div>
+                {% if m.onceki_kararlar %}
+                    {% for k in onceki_kararlar %}<div style="font-size:.85em;color:#374151;">• {{ onceki.no }} nolu toplantının {{ k.no }}. kararı: {{ k.metin|truncatechars:140 }} — <em>{{ k.get_takip_durumu_display }}</em></div>{% empty %}<div style="font-size:.85em;color:#9ca3af;">Önceki toplantıda karar alınmamış.</div>{% endfor %}
+                {% endif %}
+                {% if yonetebilir %}<textarea class="tp-gorusme" name="gorusme_{{ m.pk }}" rows="2" placeholder="Görüşme özeti">{{ m.gorusme }}</textarea>
+                {% elif m.gorusme %}<div style="font-size:.92em;">{{ m.gorusme|linebreaksbr }}</div>{% endif %}
+            </div>
+        {% endfor %}
+        {% if yonetebilir and gundem %}<button type="submit" class="btn btn-primary">Görüşmeleri Kaydet</button>{% endif %}
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="tp-bolum">
+        <h3>Katılım ({{ katilimlar|length }})</h3>
+        <form method="post">{% csrf_token %}<input type="hidden" name="islem" value="katilim">
+        <div class="table-responsive"><table class="table">
+            <thead><tr><th>#</th><th>Adı / Unvanı</th><th>Görevi</th><th>Durum</th><th>Açıklama</th></tr></thead>
+            <tbody>
+            {% for k in katilimlar %}
+            <tr>
+                <td>{{ forloop.counter }}</td><td>{{ k.ad }}</td>
+                <td style="font-size:.85em;">{{ k.gorev }}{% if not k.asil %} (yedek){% endif %}</td>
+                <td>{% if yonetebilir %}<select name="durum_{{ k.pk }}">{% for d, ad in katilim_durumlari %}<option value="{{ d }}"{% if d == k.durum %} selected{% endif %}>{{ ad }}</option>{% endfor %}</select>{% else %}{{ k.get_durum_display }}{% endif %}</td>
+                <td>{% if yonetebilir %}<input type="text" name="aciklama_{{ k.pk }}" value="{{ k.aciklama }}" maxlength="200" style="width:100%;">{% else %}{{ k.aciklama }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% if yonetebilir and katilimlar %}<button type="submit" class="btn btn-primary">Katılımı Kaydet</button>{% endif %}
+        </form>
+        {% if yonetebilir %}
+        <form method="post" style="margin-top:6px;">{% csrf_token %}<input type="hidden" name="islem" value="katilim_esitle">
+            <button type="submit" class="tp-kucuk">Kurula sonradan eklenen üyeleri listeye ekle</button></form>
+        {% endif %}
+    </div>
+
+    {% if not gizli %}
+    <div class="tp-bolum">
+        <h3>Kararlar</h3>
+        <div class="table-responsive"><table class="table">
+            <thead><tr><th>No</th><th>Karar</th><th>Oylama</th><th>Sorumlu / Termin</th><th>Takip</th>{% if yonetebilir %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+            {% for k in kararlar %}
+            <tr>
+                <td>{{ k.no }}</td>
+                <td>{{ k.metin|linebreaksbr }}{% if k.gundem_maddesi %}<div style="font-size:.78em;color:#6b7280;">Gündem: {{ k.gundem_maddesi.sira }}. {{ k.gundem_maddesi.baslik }}</div>{% endif %}</td>
+                <td style="font-size:.85em;">{{ k.oylama_metni }}</td>
+                <td style="font-size:.85em;">{{ k.sorumlu.adi_soyadi|default:"—" }}{% if k.termin %}<br>{{ k.termin|date:"d.m.Y" }}{% endif %}</td>
+                <td>
+                    {% if takip_edebilir %}
+                    <form method="post" class="tp-satir-form" style="flex-wrap:wrap;">{% csrf_token %}<input type="hidden" name="islem" value="karar_takip"><input type="hidden" name="karar" value="{{ k.pk }}">
+                        <select name="takip_durumu">{% for d, ad in takip_durumlari %}<option value="{{ d }}"{% if d == k.takip_durumu %} selected{% endif %}>{{ ad }}</option>{% endfor %}</select>
+                        <input type="text" name="takip_notu" value="{{ k.takip_notu }}" placeholder="Not" maxlength="300" style="width:130px;">
+                        <button class="tp-kucuk">Kaydet</button>
+                    </form>
+                    {% else %}{{ k.get_takip_durumu_display }}{% if k.takip_notu %} — {{ k.takip_notu }}{% endif %}{% endif %}
+                </td>
+                {% if yonetebilir %}<td><form method="post" class="tp-satir-form" onsubmit="return confirm('Karar silinsin mi?');">{% csrf_token %}<input type="hidden" name="islem" value="karar_sil"><input type="hidden" name="karar" value="{{ k.pk }}"><button class="tp-kucuk">✕</button></form></td>{% endif %}
+            </tr>
+            {% empty %}<tr><td colspan="6" class="text-muted">Henüz karar yok.</td></tr>{% endfor %}
+            </tbody>
+        </table></div>
+        {% if yonetebilir %}
+        <form method="post" class="filter-box">{% csrf_token %}<input type="hidden" name="islem" value="karar_ekle">
+            <div class="tp-grid">
+                {% for alan in karar_formu %}<div{% if alan.name == "metin" %} style="grid-column:1/-1;"{% endif %}><label for="{{ alan.id_for_label }}">{{ alan.label }}</label>{{ alan }}{{ alan.errors }}</div>{% endfor %}
+                <div><button type="submit" class="btn btn-primary">Karar Ekle</button></div>
+            </div>
+            <p style="font-size:.8em;color:#6b7280;margin:6px 0 0;">Kararlar oy çokluğuyla alınır; eşitlikte başkanın katıldığı görüş kabul edilir. Oy çokluğunda oy sayılarını girin.</p>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
