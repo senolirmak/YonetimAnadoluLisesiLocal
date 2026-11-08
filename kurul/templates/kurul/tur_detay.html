@@ -1,0 +1,46 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">{{ tur.ad }}</h2>
+    {% include "kurul/_mesajlar.html" %}
+    {% include "kurul/_tur_bilgi.html" %}
+
+    {% if not egitim_yili %}
+        <div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil.</div>
+    {% elif tur.kapsam == "okul" %}
+        <p>Bu kurul {{ egitim_yili }} için henüz açılmadı.</p>
+        <form method="post" action="{% url 'kurul:kurul_ac' tur.kod %}">{% csrf_token %}
+            <button type="submit" class="btn btn-primary">{{ egitim_yili }} için aç</button>
+        </form>
+    {% else %}
+        {% if kurullar %}
+        <form method="post" action="{% url 'kurul:tur_tamamla' tur.kod %}" style="margin:0 0 12px;">{% csrf_token %}
+            <button type="submit" class="btn" style="background:#16a34a;color:#fff;">Önerilerle Tamamla</button>
+            <span style="font-size:.85em;color:#6b7280;margin-left:8px;">Eksik otomatik üyeleri ekler{% if tur.otomatik_uyelik == "sube_ogretmenleri" %}, başkanı boş kurullara sınıf seviyesinden sorumlu müdür yardımcısını atar{% endif %}. Seçilmiş başkanlara dokunmaz.</span>
+        </form>
+        {% endif %}
+        <div class="table-responsive">
+        <table class="table">
+            <thead><tr><th>{% if tur.kapsam == "sube" %}Sınıf/Şube{% else %}Branş{% endif %}</th><th>Üye Sayısı</th><th>Başkan</th><th>Yapı</th></tr></thead>
+            <tbody>
+            {% for k in kurullar %}
+            <tr>
+                <td><a href="{% url 'kurul:kurul_detay' k.pk %}">{% if k.sinif_sube %}{{ k.sinif_sube }}{% else %}{{ k.brans }}{% endif %}</a></td>
+                <td>{{ k.uye_sayisi }}</td>
+                <td>{% for b in k.baskanlar %}{{ b.uye_adi }}{% if not forloop.last %}, {% endif %}{% empty %}<span style="color:#d97706;">Belirlenmedi</span>{% if k.oneri %} <span style="font-size:.85em;color:#166534;">· Öneri: {{ k.oneri.adi_soyadi }}</span>{% endif %}{% endfor %}</td>
+                <td>{% if k.doluluk.gereken %}{{ k.doluluk.dolu }}/{{ k.doluluk.gereken }} asil{% else %}—{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted">Bu yıl için kurul açılmadı. Ana sayfadaki yıl kurulumunu çalıştırın.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

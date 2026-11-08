@@ -1,0 +1,12 @@
+{# Kurul türünün mevzuat bilgisi kutusu #}
+<div class="filter-box" style="font-size:.9em;color:#374151;line-height:1.5;">
+    <div><strong>Mevzuat dayanağı:</strong> {{ tur.mevzuat_dayanagi }}{% if tur.mevzuat_url %} — <a href="{{ tur.mevzuat_url }}" target="_blank" rel="noopener">metni aç ↗</a>{% endif %}</div>
+    {% if tur.olusum %}<div style="margin-top:4px;"><strong>Oluşumu:</strong> {{ tur.olusum }}</div>{% endif %}
+    {% if tur.toplanma %}<div style="margin-top:4px;"><strong>Toplanma:</strong> {{ tur.toplanma }}</div>{% endif %}
+    {% if tur.gorev_suresi %}<div style="margin-top:4px;"><strong>Görev süresi:</strong> {{ tur.gorev_suresi }}</div>{% endif %}
+    <div style="margin-top:6px;font-size:.92em;color:#6b7280;">
+        {% if tur.son_dogrulama %}Resmî metinle son karşılaştırma: {{ tur.son_dogrulama|date:"j F Y" }}.
+        {% else %}<span style="color:#92400e;">Bu bilgiler resmî mevzuat metniyle henüz karşılaştırılmadı; uygulamadan önce güncel metni kontrol edin.</span>{% endif %}
+        {% if tur.gizli %}<br>Gizli kurul: bu uygulamada yalnızca üyelik tutulur.{% endif %}
+    </div>
+</div>

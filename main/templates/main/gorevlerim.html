@@ -72,6 +72,19 @@
                 <p class="gorev-bos">Bugün atanan ders doldurma göreviniz yok.</p>
                 {% endif %}
             </div>
+
+            <div class="gorev-card">
+                <div class="gorev-card-title">Kurul ve Komisyon Görevlerim</div>
+                {% if kurul_uyelikleri %}
+                <ul class="gorev-liste">
+                    {% for u in kurul_uyelikleri %}
+                    <li>{{ u.kurul.ad }}{% if u.gorev != "uye" %} — {{ u.get_gorev_display }}{% endif %}{% if not u.asil %} (yedek){% endif %}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="gorev-bos">Bu yıl için kayıtlı kurul/komisyon göreviniz yok.</p>
+                {% endif %}
+            </div>
         </div>
 </div>
 {% endblock %}

@@ -1,0 +1,96 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .kr-grup { margin-top: 26px; }
+    .kr-grup h3 { font-size: 1.05em; color: #495057; border-bottom: 2px solid #e9ecef; padding-bottom: 6px; margin-bottom: 8px; }
+    .kr-tablo td, .kr-tablo th { vertical-align: top; }
+    .kr-etiket { display: inline-block; font-size: .72em; font-weight: 600; padding: 1px 7px; border-radius: 10px; margin-left: 4px; }
+    .kr-zorunlu { background: #e0e7ff; color: #3730a3; }
+    .kr-gizli { background: #fee2e2; color: #991b1b; }
+    .kr-dogrulanmadi { background: #fef3c7; color: #92400e; }
+    .kr-soluk { color: #9ca3af; }
+    .kr-ust { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+</style>
+
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Kurul ve Komisyonlar</h2>
+    {% include "kurul/_mesajlar.html" %}
+
+    {% if not egitim_yili %}
+    <div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil. Okul Bilgisi'nden aktif yılı seçin.</div>
+    {% else %}
+    <p class="welcome-text">{{ egitim_yili }} eğitim-öğretim yılı. Kurulları mevzuat dayanaklarıyla birlikte yönetin.</p>
+
+    <div class="dn-grid">
+        <div class="dn-kart" style="--renk:#417690;">
+            <div class="dn-kart-baslik">Açık Kurul/Komisyon</div>
+            <div class="dn-sayi">{{ ozet.acik_kurul }}</div>
+        </div>
+        <div class="dn-kart" style="--renk:#dc3545;">
+            <div class="dn-kart-baslik">Henüz Açılmamış Tür</div>
+            <div class="dn-sayi">{{ eksik|length }}</div>
+        </div>
+        <div class="dn-kart" style="--renk:#d97706;">
+            <div class="dn-kart-baslik">Boş Asil Görev Yeri</div>
+            <div class="dn-sayi">{{ ozet.eksik_yer }}</div>
+        </div>
+        <div class="dn-kart" style="--renk:#6c757d;">
+            <div class="dn-kart-baslik">Mevzuatı Doğrulanmamış Tür</div>
+            <div class="dn-sayi">{{ ozet.dogrulanmamis }}</div>
+            <a href="{% url 'kurul:katalog' %}">Yapıları incele →</a>
+        </div>
+    </div>
+
+    {% if eksik %}
+    <div class="dn-uyari" style="margin-top:18px;">
+        <span><strong>{{ eksik|length }} kurul/komisyon/ekip</strong> bu yıl için henüz açılmadı.
+            Yıl kurulumu hepsini mevzuattaki yapılarıyla (iskelet) açar; öğretmenler, şube ve zümre kurullarına
+            üyeleri ders programı ile branşlardan ekler. Diğerlerinin başkan ve üyeleri kurul sayfasından seçilir.</span>
+        <form method="post" action="{% url 'kurul:yil_kurulumu' %}" style="margin:0;">{% csrf_token %}
+            <button type="submit" class="btn btn-sm" style="background:#d97706;color:#fff;">Yıl Kurulumunu Çalıştır</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% for kategori, turler in gruplar.items %}
+    <div class="kr-grup">
+        <h3>{{ kategori }}</h3>
+        <div class="table-responsive">
+        <table class="table kr-tablo">
+            <thead><tr><th>Adı</th><th>Mevzuat Dayanağı</th><th style="width:170px;">Bu Yıl</th></tr></thead>
+            <tbody>
+            {% for tur in turler %}
+            <tr>
+                <td>
+                    <a href="{% url 'kurul:tur_detay' tur.kod %}"><strong>{{ tur.ad }}</strong></a>
+                    {% if tur.zorunlu %}<span class="kr-etiket kr-zorunlu">Zorunlu</span>{% endif %}
+                    {% if tur.gizli %}<span class="kr-etiket kr-gizli">Gizli</span>{% endif %}
+                    {% if not tur.son_dogrulama %}<span class="kr-etiket kr-dogrulanmadi" title="Bilgiler resmî mevzuat metniyle henüz karşılaştırılmadı">Doğrulanmadı</span>{% endif %}
+                </td>
+                <td style="font-size:.88em;">{{ tur.mevzuat_dayanagi }}</td>
+                <td style="font-size:.9em;">
+                    {% if tur.sayilar %}
+                        {% if tur.kapsam != "okul" %}{{ tur.sayilar.kurul }} kurul · {% endif %}{{ tur.sayilar.uye }} üye
+                        {% if tur.doluluk.gereken %}<br>
+                            {% if tur.doluluk.dolu == tur.doluluk.gereken %}<span style="color:#16a34a;">Yapı tamam ({{ tur.doluluk.dolu }}/{{ tur.doluluk.gereken }})</span>
+                            {% else %}<span style="color:#d97706;">{{ tur.doluluk.dolu }}/{{ tur.doluluk.gereken }} asil seçildi</span>{% endif %}
+                        {% endif %}
+                    {% else %}
+                        <span class="kr-soluk">Açılmadı</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

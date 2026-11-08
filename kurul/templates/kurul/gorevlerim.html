@@ -1,0 +1,35 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Kurul ve Komisyon Görevlerim</h2>
+    {% if not personel_bagli %}
+        <div class="msg-box msg-error">Kullanıcınıza bağlı personel kaydı bulunamadı.</div>
+    {% elif not egitim_yili %}
+        <div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil.</div>
+    {% else %}
+    <p class="welcome-text" style="font-size:.95em;">{{ egitim_yili }} eğitim-öğretim yılında üyesi olduğunuz kurul, komisyon ve ekipler.</p>
+    <div class="table-responsive">
+    <table class="table">
+        <thead><tr><th>Kurul / Komisyon</th><th>Görevim</th><th>Mevzuat Dayanağı</th><th>Toplanma</th></tr></thead>
+        <tbody>
+        {% for u in uyelikler %}
+        <tr>
+            <td><strong>{{ u.kurul.ad }}</strong></td>
+            <td>{{ u.get_gorev_display }}{% if not u.asil %} (yedek){% endif %}</td>
+            <td style="font-size:.85em;">{{ u.kurul.tur.mevzuat_dayanagi }}</td>
+            <td style="font-size:.85em;">{{ u.kurul.tur.toplanma|truncatechars:160 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted">Bu yıl için kayıtlı kurul/komisyon göreviniz yok.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

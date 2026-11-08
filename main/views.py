@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from devamsizlik.models import OgrenciDevamsizlik
 from faaliyet.models import Faaliyet
+from kurul.services.uyelik import personel_uyelikleri
 from main.utils import get_ogretmen_gorev_verileri
 from nobet.models import GunlukNobetCizelgesi, OkulBilgi
 from ogrencinobet.models import OgrenciNobetGorevi
@@ -152,6 +153,9 @@ def gorevlerim(request):
         {
             "title": "Görevlerim",
             "sosyal_kulupler": ogretmen_kulupleri(request.user, get_aktif_egitim_yili()),
+            "kurul_uyelikleri": personel_uyelikleri(
+                getattr(request.user, "personel", None), get_aktif_egitim_yili()
+            ),
             **gorev,
         },
     )
