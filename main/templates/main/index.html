@@ -38,6 +38,9 @@
         gap: 30px;
         text-align: left;
     }
+    .welcome-container { padding-top: 20px; }  /* sol menüyle aynı hizadan başlar */
+    /* Bilgi kutusu yoksa alan yer kaplamasın */
+    .index-notlar:not(:has(.index-not)) { display: none; }
     .index-notlar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; text-align: left; }
     .index-not { padding: 8px 12px; border: 1px solid; border-radius: 6px; font-size: 0.9em; }
     .index-col-side {
@@ -54,10 +57,6 @@
 </style>
 
 <div class="welcome-container">
-    <h2 class="page-title page-title-mb">Okul Yönetim Sistemine Hoşgeldiniz</h2>
-    <p class="welcome-text">
-        Soldaki menüden istediğiniz işlemi seçebilirsiniz.
-    </p>
 
     {# Kişiye özel bilgi kutuları (sol menü dar olduğundan içerik alanında) #}
     <div class="index-notlar">
