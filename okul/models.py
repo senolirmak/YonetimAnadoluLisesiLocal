@@ -692,3 +692,44 @@ class SinifRehberOgretmeni(models.Model):
 
     def __str__(self):
         return f"{self.sinif_sube} — {self.personel}"
+
+
+class SinifSeviyesiSorumlusu(models.Model):
+    """Bir eğitim-öğretim yılında bir sınıf seviyesinden (9, 10, 11, 12…) sorumlu müdür
+    yardımcısı — okulun yapısal görev dağılımı.
+
+    Her yıl her seviyenin tek bir sorumlusu olur; bir müdür yardımcısı birden fazla
+    seviyeden sorumlu olabilir. Yıla bağlıdır, çünkü görev dağılımı yıldan yıla değişir.
+    """
+
+    egitim_yili = models.ForeignKey(
+        EgitimOgretimYili,
+        on_delete=models.CASCADE,
+        related_name="seviye_sorumlulari",
+        verbose_name="Eğitim-Öğretim Yılı",
+    )
+    sinif = models.PositiveSmallIntegerField(verbose_name="Sınıf Seviyesi")
+    personel = models.ForeignKey(
+        Personel,
+        on_delete=models.PROTECT,
+        related_name="seviye_sorumluluklari",
+        verbose_name="Müdür Yardımcısı",
+    )
+
+    class Meta:
+        db_table = "okul_sinif_seviyesi_sorumlusu"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["egitim_yili", "sinif"], name="seviye_sorumlusu_yil_sinif_tekil"
+            ),
+        ]
+        ordering = ["-egitim_yili__egitim_baslangic", "sinif"]
+        verbose_name = "Sınıf Seviyesi Sorumlusu"
+        verbose_name_plural = "Sınıf Seviyesi Sorumluları"
+
+    def __str__(self):
+        return f"{self.egitim_yili} — {self.seviye_adi}: {self.personel}"
+
+    @property
+    def seviye_adi(self):
+        return f"{self.sinif}. sınıflar"

@@ -18,7 +18,7 @@ Repo: `senolirmak/YonetimAnadoluLisesiLocal` (public). Tek geliştirici: Şenol 
 | Akademik | `dersprogrami`, `dersdefteri`, `ogrencidersleri`, `secmelidersler`, `sorumluluk`, `senesonu` |
 | Sınav | `sinav`, `sinavmedia`, `ortaksinav_engine` |
 | Öğrenci | `ogrenci`, `devamsizlik`, `disiplin`, `rehberlik`, `ogrencinobet` |
-| Personel | `personel`, `personeldevamsizlik`, `nobet`, `ekders` |
+| Personel | `personel`, `personeldevamsizlik`, `nobet`, `ekders`, `kurul` |
 | İletişim/ekran | `duyuru`, `pano`, `muduriyetcagri`, `faaliyet` |
 | Sistem | `okul`, `main`, `ebagiris`, `veriaktar`, `yedekleme`, `utility`, `devtools`, `kurulumcu` |
 

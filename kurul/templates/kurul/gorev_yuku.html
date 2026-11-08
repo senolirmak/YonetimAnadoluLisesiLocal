@@ -1,0 +1,32 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Kurul ve Komisyon Görev Dağılımı</h2>
+    <p class="welcome-text" style="font-size:.95em;">Öğretmenlerin seçimle/görevlendirmeyle aldıkları kurul ve komisyon görevleri.
+        Herkesin kendiliğinden üyesi olduğu öğretmenler, şube ve zümre kurulları sayılmaz; başkanlıklar ayrıca gösterilir.
+        Görevi olmayan öğretmenler listenin sonundadır.</p>
+    {% if not egitim_yili %}<div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil.</div>{% else %}
+    <div class="table-responsive">
+    <table class="table">
+        <thead><tr><th>#</th><th>Personel</th><th style="width:90px;">Görev</th><th>Kurul / Komisyon</th><th>Başkanlık</th></tr></thead>
+        <tbody>
+        {% for s in satirlar %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ s.personel.adi_soyadi }}</td>
+            <td><strong>{{ s.gorevler|length }}</strong></td>
+            <td style="font-size:.88em;">{% for u in s.gorevler %}{{ u.kurul.ad }}{% if not u.asil %} (yedek){% endif %}{% if not forloop.last %}; {% endif %}{% empty %}<span style="color:#9ca3af;">—</span>{% endfor %}</td>
+            <td style="font-size:.88em;">{% for u in s.baskanliklar %}{{ u.kurul.ad }}{% if not forloop.last %}; {% endif %}{% endfor %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

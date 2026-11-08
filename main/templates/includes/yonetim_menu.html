@@ -16,6 +16,12 @@
     <a href="{% url 'personel_listesi' %}" style="--renk:#6f42c1;"{% if s == 'personel_listesi' %} class="aktif"{% endif %}>Personel Listesi</a>
     <a href="{% url 'veriaktar_ana' %}" style="--renk:#0d6efd;"{% if s == 'veriaktar_ana' %} class="aktif"{% endif %}>e-Okul Veri Aktar</a>
 
+    <div class="gm-baslik">Kurullar</div>
+    <a href="{% url 'kurul:index' %}" style="--renk:#0f766e;"{% if s == 'kurul:index' %} class="aktif"{% endif %}>Kurul ve Komisyonlar</a>
+    <a href="{% url 'kurul:katalog' %}" style="--renk:#0e7490;"{% if s == 'kurul:katalog' %} class="aktif"{% endif %}>Kurul Yapıları</a>
+    <a href="{% url 'kurul:gorev_yuku' %}" style="--renk:#155e75;"{% if s == 'kurul:gorev_yuku' %} class="aktif"{% endif %}>Görev Dağılımı</a>
+    <a href="{% url 'kurul:gorevlendirme_pdf' %}" target="_blank" rel="noopener" style="--renk:#475569;">Görevlendirme Listesi (PDF) ↗</a>
+
     <div class="gm-baslik">Faaliyetler</div>
     <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" style="--renk:#fd7e14;"{% if s == 'faaliyet:faaliyet_onay_listesi' %} class="aktif"{% endif %}>Faaliyet Onayları{% if bekleyen_faaliyet_sayisi %} <span class="gm-sayac">{{ bekleyen_faaliyet_sayisi }}</span>{% endif %}</a>
     <a href="{% url 'faaliyet:faaliyet_yonetim_listesi' %}" style="--renk:#e67e22;"{% if s == 'faaliyet:faaliyet_yonetim_listesi' %} class="aktif"{% endif %}>Tüm Faaliyetler</a>

@@ -16,6 +16,7 @@ Okul personelinin haftalık nöbet görevlerini, ders doldurma listelerini, deva
 - **Öğrenci Modülü** — Öğrenci bilgileri, rehberlik, disiplin, müdüriyet görüşme kayıtları
 - **Ortak Sınav Yönetimi (Kelebek)** — genetik algoritma tabanlı sınav takvimi, oturma planı üretimi, salon ve sıra ataması, PDF raporlama; katılacak sınıf seviyeleri (9–12), kelebek/kendi sınıfı dağılımı ve günde maks. sınav sayısı yapılandırılabilir
 - **Sınav Gözetim** — Öğretmenlere sınav günü kendi sınıflarının Kelebek yerleşim listesini gösterir
+- **Kurul ve Komisyonlar** — Okulda kurulması gereken kurul/komisyon/ekiplerin mevzuat dayanaklı kataloğu, yıllık kurulum (öğretmenler, şube ve zümre kurullarına üyeler ders programı ve branştan otomatik), görev dağılımı ve görevlendirme listesi PDF'i
 - **Raporlama** — PDF, PNG ve Excel dışa aktarma
 
 ---
@@ -230,6 +231,7 @@ Uygulama `http://127.0.0.1:8000/` adresinde çalışacaktır.
 | `ogrencinobet` | `/ogrencinobet/` | Öğrenci nöbet görevleri |
 | `pano` | `/pano/` | Dijital pano / kiosk |
 | `yedekleme` | `/yedekleme/` | Veritabanı ve medya (`media/`) yedeği oluşturma/indirme/silme/geri yükleme — yalnızca müdür yardımcısı |
+| `kurul` | `/kurul/` | Kurul, komisyon ve ekipler: mevzuat dayanaklı katalog, yıllık kurulum, üyelikler, görev dağılımı, görevlendirme listesi PDF'i — yalnızca müdür yardımcısı (öğretmen kendi görevlerini `/kurul/gorevlerim/`'de görür) |
 | `admin` | `/admin/` | Django yönetim paneli |
 
 **Auth URL'leri:**

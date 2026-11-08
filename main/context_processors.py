@@ -61,6 +61,7 @@ GOREV_MENUSU_SAYFALARI = {
     "ogretmen_sinav_medya",
     # Atanan / Atanamayan Dersler sayfasından açılan istatistik
     "nobetci_ders_doldurma_istatistik",
+    "kurul:gorevlerim",
 }
 
 # Yönetici "Devamsızlık ve Nöbet İşlemleri" menüsünün gösterildiği sayfalar
@@ -169,6 +170,7 @@ YONETIM_MENUSU_SAYFALARI = {
 YONETIM_MENUSU_MODULLERI = {
     "yedekleme": "yedekleme:yedek_listesi",
     "senesonu": "senesonu:gecis_listesi",
+    "kurul": "kurul:index",
 }
 YONETIM_MENUSU_OKUL_SAYFALARI = {
     "okul:yonetim_index",
@@ -257,6 +259,16 @@ def _ana_menu(request, sayfa, namespace):
         "ana_menu_aktif": aktif_bag,
         "ana_menu_veri": get_ogretmen_gorev_verileri(request.user, timezone.localdate()),
     }
+
+
+def _kurul_gorevi_var(user):
+    from kurul.models import KurulUyesi
+    from okul.utils import get_aktif_egitim_yili
+
+    personel = getattr(user, "personel", None)
+    return personel is not None and KurulUyesi.objects.filter(
+        personel=personel, kurul__egitim_yili=get_aktif_egitim_yili()
+    ).exists()
 
 
 def _rehber_sinifi_var(user):
@@ -397,7 +409,9 @@ def yan_menu(request):
         if is_mudur_yardimcisi(request.user):
             return {
                 "yan_menu": "includes/yonetim_menu.html",
-                "yonetim_menu": {"aktif_sayfa": yonetim_koku or aktif("yonetim")},
+                "yonetim_menu": {
+                    "aktif_sayfa": sayfa if sayfa in ("kurul:gorev_yuku", "kurul:katalog") else (yonetim_koku or aktif("yonetim")),
+                },
             }
     if (
         getattr(eslesme.func, "__module__", "").startswith(SECMELI_MENUSU_UYGULAMALARI)
@@ -450,6 +464,7 @@ def _gorev_menusu(request, aktif, eslesme):
             "aktif_sayfa": aktif,
             "aktif_pk": eslesme.kwargs.get("pk"),
             "sinav_gozetim_var": gorev["sinav_gozetim_var"],
+            "kurul_gorevi_var": _kurul_gorevi_var(request.user),
             "sorumluluk_gorev_var": gorev["sorumluluk_gorev_var"],
             "sorumluluk_takvim_var": gorev["sorumluluk_takvim_var"],
             "sosyal_kulupler": list(

@@ -21,6 +21,11 @@
     {% endif %}
     {% endif %}
 
+    {% if gorev_menu.kurul_gorevi_var %}
+    <div class="gm-baslik">Kurullar</div>
+    <a href="{% url 'kurul:gorevlerim' %}" style="--renk:#0f766e;"{% if s == 'kurul:gorevlerim' %} class="aktif"{% endif %}>Kurul ve Komisyon Görevlerim</a>
+    {% endif %}
+
     {% if gorev_menu.sosyal_kulupler %}
     <div class="gm-baslik">Sosyal Kulübüm</div>
     {% for kulup in gorev_menu.sosyal_kulupler %}

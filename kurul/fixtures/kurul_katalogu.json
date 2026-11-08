@@ -1,0 +1,1505 @@
+[
+  {
+    "kod": "ogretmenler-kurulu",
+    "ad": "Öğretmenler Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "tum_personel",
+    "mevzuat_dayanagi": "Ortaöğretim Kurumları Yönetmeliği md. 109; Eğitim Kurulları ve Zümreleri Yönergesi md. 9",
+    "mevzuat_url": "https://mevzuat.meb.gov.tr/dosyalar/1865.pdf",
+    "olusum": "Müdürün başkanlığında müdür başyardımcısı, müdür yardımcıları, öğretmenler, uzman ve eğitici personel. Gerektiğinde okul aile birliği başkanı, İSG uzmanı, okul sağlığı hemşiresi vb. gündem maddesi için çağrılır.",
+    "toplanma": "Ders yılı başlamadan önce (eylülün ilk iş günü), ikinci dönemin ilk iş günü, ders yılı bitimini izleyen haftanın ilk iş günü. Ayrıca müdürün gerekli gördüğü hâllerde veya üyelerin salt çoğunluğunun yazılı isteğiyle. Tarih, yer ve gündem en az 5 gün önceden duyurulur; gündem öğretmenler odasına asılır. Kararlar oy çokluğuyla alınır, eşitlikte başkanın oyu belirler; müdür onayıyla uygulanır. Tutanağı katılmayanlar dahil tüm personel imzalar.",
+    "gorev_suresi": "",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": "2026-11-08",
+    "sira": 10,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Okul müdürü",
+        "uye_turu": "personel",
+        "personel_secimi": "mudur",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Müdür yardımcıları, öğretmenler, uzman ve eğitici personel",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 0,
+        "yedek_sayisi": 0,
+        "otomatik": true
+      }
+    ]
+  },
+  {
+    "kod": "sube-ogretmenler-kurulu",
+    "ad": "Sınıf/Şube Öğretmenler Kurulu",
+    "kategori": "kurul",
+    "kapsam": "sube",
+    "otomatik_uyelik": "sube_ogretmenleri",
+    "mevzuat_dayanagi": "Ortaöğretim Kurumları Yönetmeliği md. 110; Eğitim Kurulları ve Zümreleri Yönergesi md. 10",
+    "mevzuat_url": "https://mevzuat.meb.gov.tr/dosyalar/1865.pdf",
+    "olusum": "Aynı şubede ders okutan öğretmenler ile rehberlik öğretmenleri. Başkanı müdür veya görevlendireceği müdür yardımcısıdır. Konuya göre veliler ve şubede derse giren eğitici personel davet edilebilir.",
+    "toplanma": "Ortaöğretim kurumlarında kasım ve nisan aylarında; ihtiyaç hâlinde müdür, müdür yardımcısı, rehber öğretmen veya sınıf rehber öğretmeninin talebiyle. Ders saatleri dışında yapılır; en az 5 gün önceden duyurulur.",
+    "gorev_suresi": "",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": "2026-11-08",
+    "sira": 20,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Müdür veya görevlendireceği müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Şubede ders okutan öğretmenler ve rehberlik öğretmenleri",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 0,
+        "yedek_sayisi": 0,
+        "otomatik": true
+      }
+    ]
+  },
+  {
+    "kod": "zumre-ogretmenler-kurulu",
+    "ad": "Zümre Öğretmenler Kurulu",
+    "kategori": "kurul",
+    "kapsam": "brans",
+    "otomatik_uyelik": "brans_ogretmenleri",
+    "mevzuat_dayanagi": "Eğitim Kurulları ve Zümreleri Yönergesi md. 12",
+    "mevzuat_url": "https://mevzuat.meb.gov.tr/dosyalar/1865.pdf",
+    "olusum": "Eğitim kurumunda alanı aynı olan öğretmenler. Zümre başkanı öncelikle istekliler arasından seçilir; istekli yoksa sırasıyla alanında doktora, başöğretmen, alanında yüksek lisans, uzman öğretmen, daha önce zümre başkanlığı yapmış ve kıdemli öğretmenler arasından belirlenir. Seçilen başkan MEBBİS'e işlenir; zorunlu olmadıkça yıl içinde değiştirilmez.",
+    "toplanma": "Ders yılı başlamadan önce, ikinci dönem başında ve ders yılı sonunda (öğretmenler kurulunu izleyen iş günü); ortaöğretimde ayrıca kasım ve nisan aylarında. Kararlar oy çokluğuyla alınır, eşitlikte zümre başkanının oyu belirler; müdür onayıyla uygulanır.",
+    "gorev_suresi": "Zümre başkanı: eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": "2026-11-08",
+    "sira": 30,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Zümre başkanı",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Branştaki öğretmenler",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 0,
+        "yedek_sayisi": 0,
+        "otomatik": true
+      }
+    ]
+  },
+  {
+    "kod": "zumre-baskanlari-kurulu",
+    "ad": "Okul Zümre Başkanları Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "zumre_baskanlari",
+    "mevzuat_dayanagi": "Eğitim Kurulları ve Zümreleri Yönergesi md. 13",
+    "mevzuat_url": "https://mevzuat.meb.gov.tr/dosyalar/1865.pdf",
+    "olusum": "Sınıf/alan zümre başkanları. Kurul ilk toplantısında o yıl için kendi aralarından birini başkan seçer.",
+    "toplanma": "Ders yılı başlamadan önce, ikinci dönem başında ve ders yılı sonunda; zümre toplantılarını izleyen iş günü. Kararlar oy çokluğuyla alınır, müdür onayıyla uygulanır. Tutanağı katılmayanlar dahil üyeler imzalar.",
+    "gorev_suresi": "Başkan: eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": "2026-11-08",
+    "sira": 40,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Kurul başkanı (zümre başkanları arasından seçilir)",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Zümre başkanları",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 0,
+        "yedek_sayisi": 0,
+        "otomatik": true
+      }
+    ]
+  },
+  {
+    "kod": "odul-disiplin-kurulu",
+    "ad": "Okul Öğrenci Ödül ve Disiplin Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Ortaöğretim Kurumları Yönetmeliği (Ödül ve Disiplin bölümü)",
+    "mevzuat_url": "https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=18812&MevzuatTur=7&MevzuatTertip=5",
+    "olusum": "Müdür başyardımcısı ya da müdürün görevlendireceği müdür yardımcısının başkanlığında; ders yılının ilk ayında öğretmenler kurulunca gizli oyla seçilen öğretmenler, onur kurulu ikinci başkanı ve okul-aile birliği temsilcisi. Oy sırasına göre yedek üyeler seçilir.",
+    "toplanma": "Disiplin işlemleri gerektiğinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": true,
+    "son_dogrulama": null,
+    "sira": 50,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Müdür başyardımcısı veya görevlendirilen müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "mudur_yardimcisi",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğretmenler kurulunca gizli oyla seçilen öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 2,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Onur kurulu ikinci başkanı",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 1,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Okul-aile birliği temsilcisi",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 1,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "onur-kurulu",
+    "ad": "Onur Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Ortaöğretim Kurumları Yönetmeliği (Ödül ve Disiplin bölümü)",
+    "mevzuat_url": "https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=18812&MevzuatTur=7&MevzuatTertip=5",
+    "olusum": "Onur genel kurulunca her sınıf düzeyinden seçilen öğrenciler; son sınıf öğrencilerinden biri ikinci başkan olur. Kurula öğretmenler kurulunca belirlenen bir öğretmen rehberlik eder.",
+    "toplanma": "Gerektiğinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": true,
+    "son_dogrulama": null,
+    "sira": 60,
+    "yapi": [
+      {
+        "gorev": "gozlemci",
+        "unvan": "Rehberlik eden öğretmen (öğretmenler kurulunca belirlenir)",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "baskan_yardimcisi",
+        "unvan": "İkinci başkan (son sınıf öğrencisi)",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 1,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Sınıf düzeylerinden seçilen öğrenci",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 3,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "onleme-mudahale-komisyonu",
+    "ad": "Önleme, Müdahale ve Yönlendirme Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Ortaöğretim Kurumları Yönetmeliği md. 59/A (RG 08.09.2023)",
+    "mevzuat_url": "https://www.resmigazete.gov.tr/eskiler/2023/09/20230908-2.htm",
+    "olusum": "Müdür veya görevlendireceği müdür yardımcısının başkanlığında ilgili okul zümre başkanları, rehber öğretmen ve sınıf rehber öğretmeni.",
+    "toplanma": "Dönem sonlarında öğrenci merkezli zorunlu müdahale planı hazırlar; devamsızlık nedeniyle sınıf tekrarı riski olan öğrencileri izler; ikinci dönem sonunda görüşme tutanakları ve faaliyet raporunu okul idaresine sunar.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": true,
+    "son_dogrulama": null,
+    "sira": 70,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Müdür veya görevlendireceği müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İlgili okul zümre başkanları",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 3,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Rehber öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "rehber",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Sınıf rehber öğretmeni",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "rehberlik-yurutme-komisyonu",
+    "ad": "Rehberlik ve Psikolojik Danışma Hizmetleri Yürütme Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Rehberlik ve Psikolojik Danışma Hizmetleri Yönetmeliği (RG 14.08.2020)",
+    "mevzuat_url": "https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=34760&MevzuatTur=7&MevzuatTertip=5",
+    "olusum": "Okul müdürünün başkanlığında müdür yardımcıları, rehber öğretmen/psikolojik danışmanlar, her sınıf seviyesinden sınıf rehber öğretmeni temsilcisi, disiplin ve onur kurulundan birer temsilci, okul-aile birliği temsilcisi ve öğrenci temsilcisi.",
+    "toplanma": "Rehberlik hizmetlerinin planlanması için ders yılı başında ve gerektiğinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 80,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Okul müdürü",
+        "uye_turu": "personel",
+        "personel_secimi": "mudur",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Müdür yardımcıları",
+        "uye_turu": "personel",
+        "personel_secimi": "mudur_yardimcisi",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Rehber öğretmen / psikolojik danışman",
+        "uye_turu": "personel",
+        "personel_secimi": "rehber",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Sınıf rehber öğretmeni temsilcisi (her sınıf seviyesinden)",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 4,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Disiplin kurulu temsilcisi",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Onur kurulu temsilcisi",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Okul-aile birliği temsilcisi",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğrenci temsilcisi",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "sosyal-etkinlikler-kurulu",
+    "ad": "Sosyal Etkinlikler Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Ortaöğretim Kurumları Yönetmeliği md. 115; MEB Eğitim Kurumları Sosyal Etkinlikler Yönetmeliği md. 6",
+    "mevzuat_url": "",
+    "olusum": "Müdürün veya görevlendireceği müdür yardımcısının başkanlığında müdürün belirlediği öğretmenler, öğrenci temsilcileri ve okul-aile birliği temsilcisi. Kararları müdür onayıyla uygulanır.",
+    "toplanma": "Ders yılı başında kulüp ve toplum hizmeti çalışmalarının planlanması için ve gerektiğinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 90,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Müdür veya görevlendireceği müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Müdürün belirlediği öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 3,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğrenci temsilcisi",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 3,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Okul-aile birliği temsilcisi (veli)",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "eser-inceleme-secme-kurulu",
+    "ad": "Eser İnceleme ve Seçme Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "MEB Eğitim Kurumları Sosyal Etkinlikler Yönetmeliği",
+    "mevzuat_url": "",
+    "olusum": "Müdür veya görevlendireceği müdür yardımcısının başkanlığında öğretmenler ve öğrenci temsilcileri.",
+    "toplanma": "Yayımlanacak/sergilenecek öğrenci eserleri için gerektiğinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 100,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Müdür veya görevlendireceği müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğrenci temsilcisi",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "toren-kutlama-komisyonu",
+    "ad": "Tören ve Kutlama Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "MEB Eğitim Kurumları Sosyal Etkinlikler Yönetmeliği",
+    "mevzuat_url": "",
+    "olusum": "Müdür veya görevlendireceği müdür yardımcısının başkanlığında en az iki öğretmen ve bir öğrenci temsilcisi.",
+    "toplanma": "Belirli gün ve haftalar ile törenler öncesinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 110,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Müdür veya görevlendireceği müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğrenci temsilcisi",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "okul-spor-kulubu-yonetim-kurulu",
+    "ad": "Okul Spor Kulübü Yönetim Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Okul Spor Kulüpleri Yönetmeliği",
+    "mevzuat_url": "",
+    "olusum": "Öğretmenler kurulunca beden eğitimi (yoksa ilgili) öğretmenleri arasından seçilen asil ve yedek öğretmen üyeler ile spor kulübü genel kurulunca seçilen öğrenci üyeler.",
+    "toplanma": "Gerektiğinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 120,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Yönetim kurulu başkanı (öğretmen)",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "baskan_yardimcisi",
+        "unvan": "Başkan yardımcısı (öğretmen)",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğretmen üye",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 3,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğrenci üye",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 8,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "okul-secim-kurulu",
+    "ad": "Okul Seçim Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "MEB Demokrasi Eğitimi ve Okul Meclisleri Yönergesi",
+    "mevzuat_url": "",
+    "olusum": "Öğretmenler kurulunca seçilen bir öğretmenin başkanlığında öğrencilerden seçilen asil ve yedek üyeler. Okuldaki öğrenci seçimlerini yürütür.",
+    "toplanma": "Okul öğrenci meclisi seçimleri döneminde.",
+    "gorev_suresi": "Seçim dönemi",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 130,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Öğretmenler kurulunca seçilen öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğrenci üye",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 2,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "sandik-kurulu",
+    "ad": "Sandık Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "MEB Demokrasi Eğitimi ve Okul Meclisleri Yönergesi",
+    "mevzuat_url": "",
+    "olusum": "Öğretmenler kurulunca seçilen bir öğretmenin rehberliğinde üç asil, üç yedek öğrenci; yaşça büyük olan başkanlık eder.",
+    "toplanma": "Seçim günü.",
+    "gorev_suresi": "Seçim dönemi",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 140,
+    "yapi": [
+      {
+        "gorev": "gozlemci",
+        "unvan": "Rehberlik eden öğretmen (öğretmenler kurulunca seçilir)",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "baskan",
+        "unvan": "Sandık kurulu başkanı (yaşça en büyük öğrenci)",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğrenci üye",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 3,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "oab-denetleme-kurulu",
+    "ad": "Okul-Aile Birliği Denetleme Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "MEB Okul-Aile Birliği Yönetmeliği",
+    "mevzuat_url": "",
+    "olusum": "Genel kurulca seçilen bir veli ve öğretmenler kurulunca seçilen iki öğretmen; asil ve yedek üyeler.",
+    "toplanma": "Genel kuruldan sonraki ilk hafta içinde toplanıp başkanını seçer; denetimler yönetmelikte belirtilen dönemlerde.",
+    "gorev_suresi": "Okul-aile birliği dönemi",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 150,
+    "yapi": [
+      {
+        "gorev": "uye",
+        "unvan": "Öğretmenler kurulunca seçilen öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 2,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Genel kurulca seçilen veli",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 1,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "kontenjan-belirleme-komisyonu",
+    "ad": "Kontenjan Belirleme Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Ortaöğretim Kurumları Yönetmeliği md. 119",
+    "mevzuat_url": "https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=18812&MevzuatTur=7&MevzuatTertip=5",
+    "olusum": "İlgili mevzuata göre.",
+    "toplanma": "Kayıt-nakil dönemlerinde.",
+    "gorev_suresi": "",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 160,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Okul müdürü veya görevlendireceği müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Üye",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "satin-alma-komisyonu",
+    "ad": "Satın Alma Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Kamu İhale mevzuatı; Ortaöğretim Kurumları Yönetmeliği md. 119",
+    "mevzuat_url": "",
+    "olusum": "Müdür veya müdür yardımcısının başkanlığında öğretmenler kurulunca seçilen öğretmenler ve muhasebeden sorumlu personel.",
+    "toplanma": "Satın alma işlerinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 170,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Müdür veya müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğretmenler kurulunca seçilen öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 3,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Muhasebeden sorumlu personel",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "muayene-kabul-komisyonu",
+    "ad": "Muayene ve Kabul Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Taşınır Mal Yönetmeliği; Muayene ve Kabul İşlemlerine Dair Yönetmelik; Ortaöğretim Kurumları Yönetmeliği md. 119",
+    "mevzuat_url": "",
+    "olusum": "Biri başkan, biri işin uzmanı olmak üzere en az üç veya daha fazla tek sayıda üye ile yedek üyeler.",
+    "toplanma": "Mal ve hizmet alımlarının teslimi sırasında.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 180,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Komisyon başkanı (müdür yardımcısı)",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İşin uzmanı",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğretmenler kurulunca seçilen öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 3,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "ihale-komisyonu",
+    "ad": "İhale Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "4734 sayılı Kamu İhale Kanunu; Ortaöğretim Kurumları Yönetmeliği md. 119",
+    "mevzuat_url": "",
+    "olusum": "Biri başkan, ikisi ihale konusu işin uzmanı olmak üzere ilgili idare personelinden en az dört kişi ve mali işlerden sorumlu bir personel; en az beş ve tek sayıda üye ile yedekler.",
+    "toplanma": "İhale yapıldığında.",
+    "gorev_suresi": "İhale süresince",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 190,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Komisyon başkanı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İhale konusu işin uzmanı",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 2,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İdare personeli",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 1,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Mali işlerden sorumlu personel",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 1,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "deger-tespit-komisyonu",
+    "ad": "Taşınır Değer Tespit Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Taşınır Mal Yönetmeliği",
+    "mevzuat_url": "",
+    "olusum": "Harcama yetkilisinin onayıyla taşınır kayıt ve kontrol yetkilisi ile işin uzmanının da katıldığı en az üç kişi.",
+    "toplanma": "Bağış veya değeri bilinmeyen taşınırların kaydında.",
+    "gorev_suresi": "",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 200,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Harcama yetkilisi veya görevlendireceği kişi",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Taşınır kayıt ve kontrol yetkilisi",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İşin uzmanı",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "tasinir-sayim-kurulu",
+    "ad": "Taşınır Sayım Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Taşınır Mal Yönetmeliği; Ortaöğretim Kurumları Yönetmeliği md. 117",
+    "mevzuat_url": "",
+    "olusum": "Harcama yetkilisinin veya görevlendireceği kişinin başkanlığında, taşınır kayıt ve kontrol yetkilisinin de katıldığı en az üç kişi.",
+    "toplanma": "Yıl sonu sayımında ve gerektiğinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 210,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Harcama yetkilisi veya görevlendireceği kişi",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Taşınır kayıt ve kontrol yetkilisi",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Üye",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "tasinir-dusum-komisyonu",
+    "ad": "Taşınır Kayıttan Düşme Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Taşınır Mal Yönetmeliği",
+    "mevzuat_url": "",
+    "olusum": "Harcama yetkilisinin görevlendirdiği en az üç kişi.",
+    "toplanma": "Kullanılamaz hâle gelen taşınırların kayıttan düşülmesinde.",
+    "gorev_suresi": "",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 220,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Komisyon başkanı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Üye",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "kantin-denetleme-komisyonu",
+    "ad": "Kantin Denetleme Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Okul kantinlerinin denetimi ve hijyen kurallarına ilişkin MEB genelgesi (güncel genelgeyi kontrol edin)",
+    "mevzuat_url": "",
+    "olusum": "Ders yılı başında öğretmenler kurulunda seçilir. Müdür, müdür başyardımcısı veya müdür yardımcısının başkanlığında tercihen sağlık bilgisi/biyoloji öğretmeni, okul-aile birliğinden bir yetkili ve okul meclisi başkanı veya yardımcısı.",
+    "toplanma": "Dönemsel denetimlerde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 230,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Müdür, müdür başyardımcısı veya müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Sağlık bilgisi / biyoloji öğretmeni (tercihen)",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Okul-aile birliği yetkilisi",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Okul meclisi başkanı veya yardımcısı",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "kutuphane-secim-komisyonu",
+    "ad": "Kütüphane Kaynaklarının Tespiti ve Seçimi Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "MEB Okul Kütüphaneleri Yönetmeliği",
+    "mevzuat_url": "",
+    "olusum": "Okul müdürünün başkanlığında ilgili zümre başkanları, kütüphanecilik kulübü danışman öğretmeni ve temsilcisi, okul-aile birliğinden bir üye, okul öğrenci meclisi başkanı, kütüphaneci veya kütüphane memuru.",
+    "toplanma": "Kaynak seçimi ve alımında.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 240,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Okul müdürü",
+        "uye_turu": "personel",
+        "personel_secimi": "mudur",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İlgili zümre başkanı",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 3,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Kütüphanecilik kulübü danışman öğretmeni",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Kütüphanecilik kulübü temsilcisi",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Okul-aile birliği üyesi",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Okul öğrenci meclisi başkanı",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Kütüphaneci veya kütüphane memuru",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "web-yayin-komisyonu",
+    "ad": "Web Yayın Komisyonu",
+    "kategori": "komisyon",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "MEB internet siteleri yönergesi",
+    "mevzuat_url": "",
+    "olusum": "Okul müdürü (yayın ekibi yöneticisi), internet sitesi yöneticisi (BT öğretmeni) ve görevlendirilen öğretmenler.",
+    "toplanma": "Gerektiğinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 250,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Okul müdürü (yayın ekibi yöneticisi)",
+        "uye_turu": "personel",
+        "personel_secimi": "mudur",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İnternet sitesi yöneticisi (BT öğretmeni)",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Görevlendirilen öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "okul-gelisim-yonetim-ekibi",
+    "ad": "Okul Gelişim Yönetim Ekibi (OGYE)",
+    "kategori": "ekip",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Ortaöğretim Kurumları Yönetmeliği md. 120",
+    "mevzuat_url": "https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=18812&MevzuatTur=7&MevzuatTertip=5",
+    "olusum": "Okul müdürü, müdür yardımcıları, öğretmenler, rehber öğretmen, destek personeli, veli ve öğrenci temsilcileri, okul-aile birliği başkanı.",
+    "toplanma": "Stratejik plan ve okul gelişim çalışmalarında.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 260,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Okul müdürü",
+        "uye_turu": "personel",
+        "personel_secimi": "mudur",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "mudur_yardimcisi",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Rehber öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "rehber",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Destek personeli",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Veli",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğrenci",
+        "uye_turu": "ogrenci",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Okul-aile birliği başkanı",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "isg-kurulu",
+    "ad": "İş Sağlığı ve Güvenliği Kurulu",
+    "kategori": "kurul",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "6331 sayılı İş Sağlığı ve Güvenliği Kanunu; İş Sağlığı ve Güvenliği Kurulları Hakkında Yönetmelik; Ortaöğretim Kurumları Yönetmeliği md. 120",
+    "mevzuat_url": "",
+    "olusum": "İşveren veya vekili (okul müdürü) başkanlığında İSG uzmanı, işyeri hekimi, idari/mali işler sorumlusu, sivil savunma uzmanı ve çalışan temsilcisi. 50 ve daha fazla çalışanı olan işyerlerinde kurulur.",
+    "toplanma": "Yönetmelikte belirtilen aralıklarla (tehlike sınıfına göre).",
+    "gorev_suresi": "",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 270,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "İşveren vekili (okul müdürü)",
+        "uye_turu": "personel",
+        "personel_secimi": "mudur",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İş güvenliği uzmanı",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İşyeri hekimi",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İdari ve mali işler sorumlusu",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Sivil savunma uzmanı",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Çalışan temsilcisi",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "yangin-ekipleri",
+    "ad": "Yangınla Mücadele Ekipleri (Söndürme, Kurtarma, Koruma, İlk Yardım)",
+    "kategori": "ekip",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "MEB Yangın Önleme ve Söndürme Yönergesi; Binaların Yangından Korunması Hakkında Yönetmelik",
+    "mevzuat_url": "",
+    "olusum": "Her ekipte bir ekip başı; söndürme, kurtarma, koruma ve ilk yardım ekipleri.",
+    "toplanma": "Tatbikatlarda ve eğitimlerde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": true,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 280,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Ekiplerden sorumlu müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Söndürme ekibi başı",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Söndürme ekibi üyesi",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Kurtarma ekibi başı",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Kurtarma ekibi üyesi",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Koruma ekibi başı",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Koruma ekibi üyesi",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İlk yardım ekibi başı",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "İlk yardım ekibi üyesi",
+        "uye_turu": "personel",
+        "personel_secimi": "tum",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  },
+  {
+    "kod": "siddeti-onleme-ekibi",
+    "ad": "Okulda Şiddetin Önlenmesi Çalışma Ekibi",
+    "kategori": "ekip",
+    "kapsam": "okul",
+    "otomatik_uyelik": "yok",
+    "mevzuat_dayanagi": "Okullarda Şiddetin Önlenmesi genelgesi (güncel genelgeyi kontrol edin)",
+    "mevzuat_url": "",
+    "olusum": "Müdürün oluşturduğu çalışma ekibi.",
+    "toplanma": "Gerektiğinde.",
+    "gorev_suresi": "Eğitim-öğretim yılı",
+    "zorunlu": false,
+    "gizli": false,
+    "son_dogrulama": null,
+    "sira": 290,
+    "yapi": [
+      {
+        "gorev": "baskan",
+        "unvan": "Müdür veya görevlendireceği müdür yardımcısı",
+        "uye_turu": "personel",
+        "personel_secimi": "yonetici",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Rehber öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "rehber",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Öğretmen",
+        "uye_turu": "personel",
+        "personel_secimi": "ogretmen",
+        "asil_sayisi": 2,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      },
+      {
+        "gorev": "uye",
+        "unvan": "Okul-aile birliği temsilcisi",
+        "uye_turu": "dis",
+        "personel_secimi": "tum",
+        "asil_sayisi": 1,
+        "yedek_sayisi": 0,
+        "otomatik": false
+      }
+    ]
+  }
+]

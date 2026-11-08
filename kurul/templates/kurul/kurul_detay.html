@@ -1,0 +1,131 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+    .ky-kalem { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; background: #fff; }
+    .ky-kalem-ust { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+    .ky-kalem-ad { font-weight: 700; color: #1f2937; }
+    .ky-kalem-bilgi { font-size: .8em; color: #6b7280; }
+    .ky-alanlar { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+    .ky-alan label { display: block; font-size: .78em; color: #6b7280; margin-bottom: 2px; }
+    .ky-alan select, .ky-alan input[type=text] { width: 100%; padding: 6px; box-sizing: border-box; }
+    .ky-yedek label { color: #92400e; }
+    .ky-gorev { display: inline-block; font-size: .72em; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: #e0e7ff; color: #3730a3; margin-right: 6px; }
+    .ky-gorev-baskan { background: #dcfce7; color: #166534; }
+    .kd-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 14px; align-items: end; }
+    .kd-form label { display: block; font-size: .85em; font-weight: 600; color: #374151; margin-bottom: 3px; }
+    .kd-form select, .kd-form input[type=text] { width: 100%; padding: 6px; box-sizing: border-box; }
+    .kd-satir-form { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+    .errorlist { color: #b91c1c; font-size: .82em; margin: 2px 0 0; padding-left: 16px; }
+    .ky-baslik { font-size: 1.05em; margin: 22px 0 8px; }
+</style>
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">{{ kurul.ad }}</h2>
+    <p style="color:#6b7280;margin-top:-6px;">{{ kurul.egitim_yili }} eğitim-öğretim yılı
+        {% if kurul.tur.kapsam != "okul" %} · <a href="{% url 'kurul:tur_detay' kurul.tur.kod %}">Bu türün bütün kurulları</a>{% endif %}
+        {% if doluluk.gereken %} · Seçimle doldurulan yerler: <strong>{{ doluluk.dolu }}/{{ doluluk.gereken }}</strong> asil{% endif %}</p>
+    {% include "kurul/_mesajlar.html" %}
+    {% with tur=kurul.tur %}{% include "kurul/_tur_bilgi.html" %}{% endwith %}
+
+    {% if baskan_onerisi %}
+    <div class="dn-uyari dn-bilgi" style="margin:14px 0;">
+        <span>Başkan seçilmedi. Önerilen başkan: <strong>{{ baskan_onerisi.adi_soyadi }}</strong>
+            {% if kurul.sinif_sube %}({{ kurul.sinif_sube.sinif }}. sınıflardan sorumlu müdür yardımcısı){% endif %}</span>
+        <form method="post" style="margin:0;">{% csrf_token %}
+            <input type="hidden" name="islem" value="otomatik">
+            <button type="submit" class="btn btn-sm" style="background:#16a34a;color:#fff;">Önerilerle Tamamla</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {# ── Yapı: seçimle doldurulan görev yerleri ── #}
+    {% with satirlar=yapi_formu.satirlar %}
+    {% if satirlar %}
+    <h3 class="ky-baslik">Kurul Yapısı — Başkan ve Üyeler</h3>
+    <form method="post">{% csrf_token %}
+        <input type="hidden" name="islem" value="yapi">
+        {{ yapi_formu.non_field_errors }}
+        {% for s in satirlar %}
+        <div class="ky-kalem">
+            <div class="ky-kalem-ust">
+                <div><span class="ky-gorev{% if s.kalem.gorev == 'baskan' %} ky-gorev-baskan{% endif %}">{{ s.kalem.get_gorev_display }}</span>
+                    <span class="ky-kalem-ad">{{ s.kalem.unvan }}</span></div>
+                <div class="ky-kalem-bilgi">{{ s.kalem.sayi_metni }} · {{ s.kalem.get_uye_turu_display }}{% if s.kalem.uye_turu == "personel" %} · {{ s.kalem.get_personel_secimi_display }}{% endif %}</div>
+            </div>
+            <div class="ky-alanlar">
+                {% for alan in s.asil %}<div class="ky-alan"><label for="{{ alan.id_for_label }}">Asil {{ forloop.counter }}</label>{{ alan }}{{ alan.errors }}</div>{% endfor %}
+                {% for alan in s.yedek %}<div class="ky-alan ky-yedek"><label for="{{ alan.id_for_label }}">Yedek {{ forloop.counter }}</label>{{ alan }}{{ alan.errors }}</div>{% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">Başkan ve Üyeleri Kaydet</button>
+        <span style="font-size:.8em;color:#6b7280;margin-left:8px;">Boş bırakılan yerler boş kalır. Dış üyeler için ad-soyad değil, unvan/temsil yazılır.</span>
+    </form>
+    {% endif %}
+    {% endwith %}
+
+    {# ── Otomatik kalemler ── #}
+    {% for o in otomatik_kalemler %}
+    <h3 class="ky-baslik">{{ o.kalem.unvan }} <span style="font-size:.75em;color:#6b7280;font-weight:400;">(otomatik · {{ o.uyeler|length }} kişi)</span></h3>
+    {% if eksik_otomatik %}
+    <div class="dn-uyari dn-bilgi" style="margin:6px 0 10px;">
+        <span><strong>{{ eksik_otomatik|length }} kişi</strong> kurala göre üye olmalı ama listede yok ({{ kurul.tur.get_otomatik_uyelik_display }}).</span>
+        <form method="post" style="margin:0;">{% csrf_token %}
+            <input type="hidden" name="islem" value="otomatik">
+            <button type="submit" class="btn btn-sm" style="background:#16a34a;color:#fff;">Önerilerle Tamamla</button>
+        </form>
+    </div>
+    {% endif %}
+    <p style="font-size:.9em;line-height:1.7;">{% for u in o.uyeler %}{{ u.uye_adi }}{% if not forloop.last %} · {% endif %}{% empty %}<span class="text-muted">Henüz üye yok.</span>{% endfor %}</p>
+    {% endfor %}
+
+    {# ── Yapı dışı ek üyeler ── #}
+    <h3 class="ky-baslik">Ek Üyeler <span style="font-size:.75em;color:#6b7280;font-weight:400;">(yapı dışında, ihtiyaç hâlinde)</span></h3>
+    {% if ek_uyeler %}
+    <div class="table-responsive">
+    <table class="table">
+        <thead><tr><th>Üye</th><th>Tür</th><th>Görevi</th><th></th></tr></thead>
+        <tbody>
+        {% for u in ek_uyeler %}
+        <tr>
+            <td>{{ u.uye_adi }}</td>
+            <td style="font-size:.88em;">{{ u.uye_turu }}</td>
+            <td>
+                <form method="post" class="kd-satir-form">{% csrf_token %}
+                    <input type="hidden" name="islem" value="gorev"><input type="hidden" name="uye" value="{{ u.pk }}">
+                    <select name="gorev">{% for k, v in gorev_secenekleri %}<option value="{{ k }}"{% if k == u.gorev %} selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+                    <select name="asil"><option value="1"{% if u.asil %} selected{% endif %}>Asil</option><option value="0"{% if not u.asil %} selected{% endif %}>Yedek</option></select>
+                    <button type="submit" class="btn btn-sm" style="background:#475569;color:#fff;">Kaydet</button>
+                </form>
+            </td>
+            <td>
+                <form method="post" class="kd-satir-form" onsubmit="return confirm('Üye kuruldan çıkarılsın mı?');">{% csrf_token %}
+                    <input type="hidden" name="islem" value="cikar"><input type="hidden" name="uye" value="{{ u.pk }}">
+                    <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#991b1b;">Çıkar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+    <details style="margin-top:8px;">
+        <summary style="cursor:pointer;color:#417690;font-weight:600;">Ek üye ekle</summary>
+        <form method="post" class="filter-box" style="margin-top:8px;">{% csrf_token %}
+            <input type="hidden" name="islem" value="uye_ekle">
+            <div class="kd-form">
+                {% for alan in form %}
+                <div>{% if alan.name == "asil" %}<label>{{ alan }} {{ alan.label }}</label>{% else %}<label for="{{ alan.id_for_label }}">{{ alan.label }}</label>{{ alan }}{% endif %}
+                    {{ alan.errors }}</div>
+                {% endfor %}
+                <div><button type="submit" class="btn btn-primary">Ekle</button></div>
+            </div>
+        </form>
+    </details>
+</div>
+{% endblock %}

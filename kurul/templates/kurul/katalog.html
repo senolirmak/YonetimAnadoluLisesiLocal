@@ -1,0 +1,34 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<div class="dn-sayfa">
+    <h2 class="page-title page-title-mb">Kurul ve Komisyon Yapıları</h2>
+    <p class="welcome-text" style="font-size:.95em;">Katalog mevzuata göre hazırlanmış varsayılan listedir. Mevzuat değiştikçe yönetici panelinden
+        düzenlenebilir{% if user.is_staff %} (<a href="{% url 'admin:kurul_kurulturu_changelist' %}">Yönetici Paneli → Kurul/Komisyon Türleri</a>){% endif %}.
+        "Doğrulanmadı" işaretli kayıtları uygulamadan önce resmî metinle karşılaştırın.</p>
+    <div class="table-responsive">
+    <table class="table">
+        <thead><tr><th>Adı</th><th>Yapısı (görev yerleri)</th><th>Mevzuat Dayanağı</th><th>Son Doğrulama</th><th>Durum</th></tr></thead>
+        <tbody>
+        {% for t in turler %}
+        <tr{% if not t.aktif %} style="color:#9ca3af;"{% endif %}>
+            <td><a href="{% url 'kurul:tur_detay' t.kod %}"><strong>{{ t.ad }}</strong></a>
+                <div style="font-size:.78em;color:#6b7280;">{{ t.get_kategori_display }} · {{ t.get_kapsam_display }}</div></td>
+            <td style="font-size:.84em;">
+                {% for k in t.yapi.all %}<div><span style="color:#3730a3;font-weight:600;">{{ k.get_gorev_display }}</span> — {{ k.unvan }} <span style="color:#6b7280;">({{ k.sayi_metni }}{% if k.uye_turu != "personel" %}, {{ k.get_uye_turu_display|lower }}{% endif %})</span></div>
+                {% empty %}<span style="color:#9ca3af;">Yapı tanımlı değil</span>{% endfor %}
+            </td>
+            <td style="font-size:.88em;">{{ t.mevzuat_dayanagi }}{% if t.mevzuat_url %} <a href="{{ t.mevzuat_url }}" target="_blank" rel="noopener">↗</a>{% endif %}</td>
+            <td>{% if t.son_dogrulama %}{{ t.son_dogrulama|date:"d.m.Y" }}{% else %}<span style="color:#92400e;">Doğrulanmadı</span>{% endif %}</td>
+            <td style="font-size:.88em;">{% if t.zorunlu %}Zorunlu{% else %}İhtiyaç hâlinde{% endif %}{% if t.gizli %} · Gizli{% endif %}{% if not t.aktif %} · Pasif{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}
