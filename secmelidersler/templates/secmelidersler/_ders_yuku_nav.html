@@ -6,9 +6,15 @@ context değişkenini ("sonuc" | "alan_sube" | "yonetici" | "brans_paylasimi" |
 "arsiv") kendi adına ayarlar — CSS (.dy-adim-bar, .dy-adim, .ust-bar,
 .geri-btn) her sayfanın kendi <style> bloğunda tekrarlanır (bu app'teki
 şablonların ortak deseni).
+Okul müdürü yalnızca Sonuç Tablosu'nu (salt okunur) görür: geri bağlantısı Okul
+Yönetimi'ne gider, düzenleme adımları gösterilmez.
 {% endcomment %}
 <div class="ust-bar">
+    {% if is_mudur_yardimcisi %}
     <a href="{% url 'secmeli_index' %}" class="geri-btn">← Seçmeli Dersler</a>
+    {% else %}
+    <a href="{% url 'okul:yonetim_index' %}" class="geri-btn">← Okul Yönetimi</a>
+    {% endif %}
     {% if tum_yillar %}
     <form method="get" style="display:flex;align-items:center;gap:6px;">
         <label for="id_yil" style="font-size:0.85em;color:#495057;">Yıl:</label>
@@ -20,6 +26,7 @@ context değişkenini ("sonuc" | "alan_sube" | "yonetici" | "brans_paylasimi" |
     </form>
     {% endif %}
 </div>
+{% if is_mudur_yardimcisi %}
 <div class="dy-adim-bar">
     <a href="{% url 'secmeli_ders_yuku' %}?yil={{ secili_yil.pk }}" class="dy-adim {% if aktif_adim == 'sonuc' %}aktif{% endif %}">📊 Sonuç Tablosu</a>
     <a href="{% url 'secmeli_alan_sube_atama' %}?yil={{ secili_yil.pk }}" class="dy-adim {% if aktif_adim == 'alan_sube' %}aktif{% endif %}">🛠 Alan Şube Ataması</a>
@@ -27,3 +34,4 @@ context değişkenini ("sonuc" | "alan_sube" | "yonetici" | "brans_paylasimi" |
     <a href="{% url 'secmeli_brans_paylasimi' %}?yil={{ secili_yil.pk }}" class="dy-adim {% if aktif_adim == 'brans_paylasimi' %}aktif{% endif %}">🔀 Branş Paylaşımı</a>
     <a href="{% url 'secmeli_norm_kadro_arsiv_listesi' %}" class="dy-adim {% if aktif_adim == 'arsiv' %}aktif{% endif %}">🗄 Arşiv</a>
 </div>
+{% endif %}

@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from okul.auth import mudur_yardimcisi_required
+from okul.auth import is_mudur_yardimcisi, mudur_yardimcisi_required, ust_yonetici_required
 from okul.models import Brans, EgitimOgretimYili
 
 from .forms import (
@@ -621,7 +621,7 @@ def sinif_toplam_saat_listesi(request):
     })
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required  # okul müdürü sonuç tablosunu salt okunur görür
 def ders_yuku_raporu(request):
     """Branş bazlı haftalık ders yükü (saat) raporu — Norm Kadro hesaplama
     akışının SONUÇ sayfası. Hesaplamada kullanılan girdiler (Alan Şube
@@ -657,6 +657,7 @@ def ders_yuku_raporu(request):
         "aktif_yil": secili_yil,
         "tum_yillar": EgitimOgretimYili.objects.all(),
         "secili_yil": secili_yil,
+        "duzenleyebilir": is_mudur_yardimcisi(request.user),
     })
 
 

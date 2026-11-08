@@ -116,12 +116,14 @@
                     <td class="center" style="white-space:nowrap;">
                         <a href="{% url 'faaliyet:faaliyet_detay' f.pk %}"
                            class="btn btn-info" style="padding:3px 10px;font-size:0.82em;">Detay</a>
+                        {% if is_mudur_yardimcisi %}{# düzenleme/silme müdür yardımcısında #}
                         {% if f.durum != 'onaylandi' or not f.devamsizlik_girildi %}
                         <a href="{% url 'faaliyet:faaliyet_duzenle' f.pk %}"
                            class="btn btn-warning" style="padding:3px 10px;font-size:0.82em;">Düzenle</a>
                         {% endif %}
                         <a href="{% url 'faaliyet:faaliyet_sil' f.pk %}?next={% url 'faaliyet:faaliyet_yonetim_listesi' %}"
                            class="btn btn-danger" style="padding:3px 10px;font-size:0.82em;">Sil</a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

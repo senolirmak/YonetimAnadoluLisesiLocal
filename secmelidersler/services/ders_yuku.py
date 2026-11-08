@@ -641,6 +641,20 @@ def yonetici_dusum_haritasi():
     return dict(sonuc)
 
 
+def ozet(egitim_yili) -> dict | None:
+    """Okul Yönetimi kartı için branş bazlı ders yükünün kısa özeti."""
+    if egitim_yili is None:
+        return None
+    satirlar = hesapla(egitim_yili)
+    return {
+        "brans": len(satirlar),
+        "toplam_saat": sum(s["toplam_saat"] for s in satirlar),
+        "norm_kadro": sum(s["norm_kadro"] for s in satirlar),
+        "eksik": sum(s["eksik"] for s in satirlar),
+        "fazla": sum(s["fazla"] for s in satirlar),
+    }
+
+
 def hesapla(egitim_yili):
     """Branş bazlı ders yükünü (ve norm/mevcut/fazla/eksik karşılaştırmasını) hesaplar.
 

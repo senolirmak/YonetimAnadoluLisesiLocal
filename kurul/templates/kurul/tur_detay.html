@@ -14,11 +14,13 @@
         <div class="msg-box msg-error">Aktif eğitim-öğretim yılı tanımlı değil.</div>
     {% elif tur.kapsam == "okul" %}
         <p>Bu kurul {{ egitim_yili }} için henüz açılmadı.</p>
+        {% if is_mudur_yardimcisi %}
         <form method="post" action="{% url 'kurul:kurul_ac' tur.kod %}">{% csrf_token %}
             <button type="submit" class="btn btn-primary">{{ egitim_yili }} için aç</button>
         </form>
+        {% endif %}
     {% else %}
-        {% if kurullar %}
+        {% if kurullar and is_mudur_yardimcisi %}
         <form method="post" action="{% url 'kurul:tur_tamamla' tur.kod %}" style="margin:0 0 12px;">{% csrf_token %}
             <button type="submit" class="btn" style="background:#16a34a;color:#fff;">Önerilerle Tamamla</button>
             <span style="font-size:.85em;color:#6b7280;margin-left:8px;">Eksik otomatik üyeleri ekler{% if tur.otomatik_uyelik == "sube_ogretmenleri" %}, başkanı boş kurullara sınıf seviyesinden sorumlu müdür yardımcısını atar{% endif %}. Seçilmiş başkanlara dokunmaz.</span>

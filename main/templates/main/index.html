@@ -107,6 +107,12 @@
                     <span>Faaliyet Öğrencisi</span>
                     <span class="badge" style="background-color:#fd7e14;color:#fff;">{{ ogrenci_istatistik.faaliyet }}</span>
                 </div>
+                {% if is_ust_yonetici %}
+                <div class="info-item">
+                    <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" style="color:inherit;text-decoration:none;">Bekleyen Faaliyet Onayı</a>
+                    <a href="{% url 'faaliyet:faaliyet_onay_listesi' %}" class="badge" style="background-color:#dc3545;color:#fff;text-decoration:none;">{{ bekleyen_faaliyet_sayisi }}</a>
+                </div>
+                {% endif %}
 
                 {% if user.is_superuser or is_mudur_yardimcisi %}
                 <div style="margin-top:14px;">

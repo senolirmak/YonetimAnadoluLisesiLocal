@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Prefetch, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -22,7 +22,7 @@ from kurul.services.uyelik import (
     yapi_doluluk,
     yapiyi_kaydet,
 )
-from okul.auth import mudur_yardimcisi_required
+from okul.auth import is_mudur_yardimcisi, mudur_yardimcisi_required, ust_yonetici_required
 from okul.utils import get_aktif_egitim_yili
 
 
@@ -33,7 +33,7 @@ def _yil_gerekli(request):
     return yil
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def index(request):
     if katalog_bossa_yukle():
         messages.info(request, "Varsayılan kurul ve komisyon kataloğu yüklendi.")
@@ -88,7 +88,7 @@ def yil_kurulumu_view(request):
     return redirect("kurul:index")
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def tur_detay(request, kod):
     tur = get_object_or_404(KurulTuru, kod=kod)
     yil = get_aktif_egitim_yili()
@@ -139,12 +139,15 @@ def kurul_ac(request, kod):
     return redirect("kurul:kurul_detay", pk=kurul.pk)
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def kurul_detay(request, pk):
     kurul = get_object_or_404(Kurul.objects.select_related("tur", "egitim_yili", "sinif_sube", "brans"), pk=pk)
     form = UyeEkleForm()
     yapi_formu = KurulYapiFormu(kurul)
+    duzenleyebilir = is_mudur_yardimcisi(request.user)  # okul müdürü yalnızca görüntüler
     if request.method == "POST":
+        if not duzenleyebilir:
+            raise PermissionDenied
         islem = request.POST.get("islem")
         if islem == "yapi":
             yapi_formu = KurulYapiFormu(kurul, request.POST)
@@ -206,10 +209,12 @@ def kurul_detay(request, pk):
         "eksik_otomatik": eksik_otomatik,
         "baskan_onerisi": baskan_onerisi,
         "gorev_secenekleri": KurulUyesi.GOREV_CHOICES,
+        "duzenleyebilir": duzenleyebilir,
+        "uyeler": uyeler.order_by("kalem__sira", "-asil", "id"),
     })
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def katalog(request):
     katalog_bossa_yukle()
     return render(request, "kurul/katalog.html", {
@@ -218,7 +223,7 @@ def katalog(request):
     })
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def gorev_yuku_view(request):
     yil = get_aktif_egitim_yili()
     return render(request, "kurul/gorev_yuku.html", {
@@ -228,7 +233,7 @@ def gorev_yuku_view(request):
     })
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def gorevlendirme_pdf(request):
     from okul.models import OkulBilgi
 

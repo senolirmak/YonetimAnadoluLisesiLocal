@@ -33,6 +33,7 @@
     {% include "kurul/_mesajlar.html" %}
     {% with tur=kurul.tur %}{% include "kurul/_tur_bilgi.html" %}{% endwith %}
 
+    {% if duzenleyebilir %}
     {% if baskan_onerisi %}
     <div class="dn-uyari dn-bilgi" style="margin:14px 0;">
         <span>Başkan seçilmedi. Önerilen başkan: <strong>{{ baskan_onerisi.adi_soyadi }}</strong>
@@ -129,5 +130,23 @@
             </div>
         </form>
     </details>
+    {% else %}
+    <h3 class="ky-baslik">Başkan ve Üyeler <span style="font-size:.75em;color:#6b7280;font-weight:400;">({{ uyeler|length }} kişi)</span></h3>
+    <div class="table-responsive">
+    <table class="table">
+        <thead><tr><th>Görevi</th><th>Üye</th><th>Tür</th><th>Asil/Yedek</th></tr></thead>
+        <tbody>
+        {% for u in uyeler %}
+        <tr>
+            <td><span class="ky-gorev{% if u.gorev == 'baskan' %} ky-gorev-baskan{% endif %}">{{ u.get_gorev_display }}</span>{% if u.kalem %} <span style="font-size:.85em;color:#6b7280;">{{ u.kalem.unvan }}</span>{% endif %}</td>
+            <td>{{ u.uye_adi }}</td>
+            <td style="font-size:.88em;">{{ u.uye_turu }}</td>
+            <td>{% if u.asil %}Asil{% else %}Yedek{% endif %}</td>
+        </tr>
+        {% empty %}<tr><td colspan="4" class="text-muted">Henüz üye yok.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

@@ -10,6 +10,9 @@ ana sayfada view'dan, diğer sayfalarda main.context_processors.yan_menu'den gel
     {% endif %}
     {% if is_mudur_yardimcisi %}
     <a href="{% url 'yonetim_paneli' %}" style="--renk:#417690;">Yönetim Paneli{% if bekleyen_faaliyet_sayisi > 0 %} <span class="gm-sayac" title="Bekleyen faaliyet onayı">{{ bekleyen_faaliyet_sayisi }}</span>{% endif %}</a>
+    {% elif is_ust_yonetici %}{# okul müdürü: Yönetim Paneli'nin yalnızca bu bölümleri açık #}
+    <a href="{% url 'okul:yonetim_index' %}" style="--renk:#417690;">Okul Yönetimi</a>
+    <a href="{% url 'kurul:index' %}" style="--renk:#0f766e;">Kurul ve Komisyonlar</a>
     {% endif %}
     {# Müdür yardımcısı bu rapora Sınav İşlemleri menüsünden ulaşır; okul müdürünün o menüsü yok #}
     {% if is_tarih_degistirebilir and v.sinav_aktif_var and not is_mudur_yardimcisi %}

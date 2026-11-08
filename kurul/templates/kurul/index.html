@@ -51,9 +51,11 @@
         <span><strong>{{ eksik|length }} kurul/komisyon/ekip</strong> bu yıl için henüz açılmadı.
             Yıl kurulumu hepsini mevzuattaki yapılarıyla (iskelet) açar; öğretmenler, şube ve zümre kurullarına
             üyeleri ders programı ile branşlardan ekler. Diğerlerinin başkan ve üyeleri kurul sayfasından seçilir.</span>
+        {% if is_mudur_yardimcisi %}
         <form method="post" action="{% url 'kurul:yil_kurulumu' %}" style="margin:0;">{% csrf_token %}
             <button type="submit" class="btn btn-sm" style="background:#d97706;color:#fff;">Yıl Kurulumunu Çalıştır</button>
         </form>
+        {% endif %}
     </div>
     {% endif %}
 

@@ -12,6 +12,7 @@ from dersprogrami.models import DersProgrami
 from devamsizlik.models import OgrenciDevamsizlik
 from ogrenci.models import Ogrenci
 from okul.auth import is_mudur_yardimcisi as _mudur_yardimcisi_mi
+from okul.auth import is_ust_yonetici as _onay_yetkilisi_mi  # müdür yardımcısı veya okul müdürü
 
 from .models import Faaliyet, FaaliyetDersSaati
 from .services.tarih_kurali import GERIYE_DONUK_GUN, en_erken_tarih, sinirdan_muaf_mi, tarih_hatasi
@@ -181,7 +182,7 @@ def faaliyet_detay(request, pk):
     personel = _personel(request)
     faaliyet = get_object_or_404(Faaliyet, pk=pk)
 
-    if personel != faaliyet.ogretmen and not _mudur_yardimcisi_mi(request.user):
+    if personel != faaliyet.ogretmen and not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu faaliyeti görme yetkiniz yok.")
         return redirect("faaliyet:faaliyet_liste")
 
@@ -319,7 +320,7 @@ def ders_programi_getir(request):
 
 @login_required
 def faaliyet_yonetim_listesi(request):
-    if not _mudur_yardimcisi_mi(request.user):
+    if not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
         return redirect("index")
 
@@ -384,7 +385,7 @@ def faaliyet_yonetim_listesi(request):
 
 @login_required
 def faaliyet_onay_listesi(request):
-    if not _mudur_yardimcisi_mi(request.user):
+    if not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
         return redirect("index")
 
@@ -398,11 +399,16 @@ def faaliyet_onay_listesi(request):
 
 @login_required
 def faaliyet_onayla(request, pk):
-    if not _mudur_yardimcisi_mi(request.user):
+    if not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu işlem için yetkiniz yok.")
         return redirect("index")
 
     faaliyet = get_object_or_404(Faaliyet, pk=pk)
+    if request.method == "POST" and faaliyet.durum == Faaliyet.DURUM_ONAYLANDI:
+        # Müdür ve müdür yardımcısı aynı anda onaylayabilir; ilk onay korunur.
+        messages.info(request, f'"{faaliyet.konu}" faaliyeti zaten {faaliyet.onaylayan_adi or "onaylanmış"}'
+                               f'{" tarafından onaylanmış" if faaliyet.onaylayan_adi else ""}.')
+        return redirect("faaliyet:faaliyet_onay_listesi")
     if request.method == "POST":
         faaliyet.durum = Faaliyet.DURUM_ONAYLANDI
         faaliyet.ret_aciklamasi = ""
@@ -427,7 +433,7 @@ def faaliyet_onayla(request, pk):
 
 @login_required
 def faaliyet_reddet(request, pk):
-    if not _mudur_yardimcisi_mi(request.user):
+    if not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu işlem için yetkiniz yok.")
         return redirect("index")
 
@@ -547,7 +553,7 @@ def faaliyet_rapor(request, pk):
     personel = _personel(request)
     faaliyet = get_object_or_404(Faaliyet, pk=pk)
 
-    if personel != faaliyet.ogretmen and not _mudur_yardimcisi_mi(request.user):
+    if personel != faaliyet.ogretmen and not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu rapora erişim yetkiniz yok.")
         return redirect("faaliyet:faaliyet_liste")
 
@@ -626,7 +632,7 @@ def faaliyet_rapor_pdf(request, pk):
     personel = _personel(request)
     faaliyet = get_object_or_404(Faaliyet, pk=pk)
 
-    if personel != faaliyet.ogretmen and not _mudur_yardimcisi_mi(request.user):
+    if personel != faaliyet.ogretmen and not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu rapora erişim yetkiniz yok.")
         return redirect("faaliyet:faaliyet_liste")
 
@@ -911,7 +917,7 @@ def _toplu_rapor_filtreleri(request):
 
 @login_required
 def faaliyet_toplu_rapor(request):
-    if not _mudur_yardimcisi_mi(request.user):
+    if not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
         return redirect("index")
 
@@ -947,7 +953,7 @@ def faaliyet_toplu_rapor(request):
 
 @login_required
 def faaliyet_toplu_rapor_pdf(request):
-    if not _mudur_yardimcisi_mi(request.user):
+    if not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
         return redirect("index")
 
@@ -1018,7 +1024,7 @@ def _ogrenci_rapor_verisi(request):
 
 @login_required
 def faaliyet_ogrenci_rapor(request):
-    if not _mudur_yardimcisi_mi(request.user):
+    if not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
         return redirect("index")
 
@@ -1054,13 +1060,14 @@ def faaliyet_ogrenci_rapor(request):
             "tarih_bas": filtre["tarih_bas"],
             "tarih_bit": filtre["tarih_bit"],
             "sorgu": request.GET.urlencode(),
+            "eokul_isaretleyebilir": _mudur_yardimcisi_mi(request.user),
         },
     )
 
 
 @login_required
 def faaliyet_ogrenci_rapor_pdf(request):
-    if not _mudur_yardimcisi_mi(request.user):
+    if not _onay_yetkilisi_mi(request.user):
         messages.error(request, "Bu sayfaya erişim yetkiniz yok.")
         return redirect("index")
 

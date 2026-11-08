@@ -148,15 +148,17 @@
     <h5 class="mb-2">{{ title }}</h5>
 
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+        {% if duzenleyebilir %}
         <form method="post" action="{% url 'secmeli_norm_kadro_arsivle' %}"
               onsubmit="return confirm('Şu anki norm kadro hesabı arşivlenecek. Arşivlenen kayıt daha sonra düzenlenemez. Devam edilsin mi?');">
             {% csrf_token %}
             <input type="hidden" name="yil" value="{{ secili_yil.pk }}">
             <button type="submit" class="btn btn-primary" style="padding:6px 16px;font-size:0.85em;">📌 Normu Arşivle</button>
         </form>
+        {% endif %}
         {% if son_arsiv %}
         <span style="font-size:0.8em;color:#6c757d;">
-            Son arşiv: <a href="{% url 'secmeli_norm_kadro_arsiv_detay' pk=son_arsiv.pk %}">{{ son_arsiv.tarih|date:"d.m.Y H:i" }}</a>
+            Son arşiv: {% if duzenleyebilir %}<a href="{% url 'secmeli_norm_kadro_arsiv_detay' pk=son_arsiv.pk %}">{{ son_arsiv.tarih|date:"d.m.Y H:i" }}</a>{% else %}{{ son_arsiv.tarih|date:"d.m.Y H:i" }}{% endif %}
         </span>
         {% endif %}
     </div>

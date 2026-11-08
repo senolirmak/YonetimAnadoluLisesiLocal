@@ -11,7 +11,7 @@ from kurul.forms import KararForm, ToplantiForm
 from kurul.models import GundemMaddesi, Karar, Katilim, Kurul, Toplanti
 from kurul.services import toplanti as ts
 from kurul.services.toplanti_pdf import duyuru_pdf, karar_defteri_pdf, tutanak_pdf
-from okul.auth import mudur_yardimcisi_required
+from okul.auth import ust_yonetici_required
 from okul.utils import get_aktif_egitim_yili
 
 
@@ -195,7 +195,7 @@ def karar_defteri(request, pk):
     return _pdf(karar_defteri_pdf(kurul, okul_adi), f"kurul-{kurul.pk}-karar-defteri")
 
 
-@mudur_yardimcisi_required
+@ust_yonetici_required
 def toplanti_takvimi(request):
     """Yılın bütün kurul toplantıları; yaklaşanlar ve onay bekleyenler öne çıkar."""
     yil = get_aktif_egitim_yili()

@@ -789,3 +789,24 @@ class DuzeltmeTests(TestCase):
                 for satir_no, satir in enumerate(yol.read_text().splitlines(), 1):
                     if "{#" in satir:
                         self.assertIn("#}", satir, f"{yol.name}:{satir_no} çok satırlı {{# #}}")
+
+
+class AnaSayfaFaaliyetOnayiTests(TestCase):
+    def test_bekleyen_faaliyet_onayi_yalnizca_mudur_yardimcisina(self):
+        from faaliyet.models import Faaliyet
+
+        aktif_egitim_yili_olustur("2025-2026")
+        ogretmen = personel_olustur()
+        for i in range(2):
+            Faaliyet.objects.create(konu=f"Gezi {i}", tarih=timezone.localdate(), yer="Okul", ogretmen=ogretmen)
+        Faaliyet.objects.create(konu="Onaylı", tarih=timezone.localdate(), yer="Okul", ogretmen=ogretmen,
+                                durum=Faaliyet.DURUM_ONAYLANDI)
+
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+        resp = self.client.get(reverse("index"))
+        self.assertContains(resp, "Bekleyen Faaliyet Onayı")
+        self.assertEqual(resp.context["bekleyen_faaliyet_sayisi"], 2)
+        self.assertContains(resp, reverse("faaliyet:faaliyet_onay_listesi"))
+
+        self.client.force_login(kullanici_olustur("ogretmen"))
+        self.assertNotContains(self.client.get(reverse("index")), "Bekleyen Faaliyet Onayı")
