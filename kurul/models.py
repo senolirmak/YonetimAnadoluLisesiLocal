@@ -315,6 +315,21 @@ class KurulUyesi(models.Model):
         return self.kalem.unvan if self.kalem_id else self.get_gorev_display()
 
     @property
+    def katilim_gorevi(self):
+        """Katılım/tutanak listesindeki kısa görev: kişinin okuldaki görevi (personel
+        kaydından), kuruldaki rolü üyelik dışındaysa parantez içinde ("Müdür Yardımcısı
+        (Başkan)")."""
+        if self.personel_id:
+            gorev = self.personel.unvan
+        elif self.ogrenci_id:
+            gorev = "Öğrenci"
+        else:
+            gorev = "Dış Üye"
+        if self.gorev != GOREV_UYE:
+            gorev += f" ({self.get_gorev_display()})"
+        return gorev
+
+    @property
     def uye_turu(self):
         if self.personel_id:
             return "Personel"

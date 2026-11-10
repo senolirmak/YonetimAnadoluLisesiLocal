@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from kurul.models import GundemMaddesi, Karar, Katilim, KurulUyesi, Toplanti
 from okul.auth import is_mudur_yardimcisi, is_ust_yonetici
+from okul.utils import turkce_sira_anahtari
 
 ACILIS_MADDESI = "Açılış ve yoklama"
 ONCEKI_KARARLAR_MADDESI = "Bir önceki toplantıda alınan kararların değerlendirilmesi"
@@ -60,10 +61,46 @@ def onceki_toplanti(toplanti):
     )
 
 
+def _katilim_sira_anahtari(k):
+    """Okul Müdürü ve kurul başkanı, müdür yardımcıları, öğretmenler (branşa göre),
+    öğrenciler, dış üyeler; her grupta ada göre. Yedekler asillerden sonra gelir."""
+    uye = k.uye
+    personel = uye.personel if uye and uye.personel_id else None
+    baskan = bool(uye and uye.gorev == KurulUyesi.GOREV_BASKAN) or "(Başkan)" in k.gorev
+    if personel is not None:
+        unvan = personel.unvan
+        if unvan == "Okul Müdürü":
+            grup, alt = 0, ""
+        elif baskan:
+            grup, alt = 0, "~"  # müdürden sonra
+        elif unvan == "Müdür Yardımcısı":
+            grup, alt = 1, ""
+        else:
+            grup, alt = 2, personel.brans.ad if personel.brans_id else "~"
+    elif baskan:
+        grup, alt = 0, "~"
+    elif uye and uye.ogrenci_id:
+        grup, alt = 3, ""
+    elif uye:
+        grup, alt = 4, ""
+    else:  # üye sonradan kuruldan çıkarılmış: tutanaktaki görev metnine göre
+        grup = 0 if k.gorev.startswith("Okul Müdürü") else 1 if k.gorev.startswith("Müdür Yardımcısı") else 2
+        alt = k.gorev
+    return (not k.asil, grup, turkce_sira_anahtari(alt), turkce_sira_anahtari(k.ad))
+
+
+def sirali_katilimlar(toplanti):
+    """Katılım listesi, sayfa ve tutanakta kullanılan sırayla (bkz. _katilim_sira_anahtari)."""
+    return sorted(
+        toplanti.katilimlar.select_related("uye__personel__brans"),
+        key=_katilim_sira_anahtari,
+    )
+
+
 def _uyeleri_katilima_yaz(toplanti, uyeler):
     for u in uyeler:
         Katilim.objects.create(
-            toplanti=toplanti, uye=u, ad=u.uye_adi[:200], gorev=u.gorev_adi[:200], asil=u.asil,
+            toplanti=toplanti, uye=u, ad=u.uye_adi[:200], gorev=u.katilim_gorevi[:200], asil=u.asil,
         )
 
 
@@ -76,7 +113,7 @@ def toplanti_olustur(kurul, *, tarih, saat, yer, tur=Toplanti.TUR_OLAGAN, acikla
         kurul=kurul, no=no, tarih=tarih, saat=saat, yer=yer, tur=tur, aciklama=aciklama,
         olusturan=olusturan,
     )
-    _uyeleri_katilima_yaz(toplanti, kurul.uyeler.select_related("personel", "ogrenci", "kalem"))
+    _uyeleri_katilima_yaz(toplanti, kurul.uyeler.select_related("personel__brans", "ogrenci", "kalem"))
     if not kurul.tur.gizli:
         maddeler = [(ACILIS_MADDESI, False)]
         if onceki_toplanti(toplanti):
@@ -87,12 +124,28 @@ def toplanti_olustur(kurul, *, tarih, saat, yer, tur=Toplanti.TUR_OLAGAN, acikla
     return toplanti
 
 
-def katilimi_esitle(toplanti) -> int:
-    """Toplantı açıldıktan sonra kurula eklenen üyeleri katılım listesine ekler."""
+def katilimi_esitle(toplanti) -> tuple[int, int]:
+    """Toplantı açıldıktan sonra kurula eklenen üyeleri katılım listesine ekler; listede
+    olanların görevini güncel kurul/personel bilgisinden yeniler (onaylanmış ya da iptal
+    edilmiş toplantıda tutanak bozulmasın diye hiçbir şey değişmez).
+
+    Dönüş ``(eklenen, guncellenen)``.
+    """
+    if not toplanti.duzenlenebilir:
+        return 0, 0
+    guncellenen = 0
+    for k in toplanti.katilimlar.exclude(uye=None).select_related("uye__personel__brans"):
+        gorev = k.uye.katilim_gorevi[:200]
+        if k.gorev != gorev:
+            k.gorev = gorev
+            k.save(update_fields=["gorev"])
+            guncellenen += 1
     var = set(toplanti.katilimlar.exclude(uye=None).values_list("uye_id", flat=True))
-    yeni = list(toplanti.kurul.uyeler.exclude(pk__in=var).select_related("personel", "ogrenci", "kalem"))
+    yeni = list(
+        toplanti.kurul.uyeler.exclude(pk__in=var).select_related("personel__brans", "ogrenci", "kalem")
+    )
     _uyeleri_katilima_yaz(toplanti, yeni)
-    return len(yeni)
+    return len(yeni), guncellenen
 
 
 # ── Gündem ───────────────────────────────────────────────────────────────────

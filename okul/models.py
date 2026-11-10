@@ -398,6 +398,25 @@ class Personel(models.Model):
         return self.adi_soyadi
 
     @property
+    def unvan(self) -> str:
+        """Kayıtlı görev ve branştan kısa unvan: "Matematik Öğretmeni", "Müdür Yardımcısı",
+        "Rehber Öğretmen", "Fizik Öğretmeni (Ücretli)" gibi."""
+        gorev = self.gorev_tipi or ""
+        if gorev in ("Müdür", "Okul Müdürü"):
+            return "Okul Müdürü"
+        if gorev == "Müdür Yardımcısı":
+            return gorev
+        brans = self.brans.ad if self.brans_id else ""
+        if gorev == "Rehberlik" or brans == "Rehberlik":
+            return "Rehber Öğretmen"
+        unvan = f"{brans} Öğretmeni" if brans and brans != "Bilinmiyor" else "Öğretmen"
+        if gorev == "Ücretli Öğretmen":
+            unvan += " (Ücretli)"
+        elif gorev == "Görevlendirme":
+            unvan += " (Görevlendirme)"
+        return unvan
+
+    @property
     def arsivde_mi(self) -> bool:
         """Bu personel okuldan kalıcı olarak ayrılmış mı? (bkz. `ARSIV_DURUMLARI`)"""
         return self.durum in self.ARSIV_DURUMLARI

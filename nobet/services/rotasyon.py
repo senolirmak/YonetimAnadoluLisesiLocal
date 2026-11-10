@@ -15,20 +15,14 @@ azsa ``bos_yer`` o gün boş bırakılır. O gün bu yer birine verilmişse, rot
 import re
 from collections import defaultdict
 
+from okul.utils import turkce_sira_anahtari  # noqa: F401 — nobet içinden buradan da kullanılır
+
 VARSAYILAN_ESIK = 11
-
-_ALFABE = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
-
 
 def yer_anahtari(ad):
     """Büyük/küçük harf ve boşluk farkını yok sayan karşılaştırma anahtarı."""
     ad = (ad or "").replace("i", "İ").replace("ı", "I").upper()
     return " ".join(ad.split())
-
-
-def turkce_sira_anahtari(ad):
-    """Türkçe alfabe sırasına göre sıralama anahtarı."""
-    return [(_ALFABE.index(h) if h in _ALFABE else 100 + ord(h)) for h in yer_anahtari(ad)]
 
 
 def yer_turu(ad):

@@ -97,7 +97,7 @@ def toplanti_detay(request, pk):
         "kurul": kurul,
         "gizli": kurul.tur.gizli,
         "gundem": toplanti.gundem.all(),
-        "katilimlar": toplanti.katilimlar.all(),
+        "katilimlar": ts.sirali_katilimlar(toplanti),
         "kararlar": toplanti.kararlar.select_related("sorumlu", "gundem_maddesi"),
         "onceki": onceki,
         "onceki_kararlar": onceki.kararlar.all() if onceki else [],
@@ -145,8 +145,12 @@ def _islem_uygula(request, toplanti, islem):
         ts.katilimi_kaydet(toplanti, durumlar)
         messages.success(request, "Katılım kaydedildi.")
     elif islem == "katilim_esitle":
-        n = ts.katilimi_esitle(toplanti)
-        messages.success(request, f"Katılım listesine {n} yeni üye eklendi.")
+        eklenen, guncellenen = ts.katilimi_esitle(toplanti)
+        messages.success(
+            request,
+            f"Katılım listesi kurul üyeleriyle eşitlendi: {eklenen} yeni üye eklendi, "
+            f"{guncellenen} kişinin görevi güncellendi.",
+        )
     elif islem == "karar_ekle":
         form = KararForm(toplanti, p)
         if not form.is_valid():

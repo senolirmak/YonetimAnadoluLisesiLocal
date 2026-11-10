@@ -10,7 +10,7 @@ from reportlab.lib.units import cm
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from kurul.models import Karar, Katilim, KurulUyesi, Toplanti
-from kurul.services.toplanti import onceki_toplanti
+from kurul.services.toplanti import onceki_toplanti, sirali_katilimlar
 from sosyalkulup.services.pdf_rapor import _fontlar
 
 _GUNLER = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar")
@@ -128,7 +128,7 @@ def tutanak_pdf(toplanti, okul_adi="", okul_muduru="") -> bytes:
     icerik = _ust_bilgi(st, okul_adi, toplanti, f"{toplanti.no} Nolu Toplantı Tutanağı")
     icerik.append(_bilgi_tablosu(st, toplanti, _baskan_adi(toplanti)))
 
-    katilimlar = list(toplanti.katilimlar.all())
+    katilimlar = sirali_katilimlar(toplanti)
     gruplar = {d: [k for k in katilimlar if k.durum == d] for d, _ in Katilim.DURUM_CHOICES}
     icerik.append(_p("KATILIM", st["bolum"]))
     for durum, ad in Katilim.DURUM_CHOICES:
