@@ -1,14 +1,19 @@
 """Haftalık nöbet yeri rotasyonu.
 
-Her gün için o günün görevleri nöbet yeri adına göre sıralanır ve yerler bir adım
-kaydırılır (her öğretmen listedeki bir sonraki yere geçer); öğretmenlerin nöbet
-günleri değişmez.
+Her gün için o günün yerlerinden sabit bir döngü kurulur ve her öğretmen döngüde
+bir sonraki yere geçer; öğretmenlerin nöbet günleri değişmez. Döngü ada göre
+sıralıdır, ancak aynı türden yerler (adı yalnızca sondaki numarayla ayrılanlar,
+örn. "BAHÇE_1", "BAHÇE_2" — ya da aynı yerde birden fazla nöbetçi) döngüye eşit
+aralıklarla serpiştirilir: böylece öğretmen bu yerlere art arda haftalarda gelmez.
 
 İsteğe bağlı kural (``bos_yer``, ``esik``): bir günde nöbetçi sayısı ``esik``'ten
 azsa ``bos_yer`` o gün boş bırakılır. O gün bu yer birine verilmişse, rotasyondan
 önce o gün kimsenin tutmadığı bir yerle değiştirilir; kaydırma bu yeni yer kümesi
 üzerinden yapılır. Hangi yerin boş bırakılacağını kullanıcı seçer.
 """
+
+import re
+from collections import defaultdict
 
 VARSAYILAN_ESIK = 11
 
@@ -24,6 +29,33 @@ def yer_anahtari(ad):
 def turkce_sira_anahtari(ad):
     """Türkçe alfabe sırasına göre sıralama anahtarı."""
     return [(_ALFABE.index(h) if h in _ALFABE else 100 + ord(h)) for h in yer_anahtari(ad)]
+
+
+def yer_turu(ad):
+    """Aynı tür yerleri birleştiren anahtar: sondaki numara atılır ("BAHÇE_2" → "BAHÇE")."""
+    return re.sub(r"[\s_\-.]*\d+$", "", yer_anahtari(ad)) or yer_anahtari(ad)
+
+
+def rotasyon_dongusu(yerler):
+    """Yer adlarından (tekrar edebilir) rotasyon döngüsünü kurar.
+
+    Kalabalık türden başlayarak her türün yerleri boş kalan sıralara eşit aralıkla
+    yerleştirilir; tek yerli türler kalan sıraları ad sırasıyla doldurur.
+    """
+    turler = defaultdict(list)
+    for y in yerler:
+        turler[yer_turu(y)].append(y)
+    sira = sorted(
+        turler.items(), key=lambda kv: (-len(kv[1]), turkce_sira_anahtari(kv[0]))
+    )
+    dongu = [None] * len(yerler)
+    for _, uyeler in sira:
+        uyeler.sort(key=turkce_sira_anahtari)
+        bos = [i for i, y in enumerate(dongu) if y is None]
+        m = len(uyeler)
+        for k, y in enumerate(uyeler):
+            dongu[bos[(k * len(bos)) // m]] = y
+    return dongu
 
 
 def yeri_bosalt(gorev_yerleri, bos_yer, esik, aday_yerler):
@@ -65,20 +97,26 @@ def yeri_bosalt(gorev_yerleri, bos_yer, esik, aday_yerler):
 def gun_rotasyonu(gorev_yerleri, aday_yerler=(), bos_yer=None, esik=VARSAYILAN_ESIK):
     """Bir günün rotasyonunu hesaplar.
 
-    ``gorev_yerleri``: ``[(gorev_anahtari, yer_adi), ...]``, nöbet yeri adına göre sıralı.
+    ``gorev_yerleri``: ``[(gorev_anahtari, yer_adi), ...]`` (sırası önemsiz; aynı yerdeki
+    görevler bu sırayla o yerin döngü sıralarına dağıtılır).
     ``bos_yer``/``esik``/``aday_yerler``: bkz. ``yeri_bosalt``.
 
     Dönüş ``({gorev_anahtari: yeni_yer_adi}, uyari)``.
     """
-    gorev_yerleri = list(gorev_yerleri)
-    bosaltilmis, uyari = yeri_bosalt(gorev_yerleri, bos_yer, esik, aday_yerler)
-    if bosaltilmis != gorev_yerleri:
-        # Boşaltılan yerdeki öğretmen yeni yeri tutuyormuş gibi rotasyona girer
-        gorev_yerleri = sorted(bosaltilmis, key=lambda gy: turkce_sira_anahtari(gy[1]))
-
-    if len(gorev_yerleri) < 2:
+    # Boşaltılan yerdeki öğretmen yeni yeri tutuyormuş gibi rotasyona girer
+    gorev_yerleri, uyari = yeri_bosalt(list(gorev_yerleri), bos_yer, esik, aday_yerler)
+    n = len(gorev_yerleri)
+    if n < 2:
         return {gorev: yer for gorev, yer in gorev_yerleri}, uyari
 
-    yerler = [y for _, y in gorev_yerleri]
-    yeni_yerler = yerler[1:] + yerler[:1]
-    return {gorev: yeni for (gorev, _), yeni in zip(gorev_yerleri, yeni_yerler)}, uyari
+    dongu = rotasyon_dongusu([y for _, y in gorev_yerleri])
+    # Her görevi döngüde kendi yerinin bir sırasına oturt (aynı yerde birden fazla
+    # nöbetçi varsa, görev sırasına göre o yerin sıralarına dağıtılır)
+    yer_siralari = defaultdict(list)
+    for i, y in enumerate(dongu):
+        yer_siralari[y].append(i)
+    yeni = {}
+    for gorev, yer in gorev_yerleri:
+        konum = yer_siralari[yer].pop(0)
+        yeni[gorev] = dongu[(konum + 1) % n]
+    return yeni, uyari

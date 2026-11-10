@@ -54,6 +54,47 @@ class GunRotasyonuTests(SimpleTestCase):
         self.assertEqual(yeni, {"a": "KANTİN"})
 
 
+OKUL_YERLERI = [
+    "1.KAT GÜNEY", "1.KAT KUZEY", "2.KAT GÜNEY", "2.KAT KUZEY", "3.KAT GUNEY",
+    "BAHÇE ÖN ARKA_1", "BAHÇE ÖN ARKA_2", "BAHÇE ÖN ARKA_3", "GİRİŞ GÜNEY", "GİRİŞ KUZEY",
+]
+
+
+def _haftalar(yerler, hafta_sayisi):
+    """Rotasyonu art arda uygular; her öğretmenin hafta hafta yerlerini döndürür."""
+    durum = {f"o{i}": y for i, y in enumerate(yerler)}
+    gecmis = {o: [y] for o, y in durum.items()}
+    for _ in range(hafta_sayisi):
+        sirali = sorted(durum.items(), key=lambda gy: gy[1])
+        durum, _ = gun_rotasyonu(sirali)
+        for o, y in durum.items():
+            gecmis[o].append(y)
+    return gecmis
+
+
+class AyniTurYerlerTests(SimpleTestCase):
+    """Bahçe gibi numaralı aynı tür yerler döngüde birbirinden uzak tutulur."""
+
+    def test_bahce_art_arda_iki_hafta_gelmez(self):
+        for o, yerler in _haftalar(OKUL_YERLERI, 20).items():
+            for once, sonra in zip(yerler, yerler[1:]):
+                self.assertFalse(
+                    once.startswith("BAHÇE") and sonra.startswith("BAHÇE"),
+                    f"{o}: {yerler}",
+                )
+
+    def test_her_ogretmen_her_yere_bir_kez_ugrar(self):
+        n = len(OKUL_YERLERI)
+        for o, yerler in _haftalar(OKUL_YERLERI, n - 1).items():
+            self.assertEqual(sorted(yerler), sorted(OKUL_YERLERI), o)
+
+    def test_ayni_yerde_birden_fazla_nobetci_her_hafta_degisir(self):
+        yerler = ["BAHÇE", "BAHÇE", "KANTİN", "KORİDOR", "ZEMİN", "GİRİŞ"]
+        for o, sira in _haftalar(yerler, 12).items():
+            for once, sonra in zip(sira, sira[1:]):
+                self.assertNotEqual(once, sonra, f"{o}: {sira}")
+
+
 class RotasyonEkraniTests(TestCase):
     def setUp(self):
         self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
