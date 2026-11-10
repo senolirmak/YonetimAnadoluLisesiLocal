@@ -34,6 +34,15 @@ _TR_GUNLER = {
 }
 
 
+_HAFTA_ICI = {
+    "Monday": "Pazartesi",
+    "Tuesday": "Salı",
+    "Wednesday": "Çarşamba",
+    "Thursday": "Perşembe",
+    "Friday": "Cuma",
+}
+
+
 def _gun_adi_tr(date):
     return _TR_GUNLER[date.weekday()]
 
@@ -62,12 +71,17 @@ def nobet_dagitim(request):
             pazartesi = form.cleaned_data["baslangic_tarihi"]
 
         if request.method == "POST" and any(
-            k in request.POST for k in ["rotasyon_onizle", "rotasyon_kaydet", "rotasyon_iptal"]
+            k in request.POST
+            for k in ["rotasyon_onizle", "giris_orta_onizle", "rotasyon_kaydet", "rotasyon_iptal"]
         ):
             if not is_ust_yonetici(request.user):
                 raise PermissionDenied
 
         if "rotasyon_onizle" in request.POST:
+            from nobet.models import NobetYerleri
+            from nobet.services.rotasyon import GIRIS_ORTA, GIRIS_ORTA_ESIGI, gun_rotasyonu
+
+            aktif_yerler = list(NobetYerleri.objects.filter(aktif=True).values_list("ad", flat=True))
             rotation_updates = {}
             gun_map = {
                 "Monday": "Pazartesi",
@@ -76,31 +90,73 @@ def nobet_dagitim(request):
                 "Thursday": "Perşembe",
                 "Friday": "Cuma",
             }
-            for gun in gun_map.keys():
+            for gun, gun_tr in gun_map.items():
                 gunluk_gorevler = list(
                     NobetGorevi.objects.aktif().filter(nobet_gun=gun)
                     .select_related("nobet_yeri")
                     .order_by("nobet_yeri__ad")
                 )
-
                 if not gunluk_gorevler:
                     continue
 
-                yerler = [g.nobet_yeri.ad if g.nobet_yeri else "" for g in gunluk_gorevler]
-
-                if len(yerler) < 2:
-                    continue
-
-                yeni_yerler = yerler[1:] + yerler[:1]
-
-                for gorev, yeni_yer in zip(gunluk_gorevler, yeni_yerler):
-                    rotation_updates[str(gorev.pk)] = yeni_yer
+                mevcut = {str(g.pk): (g.nobet_yeri.ad if g.nobet_yeri else "") for g in gunluk_gorevler}
+                yeni, uyari = gun_rotasyonu(mevcut.items(), aktif_yerler)
+                if uyari:
+                    messages.error(
+                        request,
+                        f"{gun_tr}: nöbetçi sayısı {GIRIS_ORTA_ESIGI}'den az ama {uyari}; "
+                        f"{GIRIS_ORTA} dolu kaldı.",
+                    )
+                rotation_updates.update(
+                    {pk: yer for pk, yer in yeni.items() if yer != mevcut[pk]}
+                )
 
             request.session["rotation_preview"] = rotation_updates
+            request.session["onizleme_turu"] = "rotasyon"
             messages.warning(
                 request,
-                "Rotasyon önizlemesi oluşturuldu. Tabloyu kontrol edip 'Değişiklikleri Kaydet' butonuna basınız.",
+                "Rotasyon önizlemesi oluşturuldu. Tabloyu kontrol edip 'Değişiklikleri Kaydet' butonuna basınız. "
+                f"Nöbetçi sayısı {GIRIS_ORTA_ESIGI}'den az olan günlerde {GIRIS_ORTA} boş bırakılır.",
             )
+
+        elif "giris_orta_onizle" in request.POST:
+            # Mevcut çizelgede, nöbetçi sayısı eşiğin altındaki günlerde GİRİŞ ORTA'daki
+            # öğretmeni o gün boş kalan yere taşır; başka hiçbir görev değişmez.
+            from nobet.models import NobetYerleri
+            from nobet.services.rotasyon import GIRIS_ORTA, GIRIS_ORTA_ESIGI, giris_orta_bosalt
+
+            aktif_yerler = list(NobetYerleri.objects.filter(aktif=True).values_list("ad", flat=True))
+            duzeltmeler = {}
+            ozet = []
+            for gun, gun_tr in _HAFTA_ICI.items():
+                gunluk_gorevler = list(
+                    NobetGorevi.objects.aktif().filter(nobet_gun=gun).select_related("nobet_yeri")
+                )
+                mevcut = [
+                    (str(g.pk), g.nobet_yeri.ad if g.nobet_yeri else "") for g in gunluk_gorevler
+                ]
+                yeni, uyari = giris_orta_bosalt(mevcut, aktif_yerler)
+                if uyari:
+                    messages.error(request, f"{gun_tr}: {uyari}; {GIRIS_ORTA} dolu kaldı.")
+                for (pk, eski), (_, yer) in zip(mevcut, yeni):
+                    if yer != eski:
+                        duzeltmeler[pk] = yer
+                        ozet.append(f"{gun_tr}: {GIRIS_ORTA} → {yer}")
+
+            if duzeltmeler:
+                request.session["rotation_preview"] = duzeltmeler
+                request.session["onizleme_turu"] = "giris_orta"
+                messages.warning(
+                    request,
+                    f"{GIRIS_ORTA} düzeltmesi önizlemesi ({'; '.join(ozet)}). Tabloyu kontrol edip "
+                    "'Değişiklikleri Kaydet' butonuna basınız.",
+                )
+            else:
+                messages.info(
+                    request,
+                    f"Düzeltme gerekmiyor: nöbetçi sayısı {GIRIS_ORTA_ESIGI}'den az olan hiçbir günde "
+                    f"{GIRIS_ORTA}'ya nöbetçi atanmamış.",
+                )
 
         elif "rotasyon_kaydet" in request.POST:
             updates = request.session.get("rotation_preview", {})
@@ -114,14 +170,18 @@ def nobet_dagitim(request):
                             NobetGorevi.objects.filter(id=gorev_id).update(nobet_yeri_id=yer_pk)
 
                 del request.session["rotation_preview"]
-                messages.success(request, "Nöbet yerleri rotasyonu başarıyla kaydedildi.")
+                if request.session.pop("onizleme_turu", "rotasyon") == "giris_orta":
+                    messages.success(request, "GİRİŞ ORTA düzeltmesi kaydedildi.")
+                else:
+                    messages.success(request, "Nöbet yerleri rotasyonu başarıyla kaydedildi.")
             else:
                 messages.error(request, "Kaydedilecek rotasyon verisi bulunamadı.")
 
         elif "rotasyon_iptal" in request.POST:
             if "rotation_preview" in request.session:
                 del request.session["rotation_preview"]
-                messages.info(request, "Rotasyon işlemi iptal edildi.")
+                request.session.pop("onizleme_turu", None)
+                messages.info(request, "Önizleme iptal edildi; çizelge değiştirilmedi.")
 
     else:
         form = NobetDagitimForm(initial={"baslangic_tarihi": pazartesi})
@@ -132,7 +192,11 @@ def nobet_dagitim(request):
 
     nobetler = NobetGorevi.objects.aktif().select_related("nobet_yeri", "ogretmen__personel")
 
-    nobet_yerleri = sorted(list(set(nobetler.values_list("nobet_yeri__ad", flat=True))))
+    yer_kumesi = set(nobetler.values_list("nobet_yeri__ad", flat=True))
+    if rotation_preview:
+        # Rotasyonda boş bırakılan GİRİŞ ORTA'nın yerine gelen yer başka günde olmayabilir
+        yer_kumesi.update(rotation_preview.values())
+    nobet_yerleri = sorted(yer_kumesi - {None})
 
     gun_map = {
         "Monday": "Pazartesi",
@@ -171,6 +235,7 @@ def nobet_dagitim(request):
         "baslangic": pazartesi,
         "bitis": cuma,
         "is_preview": rotation_preview is not None,
+        "onizleme_turu": request.session.get("onizleme_turu", "rotasyon"),
     }
 
     return render(request, "nobet_dagitim.html", context)

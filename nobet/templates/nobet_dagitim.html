@@ -42,9 +42,9 @@
             <div style="display: flex; align-items: center; gap: 10px;">
                 {% if is_preview %}
                     <div style="background-color: #fff3cd; color: #856404; padding: 5px 10px; border: 1px solid #ffeeba; border-radius: 4px; margin-right: 10px;">
-                        <strong>Dikkat:</strong> Rotasyon önizleme modundasınız.
+                        <strong>Dikkat:</strong> {% if onizleme_turu == "giris_orta" %}GİRİŞ ORTA düzeltmesi{% else %}Rotasyon{% endif %} önizleme modundasınız.
                     </div>
-                    <button type="submit" name="rotasyon_kaydet" class="btn btn-success" onclick="return confirm('Rotasyon değişikliğini kalıcı olarak kaydetmek istiyor musunuz?');">
+                    <button type="submit" name="rotasyon_kaydet" class="btn btn-success" onclick="return confirm('Önizlenen değişikliği kalıcı olarak kaydetmek istiyor musunuz?');">
                         Değişiklikleri Kaydet
                     </button>
                     <button type="submit" name="rotasyon_iptal" class="btn btn-danger">
@@ -53,6 +53,10 @@
                 {% else %}
                     <button type="submit" name="rotasyon_onizle" class="btn btn-info">
                         Nöbet Yerlerini Rotasyon Yap (Önizle)
+                    </button>
+                    <button type="submit" name="giris_orta_onizle" class="btn btn-warning"
+                            title="11'den az nöbetçi olan günlerde GİRİŞ ORTA nöbetçisini o gün boş kalan yere taşır">
+                        GİRİŞ ORTA Düzeltmesi (Önizle)
                     </button>
                 {% endif %}
             </div>
