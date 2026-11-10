@@ -486,3 +486,44 @@ class OgretmenSayfalariTestCase(TestCase):
                 self.assertEqual(resp.status_code, 200)
                 self.assertNotContains(resp, f'href="{reverse("nobet_dagitim")}"')
                 self.assertNotContains(resp, f'href="{reverse("devamsizlik_list")}"')
+
+    def test_gunluk_yer_degisikligi_ogretmen_sayfasinda_gorunur(self):
+        """Günlük çizelgedeki yer (düz metin) görevin nöbet yerine atanırken hata vermez."""
+        tarih = datetime.date(2025, 9, 8)  # Pazartesi
+        user = kullanici_olustur("ogretmen")
+        nobetci = nobet_ogretmen_olustur(personel=personel_olustur(user=user))
+        nobet_gorevi_olustur(ogretmen=nobetci, nobet_yeri=nobet_yeri_olustur("BAHÇE"))
+        diger = nobet_gorevi_olustur(nobet_yeri=nobet_yeri_olustur("KANTİN"))
+        nobet_yeri_olustur("1.KAT GÜNEY")
+        GunlukNobetCizelgesi.objects.create(tarih=tarih, ogretmen=nobetci, nobet_yeri="1.KAT GÜNEY")
+        # Kayıtlı bir nöbet yeri olmayan ad da gösterilir (yer silinmiş/adı değişmiş olabilir)
+        GunlukNobetCizelgesi.objects.create(tarih=tarih, ogretmen=diger.ogretmen, nobet_yeri="ESKİ YER")
+
+        self.client.force_login(user)
+        resp = self.client.get(reverse("ogretmen_gunun_nobetcileri"), {"tarih": tarih.isoformat()})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "1.KAT GÜNEY")
+        self.assertContains(resp, "ESKİ YER")
+        self.assertNotContains(resp, "BAHÇE")
+        self.assertNotContains(resp, "KANTİN")
+
+    def test_haftalik_nobet_cizelgesi_yer_ve_gune_gore_dolu(self):
+        """Öğretmenin haftalık nöbet sayfası nöbet yeri × gün çizelgesini doldurur."""
+        user = kullanici_olustur("ogretmen")
+        ali = nobet_ogretmen_olustur(personel=personel_olustur(user=user, adi_soyadi="Ali Yılmaz"))
+        ayse = nobet_ogretmen_olustur(personel=personel_olustur(adi_soyadi="Ayşe Kaya"))
+        bahce, kantin = nobet_yeri_olustur("BAHÇE"), nobet_yeri_olustur("KANTİN")
+        nobet_gorevi_olustur(ogretmen=ali, nobet_yeri=bahce, nobet_gun="Monday")
+        nobet_gorevi_olustur(ogretmen=ayse, nobet_yeri=bahce, nobet_gun="Monday")
+        nobet_gorevi_olustur(ogretmen=ali, nobet_yeri=kantin, nobet_gun="Friday")
+
+        self.client.force_login(user)
+        resp = self.client.get(reverse("ogretmen_haftalik_nobet"))
+        self.assertEqual(resp.status_code, 200)
+        satirlar = {s["yer"]: s["hucreler"] for s in resp.context["tablo_satirlari"]}
+        self.assertEqual(satirlar, {
+            "BAHÇE": [["Ali Yılmaz", "Ayşe Kaya"], [], [], [], []],
+            "KANTİN": [[], [], [], [], ["Ali Yılmaz"]],
+        })
+        self.assertContains(resp, "Ayşe Kaya")
+        self.assertNotContains(resp, "Kayıtlı nöbet listesi bulunamadı")
