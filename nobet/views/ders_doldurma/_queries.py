@@ -89,6 +89,26 @@ def aktif_devamsizliklar(target_date, sadece_gorevlendirilebilir=False):
     return list(qs)
 
 
+TUM_DERS_SAATLERI = frozenset(range(1, 9))
+
+
+def devamsiz_saatler(target_date):
+    """O gün devamsız öğretmenlerin devamsız olduğu ders saatleri: ``{personel_id: {saat}}``.
+
+    Ders saati girilmemiş devamsızlık tüm gün (1–8) sayılır. ``gorevlendirme_yapilsin``
+    işaretinden bağımsızdır: devamsız olduğu saatte öğretmen nöbet de tutamaz.
+    Nöbetçi için: saatleri ``TUM_DERS_SAATLERI``'ni kapsıyorsa o gün hiç görev alamaz,
+    değilse yalnızca bu saatlerde alamaz.
+    """
+    sonuc = {}
+    for d in aktif_devamsizliklar(target_date):
+        saatler = {
+            int(h) for h in (d.ders_saatleri or "").split(",") if h.strip().isdigit()
+        } or set(TUM_DERS_SAATLERI)
+        sonuc.setdefault(d.ogretmen.personel_id, set()).update(saatler)
+    return sonuc
+
+
 def en_son_kayit_dt(target_date):
     """
     target_date için en son kaydedilen atama datetime'ını döner, yoksa None.

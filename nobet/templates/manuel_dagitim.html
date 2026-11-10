@@ -38,6 +38,12 @@
                 <button type="submit" name="kaydet" class="btn btn-success btn-sm">Tabloyu Kaydet</button>
             </div>
             
+            {% if devamsiz_nobetciler %}
+            <div class="msg-box msg-warning" style="margin-bottom:10px;">
+                <strong>Tüm gün devamsız olduğu için listede gösterilmeyen nöbetçiler:</strong>
+                {{ devamsiz_nobetciler|join:", " }}
+            </div>
+            {% endif %}
             <div class="table-responsive">
                 <table class="table table-bordered table-hover" style="font-size: 0.9em;">
                     <thead class="thead-light">
@@ -57,7 +63,9 @@
                             </td>
                             {% for hucre in satir.hucreler %}
                             <td class="center" style="min-width: 120px; padding: 15px;">
-                                {% if hucre.tip == 'dolu' %}
+                                {% if hucre.tip == 'devamsiz' %}
+                                    <span class="badge badge-danger" style="display: block; width: 65%;" title="Nöbetçi bu saatte devamsız">Devamsız</span>
+                                {% elif hucre.tip == 'dolu' %}
                                     <span class="badge badge-secondary" style="display: block; width: 65%;">Dersi Var</span>
                                 {% else %}
                                     {% if hucre.secenekler %}

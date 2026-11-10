@@ -288,6 +288,32 @@ class DersDoldurmaAkisiTestCase(TestCase):
         self.assertEqual(self.client.session["nobet_unassigned"], [])
         self.assertFalse(NobetGecmisi.objects.exists())
 
+    def test_nobetci_devamsiz_oldugu_saatte_ders_almaz(self):
+        devamsizlik_olustur(self.nobetci, PAZARTESI, ders_saatleri="2")
+
+        self._hesapla()
+
+        self.assertEqual(self.client.session["nobet_assignments"], [])
+        atanamayan = self.client.session["nobet_unassigned"]
+        self.assertEqual([(u["hour"], u["class"]) for u in atanamayan], [(2, "9/A")])
+
+    def test_kismi_devamsiz_nobetci_diger_saatlerde_ders_alir(self):
+        devamsizlik_olustur(self.nobetci, PAZARTESI, ders_saatleri="3,4")
+
+        self._hesapla()
+
+        atamalar = self.client.session["nobet_assignments"]
+        self.assertEqual(
+            [(a["hour"], a["teacher_id"]) for a in atamalar], [(2, self.nobetci.personel.pk)]
+        )
+
+    def test_tum_gun_devamsiz_nobetci_ders_almaz(self):
+        devamsizlik_olustur(self.nobetci, PAZARTESI, gorevlendirme_yapilsin=False)
+
+        self._hesapla()
+
+        self.assertEqual(self.client.session["nobet_assignments"], [])
+
     def test_nobetci_o_saatte_derste_ise_ders_atanamaz(self):
         ders_programi_olustur(self.nobetci.personel, 2, sinif_sube_olustur(11, "C"))
 
@@ -393,6 +419,56 @@ class ManuelDagitimTestCase(TestCase):
 
         self.assertFalse(NobetGecmisi.objects.exists())
         self.assertEqual(NobetAtanamayan.objects.count(), 2)
+
+    def _devamsiz_nobetci(self, ders_saatleri=""):
+        """Pazartesi nöbetçisi olup o gün kendisi de (tüm gün ya da kısmen) devamsız olan öğretmen."""
+        nobetci = nobet_ogretmen_olustur()
+        nobet_gorevi_olustur(ogretmen=nobetci)
+        devamsizlik_olustur(nobetci, PAZARTESI, ders_saatleri=ders_saatleri)
+        return nobetci
+
+    def _matris(self):
+        NobetAtanamayan.objects.create(
+            saat=1, sinif="9/A", tarih=_gun_ici(PAZARTESI, 8), atandi=0, ogretmen=self.devamsiz
+        )
+        resp = self.client.get(self.url, {"tarih": PAZARTESI.isoformat()})
+        self.assertEqual(resp.status_code, 200)
+        return resp
+
+    def test_tum_gun_devamsiz_nobetci_matriste_gosterilmez(self):
+        devamsiz_nobetci = self._devamsiz_nobetci()
+        resp = self._matris()
+        nobetci_idleri = [s["nobetci"]["id"] for s in resp.context["tablo_satirlari"]]
+        self.assertEqual(nobetci_idleri, [self.nobetci.personel.pk])
+        self.assertNotContains(resp, f"cell_{devamsiz_nobetci.personel.pk}_")
+        self.assertContains(resp, devamsiz_nobetci.personel.adi_soyadi)  # bilgi notunda
+
+    def test_kismi_devamsiz_nobetci_yalnizca_devamsiz_saatlerde_kapali(self):
+        kismi = self._devamsiz_nobetci("1")  # 1. saatte devamsız, 2. saatte uygun
+        resp = self._matris()
+        satir = next(s for s in resp.context["tablo_satirlari"] if s["nobetci"]["id"] == kismi.personel.pk)
+        self.assertEqual(satir["hucreler"][0]["tip"], "devamsiz")
+        self.assertEqual(satir["hucreler"][1]["tip"], "musait")
+        self.assertNotContains(resp, f'name="cell_{kismi.personel.pk}_1"')
+        self.assertContains(resp, f'name="cell_{kismi.personel.pk}_2"')
+
+    def test_nobetciye_devamsiz_oldugu_saatte_atama_kaydedilmez(self):
+        kismi = self._devamsiz_nobetci("1")
+        p_id = self.devamsiz.personel.pk
+
+        self.client.post(
+            self.url,
+            {
+                "kaydet": "1",
+                "target_date_hidden": PAZARTESI.isoformat(),
+                f"cell_{kismi.personel.pk}_1": f"{p_id}|9/A",  # devamsız olduğu saat
+                f"cell_{kismi.personel.pk}_2": f"{p_id}|9/B",  # uygun olduğu saat
+            },
+        )
+
+        atama = NobetGecmisi.objects.get()
+        self.assertEqual((atama.ogretmen, atama.saat, atama.sinif), (kismi, 2, "9/B"))
+        self.assertEqual(list(NobetAtanamayan.objects.values_list("saat", "sinif")), [(1, "9/A")])
 
 
 # ─────────────────────────────────────────────────────────────
