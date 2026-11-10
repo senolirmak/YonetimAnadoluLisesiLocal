@@ -122,3 +122,29 @@ class GirisOrtaDuzeltmesiTests(TestCase):
     def test_ogretmen_duzeltme_yapamaz(self):
         self.client.force_login(kullanici_olustur("ogretmen"))
         self.assertEqual(self.client.post(self.url, {"giris_orta_onizle": "1"}).status_code, 403)
+
+
+class GununNobetcileriYerListesiTests(TestCase):
+    """Günün nöbetçileri ekranındaki yer seçim listesi yalnızca geçerli listedeki yerleri sunar."""
+
+    def test_secim_listesinde_yalnizca_gecerli_listedeki_yerler(self):
+        import datetime
+
+        from nobet.models import GunlukNobetCizelgesi
+
+        eski = datetime.date(2025, 2, 3)
+        nobet_gorevi_olustur(nobet_yeri=nobet_yeri_olustur("ESKİ LİSTE YERİ"), uygulama_tarihi=eski)
+        nobet_gorevi_olustur(nobet_yeri=nobet_yeri_olustur("ARŞİV YERİ"), arsivlendi=True)
+        nobet_yeri_olustur("HİÇ KULLANILMAYAN")
+        pzt = nobet_gorevi_olustur(nobet_yeri=nobet_yeri_olustur("ZEMİN"))
+        nobet_gorevi_olustur(nobet_yeri=nobet_yeri_olustur("ÇAY OCAĞI"), nobet_gun="Friday")
+        nobet_gorevi_olustur(nobet_yeri=nobet_yeri_olustur("BAHÇE"), nobet_gun="Tuesday")
+        tarih = datetime.date(2025, 9, 8)  # Pazartesi
+        # O güne kaydedilmiş, geçerli listede olmayan yer seçili kalabilmeli
+        GunlukNobetCizelgesi.objects.create(tarih=tarih, ogretmen=pzt.ogretmen, nobet_yeri="ESKİ LİSTE YERİ")
+
+        self.client.force_login(kullanici_olustur("mudur_yardimcisi"))
+        resp = self.client.get(reverse("gunun_nobetcileri"), {"tarih": tarih.isoformat()})
+        self.assertEqual(
+            resp.context["tum_yerler"], ["BAHÇE", "ÇAY OCAĞI", "ESKİ LİSTE YERİ", "ZEMİN"]
+        )
