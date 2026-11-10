@@ -4,14 +4,13 @@ Her gün için o günün görevleri nöbet yeri adına göre sıralanır ve yerl
 kaydırılır (her öğretmen listedeki bir sonraki yere geçer); öğretmenlerin nöbet
 günleri değişmez.
 
-Kural: Bir günde nöbetçi öğretmen sayısı ``GIRIS_ORTA_ESIGI``'nden azsa
-``GIRIS_ORTA`` yeri boş bırakılır. O gün bu yer birine verilmişse, rotasyondan önce
-o gün kimsenin tutmadığı aktif bir nöbet yeriyle değiştirilir; kaydırma bu yeni yer
-kümesi üzerinden yapılır.
+İsteğe bağlı kural (``bos_yer``, ``esik``): bir günde nöbetçi sayısı ``esik``'ten
+azsa ``bos_yer`` o gün boş bırakılır. O gün bu yer birine verilmişse, rotasyondan
+önce o gün kimsenin tutmadığı bir yerle değiştirilir; kaydırma bu yeni yer kümesi
+üzerinden yapılır. Hangi yerin boş bırakılacağını kullanıcı seçer.
 """
 
-GIRIS_ORTA = "GİRİŞ ORTA"
-GIRIS_ORTA_ESIGI = 11
+VARSAYILAN_ESIK = 11
 
 _ALFABE = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
 
@@ -27,60 +26,59 @@ def turkce_sira_anahtari(ad):
     return [(_ALFABE.index(h) if h in _ALFABE else 100 + ord(h)) for h in yer_anahtari(ad)]
 
 
-def _giris_orta_mi(ad):
-    return yer_anahtari(ad) == yer_anahtari(GIRIS_ORTA)
-
-
-def giris_orta_bosalt(gorev_yerleri, aktif_yerler):
-    """Nöbetçi sayısı eşiğin altındaysa GİRİŞ ORTA'daki görevi o gün boş kalan bir yere taşır.
+def yeri_bosalt(gorev_yerleri, bos_yer, esik, aday_yerler):
+    """Nöbetçi sayısı ``esik``'in altındaysa ``bos_yer``'deki görevi o gün boş kalan bir yere taşır.
 
     ``gorev_yerleri``: bir günün ``[(gorev_anahtari, yer_adi), ...]`` listesi.
-    ``aktif_yerler``: otomatik dağıtıma açık nöbet yeri adları; boş yer bunlardan,
+    ``aday_yerler``: yerine verilebilecek yer adları; o gün kimsenin tutmadığı ve
     Türkçe alfabe sırasına göre ilki seçilir.
 
     Dönüş ``(yeni_gorev_yerleri, uyari)``: liste aynı sırada döner (yalnızca taşınan
     görevin yeri değişir); ``uyari`` boş yer bulunamadıysa açıklama, değilse ``None``.
+    ``bos_yer`` verilmezse hiçbir şey değişmez.
     """
     gorev_yerleri = list(gorev_yerleri)
-    if len(gorev_yerleri) >= GIRIS_ORTA_ESIGI or not any(
-        _giris_orta_mi(y) for _, y in gorev_yerleri
+    anahtar = yer_anahtari(bos_yer)
+    if (
+        not anahtar
+        or len(gorev_yerleri) >= esik
+        or not any(yer_anahtari(y) == anahtar for _, y in gorev_yerleri)
     ):
         return gorev_yerleri, None
 
     dolu = {yer_anahtari(y) for _, y in gorev_yerleri}
     bos_yerler = sorted(
-        (y for y in aktif_yerler if yer_anahtari(y) not in dolu and not _giris_orta_mi(y)),
+        {y for y in aday_yerler if yer_anahtari(y) not in dolu and yer_anahtari(y) != anahtar},
         key=turkce_sira_anahtari,
     )
     uyari = None
-    for i, (anahtar, yer) in enumerate(gorev_yerleri):
-        if not _giris_orta_mi(yer):
+    for i, (gorev, yer) in enumerate(gorev_yerleri):
+        if yer_anahtari(yer) != anahtar:
             continue
         if bos_yerler:
-            gorev_yerleri[i] = (anahtar, bos_yerler.pop(0))
+            gorev_yerleri[i] = (gorev, bos_yerler.pop(0))
         else:
-            uyari = "GİRİŞ ORTA yerine verilebilecek boş bir nöbet yeri bulunamadı"
+            uyari = f"{bos_yer} yerine verilebilecek boş bir nöbet yeri bulunamadı"
     return gorev_yerleri, uyari
 
 
-def gun_rotasyonu(gorev_yerleri, aktif_yerler):
+def gun_rotasyonu(gorev_yerleri, aday_yerler=(), bos_yer=None, esik=VARSAYILAN_ESIK):
     """Bir günün rotasyonunu hesaplar.
 
     ``gorev_yerleri``: ``[(gorev_anahtari, yer_adi), ...]``, nöbet yeri adına göre sıralı.
-    ``aktif_yerler``: otomatik dağıtıma açık nöbet yeri adları.
+    ``bos_yer``/``esik``/``aday_yerler``: bkz. ``yeri_bosalt``.
 
-    Dönüş ``({gorev_anahtari: yeni_yer_adi}, uyari)``; ``uyari`` GİRİŞ ORTA
-    boşaltılamadıysa açıklama, değilse ``None``.
+    Dönüş ``({gorev_anahtari: yeni_yer_adi}, uyari)``.
     """
     gorev_yerleri = list(gorev_yerleri)
-    bosaltilmis, uyari = giris_orta_bosalt(gorev_yerleri, aktif_yerler)
+    bosaltilmis, uyari = yeri_bosalt(gorev_yerleri, bos_yer, esik, aday_yerler)
     if bosaltilmis != gorev_yerleri:
-        # GİRİŞ ORTA'daki öğretmen yeni yeri tutuyormuş gibi rotasyona girer
+        # Boşaltılan yerdeki öğretmen yeni yeri tutuyormuş gibi rotasyona girer
         gorev_yerleri = sorted(bosaltilmis, key=lambda gy: turkce_sira_anahtari(gy[1]))
 
     if len(gorev_yerleri) < 2:
-        return {anahtar: yer for anahtar, yer in gorev_yerleri}, uyari
+        return {gorev: yer for gorev, yer in gorev_yerleri}, uyari
 
     yerler = [y for _, y in gorev_yerleri]
     yeni_yerler = yerler[1:] + yerler[:1]
-    return {anahtar: yeni for (anahtar, _), yeni in zip(gorev_yerleri, yeni_yerler)}, uyari
+    return {gorev: yeni for (gorev, _), yeni in zip(gorev_yerleri, yeni_yerler)}, uyari

@@ -42,21 +42,30 @@
             <div style="display: flex; align-items: center; gap: 10px;">
                 {% if is_preview %}
                     <div style="background-color: #fff3cd; color: #856404; padding: 5px 10px; border: 1px solid #ffeeba; border-radius: 4px; margin-right: 10px;">
-                        <strong>Dikkat:</strong> {% if onizleme_turu == "giris_orta" %}GİRİŞ ORTA düzeltmesi{% else %}Rotasyon{% endif %} önizleme modundasınız.
+                        <strong>Dikkat:</strong> Rotasyon önizleme modundasınız.
                     </div>
-                    <button type="submit" name="rotasyon_kaydet" class="btn btn-success" onclick="return confirm('Önizlenen değişikliği kalıcı olarak kaydetmek istiyor musunuz?');">
+                    <button type="submit" name="rotasyon_kaydet" class="btn btn-success" onclick="return confirm('Rotasyon değişikliğini kalıcı olarak kaydetmek istiyor musunuz?');">
                         Değişiklikleri Kaydet
                     </button>
                     <button type="submit" name="rotasyon_iptal" class="btn btn-danger">
                         İptal
                     </button>
                 {% else %}
+                    <label for="bos_yer" class="form-label-bold" style="margin:0;"
+                           title="Nöbetçi sayısı eşikten az olan günlerde bu yer boş bırakılır; o gün bu yerdeki öğretmen boş kalan başka bir yere geçer">
+                        Az nöbetçili günde boş kalacak yer:
+                    </label>
+                    <select name="bos_yer" id="bos_yer" class="form-control" style="width:auto;">
+                        <option value="">— Yok —</option>
+                        {% for yer in rotasyon_yerleri %}
+                        <option value="{{ yer }}"{% if yer == rotasyon_ayarlari.bos_yer %} selected{% endif %}>{{ yer }}</option>
+                        {% endfor %}
+                    </select>
+                    <label for="esik" style="margin:0;">Eşik:</label>
+                    <input type="number" name="esik" id="esik" min="1" max="99" value="{{ rotasyon_ayarlari.esik }}"
+                           class="form-control" style="width:5em;" title="Nöbetçi sayısı bu değerden az olan günlerde kural uygulanır">
                     <button type="submit" name="rotasyon_onizle" class="btn btn-info">
                         Nöbet Yerlerini Rotasyon Yap (Önizle)
-                    </button>
-                    <button type="submit" name="giris_orta_onizle" class="btn btn-warning"
-                            title="11'den az nöbetçi olan günlerde GİRİŞ ORTA nöbetçisini o gün boş kalan yere taşır">
-                        GİRİŞ ORTA Düzeltmesi (Önizle)
                     </button>
                 {% endif %}
             </div>
