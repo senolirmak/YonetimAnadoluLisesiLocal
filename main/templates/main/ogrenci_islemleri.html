@@ -33,7 +33,10 @@
     {% if rehberlik_sinifi %}
     <div class="dn-uyari dn-bilgi">
         <span><strong>Sınıf Rehber Öğretmenliği:</strong> {{ rehberlik_sinifi }}</span>
-        <a href="{% url 'sinif_oturma_plani' %}">Oturma Planını Düzenle</a>
+        <span style="display:flex;gap:1rem;flex-wrap:wrap;">
+            <a href="{% url 'sinif_oturma_plani' %}">Oturma Planını Düzenle</a>
+            <a href="{% url 'faaliyet:sinif_faaliyetleri' %}">Sınıfımın Faaliyetleri</a>
+        </span>
     </div>
     {% endif %}
     <div class="dn-not">

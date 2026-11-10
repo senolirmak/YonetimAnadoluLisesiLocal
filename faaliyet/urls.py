@@ -14,6 +14,8 @@ urlpatterns = [
     path("<int:pk>/devamsizlik/", views.faaliyet_devamsizlik, name="faaliyet_devamsizlik"),
     path("<int:pk>/rapor/", views.faaliyet_rapor, name="faaliyet_rapor"),
     path("<int:pk>/rapor/pdf/", views.faaliyet_rapor_pdf, name="faaliyet_rapor_pdf"),
+    # Sınıf rehber öğretmeni
+    path("sinifim/", views.sinif_faaliyetleri, name="sinif_faaliyetleri"),
     # AJAX
     path("ders-programi/", views.ders_programi_getir, name="ders_programi_getir"),
     # Müdür Yardımcısı

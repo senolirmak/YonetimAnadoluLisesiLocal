@@ -1141,3 +1141,61 @@ def faaliyet_eokul_isaretle(request):
     except EokulIsaretHatasi as e:
         return JsonResponse({"hata": str(e)}, status=400)
     return JsonResponse({"islendi": islendi})
+
+
+# ─────────────────────────────────────────────
+# Sınıf rehber öğretmeni — sınıfının faaliyetleri
+# ─────────────────────────────────────────────
+
+
+@login_required
+def sinif_faaliyetleri(request):
+    """Sınıf rehber öğretmeni kendi sınıfının öğrencilerinin katıldığı faaliyetleri
+    salt okunur görür. Rapor, yönetimdeki öğrenci raporuyla aynı kurala dayanır:
+    yalnızca onaylanmış ve devamsızlığı girilmiş faaliyetlere tam katılımlar."""
+    from ogrenci.services.rehberlik import rehberlik_sinif_sube
+
+    from .services.toplu_rapor import ogrenciye_gore_grupla, tamamlanan_faaliyetler
+
+    sinif_sube = rehberlik_sinif_sube(request.user)
+    if sinif_sube is None:
+        messages.error(request, "Bu sayfa yalnızca sınıf rehber öğretmenlerine açıktır.")
+        return redirect("ogrenci_islemleri")
+
+    tarih_bas = request.GET.get("tarih_bas", "").strip()
+    tarih_bit = request.GET.get("tarih_bit", "").strip()
+    ara = request.GET.get("ara", "").strip()
+
+    rapor = ogrenciye_gore_grupla(
+        tamamlanan_faaliyetler(tarih_bas=tarih_bas, tarih_bit=tarih_bit),
+        sinif=sinif_sube.sinif,
+        sube=sinif_sube.sube,
+        ara=ara,
+    )
+    katilanlar = {g["ogr"].pk for g in rapor["ogrenciler"]}
+    katilmayanlar = (
+        []
+        if ara
+        else [
+            o
+            for o in Ogrenci.objects.filter(
+                sinif=sinif_sube.sinif, sube=sinif_sube.sube, aktif=True
+            ).order_by("okulno")
+            if o.pk not in katilanlar
+        ]
+    )
+
+    return render(
+        request,
+        "faaliyet/sinif_faaliyetleri.html",
+        {
+            "title": f"Sınıfımın Faaliyetleri – {sinif_sube}",
+            "sinif_sube": sinif_sube,
+            "ogrenciler": rapor["ogrenciler"],
+            "toplam": rapor["toplam"],
+            "katilmayanlar": katilmayanlar,
+            "tarih_bas": tarih_bas,
+            "tarih_bit": tarih_bit,
+            "ara": ara,
+        },
+    )
