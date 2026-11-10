@@ -32,10 +32,12 @@ from ..permissions import is_ust_yonetici, is_yonetici
 from ._mazeret import mazeret_ctx
 from ._queries import (
     DAYS_MAP,
+    TUM_DERS_SAATLERI,
     aktif_devamsizliklar,
     aktif_gorev_tarihi,
     aktif_program_tarihi,
     ders_programi_by_ogretmenler,
+    devamsiz_saatler,
     en_son_kayit_dt,
     gecmis_tarihler,
     kayitli_atamalar_ve_atamayanlar,
@@ -240,15 +242,21 @@ def _handle_hesapla(request, form):
 
     available_teachers_data = []
     stats_dict = {}
-    absent_set = set(absent_teacher_ids)
+    # Nöbetçinin devamsız olduğu saatler dersi varmış gibi dolu sayılır; tüm gün
+    # devamsızsa o gün nöbetçi listesine hiç girmez
+    nobetci_devamsiz_saatleri = devamsiz_saatler(target_date)
     for r in duty_records:
         p_id = r.ogretmen.personel.pk
-        if p_id in absent_set:
+        devamsiz = nobetci_devamsiz_saatleri.get(p_id, set())
+        if devamsiz >= TUM_DERS_SAATLERI:
             continue
+        dersleri = dict(dp_map.get(p_id, {}))
+        for saat in devamsiz:
+            dersleri.setdefault(saat, "Devamsız")
         available_teachers_data.append({
             "ogretmen_id": p_id,
             "adi_soyadi":  r.ogretmen.personel.adi_soyadi,
-            "dersleri":    dp_map.get(p_id, {}),
+            "dersleri":    dersleri,
         })
         try:
             s = r.ogretmen.istatistikler

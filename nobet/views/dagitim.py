@@ -253,6 +253,9 @@ def nobet_dagitim(request):
 def manuel_dagitim(request):
     from datetime import datetime, time
 
+    # ders_doldurma bu modülü içe aktardığından döngüsel import olmasın diye burada
+    from .ders_doldurma._queries import TUM_DERS_SAATLERI, devamsiz_saatler
+
     target_date = timezone.localdate()
     view_datetime = None
 
@@ -361,12 +364,17 @@ def manuel_dagitim(request):
                 year=save_date.year, month=save_date.month, day=save_date.day
             )
             assigned_lesson_keys = set()
+            nobetci_devamsiz_saatleri = devamsiz_saatler(save_date)
 
             for key, value in request.POST.items():
                 if key.startswith("cell_") and value:
                     parts = key.split("_")
                     nobetci_id = int(parts[1])
                     saat = int(parts[2])
+                    if saat in nobetci_devamsiz_saatleri.get(nobetci_id, ()):
+                        # Eski sayfadan gelen form vb.: nöbetçiye devamsız olduğu saatte
+                        # ders yazılmaz, ders atanamayanlara düşer
+                        continue
 
                     val_parts = value.split("|")
                     devamsiz_id = int(val_parts[0])
@@ -451,13 +459,21 @@ def manuel_dagitim(request):
         )
     )
 
+    devamsiz_nobetciler = []
+    nobetci_devamsiz_saatleri = devamsiz_saatler(target_date)
     if gorev_date:
         nobet_gorevleri = (
-            NobetGorevi.objects.filter(uygulama_tarihi=gorev_date, nobet_gun=day_name_en)
+            NobetGorevi.objects.filter(
+                uygulama_tarihi=gorev_date, nobet_gun=day_name_en, arsivlendi=False
+            )
             .select_related("ogretmen__personel", "nobet_yeri")
             .order_by("nobet_yeri__ad")
         )
         for gorev in nobet_gorevleri:
+            # Tüm gün devamsız nöbetçi gösterilmez; kısmi devamsızın saatleri aşağıda kapanır
+            if nobetci_devamsiz_saatleri.get(gorev.ogretmen.personel_id, set()) >= TUM_DERS_SAATLERI:
+                devamsiz_nobetciler.append(gorev.ogretmen.personel.adi_soyadi)
+                continue
             yer = gunluk_degisiklikler.get(
                 gorev.ogretmen.pk, gorev.nobet_yeri.ad if gorev.nobet_yeri else ""
             )
@@ -553,9 +569,12 @@ def manuel_dagitim(request):
             ogretmen_id=n["id"], gun=day_name_en, uygulama_tarihi=program_date
         ).values_list("ders_saati__derssaati_no", flat=True)
 
+        devamsiz = nobetci_devamsiz_saatleri.get(n["id"], set())
         for saat in range(1, 9):
             durum = {}
-            if saat in kendi_dersleri:
+            if saat in devamsiz:
+                durum["tip"] = "devamsiz"
+            elif saat in kendi_dersleri:
                 durum["tip"] = "dolu"
             else:
                 durum["tip"] = "musait"
@@ -568,6 +587,7 @@ def manuel_dagitim(request):
     context = {
         "title": "Manuel Nöbet Dağıtım Matrisi",
         "target_date": target_date,
+        "devamsiz_nobetciler": sorted(devamsiz_nobetciler),
         "tablo_satirlari": tablo_satirlari,
         "saatler": range(1, 9),
     }
