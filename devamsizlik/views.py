@@ -191,11 +191,8 @@ def ogretmen_devamsizlik(request, ders_saati=None):
 
     # Oturma planı grid'i — SinifOturmaDuzeni varsa oluştur
     from ogrenci.models import SinifOturmaDuzeni
+    from ogrenci.services.oturma_duzeni import N_GRUP, N_KOLON_PER_GRUP, N_SIRA
     from okul.models import SinifSube
-
-    N_GRUP = 3
-    N_KOLON_PER_GRUP = 2
-    N_SIRA = 6
 
     try:
         sinif_sube_obj = SinifSube.objects.get(

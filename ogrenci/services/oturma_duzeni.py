@@ -10,11 +10,11 @@ from ogrenci.models import Ogrenci, SinifOturmaDuzeni
 from ogrenci.services.rehberlik import rehberlik_sinif_sube, sinif_rehber_ogretmeni
 from okul.models import SinifSube
 
-# Sınıf yerleşimi: 3 grup × 2 koltuk, 6 sıra
+# Sınıf yerleşimi: 3 grup × 2 koltuk, 7 sıra
 N_GRUP = 3
 N_KOLON_PER_GRUP = 2
 N_KOLON = N_GRUP * N_KOLON_PER_GRUP
-N_SIRA = 6
+N_SIRA = 7
 
 
 def rehber_sinifi(user):
