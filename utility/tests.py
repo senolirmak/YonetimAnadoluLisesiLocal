@@ -1,12 +1,7 @@
-"""AdvancedNobetDagitim (nöbet dağıtım GA motoru) için regresyon testleri.
+"""AdvancedNobetDagitim (ders doldurma dağıtımı) testleri.
 
-Bkz. utility/services/nobet_dagitimi_service.py. Buradaki testler özellikle iki
-regresyonu yakalamak için var:
-  1. GA'nın gerçekçi ölçekte gunicorn worker timeout'una takılacak kadar
-     yavaşlaması (eski varsayılanlar population_size=600, generations=200,
-     erken durdurma yok — bu senaryo ~95 saniye sürüyordu).
-  2. calculate_penalty içindeki defaultdict yan-etkisi (solution["teacher_counts"][t_id]
-     ile okuma yaparken sözlüğe sıfır-kayıt ekleniyordu).
+Bkz. utility/services/nobet_dagitimi_service.py — problem en düşük maliyetli akışla
+kesin çözülür: önce en fazla ders doldurulur, sonra dönem boyu yük dengelenir.
 """
 
 import random
@@ -119,23 +114,18 @@ class AdvancedNobetDagitimTestCase(SimpleTestCase):
         self.assertLess(sure, 0.5, "Uygun öğretmen yokken GA döngüsü boşuna çalışmamalı")
 
     def test_calculate_penalty_teacher_counts_uzerinde_yan_etki_birakmaz(self):
-        """Regresyon: calculate_penalty tekrar tekrar çağrıldığında
-        teacher_counts sözlüğüne sıfır-kayıt eklememeli (bkz. .get() düzeltmesi)."""
+        """Regresyon: calculate_penalty teacher_counts sözlüğüne sıfır-kayıt eklememeli."""
         available, absent, stats = _sentetik_veri(ogretmen_sayisi=20, devamsiz_sayisi=5)
         solver = AdvancedNobetDagitim(max_shifts=2)
         solver.set_teacher_statistics(stats)
-        solver.availability = solver.prepare_availability(available)
-        solver.absent_classes = solver.flatten_absent(absent)
-        solver.teachers = available
-        solver.teacher_ids = [t["ogretmen_id"] for t in available]
-
-        individual = solver.create_individual()
-        ilk_boyut = len(individual["teacher_counts"])
+        solver.optimize(available, absent)
+        cozum = solver._akis_ile_coz()
+        ilk_boyut = len(cozum["teacher_counts"])
 
         for _ in range(10):
-            solver.calculate_penalty(individual)
+            solver.calculate_penalty(cozum)
 
-        self.assertEqual(len(individual["teacher_counts"]), ilk_boyut)
+        self.assertEqual(len(cozum["teacher_counts"]), ilk_boyut)
 
     def test_gercekci_olcekte_makul_surede_biter(self):
         """Regresyon: eski varsayılanlarla (population_size=600, generations=200,
@@ -151,4 +141,87 @@ class AdvancedNobetDagitimTestCase(SimpleTestCase):
         solver.optimize(available, absent)
         sure = time.perf_counter() - baslangic
 
-        self.assertLess(sure, 25, f"GA {sure:.1f} saniye sürdü — timeout riski")
+        self.assertLess(sure, 25, f"Dağıtım {sure:.1f} saniye sürdü — timeout riski")
+
+
+def _nobetci(t_id, dolu=()):
+    return {"ogretmen_id": t_id, "adi_soyadi": f"N{t_id}", "dersleri": {h: "x" for h in dolu}}
+
+
+def _bos_ders(t_id, **saat_sinif):
+    return {"ogretmen_id": t_id, "adi_soyadi": f"D{t_id}", "dersleri": saat_sinif}
+
+
+def _dagit(nobetciler, bos, toplamlar=None, max_shifts=2, son_yer=None):
+    solver = AdvancedNobetDagitim(max_shifts=max_shifts)
+    solver.set_teacher_statistics({
+        t: {"toplam_nobet": n, "son_nobet_yeri": (son_yer or {}).get(t)}
+        for t, n in (toplamlar or {}).items()
+    })
+    return solver.optimize(nobetciler, bos)
+
+
+class AdilDagitimTestCase(SimpleTestCase):
+    def test_ders_donem_toplami_en_az_olana_gider(self):
+        sonuc = _dagit(
+            [_nobetci(1), _nobetci(2), _nobetci(3)],
+            [{"ogretmen_id": 9, "dersleri": {3: "9/A"}}],
+            toplamlar={1: 7, 2: 2, 3: 5},
+        )
+        self.assertEqual([a["teacher_id"] for a in sonuc["assignments"]], [2])
+
+    def test_toplami_cok_dusuk_olan_ayni_gun_iki_ders_alir(self):
+        sonuc = _dagit(
+            [_nobetci(1), _nobetci(2)],
+            [{"ogretmen_id": 9, "dersleri": {1: "9/A", 2: "9/B"}}],
+            toplamlar={1: 0, 2: 10},
+        )
+        self.assertEqual(sonuc["teacher_counts"], {1: 2})
+
+    def test_toplamlar_esitse_gunluk_is_paylastirilir(self):
+        sonuc = _dagit(
+            [_nobetci(1), _nobetci(2)],
+            [{"ogretmen_id": 9, "dersleri": {1: "9/A", 2: "9/B"}}],
+            toplamlar={1: 4, 2: 4},
+        )
+        self.assertEqual(sonuc["teacher_counts"], {1: 1, 2: 1})
+
+    def test_mumkun_olan_en_fazla_ders_doldurulur(self):
+        """Toplamı az olan 1, 1. saati alırsa 2. saat boş kalır; doğru çözüm 1'e 2. saati,
+        2'ye 1. saati vermektir (2 yalnızca 1. saatte boş)."""
+        sonuc = _dagit(
+            [_nobetci(1), _nobetci(2, dolu=range(2, 9))],
+            [{"ogretmen_id": 9, "dersleri": {1: "9/A", 2: "9/B"}}],
+            toplamlar={1: 0, 2: 30},
+            max_shifts=1,
+        )
+        self.assertEqual(sonuc["unassigned"], [])
+        self.assertEqual(
+            sorted((a["teacher_id"], a["hour"]) for a in sonuc["assignments"]), [(1, 2), (2, 1)]
+        )
+
+    def test_esitlikte_son_doldurdugu_sinif_tekrar_verilmez(self):
+        sonuc = _dagit(
+            [_nobetci(1), _nobetci(2)],
+            [{"ogretmen_id": 9, "dersleri": {3: "9/A"}}],
+            toplamlar={1: 3, 2: 3},
+            son_yer={1: "9/A"},
+        )
+        self.assertEqual([a["teacher_id"] for a in sonuc["assignments"]], [2])
+
+    def test_istatistigi_olmayan_nobetci_sifir_toplamli_sayilir(self):
+        sonuc = _dagit(
+            [_nobetci(1), _nobetci(2)],
+            [{"ogretmen_id": 9, "dersleri": {3: "9/A"}}],
+            toplamlar={1: 2},
+        )
+        self.assertEqual([a["teacher_id"] for a in sonuc["assignments"]], [2])
+
+    def test_ayni_veride_ayni_sonuc(self):
+        available, absent, stats = _sentetik_veri(ogretmen_sayisi=30, devamsiz_sayisi=8)
+        sonuclar = []
+        for _ in range(2):
+            solver = AdvancedNobetDagitim(max_shifts=2)
+            solver.set_teacher_statistics(stats)
+            sonuclar.append(solver.optimize(available, absent)["assignments"])
+        self.assertEqual(sonuclar[0], sonuclar[1])
