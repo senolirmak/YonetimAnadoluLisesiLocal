@@ -88,7 +88,7 @@ testlerinden biri `fet-cl` kuruluysa gerçek FET'i çalıştırır, yoksa atlan�
   nginx reload → servisi başlat. Bu akış çalışıyor; değiştirmeyin.
 - Deploy `main`'i çektiği için **`main` her zaman deploy edilebilir olmalı**: iş dallarda yapılır,
   testler ve prod migration kontrolü geçmeden `main`'e merge edilmez.
-- **Sürümleme:** git tag (`vX.Y.Z`; mevcut: `v1.0.0` … `v1.3.0`; sonuncusu için `git tag --sort=-v:refname | head -1`). Tag atmadan önce testler geçmeli.
+- **Sürümleme:** git tag (`vX.Y.Z`; `v1.0.0`dan başlar; son sürüm için `git tag --sort=-v:refname | head -1` — dokümana sabit sürüm yazmayın, eskir). Tag atmadan önce testler geçmeli.
   Not: `deploy.sh` tag'i değil `main`'i çeker; tag'ler sürüm kaydıdır.
 
 ### Kurallar
