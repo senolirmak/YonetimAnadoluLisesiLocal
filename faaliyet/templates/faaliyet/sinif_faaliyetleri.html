@@ -1,0 +1,113 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="text-align:left;">
+
+    {% for message in messages %}
+    <div class="msg-box {% if message.tags == 'error' %}msg-error{% elif message.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+
+    <h2 class="page-title">{{ sinif_sube }} Sınıfının Faaliyetleri</h2>
+
+    <p style="color:#6c757d;font-size:0.9em;margin-top:-8px;">
+        Sınıfınızdaki öğrencilerin katıldığı faaliyetler listelenir. Yalnızca onaylanmış ve
+        devamsızlık girişi tamamlanmış faaliyetler sayılır; öğrencinin devamsız sayıldığı
+        faaliyetler listeye girmez. Tarih aralığı seçilmezse geçmiş eğitim-öğretim yıllarının
+        arşivlenmiş kayıtları dahil edilmez.
+    </p>
+
+    <div class="card mb-20" style="padding:16px 20px;">
+        <form method="get" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Tarih Başlangıç</label>
+                <input type="date" name="tarih_bas" value="{{ tarih_bas }}"
+                       style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Tarih Bitiş</label>
+                <input type="date" name="tarih_bit" value="{{ tarih_bit }}"
+                       style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:0.82em;color:#555;font-weight:600;">Öğrenci (No / Ad)</label>
+                <input type="text" name="ara" value="{{ ara }}" placeholder="Okul no ya da ad soyad"
+                       style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9em;">
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding:6px 18px;">Listele</button>
+                <a href="{% url 'faaliyet:sinif_faaliyetleri' %}" class="btn" style="padding:6px 14px;background:#6c757d;color:#fff;">Temizle</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card mb-20" style="padding:12px 20px;display:flex;flex-wrap:wrap;gap:28px;">
+        <span>Faaliyete Katılan Öğrenci: <strong style="color:#417690;">{{ toplam.ogrenci }}</strong></span>
+        <span>Toplam Katılım: <strong style="color:#17a2b8;">{{ toplam.katilim }}</strong></span>
+        <span>e-Okul'a İşlenen: <strong style="color:#28a745;">{{ toplam.eokul }}</strong></span>
+    </div>
+
+    {% for g in ogrenciler %}
+    <div class="card mb-20">
+        <div class="card-header" style="background:#0d9488;color:#fff;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <span>
+                Okul No: <strong>{{ g.ogr.okulno }}</strong> &nbsp;·&nbsp;
+                Adı Soyadı: <strong>{{ g.ogr.adi }} {{ g.ogr.soyadi }}</strong>
+            </span>
+            <span style="font-size:0.88em;">{{ g.faaliyetler|length }} faaliyet</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table" style="margin:0;font-size:0.9em;">
+                <thead>
+                    <tr>
+                        <th class="center" style="width:50px;">Sn</th>
+                        <th class="center" style="width:110px;">Tarih</th>
+                        <th>Faaliyet</th>
+                        <th>Yer</th>
+                        <th>Sorumlu Öğretmen</th>
+                        <th class="center" style="width:110px;">Ders Saatleri</th>
+                        <th class="center" style="width:90px;">e-Okul</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for satir in g.faaliyetler %}
+                    <tr>
+                        <td class="center">{{ forloop.counter }}</td>
+                        <td class="center">{{ satir.faaliyet.tarih|date:"d.m.Y" }}</td>
+                        <td>{{ satir.faaliyet.konu }}</td>
+                        <td>{{ satir.faaliyet.yer }}</td>
+                        <td>{{ satir.faaliyet.ogretmen.adi_soyadi }}</td>
+                        <td class="center">{% for ds in satir.ders_saatleri %}{{ ds.ders_no }}{% if not forloop.last %}, {% endif %}{% empty %}–{% endfor %}</td>
+                        <td class="center">
+                            {% if satir.eokul %}<span style="color:#28a745;font-weight:600;" title="e-Okul'a işlendi">✓</span>{% else %}<span style="color:#9ca3af;" title="e-Okul'a henüz işlenmedi">–</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card mb-20">
+        <div style="padding:40px;text-align:center;color:#6c757d;">
+            Seçilen kriterlere uygun, sınıfınızdan faaliyete katılmış öğrenci bulunamadı.
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if katilmayanlar %}
+    <div class="card mb-20" style="padding:12px 20px;">
+        <div style="font-weight:700;color:#374151;margin-bottom:6px;">
+            Bu dönemde faaliyete katılmamış öğrenciler ({{ katilmayanlar|length }})
+        </div>
+        <div style="font-size:0.88em;color:#4b5563;">
+            {% for o in katilmayanlar %}{{ o.okulno }} {{ o.adi }} {{ o.soyadi }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

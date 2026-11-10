@@ -131,6 +131,7 @@ OGRENCI_MENUSU_SAYFALARI = {
     "faaliyet:faaliyet_sil",
     "faaliyet:faaliyet_devamsizlik",
     "faaliyet:faaliyet_rapor",
+    "faaliyet:sinif_faaliyetleri",
 }
 
 # Müdür yardımcısı "Sınav İşlemleri" menüsünün gösterildiği tekil sayfalar...
@@ -281,11 +282,8 @@ def _kurul_gorevi_var(user):
     ).exists()
 
 
-def _rehber_sinifi_var(user):
-    from okul.auth import is_ust_yonetici
-
-    if is_ust_yonetici(user):
-        return True  # zaten her şeyi görür; sorgu gereksiz
+def _sinif_rehberligi_var(user):
+    """Kullanıcı aktif yılda bir sınıfın rehber öğretmeni mi?"""
     from ogrenci.services.rehberlik import rehberlik_sinif_sube
 
     return rehberlik_sinif_sube(user) is not None
@@ -459,13 +457,17 @@ def yan_menu(request):
     if sayfa in OGRENCI_MENUSU_SAYFALARI or (
         sayfa in FAALIYET_ONAY_SAYFALARI and _is_ust_yonetici(request.user)
     ):
+        sinif_rehberligi = _sinif_rehberligi_var(request.user)
         return {
             "yan_menu": "includes/ogrenci_menu.html",
             "ogrenci_menu": {
                 "aktif_sayfa": aktif("ogrenci"),
                 # Öğrenci Listesi / Sosyal Kulübü Belirle, yönetici olmayanlara yalnızca
-                # rehberi oldukları sınıf için açılır (bkz. ogrenci.views.ogrenci_liste)
-                "rehber_sinifi_var": _rehber_sinifi_var(request.user),
+                # rehberi oldukları sınıf için açılır (bkz. ogrenci.views.ogrenci_liste);
+                # üst yönetici zaten her şeyi görür
+                "rehber_sinifi_var": sinif_rehberligi or _is_ust_yonetici(request.user),
+                # "Sınıfımın Faaliyetleri" yalnızca gerçekten sınıf rehberliği olana
+                "sinif_rehberligi_var": sinif_rehberligi,
             },
         }
     return _ana_menu(request, sayfa, eslesme.namespace)
