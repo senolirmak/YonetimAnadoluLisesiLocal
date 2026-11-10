@@ -479,7 +479,7 @@ class OturmaPlanService(BaseService):
         Fitness: komsu ciftler arasindaki ayni-key cakisma sayisi (0 = ideal).
         Mutasyon: rastgele birkac pozisyon ciftinin key'ini takas eder — bu,
         Faz 1'deki eski "takas onarımı" adımının GA mutasyonu icindeki karsiligidir.
-        Çaprazlama kullanılmaz (projede AdvancedNobetDagitim/takvim GA'larıyla
+        Çaprazlama kullanılmaz (projedeki takvim GA'larıyla
         aynı sade desen: elitizm + mutasyon).
         """
         EMPTY_KEY = ("__EMPTY__", None)
