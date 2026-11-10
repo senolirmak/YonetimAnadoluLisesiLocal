@@ -11,7 +11,15 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import KeepInFrame, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    Flowable,
+    KeepInFrame,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from ogrenci.services.oturma_duzeni import N_GRUP, N_KOLON_PER_GRUP
 
@@ -25,6 +33,29 @@ def _fontlar():
         return "DejaVuSans", "DejaVuSans-Bold"
     except Exception:
         return "Helvetica", "Helvetica-Bold"
+
+
+class _DikeyYazi(Flowable):
+    """Saat yönünde 90° döndürülmüş, yukarıdan aşağıya okunan tek satırlık yazı."""
+
+    def __init__(self, metin, font, boyut, renk):
+        super().__init__()
+        self.metin, self.font, self.boyut, self.renk = metin, font, boyut, renk
+
+    def wrap(self, *_):
+        self.genislik = pdfmetrics.stringWidth(self.metin, self.font, self.boyut)
+        return self.boyut, self.genislik
+
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        c.setFont(self.font, self.boyut)
+        c.setFillColor(self.renk)
+        # Döndürme sonrası yazı (0, genişlik) noktasından aşağı doğru ilerler
+        c.translate(self.boyut * 0.25, self.genislik)
+        c.rotate(-90)
+        c.drawString(0, 0, self.metin)
+        c.restoreState()
 
 
 def oturma_plani_pdf(sinif_sube, egitim_yili, grid, yerlestirilmemis, rehber_adi="", okul_adi=""):
@@ -59,23 +90,32 @@ def oturma_plani_pdf(sinif_sube, egitim_yili, grid, yerlestirilmemis, rehber_adi
         Spacer(1, 8),
     ]
 
-    # Sütunlar: [sıra no] + her grup için 2 koltuk, gruplar arasında dar koridor
-    koltuk_g, koridor_g, sira_g = 2.6 * cm, 0.4 * cm, 0.7 * cm
+    # Sütunlar: [sıra no] + her grup için 2 koltuk, gruplar arasında dar koridor,
+    # en sağda sınıf kapısı sütunu
+    koltuk_g, koridor_g, sira_g, kapi_g = 2.45 * cm, 0.4 * cm, 0.7 * cm, 0.45 * cm
     sutunlar = [sira_g]
     for g in range(N_GRUP):
         sutunlar += [koltuk_g] * N_KOLON_PER_GRUP
         if g < N_GRUP - 1:
             sutunlar.append(koridor_g)
+    sutunlar.append(kapi_g)
+    kapi_sutunu = len(sutunlar) - 1
     koridorlar = [1 + (g + 1) * N_KOLON_PER_GRUP + g for g in range(N_GRUP - 1)]
 
+    # Satırlar: 0 tahta, 1 öğretmen masası, 2 grup başlıkları, 3.. koltuk sıraları
     tahta = [""] * len(sutunlar)
     tahta[1] = "TAHTA"
+    masa = [""] * len(sutunlar)
+    masa[1] = "Öğretmen Masası"
+    masa[-1] = _DikeyYazi("KAPI", font_kalin, 8, colors.Color(0.47, 0.21, 0.06))
     grup_basliklari = [""]
     for g in range(1, N_GRUP + 1):
         grup_basliklari += [f"{g}. Grup", ""]
         if g < N_GRUP:
             grup_basliklari.append("")
-    satirlar = [tahta, grup_basliklari]
+    grup_basliklari.append("")
+    satirlar = [tahta, masa, grup_basliklari]
+    ilk_sira = len(satirlar)
 
     for no, satir in enumerate(grid, 1):
         hucreler = [str(no)]
@@ -88,6 +128,7 @@ def oturma_plani_pdf(sinif_sube, egitim_yili, grid, yerlestirilmemis, rehber_adi
                 )
             if g < len(satir) - 1:
                 hucreler.append("")
+        hucreler.append("")
         satirlar.append(hucreler)
 
     komutlar = [
@@ -101,30 +142,42 @@ def oturma_plani_pdf(sinif_sube, egitim_yili, grid, yerlestirilmemis, rehber_adi
         ("TEXTCOLOR", (1, 0), (-1, 0), colors.white),
         ("FONTNAME", (1, 0), (-1, 0), font_kalin),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
+        # Öğretmen masası: 1. grubun üstünde
+        ("SPAN", (1, 1), (N_KOLON_PER_GRUP, 1)),
+        ("BACKGROUND", (1, 1), (N_KOLON_PER_GRUP, 1), colors.Color(0.996, 0.95, 0.78)),
+        ("BOX", (1, 1), (N_KOLON_PER_GRUP, 1), 1.2, colors.Color(0.85, 0.47, 0.02)),
+        ("FONTNAME", (1, 1), (N_KOLON_PER_GRUP, 1), font_kalin),
         # Grup başlıkları
-        ("FONTNAME", (0, 1), (-1, 1), font_kalin),
-        ("FONTSIZE", (0, 1), (-1, 1), 8),
+        ("FONTNAME", (0, 2), (-1, 2), font_kalin),
+        ("FONTSIZE", (0, 2), (-1, 2), 8),
         # Sıra numaraları
-        ("TEXTCOLOR", (0, 2), (0, -1), colors.grey),
-        ("FONTNAME", (0, 2), (0, -1), font_kalin),
+        ("TEXTCOLOR", (0, ilk_sira), (0, -1), colors.grey),
+        ("FONTNAME", (0, ilk_sira), (0, -1), font_kalin),
+        # Sınıf kapısı: tahtanın hemen altında, 3. grubun sağında; masa ve grup
+        # başlığı satırları boyunca uzanır
+        ("SPAN", (kapi_sutunu, 1), (kapi_sutunu, 2)),
+        ("BACKGROUND", (kapi_sutunu, 1), (kapi_sutunu, 2), colors.Color(0.91, 0.83, 0.74)),
+        ("BOX", (kapi_sutunu, 1), (kapi_sutunu, 2), 1.2, colors.Color(0.57, 0.25, 0.05)),
+        ("LEFTPADDING", (kapi_sutunu, 1), (kapi_sutunu, 2), 0),
+        ("RIGHTPADDING", (kapi_sutunu, 1), (kapi_sutunu, 2), 0),
     ]
     sutun = 1
     for g in range(N_GRUP):
         ilk, son = sutun, sutun + N_KOLON_PER_GRUP - 1
         komutlar += [
-            ("SPAN", (ilk, 1), (son, 1)),
-            ("BACKGROUND", (ilk, 1), (son, 1), colors.Color(0.93, 0.93, 0.93)),
-            ("BOX", (ilk, 2), (son, -1), 1, colors.black),
-            ("INNERGRID", (ilk, 2), (son, -1), 0.5, colors.grey),
+            ("SPAN", (ilk, 2), (son, 2)),
+            ("BACKGROUND", (ilk, 2), (son, 2), colors.Color(0.93, 0.93, 0.93)),
+            ("BOX", (ilk, ilk_sira), (son, -1), 1, colors.black),
+            ("INNERGRID", (ilk, ilk_sira), (son, -1), 0.5, colors.grey),
         ]
         sutun = son + 2
     for k in koridorlar:
-        komutlar.append(("BACKGROUND", (k, 2), (k, -1), colors.Color(0.97, 0.97, 0.97)))
+        komutlar.append(("BACKGROUND", (k, ilk_sira), (k, -1), colors.Color(0.97, 0.97, 0.97)))
 
     tablo = Table(
         satirlar,
         colWidths=sutunlar,
-        rowHeights=[0.7 * cm, 0.55 * cm] + [3.0 * cm] * len(grid),
+        rowHeights=[0.7 * cm, 0.9 * cm, 0.7 * cm] + [2.6 * cm] * len(grid),
     )
     tablo.setStyle(TableStyle(komutlar))
     icerik.append(tablo)

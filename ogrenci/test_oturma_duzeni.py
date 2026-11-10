@@ -108,6 +108,8 @@ class ViewTestCase(OturmaDuzeniTemel):
         self.assertFalse(r.context["duzenleyebilir"])
         self.assertContains(r, self.ogr1.adi)
         self.assertNotContains(r, "Oturma Düzenini Kaydet")
+        self.assertContains(r, "Öğretmen Masası", count=1)
+        self.assertContains(r, 'class="sinif-kapisi"', count=1)
 
     def test_rehber_baska_sinifi_salt_okunur_gorur(self):
         self.client.force_login(self.rehber)
@@ -182,7 +184,7 @@ class PdfTestCase(OturmaDuzeniTemel):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Content-Type"], "application/pdf")
         metin = self._metin(r)
-        for parca in ("9/A", "2025-2026", "TAHTA", "Ayşe Çınar", "Sınıf Rehber Öğretmeni",
+        for parca in ("9/A", "2025-2026", "TAHTA", "Öğretmen Masası", "KAPI", "Ayşe Çınar", "Sınıf Rehber Öğretmeni",
                       "yer almayan", self.ogr2.adi):
             self.assertIn(parca, metin)
         self.assertNotIn(self.yabanci.adi, metin)
@@ -194,9 +196,9 @@ class PdfTestCase(OturmaDuzeniTemel):
     def test_kalabalik_sinif_tek_sayfaya_sigar(self):
         ogrenciler = [
             ogrenci_olustur(9, "A", adi=f"Uzunisimliöğrenci{i}", soyadi="Çokuzunsoyadıolan")
-            for i in range(40)
+            for i in range(45)
         ]
-        koltuklar = {(s, k): ogrenciler[(s - 1) * 6 + k - 1].pk for s in range(1, 7) for k in range(1, 7)}
+        koltuklar = {(s, k): ogrenciler[(s - 1) * 6 + k - 1].pk for s in range(1, 8) for k in range(1, 7)}
         od.oturma_duzeni_kaydet(self.sinif, self.yil, self.rehber, koltuklar)
         self.client.force_login(self.rehber)
         self._metin(self.client.get(self.url))
