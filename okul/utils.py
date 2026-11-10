@@ -117,3 +117,13 @@ def get_aktif_dp_tarihi() -> datetime.date | None:
             .first()
         )
     return tarih
+
+
+_TURKCE_ALFABE = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
+
+
+def turkce_sira_anahtari(metin: str) -> list[int]:
+    """Türkçe alfabe sırasına göre, büyük/küçük harf ve fazla boşluk farkını yok sayan
+    sıralama anahtarı (Python'un `sorted`'ı Ç, Ğ, İ, Ö, Ş, Ü'yü alfabenin sonuna atar)."""
+    metin = " ".join((metin or "").replace("i", "İ").replace("ı", "I").upper().split())
+    return [_TURKCE_ALFABE.index(h) if h in _TURKCE_ALFABE else 100 + ord(h) for h in metin]

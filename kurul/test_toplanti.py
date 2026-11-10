@@ -54,7 +54,7 @@ class ToplantiServisTests(_Kurulum):
         self.assertEqual(t1.no, 1)
         self.assertEqual(
             list(t1.katilimlar.values_list("ad", "gorev")),
-            [("Başkan Öğretmen", "Başkan"), ("Üye Öğretmen", "Üye")],
+            [("Başkan Öğretmen", "Öğretmen (Başkan)"), ("Üye Öğretmen", "Öğretmen")],
         )
         self.assertEqual([m.baslik for m in t1.gundem.all()], [ts.ACILIS_MADDESI, ts.DILEK_MADDESI])
 
@@ -92,8 +92,76 @@ class ToplantiServisTests(_Kurulum):
         self.assertEqual((k.durum, k.aciklama), (Katilim.DURUM_MAZERETLI, "Raporlu"))
 
         uye_ekle(self.kurul, personel=personel_olustur(adi_soyadi="Yeni Gelen"))
-        self.assertEqual(ts.katilimi_esitle(t), 1)
-        self.assertEqual(ts.katilimi_esitle(t), 0)
+        self.assertEqual(ts.katilimi_esitle(t), (1, 0))
+        self.assertEqual(ts.katilimi_esitle(t), (0, 0))
+
+    def test_katilim_gorevi_personel_kaydindan_gelir(self):
+        from okul.models import Brans
+
+        matematik = Brans.objects.create(ad="Matematik")
+        self.uye.brans = matematik
+        self.uye.save()
+        myrd = personel_olustur(adi_soyadi="Yardımcı Kişi", gorev_tipi="Müdür Yardımcısı")
+        rehber = personel_olustur(adi_soyadi="Rehber Kişi", gorev_tipi="Rehberlik")
+        ucretli = personel_olustur(adi_soyadi="Ücretli Kişi", gorev_tipi="Ücretli Öğretmen", brans=matematik)
+        uye_ekle(self.kurul, personel=myrd, gorev="raportor")
+        uye_ekle(self.kurul, personel=rehber)
+        uye_ekle(self.kurul, personel=ucretli)
+
+        t = self._toplanti()
+        self.assertEqual(
+            dict(t.katilimlar.values_list("ad", "gorev")),
+            {
+                "Başkan Öğretmen": "Öğretmen (Başkan)",
+                "Üye Öğretmen": "Matematik Öğretmeni",
+                "Yardımcı Kişi": "Müdür Yardımcısı (Raportör/Yazman)",
+                "Rehber Kişi": "Rehber Öğretmen",
+                "Ücretli Kişi": "Matematik Öğretmeni (Ücretli)",
+            },
+        )
+
+    def test_katilim_sirasi_mudur_baskan_yardimci_ogretmen_brans(self):
+        from okul.models import Brans
+
+        fizik, biyoloji, ingilizce = (Brans.objects.create(ad=a) for a in ("Fizik", "Biyoloji", "İngilizce"))
+        # Başkan (self.baskan) ve self.uye kurulumda; diğerleri karışık sırayla eklenir
+        self.uye.brans = fizik
+        self.uye.save()
+        for ad, kw in [
+            ("Zeki İngilizceci", {"brans": ingilizce}),
+            ("Ayşe Yardımcı", {"gorev_tipi": "Müdür Yardımcısı"}),
+            ("Can Biyolog", {"brans": biyoloji}),
+            ("Okan Müdür", {"gorev_tipi": "Okul Müdürü"}),
+            ("Ali Fizikçi", {"brans": fizik}),
+            ("Bora Yardımcı", {"gorev_tipi": "Müdür Yardımcısı"}),
+        ]:
+            uye_ekle(self.kurul, personel=personel_olustur(adi_soyadi=ad, **kw))
+        uye_ekle(self.kurul, personel=personel_olustur(adi_soyadi="Yedek Biyolog", brans=biyoloji), asil=False)
+
+        t = self._toplanti()
+        beklenen = [
+            "Okan Müdür", "Başkan Öğretmen", "Ayşe Yardımcı", "Bora Yardımcı",
+            "Can Biyolog", "Ali Fizikçi", "Üye Öğretmen", "Zeki İngilizceci", "Yedek Biyolog",
+        ]
+        self.assertEqual([k.ad for k in ts.sirali_katilimlar(t)], beklenen)
+
+        self.client.force_login(self.myrd)
+        resp = self.client.get(reverse("kurul:toplanti_detay", args=[t.pk]))
+        self.assertEqual([k.ad for k in resp.context["katilimlar"]], beklenen)
+
+    def test_esitleme_eski_gorevleri_yeniler_onaylananda_dokunmaz(self):
+        t = self._toplanti()
+        t.katilimlar.update(gorev="Şubede ders okutan öğretmenler ve rehberlik öğretmenleri")
+        self.assertEqual(ts.katilimi_esitle(t), (0, 2))
+        self.assertEqual(
+            sorted(t.katilimlar.values_list("gorev", flat=True)), ["Öğretmen", "Öğretmen (Başkan)"]
+        )
+
+        t.katilimlar.update(gorev="Eski")
+        Toplanti.objects.filter(pk=t.pk).update(durum=Toplanti.DURUM_ONAYLANDI)
+        t.refresh_from_db()
+        self.assertEqual(ts.katilimi_esitle(t), (0, 0))
+        self.assertEqual(set(t.katilimlar.values_list("gorev", flat=True)), {"Eski"})
 
     def test_katilim_uye_cikarilsa_da_tutanakta_kalir(self):
         t = self._toplanti()

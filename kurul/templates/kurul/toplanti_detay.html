@@ -148,7 +148,7 @@
         </form>
         {% if yonetebilir %}
         <form method="post" style="margin-top:6px;">{% csrf_token %}<input type="hidden" name="islem" value="katilim_esitle">
-            <button type="submit" class="tp-kucuk">Kurula sonradan eklenen üyeleri listeye ekle</button></form>
+            <button type="submit" class="tp-kucuk" title="Kurula sonradan eklenen üyeleri listeye ekler, görevleri personel kayıtlarından yeniler">Katılım listesini kurul üyeleriyle eşitle</button></form>
         {% endif %}
     </div>
 
