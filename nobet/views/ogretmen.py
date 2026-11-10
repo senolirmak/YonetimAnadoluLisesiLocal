@@ -16,6 +16,7 @@ from nobet.models import (
     NobetGorevi,
     NobetIstatistik,
     NobetPersonel,
+    NobetYerleri,
 )
 from okul.auth import is_mudur_yardimcisi, is_ogretmen_menu
 from personeldevamsizlik.models import Devamsizlik
@@ -75,24 +76,28 @@ def ogretmen_haftalik_nobet(request):
     cuma = pazartesi + timedelta(days=4)
 
     # Sadece seçili uygulama tarihine ait kayıtlar
-    nobetler = NobetGorevi.objects.filter(uygulama_tarihi=secili).select_related(
-        "ogretmen__personel"
+    nobetler = (
+        NobetGorevi.objects.filter(uygulama_tarihi=secili, arsivlendi=False)
+        .select_related("ogretmen__personel", "nobet_yeri")
+        .order_by("ogretmen__personel__adi_soyadi")
     )
 
-    # Öğretmen → {gün: yer} haritası
-    ogretmen_nobet_map = {}
+    # Nöbet yeri × gün çizelgesi (yönetimdeki nobet_dagitim çizelgesiyle aynı düzen):
+    # her satır {"yer", "hucreler": [gün başına öğretmen adları]}
+    matris = {}
     for n in nobetler:
-        isim = n.ogretmen.personel.adi_soyadi
-        gun_tr = _GUN_TR.get(n.nobet_gun, n.nobet_gun)
-        ogretmen_nobet_map.setdefault(isim, {})[gun_tr] = n.nobet_yeri
+        yer = n.nobet_yeri.ad if n.nobet_yeri else ""
+        gun_tr = _GUN_TR.get(n.nobet_gun)
+        if gun_tr is None:
+            continue
+        matris.setdefault(yer, {g: [] for g in _TR_GUNLER})[gun_tr].append(
+            n.ogretmen.personel.adi_soyadi
+        )
 
-    # Tablo satırları: her öğretmen için 5 günlük satır
-    tablo_satirlari = []
-    for isim, gun_yer in sorted(ogretmen_nobet_map.items()):
-        satir = {"ogretmen": isim}
-        for gun in _TR_GUNLER:
-            satir[gun] = gun_yer.get(gun, "")
-        tablo_satirlari.append(satir)
+    tablo_satirlari = [
+        {"yer": yer, "hucreler": [matris[yer][g] for g in _TR_GUNLER]}
+        for yer in sorted(matris)
+    ]
 
     return render(
         request,
@@ -142,19 +147,25 @@ def ogretmen_gunun_nobetcileri(request):
                 uygulama_tarihi=gorev_date,
                 nobet_gun=day_name_en,
             )
-            .select_related("ogretmen__personel")
-            .order_by("nobet_yeri")
+            .select_related("ogretmen__personel", "nobet_yeri")
+            .order_by("nobet_yeri__ad")
         )
 
-        gunluk_degisiklikler = {
-            k.ogretmen_id: k.nobet_yeri
-            for k in GunlukNobetCizelgesi.objects.filter(tarih=target_date)
-        }
+        # Günlük çizelge yeri düz metin tutar; görevin nöbet yeri ise NobetYerleri FK'sıdır
+        gunluk_degisiklikler = dict(
+            GunlukNobetCizelgesi.objects.filter(tarih=target_date).values_list(
+                "ogretmen_id", "nobet_yeri"
+            )
+        )
+        yer_map = {y.ad: y for y in NobetYerleri.objects.filter(ad__in=gunluk_degisiklikler.values())}
         full_day_hours = set(range(1, 9))
 
         for gorev in tum_gorevler:
             if gorev.ogretmen.pk in gunluk_degisiklikler:
-                gorev.nobet_yeri = gunluk_degisiklikler[gorev.ogretmen.pk]
+                yer_str = gunluk_degisiklikler[gorev.ogretmen.pk]
+                # Kayıtlı olmayan ad (yer silinmiş/adı değişmiş) yalnızca gösterim için
+                # kaydedilmeyen bir nesneyle verilir
+                gorev.nobet_yeri = yer_map.get(yer_str) or NobetYerleri(ad=yer_str)
 
             is_full_absent = False
             for absence in Devamsizlik.objects.filter(

@@ -27,6 +27,7 @@ from ..models import (
     NobetPersonel,
 )
 from ..services.pdf_rapor import NobetPDFReport
+from ..services.rotasyon import turkce_sira_anahtari
 from .dagitim import _gun_adi_tr
 from .permissions import is_mudur_yardimcisi, is_yonetici
 
@@ -108,7 +109,9 @@ def gunun_nobetcileri(request):
     gorevler = []
     if gorev_date:
         tum_gorevler = (
-            NobetGorevi.objects.filter(uygulama_tarihi=gorev_date, nobet_gun=day_name_en)
+            NobetGorevi.objects.filter(
+                uygulama_tarihi=gorev_date, nobet_gun=day_name_en, arsivlendi=False
+            )
             .select_related("ogretmen__personel", "nobet_yeri")
             .order_by("nobet_yeri__ad")
         )
@@ -165,12 +168,18 @@ def gunun_nobetcileri(request):
             if not is_full_absent:
                 gorevler.append(gorev)
 
-    tum_yerler = (
-        NobetGorevi.objects.filter(nobet_yeri__isnull=False)
-        .values_list("nobet_yeri__ad", flat=True)
-        .distinct()
-        .order_by("nobet_yeri__ad")
-    )
+    # Seçim listesi: yalnızca geçerli nöbet listesinde (aynı uygulama tarihli, arşivlenmemiş
+    # görevlerde) kullanılan yerler. O gün için kaydedilmiş bir değişiklik bu listede yoksa
+    # da seçili kalabilmesi için eklenir.
+    tum_yerler = []
+    if gorev_date:
+        tum_yerler = set(
+            NobetGorevi.objects.filter(
+                uygulama_tarihi=gorev_date, arsivlendi=False, nobet_yeri__isnull=False
+            ).values_list("nobet_yeri__ad", flat=True)
+        )
+        tum_yerler.update(gorev.nobet_yeri.ad for gorev in gorevler if gorev.nobet_yeri)
+        tum_yerler = sorted(tum_yerler, key=turkce_sira_anahtari)
 
     context = {
         "title": "Günün Nöbetçileri",
