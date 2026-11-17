@@ -60,6 +60,7 @@ urlpatterns = [
     path("eba/", include("ebagiris.urls")),
     path("sosyalkulup/", include("sosyalkulup.urls")),
     path("kurul/", include("kurul.urls")),
+    path("tahtalar/", include("tahtalar.urls")),
     path("", include("main.urls")),
     path("", include("nobet.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

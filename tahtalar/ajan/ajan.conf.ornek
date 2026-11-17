@@ -1,0 +1,15 @@
+[ajan]
+# Okul sunucusunun adresi (sonda / olmadan)
+sunucu = https://<SUNUCU_ADRESI>
+
+# Sunucudaki .env içindeki TAHTA_KAYIT_ANAHTARI ile aynı olmalı.
+# Yalnızca ilk kayıtta kullanılır.
+kayit_anahtari = <KAYIT_ANAHTARI>
+
+# Sunucu yerel CA ile HTTPS kullanıyorsa CA sertifikasının yolu
+# (giriş sayfasındaki "CA sertifikasını indir" bağlantısından alınır).
+# Boş bırakılırsa sistemin güvendiği sertifikalar kullanılır.
+ca_dosyasi = /etc/okul-ajan/yerel-ca.crt
+
+# Kaç saniyede bir sunucuya bağlanılacağı (en az 15)
+aralik = 60
