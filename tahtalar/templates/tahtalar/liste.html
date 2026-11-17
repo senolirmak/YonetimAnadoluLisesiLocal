@@ -1,0 +1,247 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}Etkileşimli Tahtalar – Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+{% include "okul/yonetim/_style.html" %}
+<style>
+  .th-ozet { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem; }
+  .th-ozet a {
+    flex: 1; min-width: 140px; text-decoration: none; color: #1a1a2e;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: .7rem .9rem;
+  }
+  .th-ozet a.secili { border-color: #417690; box-shadow: 0 0 0 2px #41769033; }
+  .th-ozet b { display: block; font-size: 1.4rem; }
+  .th-ozet span { font-size: .8rem; color: #6b7280; }
+  .th-uyari b { color: #b91c1c; }
+  .th-durum { display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; }
+  .th-nokta { width: .6rem; height: .6rem; border-radius: 50%; background: #9ca3af; }
+  .th-yesil { background: #16a34a; }
+  .th-kirmizi { background: #dc2626; }
+  .th-sari { background: #d97706; }
+  .th-silik { color: #9ca3af; font-size: .8rem; }
+  .th-eylem { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: .75rem; }
+  .th-tablo-kap { overflow-x: auto; }
+  details summary { cursor: pointer; font-weight: 600; color: #374151; }
+</style>
+
+<div class="container">
+  <h2 class="page-title mb-20">Etkileşimli Tahtalar</h2>
+  {% include "okul/yonetim/_mesajlar.html" %}
+
+  <div class="th-ozet">
+    <a href="{% url 'tahtalar:liste' %}"{% if not filtre %} class="secili"{% endif %}>
+      <b>{{ ozet.toplam }}</b><span>Ajanı kurulu tahta</span>
+    </a>
+    <a href="?filtre=cevrimici"{% if filtre == 'cevrimici' %} class="secili"{% endif %}>
+      <b>{{ ozet.cevrimici }}</b><span>Şu an çevrimiçi</span>
+    </a>
+    <a href="?filtre=ahenk_sorunlu" class="{% if ozet.ahenk_sorunlu %}th-uyari{% endif %}{% if filtre == 'ahenk_sorunlu' %} secili{% endif %}">
+      <b>{{ ozet.ahenk_sorunlu }}</b><span>Ahenk çalışmıyor / bilinmiyor</span>
+    </a>
+    <a href="?filtre=meb_kayitsiz" class="{% if ozet.meb_kayitsiz %}th-uyari{% endif %}{% if filtre == 'meb_kayitsiz' %} secili{% endif %}">
+      <b>{{ ozet.meb_kayitsiz }}</b><span>MEB'e kayıtsız / bilinmiyor</span>
+    </a>
+    <a href="?filtre=guncelleme" class="{% if ozet.guncelleme %}th-uyari{% endif %}{% if filtre == 'guncelleme' %} secili{% endif %}">
+      <b>{{ ozet.guncelleme }}</b><span>Güncelleniyor / sorunlu</span>
+    </a>
+    <a href="#ajansiz">
+      <b>{{ ozet.ajansiz }}</b><span>Ajanı kurulmamış (Lider listesinde)</span>
+    </a>
+  </div>
+
+  <div class="ay-kart ay-kart-full">
+    <div class="ay-baslik">
+      Tahtalar{% if filtre_etiketi %} — {{ filtre_etiketi }}{% endif %}
+      <a href="{% url 'tahtalar:liste' %}{% if filtre %}?filtre={{ filtre }}{% endif %}" style="float:right;font-size:.82rem;font-weight:500;">↻ Yenile</a>
+    </div>
+
+    {% if tahtalar %}
+    <form method="post" action="{% url 'tahtalar:komut_ver' %}" id="komut-formu">
+      {% csrf_token %}
+      {% if filtre %}<input type="hidden" name="filtre" value="{{ filtre }}">{% endif %}
+      <div class="th-eylem">
+        <span id="secim-sayisi" class="th-silik">Seçili tahta yok</span>
+        {% for deger, etiket in komut_secenekleri %}
+        <button type="submit" name="komut" value="{{ deger }}" data-etiket="{{ etiket }}"
+                data-uyari="{% if deger == 'guncelle' %}Güncelleme 10-30 dakika sürebilir. Bu sürede tahtaları kapatmayın; kapat/yeniden başlat komutları güncelleme bitene kadar reddedilir.{% endif %}"
+                class="btn-kaydet{% if deger == 'kapat' %} btn-tehlike{% endif %}" disabled>
+          Seçilenleri {{ etiket|lower }}
+        </button>
+        {% endfor %}
+        <span class="th-silik">Komut bir dakika içinde uygulanır; {{ gecerlilik_dk }} dakikada ulaşmazsa iptal olur. Güncelleme sürerken tahtayı kapatmayın.</span>
+      </div>
+
+      <div class="th-tablo-kap">
+      <table class="ay-tablo">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="hepsini-sec" aria-label="Hepsini seç"></th>
+            <th>Tahta</th>
+            <th>Bağlantı</th>
+            <th>Oturum</th>
+            <th>MEB Ahenk</th>
+            <th>MEB kaydı</th>
+            <th>Güncelleme</th>
+            <th>IP</th>
+            <th>Son komut</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tahtalar %}
+          <tr>
+            <td><input type="checkbox" name="tahta" value="{{ t.pk }}" class="tahta-sec" aria-label="{{ t.ad }}"{% if t.ekran_oturumu %} data-oturum="{{ t.ad }}"{% endif %}></td>
+            <td>
+              <strong>{{ t.ad }}</strong>
+              {% if t.konum and t.konum != t.ad %}<div class="th-silik">{{ t.konum }}</div>{% endif %}
+            </td>
+            <td>
+              {% if t.cevrimici %}
+              <span class="th-durum"><span class="th-nokta th-yesil"></span>Çevrimiçi</span>
+              {% else %}
+              <span class="th-durum"><span class="th-nokta"></span>Çevrimdışı</span>
+              <div class="th-silik">{% if t.son_gorulme %}{{ t.son_gorulme|timesince }} önce{% else %}hiç bağlanmadı{% endif %}</div>
+              {% endif %}
+            </td>
+            <td>
+              {% if t.ekran_oturumu %}
+              {% with o=t.ekran_oturumu %}
+              <strong>{{ o.personel|default:o.ad|default:o.kullanici }}</strong>
+              <div class="th-silik">
+                {% if o.personel %}<span title="EBA hesabı bağlı personel">✓ Personel</span>
+                {% elif o.eba %}<span title="EBA ile giriş; EBA hesabı bağlı bir personel kaydı yok (öğrenci ya da hesabını bağlamamış öğretmen)">EBA girişi</span>
+                {% else %}<span title="Tahtanın yerel hesabı">Yerel hesap ({{ o.kullanici }})</span>{% endif %}
+                {% if o.baslangic %}· {{ o.baslangic|date:"H:i" }}'den beri{% endif %}
+              {% endwith %}
+                {% if t.diger_oturum_sayisi %}· +{{ t.diger_oturum_sayisi }} arka planda{% endif %}
+              </div>
+              {% elif t.cevrimici %}
+              <span class="th-silik">Giriş ekranında</span>
+              {% else %}<span class="th-silik">—</span>{% endif %}
+            </td>
+            <td>
+              <span class="th-durum">
+                <span class="th-nokta {% if t.ahenk_servisi == 'calisiyor' %}th-yesil{% elif t.ahenk_servisi == 'durmus' %}th-kirmizi{% endif %}"></span>
+                {{ t.get_ahenk_servisi_display }}
+              </span>
+            </td>
+            <td>
+              <span class="th-durum">
+                {% if t.meb_kayitli %}<span class="th-nokta th-yesil"></span>Kayıtlı
+                {% elif t.meb_kayitli is False %}<span class="th-nokta th-kirmizi"></span>Kayıtsız
+                {% else %}<span class="th-nokta"></span>Bilinmiyor{% endif %}
+              </span>
+            </td>
+            <td>
+              {% if t.guncelleme_durumu %}
+              <span class="th-durum">
+                <span class="th-nokta {% if t.guncelleme_durumu == 'basarili' %}th-yesil{% elif t.guncelleme_durumu == 'suruyor' %}th-sari{% else %}th-kirmizi{% endif %}"></span>
+                {{ t.get_guncelleme_durumu_display }}
+              </span>
+              <div class="th-silik">{{ t.guncelleme_zamani|date:"d.m.Y H:i" }}</div>
+              {% else %}<span class="th-silik">—</span>{% endif %}
+            </td>
+            <td>{{ t.ip_adresi|default:"—" }}</td>
+            <td>
+              {% if t.son_komut %}
+              {{ t.son_komut.get_komut_display }}
+              <div class="th-silik">{{ t.son_komut.get_durum_display }} · {{ t.son_komut.olusturma|date:"d.m H:i" }}</div>
+              {% else %}<span class="th-silik">—</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </form>
+    {% else %}
+    <p class="ay-bos">
+      {% if filtre %}Bu filtreye uyan tahta yok.{% else %}Henüz ajanı kurulmuş tahta yok. Kurulum için <code>tahtalar/ajan/README.md</code>'ye bakın.{% endif %}
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="ay-grid" style="margin-top:1.5rem;">
+    <div class="ay-kart ay-kart-half">
+      <div class="ay-baslik">Son komutlar</div>
+      {% if son_komutlar %}
+      <table class="ay-tablo">
+        <tbody>
+          {% for k in son_komutlar %}
+          <tr>
+            <td>{{ k.tahta.ad }}</td>
+            <td>{{ k.get_komut_display }}</td>
+            <td>{{ k.get_durum_display }}{% if k.sonuc_mesaji %}<div class="th-silik">{{ k.sonuc_mesaji }}</div>{% endif %}</td>
+            <td class="th-silik">{{ k.olusturma|date:"d.m H:i" }}{% if k.olusturan %}<br>{{ k.olusturan.get_full_name|default:k.olusturan.username }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="ay-bos">Henüz komut verilmedi.</p>
+      {% endif %}
+    </div>
+
+    <div class="ay-kart ay-kart-half" id="ajansiz">
+      <div class="ay-baslik">Ajanı kurulmamış tahtalar ({{ ajansiz|length }})</div>
+      {% if ajansiz %}
+      <details>
+        <summary>MEB Lider listesinde olup sunucuya bağlanmamış tahtalar</summary>
+        <table class="ay-tablo" style="margin-top:.5rem;">
+          <thead><tr><th>Şube</th><th>Lider'de</th><th>Ahenk</th></tr></thead>
+          <tbody>
+            {% for e in ajansiz %}
+            <tr>
+              <td>{{ e.sube_adi }}</td>
+              <td>{% if e.lider_aktif is False %}Pasif{% else %}Aktif{% endif %}</td>
+              <td>{{ e.ahenk_surumu|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </details>
+      {% else %}
+      <p class="ay-bos">Lider listesindeki bütün tahtaların ajanı kurulu.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById("komut-formu");
+  if (!form) return;
+  var kutular = form.querySelectorAll(".tahta-sec");
+  var hepsi = document.getElementById("hepsini-sec");
+  var dugmeler = form.querySelectorAll("button[name=komut]");
+  var sayac = document.getElementById("secim-sayisi");
+
+  function guncelle() {
+    var n = form.querySelectorAll(".tahta-sec:checked").length;
+    sayac.textContent = n ? n + " tahta seçili" : "Seçili tahta yok";
+    dugmeler.forEach(function (d) { d.disabled = n === 0; });
+    hepsi.checked = n > 0 && n === kutular.length;
+  }
+  hepsi.addEventListener("change", function () {
+    kutular.forEach(function (k) { k.checked = hepsi.checked; });
+    guncelle();
+  });
+  kutular.forEach(function (k) { k.addEventListener("change", guncelle); });
+  dugmeler.forEach(function (d) {
+    d.addEventListener("click", function (e) {
+      var n = form.querySelectorAll(".tahta-sec:checked").length;
+      var soru = n + " tahta için “" + d.dataset.etiket + "” komutu verilsin mi?";
+      if (d.dataset.uyari) soru += "\n\n" + d.dataset.uyari;
+      var kullanilan = Array.prototype.map.call(
+        form.querySelectorAll(".tahta-sec:checked[data-oturum]"), function (k) { return k.dataset.oturum; });
+      if (kullanilan.length && d.value !== "guncelle")
+        soru += "\n\nŞu an oturum açık (kullanılıyor): " + kullanilan.join(", ") + ". Kaydedilmemiş çalışmalar kaybolabilir.";
+      if (!confirm(soru)) e.preventDefault();
+    });
+  });
+  guncelle();
+})();
+</script>
+{% endblock %}

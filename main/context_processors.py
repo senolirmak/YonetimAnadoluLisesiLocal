@@ -182,6 +182,7 @@ YONETIM_MENUSU_MODULLERI = {
     "yedekleme": "yedekleme:yedek_listesi",
     "senesonu": "senesonu:gecis_listesi",
     "kurul": "kurul:index",
+    "tahtalar": "okul:yonetim_index",
 }
 YONETIM_MENUSU_OKUL_SAYFALARI = {
     "okul:yonetim_index",
@@ -418,7 +419,7 @@ def yan_menu(request):
     ):
         from okul.auth import is_mudur_yardimcisi
 
-        mudur_acik = sayfa in YONETIM_MENUSU_OKUL_SAYFALARI or eslesme.namespace == "kurul"
+        mudur_acik = sayfa in YONETIM_MENUSU_OKUL_SAYFALARI or eslesme.namespace in ("kurul", "tahtalar")
         if is_mudur_yardimcisi(request.user) or (mudur_acik and _is_ust_yonetici(request.user)):
             return {
                 "yan_menu": "includes/yonetim_menu.html",

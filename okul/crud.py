@@ -181,10 +181,12 @@ def yonetim_index(request):
     ]
     from okul.utils import get_aktif_egitim_yili
     from secmelidersler.services import ders_yuku
+    from tahtalar.services.panel import ozet as tahta_ozeti
 
     yil = get_aktif_egitim_yili()
     return render(request, "okul/yonetim/index.html", {
         "kartlar": kartlar,
+        "tahta_ozeti": tahta_ozeti(),
         "ders_yuku_yili": yil,
         "ders_yuku_ozeti": ders_yuku.ozet(yil),
     })

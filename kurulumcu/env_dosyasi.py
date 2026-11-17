@@ -36,6 +36,26 @@ def yaz(yol: Path, degerler: dict[str, str]) -> None:
     yol.chmod(0o600)
 
 
+def eksikse_ekle(yol: Path, anahtar: str, uretici, *, sudo: bool = False) -> bool:
+    """`anahtar` .env'de yoksa ya da boşsa `uretici()`'nin değeriyle ekler; doluysa
+    dokunmaz (tekrar çalıştırmada var olan sır değişmez). Eklediyse True döner.
+    `sudo` için bkz. anahtar_ayarla."""
+    if not yol.is_file():
+        return False
+    if sudo:
+        from . import yardimci as y
+
+        mevcut = y.cikti(["cat", str(yol)], sudo=True)
+    else:
+        mevcut = yol.read_text()
+    for satir in mevcut.splitlines():
+        ad, esit, deger = satir.strip().partition("=")
+        if esit and ad.strip() == anahtar and deger.strip():
+            return False
+    anahtar_ayarla(yol, anahtar, uretici(), sudo=sudo)
+    return True
+
+
 def anahtar_ayarla(yol: Path, anahtar: str, deger: str, *, sudo: bool = False) -> None:
     """Var olan bir .env dosyasında tek bir anahtarı günceller ya da (yoksa)
     sona ekler; diğer satırları ve sırayı korur. `yaz()`'ın aksine sabit bir

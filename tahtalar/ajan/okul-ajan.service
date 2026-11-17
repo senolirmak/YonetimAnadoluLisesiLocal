@@ -1,0 +1,25 @@
+[Unit]
+Description=Okul tahta ajanı (akalyonetim)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/okul-ajan/okul_ajan.py
+Restart=always
+RestartSec=30
+
+# Token /var/lib/okul-ajan altında tutulur (STATE_DIRECTORY).
+StateDirectory=okul-ajan
+StateDirectoryMode=0700
+
+# Sertleştirme. /usr, /boot ve /etc salt okunur; /etc/ahenk ayrıca açıkça
+# salt okunur yapılır — ajan MEB Ahenk dosyalarına hiçbir koşulda yazamaz.
+ProtectSystem=full
+ReadOnlyPaths=-/etc/ahenk
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
