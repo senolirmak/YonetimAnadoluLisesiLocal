@@ -27,7 +27,7 @@ def tahta_listesi(request):
             "filtre_etiketi": panel.FILTRELER[filtre][0] if filtre else "",
             "ajansiz": panel.ajansiz_envanter(),
             "son_komutlar": panel.son_komutlar(),
-            "komut_secenekleri": TahtaKomutu.KOMUT_SECENEKLERI,
+            "komut_secenekleri": TahtaKomutu.PANEL_KOMUTLARI,
             "gecerlilik_dk": int(KOMUT_GECERLILIK.total_seconds() // 60),
         },
     )
@@ -37,7 +37,7 @@ def tahta_listesi(request):
 @require_POST
 def komut_ver(request):
     komut = request.POST.get("komut")
-    etiketler = dict(TahtaKomutu.KOMUT_SECENEKLERI)
+    etiketler = dict(TahtaKomutu.PANEL_KOMUTLARI)
     secilen = [i for i in request.POST.getlist("tahta") if i.isdigit()]
     tahtalar = list(Tahta.objects.filter(pk__in=secilen, aktif=True))
     filtre = request.POST.get("filtre")

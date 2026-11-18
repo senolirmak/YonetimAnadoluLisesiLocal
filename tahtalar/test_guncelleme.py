@@ -107,7 +107,7 @@ class AjanGuncellemeTestCase(TestCase):
             durum, mesaj = self.ajan.komutu_uygula("guncelle")
         self.assertEqual((durum, mesaj), ("tamamlandi", "Güncelleme başlatıldı."))
         systemd_run = next(c for c in cagrilar if c[0] == "systemd-run")
-        self.assertIn("--unit=okul-ajan-guncelleme", systemd_run)
+        self.assertIn("--unit=akal-eta-yonetim-guncelleme", systemd_run)
         self.assertEqual(systemd_run[-1], str(self.dosya))
         betik = systemd_run[systemd_run.index("-c") + 1]
         self.assertIn("--force-confold", betik)

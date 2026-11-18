@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 {% load static %}
 
-{% block title %}Tahta Ajanı Paketi – Okul Yönetim Sistemi{% endblock %}
+{% block title %}akal-eta-yonetim Kurulum Paketi – Okul Yönetim Sistemi{% endblock %}
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
@@ -18,16 +18,16 @@
 </style>
 
 <div class="container">
-  <h2 class="page-title mb-20">Tahta Ajanı Paketi
+  <h2 class="page-title mb-20">akal-eta-yonetim Kurulum Paketi
     <a href="{% url 'tahtalar:liste' %}" style="float:right;font-size:.85rem;font-weight:500;">← Tahtalar</a>
   </h2>
 
   <div class="ay-kart ay-kart-full pk-kart">
-    <div class="ay-baslik">okul-ajan {{ surum }} — ETAP/Pardus için .deb</div>
+    <div class="ay-baslik">akal-eta-yonetim {{ surum }} — ETAP/Pardus için .deb</div>
     <p class="pk-silik">
       Paket sunucu adresini, kayıt anahtarını{% if ca_var %} ve yerel CA sertifikasını{% endif %} içerir;
-      tahtada ek ayar gerekmez. Daha önce <code>kur.sh</code> ile kurulmuş tahtalara da kurulabilir
-      (yalnızca sunucu adresi ve kayıt anahtarı güncellenir, tahtanın kaydı korunur).
+      tahtada ek ayar gerekmez. Daha önce <code>kur.sh</code> ile ya da eski adıyla (<code>okul-ajan</code>) kurulmuş tahtalara da kurulabilir:
+      eski kurulum kaldırılır, ayarlar ve tahtanın kaydı korunur.
     </p>
 
     {% if hata %}<p class="pk-hata">{{ hata }}</p>{% endif %}
@@ -63,19 +63,19 @@
       <code>sudo apt install ./{{ dosya_adi }}</code> ile kurun.</p>
     {% endif %}
     <p class="pk-silik">Kontrol: tahta bir dakika içinde <a href="{% url 'tahtalar:liste' %}">Tahtalar</a> sayfasında
-      "Çevrimiçi" görünmeli. Günlük: <code>sudo journalctl -u okul-ajan -n 20 -f</code> — yeni tahtada
-      "Sunucuya kaydolundu", daha önce kayıtlı tahtada yalnızca "okul-ajan … başladı" satırı görünür
+      "Çevrimiçi" görünmeli. Günlük: <code>sudo journalctl -u akal-eta-yonetim -n 20 -f</code> — yeni tahtada
+      "Sunucuya kaydolundu", daha önce kayıtlı tahtada yalnızca "akal-eta-yonetim … başladı" satırı görünür
       (başarılı bağlantılar günlüğe yazılmaz).
-      Kaldırma: <code>sudo apt remove okul-ajan</code> (ayarlarla birlikte: <code>sudo apt purge okul-ajan</code>).</p>
+      Kaldırma: <code>sudo apt remove akal-eta-yonetim</code> (ayarlarla birlikte: <code>sudo apt purge akal-eta-yonetim</code>).</p>
   </div>
   {% endif %}
 
   <div class="ay-kart ay-kart-full pk-kart">
-    <div class="ay-baslik">Eski sürümlü ajanlar ({{ eski_surumlu|length }})</div>
+    <div class="ay-baslik">Eski sürümlü kurulumlar ({{ eski_surumlu|length }})</div>
     {% if eski_surumlu %}
     <p class="pk-silik">Bu tahtalara paketi yeniden kurun.</p>
     <table class="ay-tablo">
-      <thead><tr><th>Tahta</th><th>Ajan sürümü</th><th>Son görülme</th></tr></thead>
+      <thead><tr><th>Tahta</th><th>Sürüm</th><th>Son görülme</th></tr></thead>
       <tbody>
         {% for t in eski_surumlu %}
         <tr><td>{{ t.ad }}</td><td>{{ t.ajan_surumu }}</td><td>{% if t.son_gorulme %}{{ t.son_gorulme|timesince }} önce{% else %}—{% endif %}</td></tr>
@@ -83,7 +83,7 @@
       </tbody>
     </table>
     {% else %}
-    <p class="ay-bos">Bütün tahtalarda ajanın güncel sürümü ({{ surum }}) çalışıyor.</p>
+    <p class="ay-bos">Bütün tahtalarda akal-eta-yonetim'in güncel sürümü ({{ surum }}) çalışıyor.</p>
     {% endif %}
   </div>
 </div>

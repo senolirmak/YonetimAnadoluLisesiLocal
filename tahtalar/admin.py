@@ -96,7 +96,7 @@ class TahtaAdmin(admin.ModelAdmin):
     )
 
     def has_add_permission(self, request):
-        # Tahtalar ajan üzerinden kendini kaydeder.
+        # Tahtalar akal-eta-yonetim üzerinden kendini kaydeder.
         return False
 
     @admin.display(description="Lider kaydı", boolean=True)
@@ -197,6 +197,6 @@ class TahtaEnvanteriAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False
 
-    @admin.display(description="Ajan bağlı", boolean=True)
+    @admin.display(description="akal-eta-yonetim bağlı", boolean=True)
     def ajan_tahtasi(self, obj):
         return hasattr(obj, "tahta")

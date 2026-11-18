@@ -109,5 +109,5 @@ secmelidersler_data.json
 /devtools/
 /local_scripts/
 
-# Tahta ajanı kurulum ayarı (gerçek kayıt anahtarı içerir)
-tahtalar/ajan/kurulum.conf
+# akal-eta-yonetim kurulum ayarı (gerçek kayıt anahtarı içerir)
+tahtalar/akal-eta-yonetim/kurulum.conf

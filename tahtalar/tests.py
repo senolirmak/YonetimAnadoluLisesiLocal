@@ -235,8 +235,8 @@ class TahtaAdminTestCase(TestCase):
 
 
 def _ajan_modulu():
-    yol = Path(__file__).parent / "ajan" / "okul_ajan.py"
-    spec = importlib.util.spec_from_file_location("okul_ajan", yol)
+    yol = Path(__file__).parent / "akal-eta-yonetim" / "akal_eta_yonetim.py"
+    spec = importlib.util.spec_from_file_location("akal_eta_yonetim", yol)
     modul = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(modul)
     return modul

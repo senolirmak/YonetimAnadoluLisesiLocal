@@ -183,9 +183,10 @@ def main() -> None:
             "ALLOWED_HOSTS=alan-adi.com,sunucu-ip"
         )
 
-    # Etkileşimli tahta ajanlarının ilk kayıt anahtarı (bkz. tahtalar/ajan/README.md).
+    # Tahtalardaki akal-eta-yonetim'in ilk kayıt anahtarı
+    # (bkz. tahtalar/akal-eta-yonetim/README.md).
     # Yalnızca yoksa üretilir; tekrar çalıştırmada var olan anahtar korunur, çünkü
-    # tahtalardaki ajan.conf dosyaları onu kullanır. Tekrar çalıştırmada .env servis
+    # tahtalardaki akal-eta-yonetim.conf dosyaları onu kullanır. Tekrar çalıştırmada .env servis
     # kullanıcısına devredilmiş olabilir (mod 640) → sudo gerekir.
     if env_dosyasi.eksikse_ekle(
         env_yolu,
@@ -194,7 +195,8 @@ def main() -> None:
         sudo=not os.access(env_yolu, os.W_OK),
     ):
         y.basari(
-            "TAHTA_KAYIT_ANAHTARI üretildi (.env). Tahtalardaki ajan.conf'a bu değer yazılmalı."
+            "TAHTA_KAYIT_ANAHTARI üretildi (.env). Tahtalara kurulan akal-eta-yonetim "
+            "paketi bu değeri kendisi taşır; kur.sh ile kurulumda kurulum.conf'a yazılmalı."
         )
 
     # ── 4. PostgreSQL veritabanı ve kullanıcısı ──────────────────

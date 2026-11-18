@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-# Ajan 60 sn'de bir bağlanır; üç tur üst üste gelmezse tahta çevrimdışı sayılır.
+# akal-eta-yonetim 60 sn'de bir bağlanır; üç tur üst üste gelmezse tahta çevrimdışı sayılır.
 CEVRIMICI_ESIK = timedelta(seconds=180)
 
 # Teslim edilmemiş bir komut bu süreden sonra geçersizdir. Böylece kapalı bir
@@ -24,8 +24,8 @@ class TahtaQuerySet(models.QuerySet):
 class TahtaEnvanteri(models.Model):
     """MEB Lider'den alınan tahta envanteri (bkz. `tahta_envanteri_yukle` komutu).
 
-    Lider'deki durum, dışa aktarma anındaki durumdur; canlı durum için ajanın
-    bildirdiği `Tahta` kaydına bakılır. Ajanla kaydolan tahta MAC adresiyle
+    Lider'deki durum, dışa aktarma anındaki durumdur; canlı durum için
+    akal-eta-yonetim'in bildirdiği `Tahta` kaydına bakılır. Kaydolan tahta MAC adresiyle
     buradaki satıra bağlanır.
     """
 
@@ -78,7 +78,7 @@ class Tahta(models.Model):
     )
     token_ozeti = models.CharField(max_length=64, unique=True, editable=False)
     aktif = models.BooleanField(
-        "Aktif", default=True, help_text="Pasif tahtanın ajanı sunucuya bağlanamaz."
+        "Aktif", default=True, help_text="Pasif tahtanın akal-eta-yonetim uygulaması sunucuya bağlanamaz."
     )
     envanter = models.OneToOneField(
         TahtaEnvanteri,
@@ -87,14 +87,14 @@ class Tahta(models.Model):
         blank=True,
         related_name="tahta",
         verbose_name="MEB Lider kaydı",
-        help_text="Ajanın bildirdiği MAC adresiyle otomatik eşleşir.",
+        help_text="akal-eta-yonetim'in bildirdiği MAC adresiyle otomatik eşleşir.",
     )
     mac_adresleri = models.CharField("MAC adresleri", max_length=255, blank=True)
 
     hostname = models.CharField("Bilgisayar adı", max_length=100, blank=True)
     ip_adresi = models.GenericIPAddressField("IP adresi", null=True, blank=True)
     isletim_sistemi = models.CharField("İşletim sistemi", max_length=150, blank=True)
-    ajan_surumu = models.CharField("Ajan sürümü", max_length=20, blank=True)
+    ajan_surumu = models.CharField("akal-eta-yonetim sürümü", max_length=20, blank=True)
     acik_kalma_suresi = models.PositiveIntegerField("Açık kalma süresi (sn)", null=True, blank=True)
     ahenk_servisi = models.CharField(
         "MEB Ahenk servisi",
@@ -118,9 +118,18 @@ class Tahta(models.Model):
         "Son güncelleme", max_length=12, choices=GUNCELLEME_SECENEKLERI, blank=True
     )
     guncelleme_zamani = models.DateTimeField("Son güncelleme zamanı", null=True, blank=True)
-    # Ajanın son bildirdiği açık oturumlar; her bağlantıda üzerine yazılır,
+    # Tahtanın son bildirdiği açık oturumlar; her bağlantıda üzerine yazılır,
     # geçmiş tutulmaz. Öğe: {kullanici, ad, aktif, tur, baslangic (epoch sn)}.
     oturumlar = models.JSONField("Açık oturumlar", default=list, blank=True)
+
+    # ETA envanter kaydı (ETAP'ın eta-register uygulamasının kullandığı sunucu).
+    # akal-eta-yonetim günde bir kez sorgular; None: henüz sorgulanmadı / sorgulanamadı.
+    eta_kayitli = models.BooleanField("ETA'ya kayıtlı", null=True, blank=True)
+    eta_okul_kodu = models.CharField("ETA okul kodu", max_length=20, blank=True)
+    eta_okul_adi = models.CharField("ETA okul adı", max_length=200, blank=True)
+    eta_birim_adi = models.CharField("ETA birim adı", max_length=20, blank=True)
+    eta_kontrol_zamani = models.DateTimeField("ETA son kontrol", null=True, blank=True)
+    eta_hata = models.CharField("ETA kontrol hatası", max_length=255, blank=True)
     son_gorulme = models.DateTimeField("Son görülme", null=True, blank=True)
     kayit_tarihi = models.DateTimeField("Kayıt tarihi", auto_now_add=True)
 
@@ -150,10 +159,15 @@ class TahtaKomutu(models.Model):
     KAPAT = "kapat"
     YENIDEN_BASLAT = "yeniden_baslat"
     GUNCELLE = "guncelle"
-    KOMUT_SECENEKLERI = [
+    ETA_KAYDET = "eta_kaydet"
+    # Tahtalar sayfasındaki toplu komut düğmeleri (parametresiz komutlar).
+    PANEL_KOMUTLARI = [
         (KAPAT, "Kapat"),
         (YENIDEN_BASLAT, "Yeniden başlat"),
         (GUNCELLE, "Güncelle"),
+    ]
+    KOMUT_SECENEKLERI = PANEL_KOMUTLARI + [
+        (ETA_KAYDET, "ETA'ya kaydet / güncelle"),
     ]
 
     BEKLIYOR = "bekliyor"
@@ -173,6 +187,8 @@ class TahtaKomutu(models.Model):
     komut = models.CharField("Komut", max_length=20, choices=KOMUT_SECENEKLERI)
     durum = models.CharField("Durum", max_length=12, choices=DURUM_SECENEKLERI, default=BEKLIYOR)
     sonuc_mesaji = models.CharField("Sonuç", max_length=255, blank=True)
+    # Yalnızca parametreli komutlarda dolu; ör. eta_kaydet: {okul_kodu, birim_adi}.
+    parametreler = models.JSONField("Parametreler", default=dict, blank=True)
     olusturan = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
