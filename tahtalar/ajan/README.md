@@ -24,13 +24,27 @@ tahtalar çalışmaya devam eder; yalnızca yeni kayıtlar yeni anahtarı ister.
 
 ## Her tahtada
 
-1. Bu klasördeki dosyaları tahtaya kopyalayın (USB bellek ya da `scp`). Sunucu
-   HTTPS kullanıyorsa giriş sayfasından indirilen CA sertifikasını da
+USB belleği bir kez hazırlayın, sonra her tahtada tek komutla kurun:
+
+1. Bu klasördeki dosyaları USB belleğe kopyalayın. `kurulum.conf.ornek`
+   dosyasını `kurulum.conf` adıyla kopyalayıp doldurun:
+   ```
+   SUNUCU_ADRESI=https://<SUNUCU_ADRESI>
+   TAHTA_KAYIT_ANAHTARI=<KAYIT_ANAHTARI>
+   ```
+   Sunucu HTTPS kullanıyorsa giriş sayfasından indirilen CA sertifikasını da
    `yerel-ca.crt` adıyla aynı klasöre koyun.
-2. `sudo sh kur.sh`
-3. `/etc/okul-ajan/ajan.conf` içinde `sunucu` ve `kayit_anahtari` değerlerini
-   girin, sonra `sudo systemctl enable --now okul-ajan`.
-4. Kontrol: `journalctl -u okul-ajan -f` — "Sunucuya kaydolundu" görünmeli.
+2. Tahtada USB'deki klasörde: `sudo sh kur.sh`
+   (ayar dosyası başka yerdeyse: `sudo sh kur.sh /yol/kurulum.conf`).
+   Betik değerleri `/etc/okul-ajan/ajan.conf`'a yazar ve servisi başlatır.
+   Yeniden çalıştırmak güvenlidir: yalnızca `sunucu` ve `kayit_anahtari`
+   güncellenir, diğer ayarlar korunur.
+3. Kontrol: `journalctl -u okul-ajan -f` — "Sunucuya kaydolundu" görünmeli.
+
+`kurulum.conf` kayıt anahtarını içerir: USB belleği okulda tutun, kurulum
+bitince dosyayı silebilirsiniz. Bu dosya depoya eklenmez (`.gitignore`).
+`kurulum.conf` yoksa betik yine kurar; değerleri `/etc/okul-ajan/ajan.conf`
+içine elle girip `sudo systemctl enable --now okul-ajan` çalıştırırsınız.
 
 Tahta admin panelinde bilgisayar adıyla görünür; adını ve konumunu oradan
 düzeltebilirsiniz.
