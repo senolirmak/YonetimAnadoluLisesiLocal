@@ -1,20 +1,20 @@
 [Unit]
-Description=Okul tahta ajanı (akalyonetim)
+Description=akal-eta-yonetim: etkileşimli tahta yönetimi (akalyonetim)
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /opt/okul-ajan/okul_ajan.py
+ExecStart=/usr/bin/python3 /opt/akal-eta-yonetim/akal_eta_yonetim.py
 Restart=always
 RestartSec=30
 
-# Token /var/lib/okul-ajan altında tutulur (STATE_DIRECTORY).
-StateDirectory=okul-ajan
+# Token /var/lib/akal-eta-yonetim altında tutulur (STATE_DIRECTORY).
+StateDirectory=akal-eta-yonetim
 StateDirectoryMode=0700
 
 # Sertleştirme. /usr, /boot ve /etc salt okunur; /etc/ahenk ayrıca açıkça
-# salt okunur yapılır — ajan MEB Ahenk dosyalarına hiçbir koşulda yazamaz.
+# salt okunur yapılır — uygulama MEB Ahenk dosyalarına hiçbir koşulda yazamaz.
 ProtectSystem=full
 ReadOnlyPaths=-/etc/ahenk
 ProtectHome=true

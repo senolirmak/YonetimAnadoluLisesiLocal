@@ -189,7 +189,7 @@ def sunucu_sertifikasi_olustur(sanlar: list[str], force: bool = False) -> bool:
     `force=False` (varsayılan) iken sertifika zaten varsa ve yerel CA ile
     doğrulanabiliyorsa atlar. Doğrulanamıyorsa (elle üretilmiş kendinden
     imzalı ya da başka bir CA'nın sertifikası, süresi dolmuş vb.) istemciler
-    — tarayıcılar ve tahta ajanı — ona güvenemez; bu durumda uyarır ve eski
+    — tarayıcılar ve tahtalardaki akal-eta-yonetim — ona güvenemez; bu durumda uyarır ve eski
     sertifikayı yedekleyip yeniden üretmeyi sorar. Kendiliğinden silmez."""
     if not force and y.basarili_mi(["test", "-f", str(SUNUCU_SERTIFIKA)], sudo=True):
         gecerli, neden = _yerel_ca_ile_dogrula(SUNUCU_SERTIFIKA)
@@ -200,7 +200,7 @@ def sunucu_sertifikasi_olustur(sanlar: list[str], force: bool = False) -> bool:
             f"Mevcut sunucu sertifikası ({SUNUCU_SERTIFIKA}) yerel CA ({CA_SERTIFIKA}) ile "
             f"doğrulanamıyor: {neden}\n"
             "Bu durumda istemcilere dağıtılan CA sertifikası işe yaramaz; tarayıcılar ve "
-            "tahta ajanı sunucuya güvenemez."
+            "tahtalardaki akal-eta-yonetim sunucuya güvenemez."
         )
         if not y.sor(
             "Eski sertifika yedeklenip yerel CA ile yeniden üretilsin mi?", "E"

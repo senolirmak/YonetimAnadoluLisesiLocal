@@ -111,7 +111,8 @@ LOGOUT_REDIRECT_URL = "/giris/"
 # ebagiris/services/eba_client.py modül docstring'i — gerçek EBA sunucusunun
 # MAC yerine bunu kabul edip etmeyeceği HENÜZ DOĞRULANMADI, prototip aşaması
 # yerel sahte sunucuyla test edilir; bkz. `python manage.py eba_mock_sunucu`).
-# Tahta ajanlarının ilk kayıtta kullandığı ortak anahtar (bkz. tahtalar/ajan/README.md).
+# Tahtalardaki akal-eta-yonetim'in ilk kayıtta kullandığı ortak anahtar
+# (bkz. tahtalar/akal-eta-yonetim/README.md).
 # Boşsa yeni tahta kaydı kapalıdır; kayıtlı tahtalar çalışmaya devam eder.
 TAHTA_KAYIT_ANAHTARI = os.getenv("TAHTA_KAYIT_ANAHTARI", "")
 

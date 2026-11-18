@@ -1,4 +1,4 @@
-"""Tahtadaki ajanın konuştuğu JSON uç noktaları.
+"""Tahtadaki akal-eta-yonetim uygulamasının konuştuğu JSON uç noktaları.
 
 Kullanıcı oturumu yerine tahtaya özel token ile doğrulanır; bu yüzden CSRF
 korumasına tabi değildir.

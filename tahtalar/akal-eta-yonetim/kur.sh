@@ -1,9 +1,11 @@
 #!/bin/sh
-# Okul tahta ajanını bu tahtaya kurar. Tahtada root olarak çalıştırın:
+# akal-eta-yonetim uygulamasını bu tahtaya kurar. Tahtada root olarak çalıştırın:
 #   sudo sh kur.sh                      # ayarları yandaki kurulum.conf'tan okur
 #   sudo sh kur.sh /yol/kurulum.conf    # ayar dosyası başka bir yerdeyse
-# Dosyalar bu betikle aynı klasörde olmalı: okul_ajan.py, okul-ajan.service,
-# ajan.conf.ornek, kurulum.conf (ve varsa yerel-ca.crt).
+# Dosyalar bu betikle aynı klasörde olmalı: akal_eta_yonetim.py,
+# akal-eta-yonetim.service, akal-eta-yonetim.conf.ornek, eski-kurulumu-tasi.sh,
+# kurulum.conf (ve varsa yerel-ca.crt). Eski adla (okul-ajan) yapılmış kurulum
+# varsa ayarları ve tahtanın sunucu kaydı taşınır.
 #
 # kurulum.conf (USB'de, bkz. kurulum.conf.ornek):
 #   SUNUCU_ADRESI=https://<SUNUCU_ADRESI>
@@ -15,7 +17,8 @@ export LC_ALL=C
 
 KAYNAK=$(cd "$(dirname "$0")" && pwd)
 KURULUM_DOSYASI=${1:-"$KAYNAK/kurulum.conf"}
-AYAR=/etc/okul-ajan/ajan.conf
+UYGULAMA=akal-eta-yonetim
+AYAR=/etc/$UYGULAMA/$UYGULAMA.conf
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "Root olarak çalıştırın: sudo sh $0" >&2
@@ -60,12 +63,14 @@ if [ -n "$ANAHTAR" ] && ! printf '%s' "$ANAHTAR" | grep -Eq '^[A-Za-z0-9_-]+$'; 
     exit 1
 fi
 
-install -d -m 0755 /opt/okul-ajan
-install -m 0755 "$KAYNAK/okul_ajan.py" /opt/okul-ajan/okul_ajan.py
+sh "$KAYNAK/eski-kurulumu-tasi.sh"
 
-install -d -m 0700 /etc/okul-ajan
+install -d -m 0755 /opt/$UYGULAMA
+install -m 0755 "$KAYNAK/akal_eta_yonetim.py" /opt/$UYGULAMA/akal_eta_yonetim.py
+
+install -d -m 0700 /etc/$UYGULAMA
 if [ ! -f "$AYAR" ]; then
-    install -m 0600 "$KAYNAK/ajan.conf.ornek" "$AYAR"
+    install -m 0600 "$KAYNAK/$UYGULAMA.conf.ornek" "$AYAR"
     echo "$AYAR oluşturuldu."
 fi
 # Değerler verildiyse (yeniden kurulumda da) ayar dosyasına yazılır; diğer
@@ -78,16 +83,16 @@ if [ -n "$ANAHTAR" ]; then
 fi
 
 if [ -f "$KAYNAK/yerel-ca.crt" ]; then
-    install -m 0644 "$KAYNAK/yerel-ca.crt" /etc/okul-ajan/yerel-ca.crt
+    install -m 0644 "$KAYNAK/yerel-ca.crt" /etc/$UYGULAMA/yerel-ca.crt
 fi
 
-install -m 0644 "$KAYNAK/okul-ajan.service" /etc/systemd/system/okul-ajan.service
+install -m 0644 "$KAYNAK/$UYGULAMA.service" /etc/systemd/system/$UYGULAMA.service
 systemctl daemon-reload
 
 if grep -q '<KAYIT_ANAHTARI>\|<SUNUCU_ADRESI>' "$AYAR"; then
-    echo "Eksik ayar var. $AYAR dosyasını düzenledikten sonra: systemctl enable --now okul-ajan"
+    echo "Eksik ayar var. $AYAR dosyasını düzenledikten sonra: systemctl enable --now $UYGULAMA"
 else
-    systemctl enable --now okul-ajan
-    systemctl restart okul-ajan
-    echo "okul-ajan çalışıyor. Günlük: sudo journalctl -u okul-ajan -n 20 -f"
+    systemctl enable --now $UYGULAMA
+    systemctl restart $UYGULAMA
+    echo "$UYGULAMA çalışıyor. Günlük: sudo journalctl -u $UYGULAMA -n 20 -f"
 fi

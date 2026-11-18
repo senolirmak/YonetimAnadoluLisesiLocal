@@ -1,4 +1,5 @@
-"""Tahtadaki ajanın (tahtalar/ajan/okul_ajan.py) sunucu tarafı.
+"""Tahtadaki akal-eta-yonetim uygulamasının
+(tahtalar/akal-eta-yonetim/akal_eta_yonetim.py) sunucu tarafı.
 
 Ajan iki uç nokta kullanır:
   - kayıt: ortak kayıt anahtarıyla bir kez kaydolur, tahtaya özel token alır.
@@ -105,6 +106,7 @@ def durum_guncelle(tahta, veri):
     tahta.meb_kayitli = kayitli if isinstance(kayitli, bool) else None
 
     guncelleme_bilgisini_isle(tahta, veri.get("guncelleme"))
+    eta_bilgisini_isle(tahta, veri.get("eta"))
     tahta.oturumlar = oturum_listesi(veri.get("oturumlar"))
 
     macler = mac_listesi(veri.get("mac_adresleri"))
@@ -202,6 +204,40 @@ def guncelleme_bilgisini_isle(tahta, bilgi):
     tahta.guncelleme_durumu = bilgi["durum"]
 
 
+def _epoch(deger):
+    if not isinstance(deger, int) or isinstance(deger, bool) or deger <= 0:
+        return None
+    try:
+        return datetime.datetime.fromtimestamp(deger, tz=datetime.UTC)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def eta_bilgisini_isle(tahta, bilgi):
+    """Ajanın son ETA envanter sorgusu:
+    {'kayitli': bool|None, 'okul_kodu', 'okul_adi', 'birim_adi', 'hata', 'zaman': epoch}.
+    Bilgi yoksa (eski ajan ya da henüz sorgulanmamış) önceki kayıt korunur.
+    Sorgu başarısızsa (kayitli None) son bilinen kayıt bilgisi korunur, yalnızca
+    hata ve zaman güncellenir."""
+    if not isinstance(bilgi, dict):
+        return
+    zaman = _epoch(bilgi.get("zaman"))
+    if zaman is None:
+        return
+    tahta.eta_kontrol_zamani = zaman
+    tahta.eta_hata = _metin(bilgi, "hata", 255)
+    kayitli = bilgi.get("kayitli")
+    if not isinstance(kayitli, bool):
+        return
+    tahta.eta_kayitli = kayitli
+    if kayitli:
+        tahta.eta_okul_kodu = _metin(bilgi, "okul_kodu", 20)
+        tahta.eta_okul_adi = _metin(bilgi, "okul_adi", 200)
+        tahta.eta_birim_adi = _metin(bilgi, "birim_adi", 20)
+    else:
+        tahta.eta_okul_kodu = tahta.eta_okul_adi = tahta.eta_birim_adi = ""
+
+
 def mac_normalize(deger):
     """'AA-BB-CC-11-22-33' → 'aa:bb:cc:11:22:33'; geçersizse boş metin."""
     if not isinstance(deger, str):
@@ -279,13 +315,16 @@ def bekleyen_komutlari_teslim_et(tahta):
         komut.durum = TahtaKomutu.GONDERILDI
         komut.gonderilme = simdi
         komut.save(update_fields=["durum", "gonderilme"])
-    return [{"id": k.pk, "komut": k.komut} for k in komutlar]
+    return [
+        {"id": k.pk, "komut": k.komut, **({"parametreler": k.parametreler} if k.parametreler else {})}
+        for k in komutlar
+    ]
 
 
 def komut_olustur(tahtalar, komut, kullanici=None):
-    """Seçilen tahtalara komut ekler. Aynı komut tahtada zaten bekliyorsa
-    yenisi eklenmez. Döner: oluşturulan komut sayısı."""
-    if komut not in {k for k, _ in TahtaKomutu.KOMUT_SECENEKLERI}:
+    """Seçilen tahtalara parametresiz komut ekler. Aynı komut tahtada zaten
+    bekliyorsa yenisi eklenmez. Döner: oluşturulan komut sayısı."""
+    if komut not in {k for k, _ in TahtaKomutu.PANEL_KOMUTLARI}:
         raise ValueError(f"Bilinmeyen komut: {komut}")
     suresi_dolanlari_iptal_et()
     bekleyenler = set(
@@ -300,3 +339,60 @@ def komut_olustur(tahtalar, komut, kullanici=None):
     ]
     TahtaKomutu.objects.bulk_create(yeni)
     return len(yeni)
+
+
+ETA_OKUL_KODU = re.compile(r"^[0-9]{1,12}$")
+ETA_BIRIM_EN_AZ, ETA_BIRIM_EN_COK = 2, 12  # eta-register'ın sınırı
+
+
+def eta_okul_kodu_dogrula(kod):
+    kod = (kod or "").strip()
+    if not ETA_OKUL_KODU.match(kod):
+        raise ValueError("Okul (tesis) kodu yalnızca rakamlardan oluşmalı.")
+    return kod
+
+
+def eta_birim_adi_dogrula(ad):
+    ad = " ".join((ad or "").split())
+    if not ETA_BIRIM_EN_AZ <= len(ad) <= ETA_BIRIM_EN_COK:
+        raise ValueError(
+            f"Birim adı {ETA_BIRIM_EN_AZ}-{ETA_BIRIM_EN_COK} karakter olmalı: “{ad}”."
+        )
+    return ad
+
+
+def eta_birim_onerisi(tahta):
+    """Birim adı için öneri: ETA'daki mevcut ad, yoksa Lider'deki şube adı, yoksa tahta adı."""
+    for aday in (
+        tahta.eta_birim_adi,
+        tahta.envanter.sube_adi if tahta.envanter_id else "",
+        tahta.ad,
+    ):
+        aday = " ".join((aday or "").split())
+        if aday:
+            return aday[:ETA_BIRIM_EN_COK].strip()
+    return ""
+
+
+@transaction.atomic
+def eta_kayit_komutu_olustur(tahta_birimleri, okul_kodu, kullanici=None):
+    """[(tahta, birim_adi)] için eta_kaydet komutu ekler. Tahtada bekleyen eski
+    eta_kaydet komutu varsa iptal edilir (son verilen geçerlidir).
+    Döner: oluşturulan komut sayısı. Değerler önceden doğrulanmış olmalı."""
+    suresi_dolanlari_iptal_et()
+    tahtalar = [t for t, _ in tahta_birimleri]
+    TahtaKomutu.objects.filter(
+        tahta__in=tahtalar, komut=TahtaKomutu.ETA_KAYDET, durum=TahtaKomutu.BEKLIYOR
+    ).update(durum=TahtaKomutu.IPTAL, sonuc_mesaji="Yerine yeni kayıt komutu verildi.")
+    TahtaKomutu.objects.bulk_create(
+        [
+            TahtaKomutu(
+                tahta=t,
+                komut=TahtaKomutu.ETA_KAYDET,
+                parametreler={"okul_kodu": okul_kodu, "birim_adi": birim},
+                olusturan=kullanici,
+            )
+            for t, birim in tahta_birimleri
+        ]
+    )
+    return len(tahta_birimleri)

@@ -1,0 +1,153 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}ETA Kaydı – Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+{% include "okul/yonetim/_style.html" %}
+<style>
+  .eta-ozet { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem; }
+  .eta-ozet div { flex: 1; min-width: 140px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: .7rem .9rem; }
+  .eta-ozet b { display: block; font-size: 1.4rem; }
+  .eta-ozet span { font-size: .8rem; color: #6b7280; }
+  .eta-durum { display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; }
+  .eta-nokta { width: .6rem; height: .6rem; border-radius: 50%; background: #9ca3af; }
+  .eta-yesil { background: #16a34a; }
+  .eta-kirmizi { background: #dc2626; }
+  .eta-sari { background: #d97706; }
+  .eta-silik { color: #6b7280; font-size: .8rem; }
+  .eta-uyari { color: #b45309; font-size: .8rem; }
+  .eta-eylem { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; margin-bottom: .75rem; }
+  .eta-eylem label { display: flex; flex-direction: column; font-size: .85rem; color: #374151; }
+  .eta-eylem input[type=text], .eta-birim { padding: .4rem .55rem; border: 1px solid #d1d5db; border-radius: 6px; }
+  .eta-birim { width: 8.5rem; }
+  .eta-tablo-kap { overflow-x: auto; }
+</style>
+
+<div class="container">
+  <h2 class="page-title mb-20">ETA Kaydı
+    <a href="{% url 'tahtalar:liste' %}" style="float:right;font-size:.85rem;font-weight:500;">← Tahtalar</a>
+  </h2>
+  {% include "okul/yonetim/_mesajlar.html" %}
+
+  <div class="ay-kart ay-kart-full">
+    <p class="eta-silik" style="margin:.25rem 0;">
+      ETAP'ın <strong>eta-register</strong> uygulamasının yaptığı kaydı arayüzsüz yapar: tahtadaki akal-eta-yonetim
+      uygulaması tahtanın MAC adresiyle ETA sunucusuna (MEB) kaydeder ya da mevcut kaydın okul kodunu ve birim adını
+      günceller. Kayıt durumu tahtalardan günde bir kez sorgulanır; komut sonrası hemen yenilenir.
+      akal-eta-yonetim Ahenk'i kurmaz; gerekiyorsa ETAP'ın kendi eta-register'ı etapadmin oturumunda kurar.
+    </p>
+  </div>
+
+  <div class="eta-ozet">
+    <div><b>{{ kayitli }}</b><span>ETA'ya kayıtlı</span></div>
+    <div><b>{{ kayitsiz }}</b><span>Kayıtsız</span></div>
+    <div><b>{{ bilinmiyor }}</b><span>Bilinmiyor (henüz sorgulanmadı / hata)</span></div>
+  </div>
+
+  <div class="ay-kart ay-kart-full">
+    <div class="ay-baslik">Tahtalar</div>
+    {% if tahtalar %}
+    <form method="post" id="eta-formu">
+      {% csrf_token %}
+      <div class="eta-eylem">
+        <label>Okul (tesis) kodu
+          <input type="text" name="okul_kodu" value="{{ okul_kodu }}" inputmode="numeric" pattern="[0-9]+" required>
+        </label>
+        <button type="submit" class="btn-kaydet" id="eta-gonder" disabled>Seçilenleri ETA'ya kaydet / güncelle</button>
+        <span id="secim-sayisi" class="eta-silik">Seçili tahta yok</span>
+      </div>
+      <p class="eta-silik">
+        Birim adı tahtanın bulunduğu yerdir (örn. 10-A), {{ birim_en_az }}-{{ birim_en_cok }} karakter.
+        Kayıtlı tahtada okul kodu ve birim adı güncellenir. Komut bir dakika içinde uygulanır;
+        {{ gecerlilik_dk }} dakikada tahtaya ulaşmazsa iptal olur.
+      </p>
+      <div class="eta-tablo-kap">
+      <table class="ay-tablo">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="hepsini-sec" aria-label="Hepsini seç"></th>
+            <th>Tahta</th>
+            <th>ETA kaydı</th>
+            <th>Birim adı</th>
+            <th>Son komut</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tahtalar %}
+          <tr>
+            <td><input type="checkbox" name="tahta" value="{{ t.pk }}" class="tahta-sec" aria-label="{{ t.ad }}"></td>
+            <td>
+              <strong>{{ t.ad }}</strong>
+              <div class="eta-silik">{% if t.cevrimici %}Çevrimiçi{% else %}Çevrimdışı{% endif %}{% if t.ajan_surumu %} · sürüm {{ t.ajan_surumu }}{% endif %}</div>
+            </td>
+            <td>
+              {% if t.eta_kayitli %}
+              <span class="eta-durum"><span class="eta-nokta eta-yesil"></span>Kayıtlı</span>
+              <div class="eta-silik">{{ t.eta_okul_adi|default:"—" }} ({{ t.eta_okul_kodu|default:"?" }}){% if t.eta_birim_adi %} · {{ t.eta_birim_adi }}{% endif %}</div>
+              {% if t.baska_okulda %}<div class="eta-uyari">Başka bir okul koduna kayıtlı.</div>{% endif %}
+              {% elif t.eta_kayitli is False %}
+              <span class="eta-durum"><span class="eta-nokta eta-kirmizi"></span>Kayıtsız</span>
+              {% else %}
+              <span class="eta-durum"><span class="eta-nokta"></span>Bilinmiyor</span>
+              {% endif %}
+              {% if t.eta_hata %}<div class="eta-uyari" title="{{ t.eta_hata }}">Son sorgu başarısız: {{ t.eta_hata|truncatechars:60 }}</div>{% endif %}
+              {% if t.eta_kontrol_zamani %}<div class="eta-silik">Sorgu: {{ t.eta_kontrol_zamani|timesince }} önce</div>
+              {% elif not t.eta_hata %}<div class="eta-silik">Henüz sorgulanmadı (akal-eta-yonetim 1.1.0 gerekir)</div>{% endif %}
+            </td>
+            <td>
+              <input type="text" class="eta-birim" name="birim_{{ t.pk }}" value="{{ t.birim_onerisi }}"
+                     minlength="{{ birim_en_az }}" maxlength="{{ birim_en_cok }}" aria-label="{{ t.ad }} birim adı">
+            </td>
+            <td>
+              {% with k=t.son_eta_komutu %}
+              {% if k %}
+              <span class="eta-durum">
+                <span class="eta-nokta {% if k.durum == 'tamamlandi' %}eta-yesil{% elif k.durum == 'basarisiz' %}eta-kirmizi{% elif k.durum == 'bekliyor' or k.durum == 'gonderildi' %}eta-sari{% endif %}"></span>
+                {{ k.get_durum_display }}
+              </span>
+              <div class="eta-silik">{{ k.olusturma|timesince }} önce · {{ k.parametreler.birim_adi }}</div>
+              {% if k.sonuc_mesaji %}<div class="eta-silik" title="{{ k.sonuc_mesaji }}">{{ k.sonuc_mesaji|truncatechars:70 }}</div>{% endif %}
+              {% else %}<span class="eta-silik">—</span>{% endif %}
+              {% endwith %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </form>
+    {% else %}
+    <p class="ay-bos">akal-eta-yonetim kurulu tahta yok.</p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById("eta-formu");
+  if (!form) return;
+  var kutular = form.querySelectorAll(".tahta-sec");
+  var hepsi = document.getElementById("hepsini-sec");
+  var dugme = document.getElementById("eta-gonder");
+  var sayac = document.getElementById("secim-sayisi");
+  function guncelle() {
+    var n = form.querySelectorAll(".tahta-sec:checked").length;
+    dugme.disabled = n === 0;
+    sayac.textContent = n ? n + " tahta seçili" : "Seçili tahta yok";
+  }
+  kutular.forEach(function (k) { k.addEventListener("change", guncelle); });
+  hepsi.addEventListener("change", function () {
+    kutular.forEach(function (k) { k.checked = hepsi.checked; });
+    guncelle();
+  });
+  form.addEventListener("submit", function (e) {
+    var n = form.querySelectorAll(".tahta-sec:checked").length;
+    if (!confirm(n + " tahta ETA sunucusuna (MEB) kaydedilecek / kaydı güncellenecek. Devam edilsin mi?")) {
+      e.preventDefault();
+    }
+  });
+})();
+</script>
+{% endblock %}

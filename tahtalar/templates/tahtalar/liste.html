@@ -29,13 +29,14 @@
 
 <div class="container">
   <h2 class="page-title mb-20">Etkileşimli Tahtalar
-    <a class="btn-kaydet" href="{% url 'tahtalar:paket' %}" style="float:right;font-size:.85rem;">Ajan paketi (.deb)</a>
+    <a class="btn-kaydet" href="{% url 'tahtalar:paket' %}" style="float:right;font-size:.85rem;">Kurulum paketi (.deb)</a>
+    <a class="btn-kaydet" href="{% url 'tahtalar:eta' %}" style="float:right;font-size:.85rem;margin-right:.5rem;">ETA kaydı</a>
   </h2>
   {% include "okul/yonetim/_mesajlar.html" %}
 
   <div class="th-ozet">
     <a href="{% url 'tahtalar:liste' %}"{% if not filtre %} class="secili"{% endif %}>
-      <b>{{ ozet.toplam }}</b><span>Ajanı kurulu tahta</span>
+      <b>{{ ozet.toplam }}</b><span>akal-eta-yonetim kurulu tahta</span>
     </a>
     <a href="?filtre=cevrimici"{% if filtre == 'cevrimici' %} class="secili"{% endif %}>
       <b>{{ ozet.cevrimici }}</b><span>Şu an çevrimiçi</span>
@@ -50,7 +51,7 @@
       <b>{{ ozet.guncelleme }}</b><span>Güncelleniyor / sorunlu</span>
     </a>
     <a href="#ajansiz">
-      <b>{{ ozet.ajansiz }}</b><span>Ajanı kurulmamış (Lider listesinde)</span>
+      <b>{{ ozet.ajansiz }}</b><span>akal-eta-yonetim kurulu değil (Lider listesinde)</span>
     </a>
   </div>
 
@@ -160,7 +161,7 @@
     </form>
     {% else %}
     <p class="ay-bos">
-      {% if filtre %}Bu filtreye uyan tahta yok.{% else %}Henüz ajanı kurulmuş tahta yok. Kurulum için <code>tahtalar/ajan/README.md</code>'ye bakın.{% endif %}
+      {% if filtre %}Bu filtreye uyan tahta yok.{% else %}Henüz akal-eta-yonetim kurulmuş tahta yok. Kurulum için yukarıdaki <a href="{% url 'tahtalar:paket' %}">Kurulum paketi</a> sayfasına bakın.{% endif %}
     </p>
     {% endif %}
   </div>
@@ -187,7 +188,7 @@
     </div>
 
     <div class="ay-kart ay-kart-half" id="ajansiz">
-      <div class="ay-baslik">Ajanı kurulmamış tahtalar ({{ ajansiz|length }})</div>
+      <div class="ay-baslik">akal-eta-yonetim kurulu olmayan tahtalar ({{ ajansiz|length }})</div>
       {% if ajansiz %}
       <details>
         <summary>MEB Lider listesinde olup sunucuya bağlanmamış tahtalar</summary>
@@ -205,7 +206,7 @@
         </table>
       </details>
       {% else %}
-      <p class="ay-bos">Lider listesindeki bütün tahtaların ajanı kurulu.</p>
+      <p class="ay-bos">Lider listesindeki bütün tahtalarda akal-eta-yonetim kurulu.</p>
       {% endif %}
     </div>
   </div>

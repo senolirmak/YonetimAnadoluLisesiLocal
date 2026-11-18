@@ -38,7 +38,7 @@
       <p style="color:#6b7280;font-size:.9rem;margin:0 0 1rem;">
         {{ tahta_ozeti.toplam }} tahta · {{ tahta_ozeti.cevrimici }} çevrimiçi
         {% if tahta_ozeti.ahenk_sorunlu %}· <span style="color:#b91c1c;">{{ tahta_ozeti.ahenk_sorunlu }} Ahenk sorunlu</span>{% endif %}
-        {% if tahta_ozeti.ajansiz %}· {{ tahta_ozeti.ajansiz }} ajanı kurulmamış{% endif %}
+        {% if tahta_ozeti.ajansiz %}· {{ tahta_ozeti.ajansiz }} tahtada akal-eta-yonetim kurulu değil{% endif %}
       </p>
       <a class="btn-kaydet" href="{% url 'tahtalar:liste' %}">Tahtalar</a>
     </div>
