@@ -39,6 +39,12 @@ varsa yerel CA sertifikasını içeren bir paket üretir:
 Paket `kur.sh` ile kurulmuş tahtalara da kurulabilir: `ajan.conf`'ta yalnızca
 `sunucu` ve `kayit_anahtari` güncellenir, tahtanın kaydı (token) korunur.
 Kaldırma: `sudo apt remove okul-ajan` (ayarlarla birlikte `apt purge`).
+
+Kontrol: tahta bir dakika içinde Tahtalar sayfasında "Çevrimiçi" görünmeli.
+Günlük için `sudo journalctl -u okul-ajan -n 20 -f` (sudo olmadan ETAP'ta boş
+döner). Daha önce kayıtlı tahtada kayıt korunduğu için "Sunucuya kaydolundu"
+yazmaz, yalnızca "okul-ajan … başladı" görünür; başarılı bağlantılar günlüğe
+yazılmaz.
 Paket ve link kayıt anahtarını içerir; okul dışına paylaşmayın.
 
 Ajan kodu değiştiğinde `okul_ajan.py` içindeki `SURUM` artırılmalıdır; paket
@@ -61,7 +67,7 @@ USB belleği bir kez hazırlayın, sonra her tahtada tek komutla kurun:
    Betik değerleri `/etc/okul-ajan/ajan.conf`'a yazar ve servisi başlatır.
    Yeniden çalıştırmak güvenlidir: yalnızca `sunucu` ve `kayit_anahtari`
    güncellenir, diğer ayarlar korunur.
-3. Kontrol: `journalctl -u okul-ajan -f` — "Sunucuya kaydolundu" görünmeli.
+3. Kontrol: `sudo journalctl -u okul-ajan -n 20 -f` — "Sunucuya kaydolundu" görünmeli.
 
 `kurulum.conf` kayıt anahtarını içerir: USB belleği okulda tutun, kurulum
 bitince dosyayı silebilirsiniz. Bu dosya depoya eklenmez (`.gitignore`).
@@ -117,7 +123,7 @@ tahtayı kapatırken / yeniden başlatırken sayfa ayrıca uyarır.
 
 - Ajanın kısıtlı servisinin dışında, ayrı bir systemd birimi
   (`okul-ajan-guncelleme`) olarak çalışır. Günlük:
-  `journalctl -u okul-ajan-guncelleme`
+  `sudo journalctl -u okul-ajan-guncelleme`
 - `upgrade` paket kaldırmaz, yalnızca kurulu paketleri günceller
   (`full-upgrade` değil).
 - Yapılandırma dosyalarının mevcut hâli korunur (`--force-confold`); güncelleme

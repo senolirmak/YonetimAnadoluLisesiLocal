@@ -132,7 +132,7 @@ if [ -d /run/systemd/system ]; then
     systemctl enable okul-ajan.service >/dev/null 2>&1 || true
     systemctl restart okul-ajan.service
 fi
-echo "okul-ajan çalışıyor. Günlük: journalctl -u okul-ajan -f"
+echo "okul-ajan çalışıyor. Günlük: sudo journalctl -u okul-ajan -n 20 -f"
 exit 0
 """
 

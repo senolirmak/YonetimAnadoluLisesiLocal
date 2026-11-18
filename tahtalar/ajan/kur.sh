@@ -89,5 +89,5 @@ if grep -q '<KAYIT_ANAHTARI>\|<SUNUCU_ADRESI>' "$AYAR"; then
 else
     systemctl enable --now okul-ajan
     systemctl restart okul-ajan
-    echo "okul-ajan çalışıyor. Günlük: journalctl -u okul-ajan -f"
+    echo "okul-ajan çalışıyor. Günlük: sudo journalctl -u okul-ajan -n 20 -f"
 fi
