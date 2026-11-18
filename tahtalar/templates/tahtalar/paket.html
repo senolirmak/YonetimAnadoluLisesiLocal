@@ -1,0 +1,98 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}Tahta Ajanı Paketi – Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+{% include "okul/yonetim/_style.html" %}
+<style>
+  .pk-form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; }
+  .pk-form label { display: flex; flex-direction: column; font-size: .85rem; color: #374151; flex: 1; min-width: 260px; }
+  .pk-form input[type=text] { padding: .45rem .6rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; }
+  .pk-kod { display: block; background: #1f2937; color: #f9fafb; padding: .7rem .9rem; border-radius: 6px;
+            font-family: monospace; font-size: .85rem; white-space: pre-wrap; word-break: break-all; }
+  .pk-silik { color: #6b7280; font-size: .85rem; }
+  .pk-hata { color: #b91c1c; font-weight: 600; }
+  .pk-kart p, .pk-kart ol { margin: .5rem 0; }
+</style>
+
+<div class="container">
+  <h2 class="page-title mb-20">Tahta Ajanı Paketi
+    <a href="{% url 'tahtalar:liste' %}" style="float:right;font-size:.85rem;font-weight:500;">← Tahtalar</a>
+  </h2>
+
+  <div class="ay-kart ay-kart-full pk-kart">
+    <div class="ay-baslik">okul-ajan {{ surum }} — ETAP/Pardus için .deb</div>
+    <p class="pk-silik">
+      Paket sunucu adresini, kayıt anahtarını{% if ca_var %} ve yerel CA sertifikasını{% endif %} içerir;
+      tahtada ek ayar gerekmez. Daha önce <code>kur.sh</code> ile kurulmuş tahtalara da kurulabilir
+      (yalnızca sunucu adresi ve kayıt anahtarı güncellenir, tahtanın kaydı korunur).
+    </p>
+
+    {% if hata %}<p class="pk-hata">{{ hata }}</p>{% endif %}
+
+    <form method="post" class="pk-form">
+      {% csrf_token %}
+      <label>Sunucu adresi (tahtaların bağlanacağı)
+        <input type="text" name="sunucu" value="{{ sunucu }}" required>
+      </label>
+      <button type="submit" name="islem" value="link" class="btn-kaydet">İndirme linki oluştur</button>
+      <button type="submit" name="islem" value="indir" class="btn-kaydet">Paketi indir (USB için)</button>
+    </form>
+    {% if not hata %}
+    <p class="pk-silik">
+      {% if ca_gomulu %}Yerel CA sertifikası pakete eklenecek.
+      {% elif ca_var %}Adres HTTPS değil; CA sertifikası eklenmeyecek.
+      {% else %}Sunucuda yerel CA sertifikası yok; tahta sistemin güvendiği sertifikaları kullanacak.{% endif %}
+    </p>
+    {% endif %}
+  </div>
+
+  {% if link %}
+  <div class="ay-kart ay-kart-full pk-kart">
+    <div class="ay-baslik">Tahtada kurulum</div>
+    <p>Link <strong>{{ link_saat }} saat</strong> geçerlidir ve kayıt anahtarını içeren paketi verir;
+       yalnızca okuldaki tahtalarda kullanın, paylaşmayın.</p>
+    <p>Tahtada bir terminal açıp çalıştırın:</p>
+    <code class="pk-kod" id="pk-komut">cd /tmp && wget -O {{ dosya_adi }} '{{ link }}' && sudo apt install -y ./{{ dosya_adi }}</code>
+    <p><button type="button" class="btn-kaydet" id="pk-kopyala">Komutu kopyala</button></p>
+    {% if ca_gomulu %}
+    <p class="pk-silik">wget sertifika hatası verirse tahta yerel CA'ya henüz güvenmiyordur:
+      paketi yukarıdaki <em>Paketi indir</em> düğmesiyle USB'ye alıp tahtada
+      <code>sudo apt install ./{{ dosya_adi }}</code> ile kurun.</p>
+    {% endif %}
+    <p class="pk-silik">Kontrol: <code>journalctl -u okul-ajan -f</code> — "Sunucuya kaydolundu" görünmeli.
+      Kaldırma: <code>sudo apt remove okul-ajan</code> (ayarlarla birlikte: <code>sudo apt purge okul-ajan</code>).</p>
+  </div>
+  {% endif %}
+
+  <div class="ay-kart ay-kart-full pk-kart">
+    <div class="ay-baslik">Eski sürümlü ajanlar ({{ eski_surumlu|length }})</div>
+    {% if eski_surumlu %}
+    <p class="pk-silik">Bu tahtalara paketi yeniden kurun.</p>
+    <table class="ay-tablo">
+      <thead><tr><th>Tahta</th><th>Ajan sürümü</th><th>Son görülme</th></tr></thead>
+      <tbody>
+        {% for t in eski_surumlu %}
+        <tr><td>{{ t.ad }}</td><td>{{ t.ajan_surumu }}</td><td>{% if t.son_gorulme %}{{ t.son_gorulme|timesince }} önce{% else %}—{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="ay-bos">Bütün tahtalarda ajanın güncel sürümü ({{ surum }}) çalışıyor.</p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function () {
+  var dugme = document.getElementById("pk-kopyala");
+  if (!dugme) return;
+  dugme.addEventListener("click", function () {
+    var metin = document.getElementById("pk-komut").textContent;
+    navigator.clipboard.writeText(metin).then(function () { dugme.textContent = "Kopyalandı ✓"; });
+  });
+})();
+</script>
+{% endblock %}
