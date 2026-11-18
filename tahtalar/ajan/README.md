@@ -22,7 +22,29 @@ panelinde **Etkileşimli Tahtalar → Tahtalar** altında listelenir.
 Anahtar yalnızca yeni tahtaların kaydı için kullanılır. Değiştirilirse kayıtlı
 tahtalar çalışmaya devam eder; yalnızca yeni kayıtlar yeni anahtarı ister.
 
-## Her tahtada
+## Her tahtada: .deb paketiyle (önerilen)
+
+Tahtalar sayfasındaki **Ajan paketi (.deb)** düğmesi (`/tahtalar/paket/`,
+yalnızca müdür yardımcısı ve okul müdürü) sunucu adresini, kayıt anahtarını ve
+varsa yerel CA sertifikasını içeren bir paket üretir:
+
+- **İndirme linki oluştur:** 24 saat geçerli, imzalı bir link ve tahtada
+  çalıştırılacak tek satırlık komut verir
+  (`wget … && sudo apt install -y ./okul-ajan_<sürüm>_all.deb`).
+  Tahta yerel CA'ya henüz güvenmiyorsa wget sertifika hatası verir; o zaman
+  USB yolunu kullanın.
+- **Paketi indir (USB için):** paketi indirir; tahtada
+  `sudo apt install ./okul-ajan_<sürüm>_all.deb`.
+
+Paket `kur.sh` ile kurulmuş tahtalara da kurulabilir: `ajan.conf`'ta yalnızca
+`sunucu` ve `kayit_anahtari` güncellenir, tahtanın kaydı (token) korunur.
+Kaldırma: `sudo apt remove okul-ajan` (ayarlarla birlikte `apt purge`).
+Paket ve link kayıt anahtarını içerir; okul dışına paylaşmayın.
+
+Ajan kodu değiştiğinde `okul_ajan.py` içindeki `SURUM` artırılmalıdır; paket
+sürümü buradan alınır ve sayfa eski sürümle çalışan tahtaları listeler.
+
+## Her tahtada: USB ile kur.sh
 
 USB belleği bir kez hazırlayın, sonra her tahtada tek komutla kurun:
 

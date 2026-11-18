@@ -28,7 +28,9 @@
 </style>
 
 <div class="container">
-  <h2 class="page-title mb-20">Etkileşimli Tahtalar</h2>
+  <h2 class="page-title mb-20">Etkileşimli Tahtalar
+    <a class="btn-kaydet" href="{% url 'tahtalar:paket' %}" style="float:right;font-size:.85rem;">Ajan paketi (.deb)</a>
+  </h2>
   {% include "okul/yonetim/_mesajlar.html" %}
 
   <div class="th-ozet">
