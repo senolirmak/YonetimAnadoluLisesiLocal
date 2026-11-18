@@ -1,0 +1,9 @@
+# Bu dosyayı "kurulum.conf" adıyla kopyalayıp değerleri doldurun ve kur.sh ile
+# aynı klasöre (USB belleğe) koyun. kur.sh değerleri buradan okur.
+# Gerçek anahtarı içeren kurulum.conf depoya eklenmez (.gitignore).
+
+# Okul sunucusunun adresi (https:// yazılmazsa varsayılır)
+SUNUCU_ADRESI=https://<SUNUCU_ADRESI>
+
+# Sunucudaki .env içindeki TAHTA_KAYIT_ANAHTARI ile aynı olmalı
+TAHTA_KAYIT_ANAHTARI=<KAYIT_ANAHTARI>

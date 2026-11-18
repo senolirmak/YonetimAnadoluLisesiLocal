@@ -108,3 +108,6 @@ secmelidersler_data.json
 # Yerel geliştirici araçları (asla GitHub'a gitmez)
 /devtools/
 /local_scripts/
+
+# Tahta ajanı kurulum ayarı (gerçek kayıt anahtarı içerir)
+tahtalar/ajan/kurulum.conf
