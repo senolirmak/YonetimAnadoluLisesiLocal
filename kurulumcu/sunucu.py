@@ -322,6 +322,17 @@ def saglik_kontrolu_https(servis: str, ca_sertifika_yolu: Path) -> None:
         if hata_nesnesi.code < 500:
             y.basari(f"Site ayağa kalktı: https://127.0.0.1/ üzerinden {hata_nesnesi.code} yanıtı alınıyor.")
             return
+    except urllib.error.URLError as hata_nesnesi:
+        if isinstance(hata_nesnesi.reason, ssl.SSLCertVerificationError):
+            # Site ayakta ama sunduğu sertifika yerel CA ile doğrulanamıyor;
+            # "yanıt vermiyor" demek sorunu nginx/gunicorn'da arattırır.
+            y.uyari(
+                f"Site yanıt veriyor ama Nginx'in sunduğu sertifika yerel CA ({ca_sertifika_yolu}) "
+                f"ile doğrulanamıyor: {hata_nesnesi.reason.verify_message}. "
+                "'grep -rn ssl_certificate /etc/nginx/' ile Nginx'in hangi sertifikayı "
+                "kullandığını kontrol edin."
+            )
+            return
     except Exception:
         pass
     y.uyari(f"Site HTTPS üzerinden henüz yanıt vermiyor. Kontrol: 'sudo journalctl -u {servis} -f' ve 'sudo journalctl -u nginx -f'")

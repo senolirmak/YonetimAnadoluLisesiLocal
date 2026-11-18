@@ -31,6 +31,7 @@ from __future__ import annotations
 import ipaddress
 import subprocess
 import tempfile
+import time
 import urllib.request
 from pathlib import Path
 
@@ -185,10 +186,28 @@ def sunucu_sertifikasi_olustur(sanlar: list[str], force: bool = False) -> bool:
     yerel CA ile imzalı bir sunucu sertifikası üretir. `yerel_ca_olustur()`
     daha önce çalıştırılmış olmalı.
 
-    `force=False` (varsayılan) iken sertifika zaten varsa atlar."""
+    `force=False` (varsayılan) iken sertifika zaten varsa ve yerel CA ile
+    doğrulanabiliyorsa atlar. Doğrulanamıyorsa (elle üretilmiş kendinden
+    imzalı ya da başka bir CA'nın sertifikası, süresi dolmuş vb.) istemciler
+    — tarayıcılar ve tahta ajanı — ona güvenemez; bu durumda uyarır ve eski
+    sertifikayı yedekleyip yeniden üretmeyi sorar. Kendiliğinden silmez."""
     if not force and y.basarili_mi(["test", "-f", str(SUNUCU_SERTIFIKA)], sudo=True):
-        y.uyari(f"Sunucu sertifikası zaten var ({SUNUCU_SERTIFIKA}), atlanıyor.")
-        return True
+        gecerli, neden = _yerel_ca_ile_dogrula(SUNUCU_SERTIFIKA)
+        if gecerli:
+            y.uyari(f"Sunucu sertifikası zaten var ve yerel CA ile imzalı ({SUNUCU_SERTIFIKA}), atlanıyor.")
+            return True
+        y.uyari(
+            f"Mevcut sunucu sertifikası ({SUNUCU_SERTIFIKA}) yerel CA ({CA_SERTIFIKA}) ile "
+            f"doğrulanamıyor: {neden}\n"
+            "Bu durumda istemcilere dağıtılan CA sertifikası işe yaramaz; tarayıcılar ve "
+            "tahta ajanı sunucuya güvenemez."
+        )
+        if not y.sor(
+            "Eski sertifika yedeklenip yerel CA ile yeniden üretilsin mi?", "E"
+        ).lower().startswith("e"):
+            y.uyari("Sunucu sertifikası değiştirilmedi.")
+            return True
+        _sunucu_sertifikasini_yedekle()
 
     if not (y.basarili_mi(["test", "-f", str(CA_ANAHTAR)], sudo=True)
             and y.basarili_mi(["test", "-f", str(CA_SERTIFIKA)], sudo=True)):
@@ -244,6 +263,34 @@ def sunucu_sertifikasi_olustur(sanlar: list[str], force: bool = False) -> bool:
     y.calistir(["chmod", "644", str(SUNUCU_SERTIFIKA)], sudo=True)
     y.basari(f"Sunucu sertifikası oluşturuldu: {SUNUCU_SERTIFIKA}")
     return True
+
+
+def _yerel_ca_ile_dogrula(sertifika_yolu: Path) -> tuple[bool, str]:
+    """Sertifikanın yerel CA ile imzalı ve geçerli olup olmadığını
+    `openssl verify` ile denetler; (sonuç, openssl'in verdiği neden) döner."""
+    if not y.basarili_mi(["test", "-f", str(CA_SERTIFIKA)], sudo=True):
+        return False, "yerel CA bulunamadı"
+    sonuc = subprocess.run(
+        ["sudo", "openssl", "verify", "-CAfile", str(CA_SERTIFIKA), str(sertifika_yolu)],
+        text=True,
+        capture_output=True,
+    )
+    if sonuc.returncode == 0:
+        return True, ""
+    satirlar = [s.strip() for s in (sonuc.stdout + sonuc.stderr).splitlines() if s.strip()]
+    hata_satiri = next((s for s in satirlar if s.startswith("error")), None)
+    return False, hata_satiri or (satirlar[0] if satirlar else f"çıkış kodu {sonuc.returncode}")
+
+
+def _sunucu_sertifikasini_yedekle() -> None:
+    """Mevcut sunucu sertifikası ve anahtarını, üzerine yazılmadan önce
+    aynı dizine zaman damgalı kopyalar olarak yedekler."""
+    damga = time.strftime("%Y%m%d-%H%M%S")
+    for dosya in (SUNUCU_SERTIFIKA, SUNUCU_ANAHTAR):
+        if y.basarili_mi(["test", "-f", str(dosya)], sudo=True):
+            yedek = f"{dosya}.yedek-{damga}"
+            y.calistir(["cp", "-a", str(dosya), yedek], sudo=True)
+            y.bilgi(f"Yedeklendi: {yedek}")
 
 
 def ca_sertifikasini_disari_kopyala(proje_dizin: Path) -> Path:
