@@ -62,7 +62,10 @@
       paketi yukarıdaki <em>Paketi indir</em> düğmesiyle USB'ye alıp tahtada
       <code>sudo apt install ./{{ dosya_adi }}</code> ile kurun.</p>
     {% endif %}
-    <p class="pk-silik">Kontrol: <code>journalctl -u okul-ajan -f</code> — "Sunucuya kaydolundu" görünmeli.
+    <p class="pk-silik">Kontrol: tahta bir dakika içinde <a href="{% url 'tahtalar:liste' %}">Tahtalar</a> sayfasında
+      "Çevrimiçi" görünmeli. Günlük: <code>sudo journalctl -u okul-ajan -n 20 -f</code> — yeni tahtada
+      "Sunucuya kaydolundu", daha önce kayıtlı tahtada yalnızca "okul-ajan … başladı" satırı görünür
+      (başarılı bağlantılar günlüğe yazılmaz).
       Kaldırma: <code>sudo apt remove okul-ajan</code> (ayarlarla birlikte: <code>sudo apt purge okul-ajan</code>).</p>
   </div>
   {% endif %}
