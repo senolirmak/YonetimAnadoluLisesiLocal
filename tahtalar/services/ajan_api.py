@@ -106,6 +106,7 @@ def durum_guncelle(tahta, veri):
     tahta.meb_kayitli = kayitli if isinstance(kayitli, bool) else None
 
     guncelleme_bilgisini_isle(tahta, veri.get("guncelleme"))
+    kendini_guncelleme_bilgisini_isle(tahta, veri.get("kendini_guncelleme"))
     eta_bilgisini_isle(tahta, veri.get("eta"))
     tahta.oturumlar = oturum_listesi(veri.get("oturumlar"))
 
@@ -202,6 +203,25 @@ def guncelleme_bilgisini_isle(tahta, bilgi):
     except (OverflowError, OSError, ValueError):
         return
     tahta.guncelleme_durumu = bilgi["durum"]
+
+
+GECERLI_OTO_GUNCELLEME_DURUMLARI = {k for k, _ in Tahta.OTO_GUNCELLEME_SECENEKLERI}
+SURUM_KALIBI = re.compile(r"^\d+\.\d+\.\d+$")
+
+
+def kendini_guncelleme_bilgisini_isle(tahta, bilgi):
+    """{'durum', 'zaman', 'hedef'}: tahtanın APT deposundan kendini güncellemesi.
+    Bilgi yoksa önceki kayıt korunur."""
+    if not isinstance(bilgi, dict):
+        return
+    durum = _secenek(bilgi.get("durum"), GECERLI_OTO_GUNCELLEME_DURUMLARI)
+    hedef = bilgi.get("hedef")
+    zaman = _epoch(bilgi.get("zaman"))
+    if not durum or zaman is None or not isinstance(hedef, str) or not SURUM_KALIBI.match(hedef):
+        return
+    tahta.oto_guncelleme_durumu = durum
+    tahta.oto_guncelleme_hedef = hedef
+    tahta.oto_guncelleme_zamani = zaman
 
 
 def _epoch(deger):

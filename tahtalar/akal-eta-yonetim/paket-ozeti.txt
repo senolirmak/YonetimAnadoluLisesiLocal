@@ -1,0 +1,3 @@
+# akal-eta-yonetim paket içeriğinin özeti; elle değiştirmeyin.
+# Güncellemek için: python manage.py tahta_surum_artir
+1.2.0 34036ba06a70023c545312a3cce3cb102ad4bd2bf28ea504fe74ed27082e80cc

@@ -47,8 +47,88 @@ yazmaz, yalnızca "akal-eta-yonetim … başladı" görünür; başarılı bağl
 yazılmaz.
 Paket ve link kayıt anahtarını içerir; okul dışına paylaşmayın.
 
-Kod değiştiğinde `akal_eta_yonetim.py` içindeki `SURUM` artırılmalıdır; paket
-sürümü buradan alınır ve sayfa eski sürümle çalışan tahtaları listeler.
+Paket sürümü `akal_eta_yonetim.py` içindeki `SURUM`'dan alınır; sayfa eski
+sürümle çalışan tahtaları listeler. Tahtalar yeni sürümü yalnızca `SURUM` artınca
+alır. Pakete giren bir şey (bu klasördeki dosyalar ya da `kurulum_paketi.py`'deki
+postinst/prerm/postrm/control) değiştiğinde:
+
+```sh
+python manage.py tahta_surum_artir            # düzeltme: 1.2.0 → 1.2.1
+python manage.py tahta_surum_artir --kucuk    # yeni özellik: 1.2.0 → 1.3.0
+python manage.py tahta_surum_artir --buyuk    # 1.2.0 → 2.0.0
+python manage.py tahta_surum_artir --denetle  # yalnızca kontrol
+```
+
+Komut `SURUM`'u ve içerik özetini (`paket-ozeti.txt`) birlikte günceller; ikisi
+birlikte commit'lenir. Unutulursa `tahtalar.test_paket_surumu` testi başarısız
+olur ve yeni sürümü önerir — testler geçmeden `main`'e merge edilmediği için
+sürümü artırılmamış bir paket tahtalara gitmez. İçerik değişmeden `SURUM`
+artırılırsa da test uyarır.
+
+## Otomatik güncelleme (yerel APT deposu)
+
+Sunucu `/tahtalar/apt/` altında küçük bir APT deposu sunar; depoda
+akal-eta-yonetim'in güncel sürümü (`SURUM`) bulunur. Dosyalar diskte tutulmaz,
+her istekte üretilir: sürüm artırılıp `main`'e alındığında deploy sonrası depo
+kendiliğinden güncellenir, `deploy.sh`'ye ek adım gerekmez.
+
+**Sunucuda bir kez** depo imza anahtarını üretin (uygulamayı çalıştıran
+kullanıcıyla, dosyayı gunicorn okuyabilmeli):
+
+```sh
+python manage.py tahta_apt_anahtari_olustur --settings=config.settings.production
+```
+
+Anahtar `tahta-apt-imza-anahtari.json` dosyasına yazılır (yalnızca sahibi
+okur, repoya girmez — yedekleyin). Anahtar varsa komut bir şey değiştirmez.
+
+**Her tahtada bir kez** bu anahtardan sonra üretilen paketi (1.2.0+) bilinen
+yolla kurun (link ya da USB). Paketin postinst'i:
+
+- `/etc/apt/sources.list.d/akal-eta-yonetim.list` dosyasına ayar dosyasındaki
+  sunucu adresiyle depo satırını yazar
+  (`signed-by=/usr/share/keyrings/akal-eta-yonetim.gpg` — yalnızca bu depo için
+  geçerli anahtar; sistemin diğer depolarına etkisi yoktur),
+- `/etc/apt/apt.conf.d/50akal-eta-yonetim`: okul sunucusuna vekil sunucusuz
+  (DIRECT) gidilir; sunucu HTTPS ise yerel CA `/etc/apt/akal-eta-yonetim-ca.crt`
+  olarak kopyalanır (APT `_apt` kullanıcısıyla indirir).
+
+Sonrası kendiliğindendir: sunucu her bağlantıda güncel sürümü (`son_surum`)
+bildirir; tahtadaki sürüm daha eskiyse uygulama ayrı bir systemd birimiyle
+(`akal-eta-yonetim-kendini-guncelle`) **yalnızca kendi paketini, yalnızca bu
+depodan** o sürüme günceller (diğer paketlere ve depolara dokunmaz). Günlük:
+`sudo journalctl -u akal-eta-yonetim-kendini-guncelle`
+
+**Sağlık kontrolü ve geri dönüş:** yeni sürüm kurulduktan sonra 180 saniye
+içinde sunucuyla en az bir kez başarıyla konuşmalıdır (uygulama bunu
+`/var/lib/akal-eta-yonetim/calisiyor` dosyasına yazar). Konuşamazsa — açılışta
+çöküyorsa ya da kurulumu yarıda kaldıysa — önceki sürüm depodan geri kurulur
+ve servis onunla yeniden başlar. Çalışmayan sürüm
+`/var/lib/akal-eta-yonetim/bozuk-surumler`'e yazılır ve bir daha denenmez;
+düzeltmeyi `SURUM`'u artırarak yayınlayın, tahtalar yeni sürümü alır. Kurulum
+hiç başlamadan durduysa (indirme hatası, paket kilidi) eski sürüm yerinde
+kalır; saatte bir yeniden denenir. Sonuç Kurulum paketi sayfasındaki "Eski
+sürümlü kurulumlar" tablosunda görünür (örn. "1.3.0: Çalışmadı, geri
+dönüldü"). Çalışıp yanlış iş yapan bir sürüm bu kontrolden geçer; onun
+düzeltmesi de yeni sürümle yayınlanır.
+
+**Sürüm arşivi:** sunucu tahtalara sunduğu her sürümü bir kez
+`tahta-paketleri/` klasörüne kaydeder (repoya girmez; uygulamayı çalıştıran
+kullanıcı yazabilmeli, yazamazsa depo yine çalışır ama geri dönüş noktası
+kalmaz). Depo listesinde son 5 sürüm bulunur; geri dönüş buradan yapılır.
+Klasörü silmeyin; sunucu yedeğine dahil edin.
+
+**Sabitleme (pin):** paket kurulu sürümünü
+`/etc/apt/preferences.d/akal-eta-yonetim` ile sabitler. Böylece **Güncelle**
+komutunun genel `apt upgrade`'i bu paketi sağlık kontrolü olmadan yükseltmez;
+paket yalnızca yukarıdaki kontrollü yolla ya da elle `.deb` kurularak değişir.
+
+Depodaki paket kayıt anahtarı, sunucu adresi ve CA içermez; kurulu tahtanın
+ayarlarına dokunmaz (kurulum paketinden kalan `kurulum.conf` yükseltmede
+silinir). Paket kaldırılınca depo satırı, APT ayarı ve sabitleme de silinir.
+
+Anahtar değiştirilirse (`--zorla`) depoyu tanıyan tahtalar güncelleme alamaz;
+paketin her tahtaya yeniden kurulması gerekir.
 
 ## Eski adla (okul-ajan) kurulmuş tahtalar
 
@@ -159,7 +239,8 @@ sayfada "Son sorgu başarısız" olarak görünür.
 ## Güncelleme
 
 **Güncelle** komutu tahtada `apt-get update` + `apt-get upgrade` çalıştırır
-(tahtanın kendi depolarından, yani MEB/Pardus depolarından):
+(tahtanın kendi depolarından, yani MEB/Pardus depolarından; akal-eta-yonetim
+sabitlendiği için bu yolla güncellenmez, kendini güncellemesiyle gelir):
 
 - Uygulamanın kısıtlı servisinin dışında, ayrı bir systemd birimi
   (`akal-eta-yonetim-guncelleme`) olarak çalışır. Günlük:
@@ -185,6 +266,10 @@ sayfada "Son sorgu başarısız" olarak görünür.
 | `HTTP 403: Bu tahta pasife alınmış.` | Admin panelinde tahtanın "Aktif" işareti kaldırılmış |
 | `HTTP 401` | Tahta sunucuda silinmiş; kendini yeniden kaydeder |
 | `CERTIFICATE_VERIFY_FAILED` | `ca_dosyasi` eksik ya da yanlış |
+| kendini-guncelle günlüğünde `NO_PUBKEY` / `The following signatures were invalid` | Sunucudaki depo anahtarı değişmiş; paketi tahtaya yeniden kurun |
+| kendini-guncelle günlüğünde `... list yok` | Tahtadaki paket depo anahtarından önce üretilmiş; paketi bir kez yeniden kurun |
+| Sayfada "Çalışmadı, geri dönüldü" | Yeni sürüm tahtada açılmadı ya da sunucuyla konuşamadı; tahtada `journalctl -u akal-eta-yonetim` ile hatayı görün, düzeltip `SURUM`'u artırın |
+| Sayfada "Başarısız" | Paket indirilemedi/kurulamadı (eski sürüm çalışıyor, saatte bir yeniden dener) ya da geri dönüş de başarısız oldu (günlüğe bakın; paketi elle kurun) |
 | ETA sayfasında "Son sorgu başarısız: ETA sunucusuna ulaşılamadı" | Tahta `api-etap.eba.gov.tr:1000`'e ulaşamıyor (ağ / vekil sunucu) |
 | ETA komutu "Dokunmatik panel üreticisi … listede değil" | eta-register da bu tahtayı kaydetmez; ETAP'a (eta@pardus.org.tr) bildirilmeli |
 

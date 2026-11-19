@@ -8,7 +8,7 @@ from django.urls import reverse
 
 from okul.auth import ust_yonetici_required
 from tahtalar.models import Tahta
-from tahtalar.services import kurulum_paketi
+from tahtalar.services import apt_deposu, depo_anahtari, kurulum_paketi
 
 
 def _paket_yaniti(sunucu):
@@ -35,10 +35,15 @@ def paket_sayfasi(request):
         "sunucu": sunucu_girdi,
         "ca_var": kurulum_paketi.ca_sertifikasi() is not None,
         "link_saat": kurulum_paketi.LINK_GECERLILIK_SN // 3600,
+        "depo_hazir": False,
         "eski_surumlu": Tahta.objects.filter(aktif=True)
         .exclude(ajan_surumu__in=["", surum])
         .order_by("ad"),
     }
+    try:
+        baglam["depo_hazir"] = depo_anahtari.imza_anahtari() is not None
+    except depo_anahtari.AnahtarHatasi as hata:
+        baglam["depo_hatasi"] = str(hata)
     try:
         kurulum_paketi.kayit_anahtari()
         sunucu = kurulum_paketi.sunucu_adresini_dogrula(sunucu_girdi)
@@ -66,3 +71,31 @@ def paket_link(request, token):
         return _paket_yaniti(sunucu)
     except kurulum_paketi.PaketHatasi:
         raise Http404("Paket şu an üretilemiyor.") from None
+
+
+_ICERIK_TURLERI = {
+    "InRelease": "text/plain; charset=utf-8",
+    "Release": "text/plain; charset=utf-8",
+    "Packages": "text/plain; charset=utf-8",
+    "Release.gpg": "application/pgp-signature",
+}
+
+
+def apt_deposu_dosyasi(request, dosya):
+    """Tahtadaki APT'nin indirdiği depo dosyaları. Oturum gerektirmez: içerik
+    kayıt anahtarı, sunucu adresi ya da kişisel veri taşımaz; bütünlüğü
+    imza sağlar. Depo anahtarı yoksa 404."""
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    try:
+        icerik = apt_deposu.depo_dosyasi(dosya)
+    except (kurulum_paketi.PaketHatasi, depo_anahtari.AnahtarHatasi):
+        icerik = None
+    if icerik is None:
+        raise Http404("Depoda böyle bir dosya yok.")
+    yanit = HttpResponse(
+        icerik,
+        content_type=_ICERIK_TURLERI.get(dosya, "application/vnd.debian.binary-package"),
+    )
+    yanit["Cache-Control"] = "no-cache"
+    return yanit

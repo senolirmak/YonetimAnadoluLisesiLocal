@@ -71,14 +71,34 @@
   {% endif %}
 
   <div class="ay-kart ay-kart-full pk-kart">
+    <div class="ay-baslik">Otomatik güncelleme (APT deposu)</div>
+    {% if depo_hazir %}
+    <p><strong>Açık.</strong> Bu sayfadaki paketle kurulan tahtalar (1.2.0 ve sonrası) sunucudaki depoyu tanır;
+      akal-eta-yonetim'in yeni sürümü sunucuya geldiğinde bir dakika içinde kendiliğinden kurulur
+      (başarısız olursa saatte bir yeniden dener). Tahtadaki günlük:
+      <code>sudo journalctl -u akal-eta-yonetim-kendini-guncelle</code></p>
+    {% else %}
+    <p class="pk-hata">Kapalı: {% if depo_hatasi %}{{ depo_hatasi }} (dosyayı uygulamayı çalıştıran kullanıcı okuyabilmeli){% else %}sunucuda depo imza anahtarı yok{% endif %}.</p>
+    <p class="pk-silik">Sunucuda bir kez çalıştırın, ardından tahtalara bu sayfadaki paketi kurun:
+      <code>python manage.py tahta_apt_anahtari_olustur --settings=config.settings.production</code></p>
+    {% endif %}
+  </div>
+
+  <div class="ay-kart ay-kart-full pk-kart">
     <div class="ay-baslik">Eski sürümlü kurulumlar ({{ eski_surumlu|length }})</div>
     {% if eski_surumlu %}
-    <p class="pk-silik">Bu tahtalara paketi yeniden kurun.</p>
+    <p class="pk-silik">{% if depo_hazir %}1.2.0 ve sonrasındaki tahtalar kendiliğinden güncellenir; daha eski
+      sürümlere paketi bir kez elle kurun. Yeni sürümü çalışmayan tahta eski sürüme kendiliğinden döner
+      ve o sürümü bir daha denemez; düzeltilmiş sürümü (SURUM artırılarak) yayınlayın.
+      Tahtadaki günlük: <code>sudo journalctl -u akal-eta-yonetim-kendini-guncelle</code>{% else %}Bu tahtalara paketi yeniden kurun.{% endif %}</p>
     <table class="ay-tablo">
-      <thead><tr><th>Tahta</th><th>Sürüm</th><th>Son görülme</th></tr></thead>
+      <thead><tr><th>Tahta</th><th>Sürüm</th><th>Otomatik güncelleme</th><th>Son görülme</th></tr></thead>
       <tbody>
         {% for t in eski_surumlu %}
-        <tr><td>{{ t.ad }}</td><td>{{ t.ajan_surumu }}</td><td>{% if t.son_gorulme %}{{ t.son_gorulme|timesince }} önce{% else %}—{% endif %}</td></tr>
+        <tr><td>{{ t.ad }}</td><td>{{ t.ajan_surumu }}</td>
+          <td>{% if t.oto_guncelleme_durumu %}<span{% if t.oto_guncelleme_durumu != "basarili" and t.oto_guncelleme_durumu != "suruyor" %} class="pk-hata"{% endif %}>{{ t.oto_guncelleme_hedef }}: {{ t.get_oto_guncelleme_durumu_display }}</span>
+            <span class="pk-silik">({{ t.oto_guncelleme_zamani|timesince }} önce)</span>{% else %}—{% endif %}</td>
+          <td>{% if t.son_gorulme %}{{ t.son_gorulme|timesince }} önce{% else %}—{% endif %}</td></tr>
         {% endfor %}
       </tbody>
     </table>

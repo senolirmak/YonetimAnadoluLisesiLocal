@@ -118,6 +118,25 @@ class Tahta(models.Model):
         "Son güncelleme", max_length=12, choices=GUNCELLEME_SECENEKLERI, blank=True
     )
     guncelleme_zamani = models.DateTimeField("Son güncelleme zamanı", null=True, blank=True)
+
+    # akal-eta-yonetim'in APT deposundan kendini güncellemesinin son sonucu.
+    OTO_SURUYOR = "suruyor"
+    OTO_BASARILI = "basarili"
+    OTO_BASARISIZ = "basarisiz"
+    OTO_GERI_DONULDU = "geri_donuldu"
+    OTO_YARIDA_KALDI = "yarida_kaldi"
+    OTO_GUNCELLEME_SECENEKLERI = [
+        (OTO_SURUYOR, "Sürüyor"),
+        (OTO_BASARILI, "Başarılı"),
+        (OTO_BASARISIZ, "Başarısız"),
+        (OTO_GERI_DONULDU, "Çalışmadı, geri dönüldü"),
+        (OTO_YARIDA_KALDI, "Yarıda kaldı"),
+    ]
+    oto_guncelleme_durumu = models.CharField(
+        "Son otomatik güncelleme", max_length=12, choices=OTO_GUNCELLEME_SECENEKLERI, blank=True
+    )
+    oto_guncelleme_hedef = models.CharField("Otomatik güncelleme hedef sürümü", max_length=20, blank=True)
+    oto_guncelleme_zamani = models.DateTimeField("Son otomatik güncelleme zamanı", null=True, blank=True)
     # Tahtanın son bildirdiği açık oturumlar; her bağlantıda üzerine yazılır,
     # geçmiş tutulmaz. Öğe: {kullanici, ad, aktif, tur, baslangic (epoch sn)}.
     oturumlar = models.JSONField("Açık oturumlar", default=list, blank=True)
