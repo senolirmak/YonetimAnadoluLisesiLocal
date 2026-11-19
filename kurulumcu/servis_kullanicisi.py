@@ -253,3 +253,72 @@ def paylasilan_yedek_dizinini_hazirla(proje_dizin: Path) -> None:
     y.calistir(["chgrp", SERVIS_KULLANICISI, str(yedek_dizin)], sudo=True)
     y.calistir(["chmod", "2770", str(yedek_dizin)], sudo=True)
     y.basari(f"'backups/' paylaşılan dizin olarak hazırlandı (grup: {SERVIS_KULLANICISI}, setgid).")
+
+
+TAHTA_DEPOSU = "tahta-deposu"
+TAHTA_ANAHTARI = "imza-anahtari.json"
+# 1.2.0'ın ilk sürümünde bu ikisi proje kökündeydi; servis kullanıcısı proje
+# köküne yazamadığından (bkz. proje_dizini_sahipligini_garanti_et) taşınır.
+ESKI_TAHTA_ANAHTARI = "tahta-apt-imza-anahtari.json"
+ESKI_TAHTA_PAKETLERI = "tahta-paketleri"
+
+
+def tahta_deposunu_hazirla(proje_dizin: Path, venv: Path, django_ayar_bayragi: list[str]) -> None:
+    """Tahtaların APT deposu klasörünü (`tahta-deposu/`: imza anahtarı + sunulmuş
+    akal-eta-yonetim paketlerinin arşivi) `SERVIS_KULLANICISI`'na ait olarak
+    hazırlar ve imza anahtarı yoksa üretir (bkz. tahtalar/akal-eta-yonetim/README.md).
+
+    Gunicorn bu klasöre yazar (paket arşivi, medya yedeğinden geri yükleme) ve
+    anahtarı okur; proje kökü ise kurulumu çalıştıran kullanıcıya aittir, bu yüzden
+    `media/` gibi ayrı, servis kullanıcısına devredilmiş bir klasör gerekir. Mod 700:
+    özel anahtar taşır, nginx'in okumasına gerek yoktur (Django sunar).
+
+    Tekrar çalıştırmak güvenlidir: var olan anahtar korunur (değişirse tahtalar
+    güncelleme alamaz), yalnızca sahiplik/izinler düzeltilir. İlk sürümün proje
+    kökünde bıraktığı anahtar ve paket arşivi buraya taşınır.
+
+    Anahtar servis kullanıcısıyla üretilir ki dosya ona ait olsun (`sudo -u`);
+    `.env`'yi okuyabilmesi için `calisma_zamani_dosyalarini_devret`'ten SONRA
+    çağrılmalıdır."""
+    depo = proje_dizin / TAHTA_DEPOSU
+    paketler = depo / "paketler"
+    anahtar = depo / TAHTA_ANAHTARI
+    sahip = f"{SERVIS_KULLANICISI}:{SERVIS_KULLANICISI}"
+
+    y.calistir(["install", "-d", "-o", SERVIS_KULLANICISI, "-g", SERVIS_KULLANICISI, "-m", "700", str(depo)], sudo=True)
+    y.calistir(["install", "-d", "-o", SERVIS_KULLANICISI, "-g", SERVIS_KULLANICISI, "-m", "755", str(paketler)], sudo=True)
+
+    eski_anahtar = proje_dizin / ESKI_TAHTA_ANAHTARI
+    if y.basarili_mi(["test", "-e", str(eski_anahtar)], sudo=True):
+        if y.basarili_mi(["test", "-e", str(anahtar)], sudo=True):
+            y.uyari(
+                f"Hem {eski_anahtar} hem {anahtar} var; {anahtar} kullanılıyor, eskisine "
+                "dokunulmadı. Aynı değillerse hangisinin tahtalarda kurulu olduğunu kontrol "
+                "edip gereksiz olanı elle silin."
+            )
+        else:
+            y.calistir(["mv", str(eski_anahtar), str(anahtar)], sudo=True)
+            y.basari(f"Tahta depo anahtarı yeni yerine taşındı: {anahtar}")
+
+    eski_paketler = proje_dizin / ESKI_TAHTA_PAKETLERI
+    if eski_paketler.is_dir():
+        for deb in sorted(eski_paketler.glob("akal-eta-yonetim_*_all.deb")):
+            y.calistir(["cp", "-n", str(deb), str(paketler / deb.name)], sudo=True)
+        y.calistir(["rm", "-rf", str(eski_paketler)], sudo=True)
+        y.basari(f"Tahta paket arşivi yeni yerine taşındı: {paketler}")
+
+    y.calistir(["chown", "-R", sahip, str(depo)], sudo=True)
+    y.calistir(["chmod", "700", str(depo)], sudo=True)
+    if y.basarili_mi(["test", "-e", str(anahtar)], sudo=True):
+        y.calistir(["chmod", "600", str(anahtar)], sudo=True)
+
+    # Anahtar yoksa üretir, varsa bir şey değiştirmez (komutun kendisi idempotent).
+    y.calistir(
+        [
+            "-u", SERVIS_KULLANICISI, "env", "-C", str(proje_dizin),
+            str(venv / "bin" / "python"), "manage.py", "tahta_apt_anahtari_olustur",
+            *django_ayar_bayragi,
+        ],
+        sudo=True,
+    )
+    y.basari(f"Tahta APT deposu hazır ({depo}, sahibi {SERVIS_KULLANICISI}).")
