@@ -28,6 +28,13 @@ konteyneri oluşturan OS kullanıcısı için mümkündür) burada hiç kullanı
 `backups/`'a (paylaşılan, setgid'li dizin — bkz. `kurulumcu/servis_kullanicisi.py:
 paylasilan_yedek_dizinini_hazirla`) aynı şekilde yazar.
 
+Medya yedeği ayrıca `media/` dışındaki iki sistem dosyasını da taşır
+(`SISTEM_ONEKI` altında): tahtaların APT deposu imza anahtarı
+(`tahta-apt-imza-anahtari.json`) ve tahtalara sunulmuş paket arşivi
+(`tahta-paketleri/`) — bkz. `tahtalar/services/depo_anahtari.py`, `apt_deposu.py`.
+Bunlar geri yüklemede `media/`'ye DEĞİL asıl yerlerine yazılır: `media/` nginx
+tarafından herkese sunulur, özel anahtar oraya asla açılmamalıdır.
+
 Medya yedekleme/geri yükleme ise (pg_dump/restore'un aksine) hiçbir harici araca ya
 da ayrıcalığa ihtiyaç duymaz: sunucu kullanıcısı (`akalsite`) zaten `media/`'nin
 sahibidir (bkz. `kurulumcu/servis_kullanicisi.py: calisma_zamani_dosyalarini_devret`),
@@ -39,6 +46,8 @@ yapmış olmalıdır — burada ek bir yetki kontrolü yoktur.
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import re
 import shlex
@@ -61,6 +70,12 @@ PG_DUMP_IMZASI = b"PGDMP"  # pg_dump -Fc (custom format) dosyalarının baştaki
 GZIP_IMZASI = b"\x1f\x8b"  # gzip (dolayısıyla .tar.gz) dosyalarının baştaki imzası
 MEDYA_YEDEK_ONEKI = "media_"
 MEDYA_YEDEK_UZANTISI = ".tar.gz"
+# Medya arşivinde `media/` dışındaki sistem dosyalarının öneki — bkz. modül docstring'i.
+SISTEM_ONEKI = "_akalyonetim_sistem"
+_TAHTA_ANAHTARI = f"{SISTEM_ONEKI}/tahta-apt-imza-anahtari.json"
+_TAHTA_PAKETLERI = f"{SISTEM_ONEKI}/tahta-paketleri"
+
+log = logging.getLogger(__name__)
 
 
 class YedekHatasi(Exception):
@@ -78,6 +93,8 @@ class YedekDosyasi:
 class MedyaArsivBilgisi:
     dosya_sayisi: int
     toplam_boyut_mb: float
+    tahta_anahtari: bool = False
+    tahta_paket_sayisi: int = 0
 
 
 @dataclass
@@ -569,7 +586,10 @@ def medya_yedek_olustur(etiket: str = "web") -> Path:
     try:
         with tarfile.open(hedef, "w:gz") as tf:
             for oge in MEDIA_DIR.iterdir():
+                if oge.name == SISTEM_ONEKI:
+                    continue
                 tf.add(oge, arcname=oge.name)
+            _sistem_dosyalarini_ekle(tf)
     except OSError as exc:
         hedef.unlink(missing_ok=True)
         raise YedekHatasi(f"Medya yedeği oluşturulamadı: {exc}") from exc
@@ -612,19 +632,113 @@ def medya_yedek_yukle(dosya) -> Path:
     return hedef
 
 
+def _tahta_yollari() -> tuple[Path, Path]:
+    from tahtalar.services import apt_deposu, depo_anahtari
+
+    return depo_anahtari.ANAHTAR_DOSYASI, apt_deposu.ARSIV_KLASORU
+
+
+def _tahta_paketi_mi(ad: str) -> bool:
+    from tahtalar.services import apt_deposu
+
+    return bool(apt_deposu._ARSIV_KALIBI.match(ad))
+
+
+def _sistem_dosyalarini_ekle(tf: tarfile.TarFile) -> None:
+    """Tahta depo anahtarını ve paket arşivini `SISTEM_ONEKI` altına ekler.
+    Okunamayan dosya medya yedeğini bozmaz; atlanır ve log'a yazılır."""
+    anahtar, paketler = _tahta_yollari()
+    ekler = [(anahtar, _TAHTA_ANAHTARI)] if anahtar.is_file() else []
+    if paketler.is_dir():
+        ekler += [
+            (deb, f"{_TAHTA_PAKETLERI}/{deb.name}")
+            for deb in sorted(paketler.iterdir())
+            if deb.is_file() and _tahta_paketi_mi(deb.name)
+        ]
+    for kaynak, ad in ekler:
+        try:
+            tf.add(kaynak, arcname=ad)
+        except OSError as exc:
+            log.warning("Medya yedeğine eklenemedi (%s): %s", kaynak, exc)
+
+
+def _sistem_uyesi_mi(ad: str) -> bool:
+    ad = ad.removeprefix("./")
+    return ad == SISTEM_ONEKI or ad.startswith(SISTEM_ONEKI + "/")
+
+
+def _atomik_yaz(hedef: Path, veri: bytes, mod: int) -> None:
+    gecici = hedef.with_name(f".{hedef.name}.{os.getpid()}.tmp")
+    fd = os.open(gecici, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mod)
+    with os.fdopen(fd, "wb") as f:
+        f.write(veri)
+    os.chmod(gecici, mod)
+    os.replace(gecici, hedef)
+
+
+def _sistem_dosyalarini_geri_yukle(tf: tarfile.TarFile, uyeler: list[tarfile.TarInfo]) -> list[str]:
+    """Arşivdeki tahta dosyalarını asıl yerlerine yazar → kullanıcıya notlar.
+
+    Anahtar: arşivdeki geçerliyse yazılır (yalnızca sahibi okur); mevcut anahtar
+    farklıysa `.onceki` uzantısıyla saklanır. Paketler: yalnızca eksik olanlar
+    eklenir, mevcut arşiv silinmez/değiştirilmez."""
+    anahtar_yolu, paket_klasoru = _tahta_yollari()
+    notlar = []
+    eklenen_paket = 0
+    for uye in uyeler:
+        ad = uye.name.removeprefix("./")
+        if not uye.isfile():
+            continue
+        veri = tf.extractfile(uye).read()
+        if ad == _TAHTA_ANAHTARI:
+            try:
+                icerik = json.loads(veri)
+                if len(bytes.fromhex(icerik["tohum"])) != 32 or not isinstance(icerik["olusturma"], int):
+                    raise ValueError
+            except (ValueError, KeyError, TypeError):
+                notlar.append("Arşivdeki tahta depo anahtarı bozuk; geri yüklenmedi.")
+                continue
+            if anahtar_yolu.is_file():
+                mevcut = anahtar_yolu.read_bytes()
+                if mevcut == veri:
+                    continue
+                _atomik_yaz(anahtar_yolu.with_name(anahtar_yolu.name + ".onceki"), mevcut, 0o600)
+                notlar.append(
+                    "Tahta depo anahtarı yedektekiyle değiştirildi; önceki anahtar "
+                    f"{anahtar_yolu.name}.onceki olarak saklandı."
+                )
+            else:
+                notlar.append("Tahta depo anahtarı geri yüklendi.")
+            _atomik_yaz(anahtar_yolu, veri, 0o600)
+        elif ad.startswith(_TAHTA_PAKETLERI + "/"):
+            dosya_adi = ad.rsplit("/", 1)[1]
+            if not _tahta_paketi_mi(dosya_adi) or (paket_klasoru / dosya_adi).exists():
+                continue
+            paket_klasoru.mkdir(mode=0o755, exist_ok=True)
+            _atomik_yaz(paket_klasoru / dosya_adi, veri, 0o644)
+            eklenen_paket += 1
+    if eklenen_paket:
+        notlar.append(f"{eklenen_paket} tahta paketi arşive geri yüklendi.")
+    return notlar
+
+
 def medya_arsiv_bilgisi(yol: Path) -> MedyaArsivBilgisi:
     """Bir medya arşivini hiçbir yere açmadan içindeki dosya sayısını ve toplam
     (sıkıştırılmamış) boyutunu okur — geri yükleme öncesi kullanıcıya özet
     göstermek içindir."""
     try:
         with tarfile.open(yol, "r:gz") as tf:
-            uyeler = [u for u in tf.getmembers() if u.isfile()]
+            dosyalar = [u for u in tf.getmembers() if u.isfile()]
     except (tarfile.TarError, OSError) as exc:
         raise YedekHatasi(f"Medya arşivi okunamadı: {exc}") from exc
 
+    uyeler = [u for u in dosyalar if not _sistem_uyesi_mi(u.name)]
+    sistem = [u.name.removeprefix("./") for u in dosyalar if _sistem_uyesi_mi(u.name)]
     return MedyaArsivBilgisi(
         dosya_sayisi=len(uyeler),
         toplam_boyut_mb=round(sum(u.size for u in uyeler) / (1024 * 1024), 2),
+        tahta_anahtari=_TAHTA_ANAHTARI in sistem,
+        tahta_paket_sayisi=sum(ad.startswith(_TAHTA_PAKETLERI + "/") for ad in sistem),
     )
 
 
@@ -661,7 +775,7 @@ def _cikarilan_izinleri_duzelt() -> None:
             (Path(kok) / ad).chmod(0o644)
 
 
-def medya_yedek_geri_yukle(dosya_adi: str) -> None:
+def medya_yedek_geri_yukle(dosya_adi: str) -> list[str]:
     """Seçilen medya arşivini `media/`'ye geri yükler — `media/` içindeki MEVCUT
     TÜM içerik önce silinir, ardından arşiv açılır (pg_restore'un `--clean`'iyle
     aynı "tam değiştirme" ilkesi).
@@ -673,14 +787,25 @@ def medya_yedek_geri_yukle(dosya_adi: str) -> None:
     `filter="data"` (Python 3.12+) mutlak yollara/`../` ile dizin dışına çıkmaya
     ve cihaz dosyası gibi olağandışı üyelere karşı korur — arşiv yalnızca
     `mudur_yardimcisi_required` yetkili bir kullanıcı tarafından yüklenebilse de
-    ek bir savunma katmanı olarak burada tutuluyor."""
+    ek bir savunma katmanı olarak burada tutuluyor.
+
+    `SISTEM_ONEKI` altındaki tahta dosyaları `media/`'ye açılmaz; asıl yerlerine
+    yazılır (bkz. `_sistem_dosyalarini_geri_yukle`). Döner: kullanıcıya notlar."""
     yol = medya_guvenli_yol(dosya_adi)
     MEDIA_DIR.mkdir(exist_ok=True)
 
     try:
         _media_icerigini_temizle()
         with tarfile.open(yol, "r:gz") as tf:
-            tf.extractall(path=MEDIA_DIR, filter="data")
-        _cikarilan_izinleri_duzelt()
+            uyeler = tf.getmembers()
+            tf.extractall(
+                path=MEDIA_DIR,
+                members=[u for u in uyeler if not _sistem_uyesi_mi(u.name)],
+                filter="data",
+            )
+            _cikarilan_izinleri_duzelt()
+            return _sistem_dosyalarini_geri_yukle(
+                tf, [u for u in uyeler if _sistem_uyesi_mi(u.name)]
+            )
     except (tarfile.TarError, OSError) as exc:
         raise YedekHatasi(f"Medya geri yüklenirken hata oluştu: {exc}") from exc

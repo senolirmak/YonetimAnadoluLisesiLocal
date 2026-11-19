@@ -252,7 +252,7 @@ def medya_yedek_geri_yukle(request):
         return redirect("yedekleme:yedek_listesi")
 
     try:
-        yedek_servisi.medya_yedek_geri_yukle(dosya_adi)
+        notlar = yedek_servisi.medya_yedek_geri_yukle(dosya_adi)
     except yedek_servisi.YedekHatasi as exc:
         messages.error(
             request,
@@ -264,4 +264,6 @@ def medya_yedek_geri_yukle(request):
             request,
             f"'{dosya_adi}' geri yüklendi. İşlem öncesi güvenlik yedeği: {guvenlik_yedegi.name}",
         )
+        for not_ in notlar:
+            messages.info(request, not_)
     return redirect("yedekleme:yedek_listesi")

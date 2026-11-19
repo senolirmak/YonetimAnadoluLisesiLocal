@@ -80,7 +80,18 @@ python manage.py tahta_apt_anahtari_olustur --settings=config.settings.productio
 ```
 
 Anahtar `tahta-apt-imza-anahtari.json` dosyasına yazılır (yalnızca sahibi
-okur, repoya girmez — yedekleyin). Anahtar varsa komut bir şey değiştirmez.
+okur, repoya girmez). Anahtar varsa komut bir şey değiştirmez. Dosya,
+gunicorn'u çalıştıran kullanıcıya ait olmalı; komut `sudo` ile çalıştırıldıysa
+sahibini düzeltin (`sudo chown <KULLANICI>:<GRUP> tahta-apt-imza-anahtari.json`),
+yoksa sayfada "Permission denied" görünür.
+
+**Yedekleme:** Yedekleme sayfasından alınan **medya yedeği** anahtarı ve
+`tahta-paketleri/` arşivini de içerir (arşivde `_akalyonetim_sistem/` altında).
+Geri yüklemede bunlar `media/`'ye değil asıl yerlerine yazılır: anahtar
+yalnızca sahibi okuyacak şekilde, mevcutsa ve farklıysa eskisi `.onceki` olarak
+saklanarak; paketlerden yalnızca eksik olanlar eklenir. Anahtar kaybolursa her
+tahtaya paketi yeniden kurmak gerektiğinden, anahtar üretildikten sonra bir
+medya yedeği alın.
 
 **Her tahtada bir kez** bu anahtardan sonra üretilen paketi (1.2.0+) bilinen
 yolla kurun (link ya da USB). Paketin postinst'i:
@@ -116,7 +127,7 @@ düzeltmesi de yeni sürümle yayınlanır.
 `tahta-paketleri/` klasörüne kaydeder (repoya girmez; uygulamayı çalıştıran
 kullanıcı yazabilmeli, yazamazsa depo yine çalışır ama geri dönüş noktası
 kalmaz). Depo listesinde son 5 sürüm bulunur; geri dönüş buradan yapılır.
-Klasörü silmeyin; sunucu yedeğine dahil edin.
+Klasörü silmeyin; medya yedeğine kendiliğinden dahil edilir.
 
 **Sabitleme (pin):** paket kurulu sürümünü
 `/etc/apt/preferences.d/akal-eta-yonetim` ile sabitler. Böylece **Güncelle**
