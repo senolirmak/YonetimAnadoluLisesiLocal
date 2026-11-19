@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from tahtalar.services import ajan_api
+from tahtalar.services import ajan_api, apt_deposu, depo_anahtari, kurulum_paketi
 
 AZAMI_GOVDE = 16 * 1024
 
@@ -56,4 +56,10 @@ def durum(request):
         return JsonResponse({"hata": "Geçersiz istek."}, status=400)
     ajan_api.sonuclari_isle(tahta, veri.get("sonuclar"))
     ajan_api.durum_guncelle(tahta, veri)
-    return JsonResponse({"komutlar": ajan_api.bekleyen_komutlari_teslim_et(tahta)})
+    yanit = {"komutlar": ajan_api.bekleyen_komutlari_teslim_et(tahta)}
+    if depo_anahtari.depo_hazir_mi():
+        # Tahta daha eski sürümdeyse APT deposundan kendini günceller (1.2.0+).
+        yanit["son_surum"] = kurulum_paketi.uygulama_surumu()
+        # Geri dönüş noktası: bildirilen her sürüm depoda arşivlenmiş olmalı.
+        apt_deposu.guncel_surumu_arsivle()
+    return JsonResponse(yanit)

@@ -13,6 +13,14 @@ Güncelleme, uygulamanın kısıtlı servisinin dışında ayrı bir systemd bir
 (akal-eta-yonetim-guncelleme) olarak çalışır; uygulama yalnızca başlatır ve sonucunu
 izler. Güncelleme sürerken kapat / yeniden başlat komutları reddedilir.
 
+Kendini güncelleme: sunucu yanıtında bildirdiği sürüm (son_surum) bu
+uygulamanınkinden yeniyse, uygulama yalnızca kendi paketini okul sunucusundaki
+APT deposundan günceller (akal-eta-yonetim-kendini-guncelle birimi). Yeni sürüm
+SAGLIK_BEKLEME saniye içinde sunucuyla konuşamazsa (işaret dosyası "calisiyor")
+eski sürüm depodan geri kurulur ve yeni sürüm "bozuk-surumler"e yazılır; daha
+yeni bir sürüm gelene kadar denenmez. Başka bir nedenle başarısız olursa en
+erken KENDINI_GUNCELLEME_ARALIGI sonra yeniden dener.
+
 MEB Ahenk ile ilişkisi: /etc/ahenk altına HİÇBİR ŞEY yazmaz. Ahenk servisinin
 çalışıp çalışmadığını ve tahtanın MEB'e kayıtlı olup olmadığını yalnızca
 okur. Servis dosyası da /etc/ahenk'i bu uygulama için salt okunur yapar.
@@ -36,7 +44,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-SURUM = "1.1.0"
+SURUM = "1.2.0"
 
 UYGULAMA = "akal-eta-yonetim"
 AYAR_DOSYASI = os.environ.get(
@@ -47,6 +55,9 @@ AHENK_KLASORU = "/etc/ahenk"
 AHENK_SERVISI = "ahenk.service"
 
 GUNCELLEME_BIRIMI = f"{UYGULAMA}-guncelleme"
+KENDINI_GUNCELLEME_BIRIMI = f"{UYGULAMA}-kendini-guncelle"
+KENDINI_GUNCELLEME_ARALIGI = 60 * 60  # başarısız denemeden sonra
+SAGLIK_BEKLEME = 180  # yeni sürümün sunucuyla ilk başarılı bağlantısı için
 
 # Güncelleme betiği. $1: sonucun yazılacağı dosya. Yarıda kalmış bir kurulum
 # önce tamamlanır; yapılandırma dosyalarının mevcut hâli korunur (confold) —
@@ -61,6 +72,78 @@ kod=$?
 if [ "$kod" -eq 0 ]; then d=basarili; else d=basarisiz; fi
 echo "$d $(date +%s) $kod" > "$1.tmp" && mv "$1.tmp" "$1"
 exit "$kod"
+"""
+
+# Yalnızca bu paketi, yalnızca okul sunucusundaki depodan, tam sürüm belirterek
+# kurar (paketin APT önceliği 50'dir; genel "apt upgrade" ona dokunmaz). apt'nin
+# listesi o depoyla sınırlanır (diğer depoların indirilmiş listeleri silinmez).
+# Paketin postinst'i uygulamayı yeniden başlatır; bu birim ayrı olduğu için sürer.
+# $1: hedef sürüm, $2: durum klasörü, $3: sağlık kontrolü süresi (sn).
+# Sonuç "$2/kendini-guncelleme-sonuc": "<durum> <epoch> <hedef>".
+# Betik durum klasörüne dosya olarak yazılıp öyle çalıştırılır: systemd-run'a
+# "sh -c" ile verilince systemd ${...} ifadelerini kendi değişkeni sanıp boşaltır;
+# paketin içindeki bir dosya olsaydı da dpkg onu çalışırken değiştirirdi.
+KENDINI_GUNCELLEME_BETIGI = r"""
+set -u
+export DEBIAN_FRONTEND=noninteractive
+UYG=akal-eta-yonetim
+HEDEF=$1
+DURUM=$2
+BEKLEME=$3
+SONUC=$DURUM/kendini-guncelleme-sonuc
+LISTE=/etc/apt/sources.list.d/$UYG.list
+APT="apt-get -q -o DPkg::Lock::Timeout=900 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+sonuc() {
+    echo "$1 $(date +%s) $HEDEF" > "$SONUC.tmp" && mv "$SONUC.tmp" "$SONUC"
+    [ -z "${2:-}" ] || echo "$2" >&2
+}
+paket_durumu() { dpkg-query -W -f='${Version} ${db:Status-Abbrev}' "$UYG" 2>/dev/null; }
+
+mkdir -p "$DURUM"
+if [ ! -f "$LISTE" ]; then
+    sonuc basarisiz "$LISTE yok: okul sunucusunun APT deposu tanımlı değil."
+    exit 1
+fi
+ESKI_DURUM=$(paket_durumu)
+ESKI=${ESKI_DURUM%% *}
+sonuc suruyor
+if ! $APT -o Dir::Etc::sourcelist="$LISTE" -o Dir::Etc::sourceparts=- \
+        -o APT::Get::List-Cleanup=0 update; then
+    sonuc basarisiz "Depo listesi alınamadı."
+    exit 1
+fi
+
+BASLANGIC=$(date +%s)
+if $APT -y install "$UYG=$HEDEF"; then
+    # Sağlık kontrolü: yeni sürüm sunucuyla en az bir kez başarıyla konuşmalı.
+    sure=0
+    while [ "$sure" -lt "$BEKLEME" ]; do
+        isaret=$(cat "$DURUM/calisiyor" 2>/dev/null)
+        if [ "${isaret%% *}" = "$HEDEF" ] && [ "${isaret#* }" -ge "$BASLANGIC" ] 2>/dev/null; then
+            sonuc basarili "$HEDEF çalışıyor."
+            exit 0
+        fi
+        sleep 5
+        sure=$((sure + 5))
+    done
+    echo "$HEDEF kuruldu ama $BEKLEME sn içinde sunucuyla konuşamadı." >&2
+elif [ "$(paket_durumu)" = "$ESKI_DURUM" ]; then
+    # Kurulum başlamadan durdu (indirme, kilit vb.): eski sürüm yerinde.
+    sonuc basarisiz "$HEDEF kurulamadı; $ESKI sürümü değişmedi."
+    exit 1
+else
+    echo "$HEDEF kurulumu yarıda kaldı." >&2
+fi
+
+# Geri dönüş. Yeni sürüm, daha yenisi gelene kadar bir daha denenmez.
+grep -qxF "$HEDEF" "$DURUM/bozuk-surumler" 2>/dev/null || echo "$HEDEF" >> "$DURUM/bozuk-surumler"
+if [ -n "$ESKI" ] && $APT -y --allow-downgrades install "$UYG=$ESKI"; then
+    sonuc geri_donuldu "$ESKI sürümüne geri dönüldü."
+    exit 1
+fi
+dpkg --configure -a
+sonuc basarisiz "$ESKI sürümüne geri dönülemedi; paketi elle kurun."
+exit 1
 """
 
 KOMUTLAR = {
@@ -316,10 +399,10 @@ def _guncelleme_dosyasi():
     return os.path.join(DURUM_KLASORU, "guncelleme")
 
 
-def guncelleme_suruyor():
+def _birim_calisiyor(birim):
     try:
         sonuc = subprocess.run(
-            ["systemctl", "is-active", GUNCELLEME_BIRIMI],
+            ["systemctl", "is-active", birim],
             capture_output=True,
             text=True,
             timeout=10,
@@ -327,6 +410,10 @@ def guncelleme_suruyor():
     except (OSError, subprocess.SubprocessError):
         return False
     return sonuc.stdout.strip() in ("active", "activating")
+
+
+def guncelleme_suruyor():
+    return _birim_calisiyor(GUNCELLEME_BIRIMI)
 
 
 def guncelleme_durumu():
@@ -372,6 +459,109 @@ def guncellemeyi_baslat():
         os.remove(yol)
         return "basarisiz", (sonuc.stderr.strip() or f"çıkış kodu {sonuc.returncode}")[:255]
     return "tamamlandi", "Güncelleme başlatıldı."
+
+
+# ── Kendini güncelleme (okul sunucusundaki APT deposundan) ──────────────
+
+
+def surum_parcalari(surum):
+    """'1.10.2' → (1, 10, 2); sayısal değilse None."""
+    if not isinstance(surum, str):
+        return None
+    try:
+        return tuple(int(p) for p in surum.strip().split("."))
+    except ValueError:
+        return None
+
+
+def _kendini_guncelleme_dosyasi():
+    return os.path.join(DURUM_KLASORU, "kendini-guncelleme")
+
+
+def _bozuk_surumler():
+    return set(_dosya_oku(os.path.join(DURUM_KLASORU, "bozuk-surumler")).split())
+
+
+def calisiyor_isaretini_yaz():
+    """Sunucuyla ilk başarılı bağlantıdan sonra: kendini güncelleme betiği yeni
+    sürümün çalıştığını bundan anlar."""
+    try:
+        os.makedirs(DURUM_KLASORU, exist_ok=True)
+        yol = os.path.join(DURUM_KLASORU, "calisiyor")
+        with open(yol + ".tmp", "w", encoding="utf-8") as f:
+            f.write(f"{SURUM} {int(time.time())}\n")
+        os.replace(yol + ".tmp", yol)
+    except OSError as hata:
+        log.warning("Çalışma işareti yazılamadı: %s", hata)
+
+
+def kendini_guncelleme_durumu():
+    """{'durum', 'zaman', 'hedef'} ya da None. durum: suruyor | basarili |
+    basarisiz | geri_donuldu | yarida_kaldi."""
+    parcalar = _dosya_oku(os.path.join(DURUM_KLASORU, "kendini-guncelleme-sonuc")).split()
+    if len(parcalar) != 3 or not parcalar[1].isdigit():
+        return None
+    durum = parcalar[0]
+    if durum == "suruyor" and not _birim_calisiyor(KENDINI_GUNCELLEME_BIRIMI):
+        durum = "yarida_kaldi"  # tahta güncelleme sırasında kapanmış
+    return {"durum": durum, "zaman": int(parcalar[1]), "hedef": parcalar[2][:20]}
+
+
+def kendini_guncelle(son_surum):
+    """Sunucunun bildirdiği sürüm daha yeniyse paketi depodan günceller.
+    Döner: başlatıldıysa True. Aynı sürüm için en çok saatte bir dener; daha
+    önce çalışmayıp geri dönülen sürümü hiç denemez."""
+    hedef, simdiki = surum_parcalari(son_surum), surum_parcalari(SURUM)
+    if hedef is None or simdiki is None or hedef <= simdiki:
+        return False
+    if son_surum in _bozuk_surumler():
+        return False
+    if _birim_calisiyor(KENDINI_GUNCELLEME_BIRIMI) or guncelleme_suruyor():
+        return False
+    onceki = _dosya_oku(_kendini_guncelleme_dosyasi()).split()
+    if (
+        len(onceki) == 2
+        and onceki[1] == son_surum
+        and onceki[0].isdigit()
+        and 0 <= time.time() - int(onceki[0]) < KENDINI_GUNCELLEME_ARALIGI
+    ):
+        return False
+    betik = os.path.join(DURUM_KLASORU, "kendini-guncelle.sh")
+    try:
+        os.makedirs(DURUM_KLASORU, exist_ok=True)
+        with open(_kendini_guncelleme_dosyasi(), "w", encoding="utf-8") as f:
+            f.write(f"{int(time.time())} {son_surum}\n")
+        fd = os.open(betik + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(KENDINI_GUNCELLEME_BETIGI)
+        os.replace(betik + ".tmp", betik)
+    except OSError as hata:
+        log.warning("Kendini güncelleme başlatılamadı: %s", hata)
+        return False
+    arguman = [
+        "systemd-run",
+        f"--unit={KENDINI_GUNCELLEME_BIRIMI}",
+        f"--description={UYGULAMA} {son_surum} sürümüne güncelleniyor",
+        "--collect",
+        "--property=Nice=10",
+        "/bin/sh",
+        betik,
+        son_surum,
+        DURUM_KLASORU,
+        str(SAGLIK_BEKLEME),
+    ]
+    try:
+        sonuc = subprocess.run(arguman, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as hata:
+        log.warning("Kendini güncelleme başlatılamadı: %s", hata)
+        return False
+    if sonuc.returncode != 0:
+        log.warning("Kendini güncelleme başlatılamadı: %s", sonuc.stderr.strip())
+        return False
+    log.info(
+        "%s sürümü depodan kuruluyor (günlük: journalctl -u %s)", son_surum, KENDINI_GUNCELLEME_BIRIMI
+    )
+    return True
 
 
 # ── ETA envanter kaydı (ETAP'ın eta-register uygulamasının sunucusu) ─────
@@ -625,6 +815,7 @@ def durum_bilgisi(ayarlar):
         "ahenk_servisi": ahenk_servis_durumu(),
         "meb_kayitli": meb_kayit_durumu(),
         "guncelleme": guncelleme_durumu(),
+        "kendini_guncelleme": kendini_guncelleme_durumu(),
         "oturumlar": oturumlar(),
         "eta": eta_bilgisi(),
     }
@@ -687,7 +878,7 @@ def komutu_uygula(komut, parametreler=None):
     arguman = KOMUTLAR.get(komut)
     if arguman is None:
         return "basarisiz", f"Bilinmeyen komut: {komut}"
-    if guncelleme_suruyor():
+    if guncelleme_suruyor() or _birim_calisiyor(KENDINI_GUNCELLEME_BIRIMI):
         # Güncelleme ortasında kapanan tahtanın paketleri bozulabilir.
         return "basarisiz", "Güncelleme sürüyor; bitince tekrar deneyin."
     try:
@@ -716,6 +907,7 @@ def tur(ayarlar, token, sonuclar):
             istek(ayarlar, "/tahtalar/api/durum/", veri, token)
         except (OSError, SunucuHatasi, ValueError):
             bekleyen.append(sonuc)
+    kendini_guncelle(yanit.get("son_surum"))
     return bekleyen
 
 
@@ -725,11 +917,15 @@ def calis():
     log.info("%s %s başladı, sunucu: %s", UYGULAMA, SURUM, ayarlar["sunucu"])
     token = token_oku()
     sonuclar = []
+    isaret_yazildi = False
     while True:
         try:
             if token is None:
                 token = kaydol(ayarlar)
             sonuclar = tur(ayarlar, token, sonuclar)
+            if not isaret_yazildi:
+                calisiyor_isaretini_yaz()
+                isaret_yazildi = True
         except SunucuHatasi as hata:
             log.warning("%s", hata)
             if hata.kod == 401:

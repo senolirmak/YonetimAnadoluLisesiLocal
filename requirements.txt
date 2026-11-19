@@ -1,5 +1,6 @@
 asgiref==3.11.1
 charset-normalizer==3.4.5
+cryptography==50.0.1
 Django==6.0.3
 et_xmlfile==2.0.0
 gunicorn==25.1.0

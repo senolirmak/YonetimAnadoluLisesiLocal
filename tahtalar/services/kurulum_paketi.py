@@ -13,8 +13,14 @@ etkinleştirip yeniden başlatır.
 
 Paket kayıt anahtarını içerir: yalnızca üst yönetici indirir ya da süreli,
 imzalı bir link üretir (bkz. `indirme_tokeni_uret`).
+
+Sunucuda APT depo anahtarı varsa (bkz. `depo_anahtari`) paket depo kaynağını
+da kurar; sonraki sürümler tahtaya sunucudaki APT deposundan gelir. Depodaki
+paket (`depo_paketi_olustur`) kayıt anahtarı, sunucu adresi ve CA içermez;
+kurulu tahtanın ayarlarına dokunmaz.
 """
 
+import gzip
 import hashlib
 import io
 import re
@@ -24,6 +30,8 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core import signing
+
+from tahtalar.services import depo_anahtari
 
 PAKET_ADI = "akal-eta-yonetim"
 ESKI_PAKET_ADI = "okul-ajan"
@@ -110,7 +118,12 @@ set -e
 UYGULAMA=akal-eta-yonetim
 AYAR=/etc/$UYGULAMA/$UYGULAMA.conf
 PAYLASIM=/usr/share/$UYGULAMA
-. "$PAYLASIM/kurulum.conf"
+# Kurulum paketinde var; APT deposundaki pakette yok (kurulu ayarlara dokunulmaz).
+SUNUCU_ADRESI=
+TAHTA_KAYIT_ANAHTARI=
+if [ -f "$PAYLASIM/kurulum.conf" ]; then
+    . "$PAYLASIM/kurulum.conf"
+fi
 
 # Eski adla (okul-ajan) yapılmış kurulumun ayarları ve sunucu kaydı taşınır.
 sh "$PAYLASIM/eski-kurulumu-tasi.sh"
@@ -120,14 +133,61 @@ if [ ! -f "$AYAR" ]; then
     install -m 0600 "$PAYLASIM/$UYGULAMA.conf.ornek" "$AYAR"
 fi
 # Yeniden kurulumda yalnızca bu iki satır güncellenir; diğer ayarlar korunur.
-sed -i "s|^[[:space:]]*sunucu[[:space:]]*=.*|sunucu = $SUNUCU_ADRESI|" "$AYAR"
-sed -i "s|^[[:space:]]*kayit_anahtari[[:space:]]*=.*|kayit_anahtari = $TAHTA_KAYIT_ANAHTARI|" "$AYAR"
+if [ -n "$SUNUCU_ADRESI" ]; then
+    sed -i "s|^[[:space:]]*sunucu[[:space:]]*=.*|sunucu = $SUNUCU_ADRESI|" "$AYAR"
+fi
+if [ -n "$TAHTA_KAYIT_ANAHTARI" ]; then
+    sed -i "s|^[[:space:]]*kayit_anahtari[[:space:]]*=.*|kayit_anahtari = $TAHTA_KAYIT_ANAHTARI|" "$AYAR"
+fi
 
 if [ -f "$PAYLASIM/yerel-ca.crt" ]; then
     install -m 0644 "$PAYLASIM/yerel-ca.crt" /etc/$UYGULAMA/yerel-ca.crt
 elif [ ! -f /etc/$UYGULAMA/yerel-ca.crt ]; then
     # CA yoksa sistemin güvendiği sertifikalar kullanılır.
     sed -i "s|^[[:space:]]*ca_dosyasi[[:space:]]*=.*|ca_dosyasi =|" "$AYAR"
+fi
+
+# APT deposu: sonraki sürümler okul sunucusundan gelir. Adres ve CA ayar
+# dosyasından alınır. Okul sunucusuna vekil sunucu (proxy) olmadan gidilir;
+# APT dosyaları _apt kullanıcısıyla indirdiği için CA okunabilir bir yere kopyalanır.
+# Kurulu sürüm 1000 öncelikle sabitlenir (pin): tahtadaki genel "apt upgrade" /
+# "dist-upgrade" (Güncelle komutu) bu paketi yükseltmez. Paket yalnızca
+# uygulamanın sağlık kontrollü kendini güncellemesiyle (tam sürüm belirterek)
+# ya da elle .deb ile kurulur; çalışmazsa eski sürüme dönülür. Her kurulumda
+# (geri dönüş dahil) pin kurulan sürüme güncellenir.
+ANAHTARLIK=/usr/share/keyrings/$UYGULAMA.gpg
+LISTE=/etc/apt/sources.list.d/$UYGULAMA.list
+APT_AYAR=/etc/apt/apt.conf.d/50$UYGULAMA
+APT_CA=/etc/apt/$UYGULAMA-ca.crt
+APT_ONCELIK=/etc/apt/preferences.d/$UYGULAMA
+ayar_degeri() {
+    sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$AYAR" | head -n 1 | tr -d '[:space:]'
+}
+SUNUCU=$(ayar_degeri sunucu)
+SUNUCU=${SUNUCU%/}
+if [ -f "$ANAHTARLIK" ] && printf '%s\\n' "$SUNUCU" | grep -Eqx 'https?://[A-Za-z0-9._:-]+(/[A-Za-z0-9._~/-]*)?'; then
+    SUNUCU_HOST=$(printf '%s\\n' "$SUNUCU" | sed -e 's|^[a-z]*://||' -e 's|[:/].*$||')
+    printf 'deb [signed-by=%s] %s/tahtalar/apt/ ./\\n' "$ANAHTARLIK" "$SUNUCU" > "$LISTE.tmp"
+    {
+        echo "// $UYGULAMA paketi üretir; elle değiştirmeyin."
+        echo "Acquire::http::Proxy::$SUNUCU_HOST \\"DIRECT\\";"
+        echo "Acquire::https::Proxy::$SUNUCU_HOST \\"DIRECT\\";"
+    } > "$APT_AYAR.tmp"
+    CA=$(ayar_degeri ca_dosyasi)
+    if [ "${SUNUCU%%://*}" = https ] && [ -n "$CA" ] && [ -f "$CA" ]; then
+        install -m 0644 "$CA" "$APT_CA"
+        echo "Acquire::https::$SUNUCU_HOST::CaInfo \\"$APT_CA\\";" >> "$APT_AYAR.tmp"
+    else
+        rm -f "$APT_CA"
+    fi
+    KURULU=$(dpkg-query -W -f='${Version}' $UYGULAMA)
+    printf 'Package: %s\\nPin: version %s\\nPin-Priority: 1000\\n' "$UYGULAMA" "$KURULU" > "$APT_ONCELIK.tmp"
+    chmod 0644 "$LISTE.tmp" "$APT_AYAR.tmp" "$APT_ONCELIK.tmp"
+    mv "$LISTE.tmp" "$LISTE"
+    mv "$APT_AYAR.tmp" "$APT_AYAR"
+    mv "$APT_ONCELIK.tmp" "$APT_ONCELIK"
+else
+    rm -f "$LISTE" "$APT_AYAR" "$APT_CA" "$APT_ONCELIK"
 fi
 
 # kur.sh kurulumunun servis dosyası paketinkini gölgeler; kaldırılır.
@@ -152,6 +212,11 @@ exit 0
 
 _POSTRM = """#!/bin/sh
 set -e
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    rm -f /etc/apt/sources.list.d/akal-eta-yonetim.list \
+        /etc/apt/apt.conf.d/50akal-eta-yonetim /etc/apt/akal-eta-yonetim-ca.crt \
+        /etc/apt/preferences.d/akal-eta-yonetim
+fi
 if [ "$1" = "purge" ]; then
     rm -rf /etc/akal-eta-yonetim /var/lib/akal-eta-yonetim
 fi
@@ -185,7 +250,7 @@ def _control(surum, kurulu_boyut_kb):
 def _tar_gz(dosyalar, zaman):
     """dosyalar: [(yol, içerik bytes | None=klasör, mod)] → tar.gz bytes (root:root)."""
     tampon = io.BytesIO()
-    with tarfile.open(fileobj=tampon, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
+    with tarfile.open(fileobj=tampon, mode="w", format=tarfile.GNU_FORMAT) as tar:
         for yol, icerik, mod in dosyalar:
             bilgi = tarfile.TarInfo(yol)
             bilgi.mode = mod
@@ -198,7 +263,8 @@ def _tar_gz(dosyalar, zaman):
             else:
                 bilgi.size = len(icerik)
                 tar.addfile(bilgi, io.BytesIO(icerik))
-    return tampon.getvalue()
+    # gzip başlığındaki zaman da sabitlenir: aynı girdi aynı baytları verir.
+    return gzip.compress(tampon.getvalue(), compresslevel=9, mtime=zaman)
 
 
 def _ar(uyeler, zaman):
@@ -217,18 +283,41 @@ def _ar(uyeler, zaman):
 
 
 def paket_olustur(sunucu):
-    """Verilen sunucu adresi ve sunucudaki kayıt anahtarıyla .deb üretir → bytes."""
+    """Kurulum paketi: verilen sunucu adresi ve sunucudaki kayıt anahtarıyla .deb → bytes."""
     sunucu = sunucu_adresini_dogrula(sunucu)
     anahtar = kayit_anahtari()
-    surum = uygulama_surumu()
-    zaman = int(time.time())
-
     kurulum_conf = (
         f"# {PAKET_ADI} paketi tarafından üretildi; postinst okur.\n"
         f"SUNUCU_ADRESI='{sunucu}'\n"
         f"TAHTA_KAYIT_ANAHTARI='{anahtar}'\n"
     ).encode("utf-8")
+    ca = ca_sertifikasi() if sunucu.startswith("https://") else None
+    return _deb(kurulum_conf, ca, int(time.time()))
 
+
+def depo_paketi_olustur():
+    """APT deposundaki paket: kayıt anahtarı, sunucu adresi ve CA içermez; aynı
+    sürüm her zaman aynı baytları verir (Packages dosyasındaki özet tutar)."""
+    if depo_anahtari.acik_anahtarlik() is None:
+        raise PaketHatasi("APT depo anahtarı yok.")
+    return _deb(None, None, depo_anahtari.SABIT_ZAMAN)
+
+
+def control_alanlari(paket):
+    """.deb içindeki control dosyasının metni (Packages dosyası için)."""
+    uyeler, i = {}, 8
+    while i < len(paket):
+        baslik = paket[i : i + 60]
+        ad = baslik[:16].decode("ascii").strip().rstrip("/")
+        boyut = int(baslik[48:58].decode("ascii").strip())
+        uyeler[ad] = paket[i + 60 : i + 60 + boyut]
+        i += 60 + boyut + (boyut % 2)
+    with tarfile.open(fileobj=io.BytesIO(uyeler["control.tar.gz"]), mode="r:gz") as tar:
+        return tar.extractfile("./control").read().decode("utf-8")
+
+
+def _deb(kurulum_conf, ca, zaman):
+    surum = uygulama_surumu()
     paylasim = f"./usr/share/{PAKET_ADI}"
     veri = [
         ("./opt/", None, 0o755),
@@ -259,12 +348,18 @@ def paket_olustur(sunucu):
             (UYGULAMA_KLASORU / "eski-kurulumu-tasi.sh").read_bytes(),
             0o755,
         ),
-        # Kayıt anahtarını içerir: yalnızca root okur.
-        (f"{paylasim}/kurulum.conf", kurulum_conf, 0o600),
     ]
-    ca = ca_sertifikasi() if sunucu.startswith("https://") else None
+    if kurulum_conf is not None:
+        # Kayıt anahtarını içerir: yalnızca root okur.
+        veri.append((f"{paylasim}/kurulum.conf", kurulum_conf, 0o600))
     if ca:
         veri.append((f"{paylasim}/yerel-ca.crt", ca, 0o644))
+    anahtarlik = depo_anahtari.acik_anahtarlik()
+    if anahtarlik:
+        veri += [
+            ("./usr/share/keyrings/", None, 0o755),
+            (f"./usr/share/keyrings/{PAKET_ADI}.gpg", anahtarlik, 0o644),
+        ]
 
     dosyalar = [(yol, icerik) for yol, icerik, _ in veri if icerik is not None]
     md5sums = "".join(
