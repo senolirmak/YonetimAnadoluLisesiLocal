@@ -34,10 +34,26 @@ hata()   { echo -e "${KIRMIZI}[HATA]${SIFIRLA}   $*" >&2; exit 1; }
 cd "$PROJE_DIZIN"
 
 # ─────────────────────────────────────────────────────────────
+# Deploy'u çalıştıran kullanıcı
+# ─────────────────────────────────────────────────────────────
+# Kurulumu yapan (sudo yetkili) kullanıcı; kurulumcu proje dizinini ona verir
+# (bkz. kurulumcu/servis_kullanicisi.py: proje_dizini_sahipligini_garanti_et).
+# git pull / pip / collectstatic onun adına çalışır, staticfiles ve deploy
+# yedekleri ona ait olur. Sabit bir ad yerine betiği çalıştırandan alınır.
+# Root olarak çalıştırılmaz: git/pip root'a ait dosyalar bırakır.
+[[ "$EUID" -ne 0 ]] \
+    || hata "deploy.sh root olarak (sudo ile) çalıştırılmamalı; kurulumu yapan kullanıcıyla çalıştırın: bash $PROJE_DIZIN/deploy.sh"
+DEPLOY_KULLANICISI="$(id -un)"
+DEPLOY_GRUBU="$(id -gn)"
+PROJE_SAHIBI="$(stat -c %U "$PROJE_DIZIN")"
+[[ "$PROJE_SAHIBI" == "$DEPLOY_KULLANICISI" ]] \
+    || hata "Proje dizininin ($PROJE_DIZIN) sahibi '$PROJE_SAHIBI'; deploy.sh'ı o kullanıcıyla çalıştırın (şu an: '$DEPLOY_KULLANICISI')."
+
+# ─────────────────────────────────────────────────────────────
 # .env'den DB bilgilerini oku
 # ─────────────────────────────────────────────────────────────
 # .env, servis kullanıcısına (akalsite, mod 640) sahiptir — bu betiği çalıştıran
-# kullanıcı (senolirmak) akalsite grubunun üyesi olsa da, aşağıdaki tek satırlık
+# kullanıcı ($DEPLOY_KULLANICISI) akalsite grubunun üyesi olsa da, aşağıdaki tek satırlık
 # alt-kabuk çağrılarında grup üyeliğinin oturuma yansımış olduğuna güvenmemek
 # için burada da sudo kullanılıyor — bkz.
 # kurulumcu/servis_kullanicisi.py: calisma_zamani_dosyalarini_devret().
@@ -87,7 +103,7 @@ basari "Ön kontroller tamamlandı."
 
 bilgi "Veritabanı yedeği alınıyor..."
 
-# backups/, bu betiği çalıştıran kullanıcı (senolirmak) İLE servis kullanıcısının
+# backups/, bu betiği çalıştıran kullanıcı ($DEPLOY_KULLANICISI) İLE servis kullanıcısının
 # (akalsite, web üzerinden yedek al/geri yükle) İKİSİNİN de yazması gereken
 # PAYLAŞILAN bir dizindir. Hangi taraf önce oluşturursa oluştursun diğeri de
 # yazabilsin diye setgid + ortak grup (akalsite) burada garanti ediliyor — bkz.
@@ -107,7 +123,7 @@ YEDEK_DOSYA="$YEDEK_DIZIN/${DB_NAME}_deploy_$(date +%Y%m%d_%H%M%S).dump"
 # (bkz. kurulumcu/veritabani.py: istemci_araclarini_dogrula).
 #
 # Çıktı düz '>' yerine 'sudo tee' ile yazılıyor: yukarıdaki chgrp/chmod doğru
-# olsa bile, senolirmak'ın akalsite grubuna üyeliği yalnızca YENİ bir oturumda
+# olsa bile, $DEPLOY_KULLANICISI'nın akalsite grubuna üyeliği yalnızca YENİ bir oturumda
 # (yeniden SSH bağlantısında) etkinleşir — bu betik eski bir oturumda
 # çalıştırılıyorsa düz '>' yine "Erişim engellendi" verebilirdi; sudo bu
 # belirsizliğe hiç bağımlı değildir.
@@ -126,7 +142,7 @@ PGPASSWORD="$DB_PASSWORD" pg_dump \
     -d "$DB_NAME" \
     -Fc \
     | sudo tee "$YEDEK_DOSYA" > /dev/null
-sudo chown senolirmak:akalsite "$YEDEK_DOSYA"
+sudo chown "$DEPLOY_KULLANICISI:akalsite" "$YEDEK_DOSYA"
 sudo chmod 660 "$YEDEK_DOSYA"
 
 if [[ ! -s "$YEDEK_DOSYA" ]]; then
@@ -189,12 +205,12 @@ basari "Kullanıcı grupları güncellendi."
 
 # ── 8. Static dosyalar ────────────────────────────────────────
 # collectstatic --clear önce staticfiles/ içindeki ESKİ dosyaları siler — bu
-# betiği çalıştıran kullanıcının (senolirmak) o an dizine yazma izni olduğundan
+# betiği çalıştıran kullanıcının ($DEPLOY_KULLANICISI) o an dizine yazma izni olduğundan
 # emin olunmalı; aşağıdaki adım 10'daki chown bunu yalnızca collectstatic'ten
 # SONRA garanti eder, bu yüzden aynısı burada da (işlemden önce) tekrarlanıyor
 # (bkz. backups/ için adım 2'deki aynı desen).
 sudo mkdir -p "$PROJE_DIZIN/staticfiles"
-sudo chown -R senolirmak:senolirmak "$PROJE_DIZIN/staticfiles"
+sudo chown -R "$DEPLOY_KULLANICISI:$DEPLOY_GRUBU" "$PROJE_DIZIN/staticfiles"
 
 bilgi "Static dosyalar toplanıyor..."
 python manage.py collectstatic --noinput --clear -v 0 --settings=config.settings.production
@@ -210,16 +226,16 @@ basari "Nginx yeniden yüklendi."
 bilgi "Dosya izinleri düzenleniyor..."
 
 # .env yalnızca servis kullanıcısı (akalsite) ve onun grubu tarafından
-# okunabilsin — deploy'u çalıştıran kullanıcı (senolirmak) bu grubun üyesidir,
+# okunabilsin — deploy'u çalıştıran kullanıcı ($DEPLOY_KULLANICISI) bu grubun üyesidir,
 # bkz. kurulumcu/servis_kullanicisi.py: servis_kullanicisini_hazirla/
 # calisma_zamani_dosyalarini_devret.
 sudo chmod 640 "$PROJE_DIZIN/.env"
 sudo chown akalsite:akalsite "$PROJE_DIZIN/.env"
 
-# staticfiles bu betiği (senolirmak) çalıştıran kullanıcı tarafından üretiliyor
+# staticfiles bu betiği ($DEPLOY_KULLANICISI) çalıştıran kullanıcı tarafından üretiliyor
 # (adım 8, collectstatic); media/ ise çalışma zamanında Gunicorn'un altında
 # çalıştığı servis kullanıcısı (akalsite) tarafından yazılıyor.
-sudo chown -R senolirmak:senolirmak "$PROJE_DIZIN/staticfiles" 2>/dev/null || true
+sudo chown -R "$DEPLOY_KULLANICISI:$DEPLOY_GRUBU" "$PROJE_DIZIN/staticfiles" 2>/dev/null || true
 sudo chown -R akalsite:www-data "$PROJE_DIZIN/media" 2>/dev/null || true
 sudo chmod g+s "$PROJE_DIZIN/media" 2>/dev/null || true
 
