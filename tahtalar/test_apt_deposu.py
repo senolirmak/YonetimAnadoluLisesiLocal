@@ -2,6 +2,7 @@
 kurması ve tahtadaki uygulamanın kendini güncellemesi."""
 
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -12,7 +13,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -37,7 +38,9 @@ class _GeciciAnahtarMixin:
         self.addCleanup(self.klasor.cleanup)
         self.yol = Path(self.klasor.name)
         for modul, ad, deger in (
-            (depo_anahtari, "ANAHTAR_DOSYASI", self.yol / "anahtar.json"),
+            (depo_anahtari, "ANAHTAR_DOSYASI", self.yol / "depo" / "imza-anahtari.json"),
+            (depo_anahtari, "ESKI_ANAHTAR_DOSYASI", self.yol / "eski-anahtar.json"),
+            (apt_deposu, "ESKI_ARSIV_KLASORU", self.yol / "eski-arsiv"),
             (kurulum_paketi, "CA_DOSYASI", self.yol / "yok.crt"),
             (apt_deposu, "ARSIV_KLASORU", self.yol / "arsiv"),
         ):
@@ -46,7 +49,7 @@ class _GeciciAnahtarMixin:
             self.addCleanup(yama.stop)
 
     def _anahtar_uret(self):
-        return depo_anahtari.imza_anahtari_olustur()
+        return depo_anahtari.imza_anahtari_olustur()[0]
 
     def _gpgv(self, *dosyalar):
         anahtarlik = self.yol / "anahtarlik.gpg"
@@ -97,10 +100,46 @@ class DepoAnahtariTestCase(_GeciciAnahtarMixin, TestCase):
         with self.assertRaises(depo_anahtari.AnahtarHatasi):
             depo_anahtari.imza_anahtari_olustur()
         self.assertEqual(depo_anahtari.imza_anahtari().parmak_izi, ilk.parmak_izi)
-        yeni = depo_anahtari.imza_anahtari_olustur(zorla=True)
+        yeni, uretildi = depo_anahtari.imza_anahtari_olustur(zorla=True)
+        self.assertTrue(uretildi)
         self.assertNotEqual(yeni.parmak_izi, ilk.parmak_izi)
 
+    def test_eski_konumdaki_anahtar_okunur_ve_yeni_yere_kopyalanir(self):
+        anahtar = self._anahtar_uret()
+        veri = depo_anahtari.ANAHTAR_DOSYASI.read_bytes()
+        depo_anahtari.ANAHTAR_DOSYASI.rename(depo_anahtari.ESKI_ANAHTAR_DOSYASI)
+        self.assertEqual(depo_anahtari.imza_anahtari().parmak_izi, anahtar.parmak_izi)
+        self.assertEqual(depo_anahtari.ANAHTAR_DOSYASI.read_bytes(), veri)
+        self.assertEqual(depo_anahtari.ANAHTAR_DOSYASI.stat().st_mode & 0o777, 0o600)
+
+    def test_eski_konum_yeni_klasor_yazilamazsa_oradan_okunmaya_devam_eder(self):
+        anahtar = self._anahtar_uret()
+        depo_anahtari.ANAHTAR_DOSYASI.rename(depo_anahtari.ESKI_ANAHTAR_DOSYASI)
+        with mock.patch.object(depo_anahtari, "_yaz", side_effect=PermissionError("yazılamaz")):
+            self.assertEqual(depo_anahtari.imza_anahtari().parmak_izi, anahtar.parmak_izi)
+        self.assertFalse(depo_anahtari.ANAHTAR_DOSYASI.exists())
+        self.assertEqual(depo_anahtari.anahtar_dosyasi(), depo_anahtari.ESKI_ANAHTAR_DOSYASI)
+
+    def test_olustur_eski_konumdakini_tasir_yenisini_uretmez(self):
+        anahtar = self._anahtar_uret()
+        depo_anahtari.ANAHTAR_DOSYASI.rename(depo_anahtari.ESKI_ANAHTAR_DOSYASI)
+        tasinan, uretildi = depo_anahtari.imza_anahtari_olustur()
+        self.assertFalse(uretildi)
+        self.assertEqual(tasinan.parmak_izi, anahtar.parmak_izi)
+        self.assertTrue(depo_anahtari.ANAHTAR_DOSYASI.is_file())
+
+    def test_okunamayan_anahtar_kurulumcuyu_onerir(self):
+        with mock.patch.object(Path, "read_bytes", side_effect=PermissionError("izin yok")):
+            with self.assertRaisesMessage(depo_anahtari.AnahtarHatasi, "kurulumcuyu yeniden"):
+                depo_anahtari.imza_anahtari()
+
+    def test_komut_yazamazsa_servis_kullanicisini_onerir(self):
+        with mock.patch.object(depo_anahtari, "_yaz", side_effect=PermissionError("izin yok")):
+            with self.assertRaisesMessage(CommandError, "sudo -u akalsite"):
+                call_command("tahta_apt_anahtari_olustur", stdout=io.StringIO())
+
     def test_bozuk_dosya(self):
+        depo_anahtari.ANAHTAR_DOSYASI.parent.mkdir()
         depo_anahtari.ANAHTAR_DOSYASI.write_text("{bozuk")
         with self.assertRaises(depo_anahtari.AnahtarHatasi):
             depo_anahtari.imza_anahtari()
@@ -226,7 +265,7 @@ class SurumArsiviTestCase(_GeciciAnahtarMixin, TestCase):
             return kurulum_paketi.depo_paketi_olustur()
 
     def _arsive_koy(self, *surumler):
-        apt_deposu.ARSIV_KLASORU.mkdir(exist_ok=True)
+        apt_deposu.ARSIV_KLASORU.mkdir(parents=True, exist_ok=True)
         for surum in surumler:
             (apt_deposu.ARSIV_KLASORU / f"akal-eta-yonetim_{surum}_all.deb").write_bytes(
                 self._surumlu_paket(surum)
@@ -260,8 +299,18 @@ class SurumArsiviTestCase(_GeciciAnahtarMixin, TestCase):
         # Listede olmayan eski sürüm sunulmaz.
         self.assertIsNone(apt_deposu.depo_dosyasi("akal-eta-yonetim_0.9.0_all.deb"))
 
+    def test_eski_arsiv_klasorundeki_paketler_de_listelenir(self):
+        self._anahtar_uret()
+        apt_deposu.ESKI_ARSIV_KLASORU.mkdir()
+        (apt_deposu.ESKI_ARSIV_KLASORU / "akal-eta-yonetim_1.1.5_all.deb").write_bytes(
+            self._surumlu_paket("1.1.5")
+        )
+        self.assertIn("Version: 1.1.5\n", apt_deposu.depo_dosyasi("Packages").decode())
+        self.assertIsNotNone(apt_deposu.depo_dosyasi("akal-eta-yonetim_1.1.5_all.deb"))
+
     def test_arsiv_yazilamazsa_depo_calisir(self):
         self._anahtar_uret()
+        apt_deposu.ARSIV_KLASORU.parent.mkdir(parents=True, exist_ok=True)
         apt_deposu.ARSIV_KLASORU.write_text("klasör değil")
         with self.assertLogs("tahtalar.services.apt_deposu", "WARNING"):
             self.assertIsNotNone(apt_deposu.depo_dosyasi("InRelease"))
@@ -682,7 +731,8 @@ class PaketSayfasiDepoDurumuTestCase(_GeciciAnahtarMixin, TestCase):
         self.assertContains(self._sayfa(), "9.9.9: Çalışmadı, geri dönüldü")
 
     def test_depo_durumu_gosterilir(self):
-        self.assertContains(self._sayfa(), "tahta_apt_anahtari_olustur")
+        self.assertContains(self._sayfa(), "kurulumcuyu (sunucu modu) yeniden çalıştırın")
+        depo_anahtari.ANAHTAR_DOSYASI.parent.mkdir(exist_ok=True)
         depo_anahtari.ANAHTAR_DOSYASI.write_text("{bozuk")
         yanit = self._sayfa()
         self.assertContains(yanit, "okunamadı")

@@ -343,6 +343,9 @@ def main() -> None:
         servis_kullanicisi.calisma_zamani_dosyalarini_devret(PROJE_DIZIN, env_yolu)
         servis_kullanicisi.paylasilan_yedek_dizinini_hazirla(PROJE_DIZIN)
         servis_kullanicisi.statik_dosyalari_erisilebilir_yap(PROJE_DIZIN)
+        # Tahtaların akal-eta-yonetim güncellemelerini çektiği APT deposunun imza
+        # anahtarı ve paket arşivi (bkz. tahtalar/akal-eta-yonetim/README.md).
+        servis_kullanicisi.tahta_deposunu_hazirla(PROJE_DIZIN, VENV, django_ayar_bayragi)
 
         servis_adi = PROJE_DIZIN.name
         servis = sunucu.gunicorn_servisi_kur(

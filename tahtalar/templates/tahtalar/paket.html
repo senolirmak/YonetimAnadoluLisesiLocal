@@ -79,8 +79,9 @@
       <code>sudo journalctl -u akal-eta-yonetim-kendini-guncelle</code></p>
     {% else %}
     <p class="pk-hata">Kapalı: {% if depo_hatasi %}{{ depo_hatasi }} (dosyayı uygulamayı çalıştıran kullanıcı okuyabilmeli){% else %}sunucuda depo imza anahtarı yok{% endif %}.</p>
-    <p class="pk-silik">Sunucuda bir kez çalıştırın, ardından tahtalara bu sayfadaki paketi kurun:
-      <code>python manage.py tahta_apt_anahtari_olustur --settings=config.settings.production</code></p>
+    <p class="pk-silik">Sunucuda kurulumcuyu (sunucu modu) yeniden çalıştırın: depo klasörünü
+      (<code>tahta-deposu/</code>) uygulama kullanıcısına ait hazırlar ve anahtarı üretir. Ardından
+      tahtalara bu sayfadaki paketi kurun.</p>
     {% endif %}
   </div>
 

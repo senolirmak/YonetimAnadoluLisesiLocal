@@ -29,13 +29,15 @@ class TahtaDosyalariYedekTestCase(TestCase):
         self.kok = Path(klasor.name)
         self.medya = self.kok / "media"
         self.medya.mkdir()
-        self.anahtar = self.kok / "tahta-apt-imza-anahtari.json"
-        self.paketler = self.kok / "tahta-paketleri"
+        self.anahtar = self.kok / "tahta-deposu" / "imza-anahtari.json"
+        self.paketler = self.kok / "tahta-deposu" / "paketler"
         for modul, ad, deger in (
             (yedek_servisi, "BACKUP_DIR", self.kok / "backups"),
             (yedek_servisi, "MEDIA_DIR", self.medya),
             (depo_anahtari, "ANAHTAR_DOSYASI", self.anahtar),
             (apt_deposu, "ARSIV_KLASORU", self.paketler),
+            (depo_anahtari, "ESKI_ANAHTAR_DOSYASI", self.kok / "tahta-apt-imza-anahtari.json"),
+            (apt_deposu, "ESKI_ARSIV_KLASORU", self.kok / "tahta-paketleri"),
         ):
             yama = mock.patch.object(modul, ad, deger)
             yama.start()
@@ -43,9 +45,9 @@ class TahtaDosyalariYedekTestCase(TestCase):
 
         (self.medya / "ogrenci").mkdir()
         (self.medya / "ogrenci" / "a.pdf").write_bytes(b"pdf")
+        self.paketler.mkdir(parents=True)
         self.anahtar.write_bytes(ANAHTAR)
         self.anahtar.chmod(0o600)
-        self.paketler.mkdir()
         for surum in ("1.2.0", "1.2.1"):
             (self.paketler / f"akal-eta-yonetim_{surum}_all.deb").write_bytes(surum.encode())
         (self.paketler / ".gecici.tmp").write_bytes(b"x")
@@ -64,6 +66,22 @@ class TahtaDosyalariYedekTestCase(TestCase):
         self.assertIn("_akalyonetim_sistem/tahta-paketleri/akal-eta-yonetim_1.2.0_all.deb", adlar)
         self.assertIn("_akalyonetim_sistem/tahta-paketleri/akal-eta-yonetim_1.2.1_all.deb", adlar)
         self.assertFalse(any(".gecici.tmp" in ad for ad in adlar))
+
+    def test_eski_konumdaki_dosyalar_yedeklenir_yeni_konuma_geri_yuklenir(self):
+        self.anahtar.unlink()
+        eski_anahtar = self.kok / "tahta-apt-imza-anahtari.json"
+        eski_anahtar.write_bytes(ANAHTAR)
+        eski_arsiv = self.kok / "tahta-paketleri"
+        eski_arsiv.mkdir()
+        (eski_arsiv / "akal-eta-yonetim_1.1.0_all.deb").write_bytes(b"1.1.0")
+        yedek = self._yedek()
+        self.assertIn(
+            "_akalyonetim_sistem/tahta-paketleri/akal-eta-yonetim_1.1.0_all.deb", self._adlar(yedek)
+        )
+        eski_anahtar.unlink()
+        yedek_servisi.medya_yedek_geri_yukle(yedek.name)
+        self.assertEqual(self.anahtar.read_bytes(), ANAHTAR)
+        self.assertEqual((self.paketler / "akal-eta-yonetim_1.1.0_all.deb").read_bytes(), b"1.1.0")
 
     def test_arsiv_bilgisi_tahta_dosyalarini_ayri_sayar(self):
         bilgi = yedek_servisi.medya_arsiv_bilgisi(self._yedek())

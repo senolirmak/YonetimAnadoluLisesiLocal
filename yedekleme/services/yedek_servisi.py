@@ -28,10 +28,10 @@ konteyneri oluşturan OS kullanıcısı için mümkündür) burada hiç kullanı
 `backups/`'a (paylaşılan, setgid'li dizin — bkz. `kurulumcu/servis_kullanicisi.py:
 paylasilan_yedek_dizinini_hazirla`) aynı şekilde yazar.
 
-Medya yedeği ayrıca `media/` dışındaki iki sistem dosyasını da taşır
-(`SISTEM_ONEKI` altında): tahtaların APT deposu imza anahtarı
-(`tahta-apt-imza-anahtari.json`) ve tahtalara sunulmuş paket arşivi
-(`tahta-paketleri/`) — bkz. `tahtalar/services/depo_anahtari.py`, `apt_deposu.py`.
+Medya yedeği ayrıca `media/` dışındaki tahta deposu dosyalarını da taşır
+(`SISTEM_ONEKI` altında): tahtaların APT deposu imza anahtarı ve tahtalara
+sunulmuş paket arşivi (`tahta-deposu/`, servis kullanıcısına ait) — bkz.
+`tahtalar/services/depo_anahtari.py`, `apt_deposu.py`.
 Bunlar geri yüklemede `media/`'ye DEĞİL asıl yerlerine yazılır: `media/` nginx
 tarafından herkese sunulur, özel anahtar oraya asla açılmamalıdır.
 
@@ -633,6 +633,7 @@ def medya_yedek_yukle(dosya) -> Path:
 
 
 def _tahta_yollari() -> tuple[Path, Path]:
+    """Geri yüklemede yazılacak yerler: (anahtar dosyası, paket klasörü)."""
     from tahtalar.services import apt_deposu, depo_anahtari
 
     return depo_anahtari.ANAHTAR_DOSYASI, apt_deposu.ARSIV_KLASORU
@@ -647,14 +648,14 @@ def _tahta_paketi_mi(ad: str) -> bool:
 def _sistem_dosyalarini_ekle(tf: tarfile.TarFile) -> None:
     """Tahta depo anahtarını ve paket arşivini `SISTEM_ONEKI` altına ekler.
     Okunamayan dosya medya yedeğini bozmaz; atlanır ve log'a yazılır."""
-    anahtar, paketler = _tahta_yollari()
-    ekler = [(anahtar, _TAHTA_ANAHTARI)] if anahtar.is_file() else []
-    if paketler.is_dir():
-        ekler += [
-            (deb, f"{_TAHTA_PAKETLERI}/{deb.name}")
-            for deb in sorted(paketler.iterdir())
-            if deb.is_file() and _tahta_paketi_mi(deb.name)
-        ]
+    from tahtalar.services import apt_deposu, depo_anahtari
+
+    anahtar = depo_anahtari.anahtar_dosyasi()
+    ekler = [(anahtar, _TAHTA_ANAHTARI)] if anahtar else []
+    ekler += [
+        (yol, f"{_TAHTA_PAKETLERI}/{ad}")
+        for ad, yol in sorted(apt_deposu.arsivdeki_paketler().items())
+    ]
     for kaynak, ad in ekler:
         try:
             tf.add(kaynak, arcname=ad)
@@ -668,6 +669,7 @@ def _sistem_uyesi_mi(ad: str) -> bool:
 
 
 def _atomik_yaz(hedef: Path, veri: bytes, mod: int) -> None:
+    hedef.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     gecici = hedef.with_name(f".{hedef.name}.{os.getpid()}.tmp")
     fd = os.open(gecici, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mod)
     with os.fdopen(fd, "wb") as f:
@@ -714,7 +716,7 @@ def _sistem_dosyalarini_geri_yukle(tf: tarfile.TarFile, uyeler: list[tarfile.Tar
             dosya_adi = ad.rsplit("/", 1)[1]
             if not _tahta_paketi_mi(dosya_adi) or (paket_klasoru / dosya_adi).exists():
                 continue
-            paket_klasoru.mkdir(mode=0o755, exist_ok=True)
+            paket_klasoru.mkdir(mode=0o755, parents=True, exist_ok=True)
             _atomik_yaz(paket_klasoru / dosya_adi, veri, 0o644)
             eklenen_paket += 1
     if eklenen_paket:

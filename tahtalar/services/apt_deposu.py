@@ -10,8 +10,10 @@ Güncel sürüm (`akal_eta_yonetim.py` içindeki `SURUM`) her istekte koddan
 Böylece `deploy.sh`'ye bir adım eklemeden, sürüm artırılıp main'e alındığında
 depo kendiliğinden güncellenir.
 
-Sunulan her sürüm `ARSIV_KLASORU`'na bir kez kaydedilir (repoya girmez); depo
-listesinde son `LISTEDEKI_SURUM_SAYISI` sürüm bulunur. Yeni sürüm tahtada
+Sunulan her sürüm `ARSIV_KLASORU`'na (tahta-deposu/paketler, servis
+kullanıcısına ait) bir kez kaydedilir (repoya girmez); depo listesinde son
+`LISTEDEKI_SURUM_SAYISI` sürüm bulunur. İlk sürümün kullandığı eski klasör
+(`ESKI_ARSIV_KLASORU`, proje kökünde) varsa oradaki paketler de okunur. Yeni sürüm tahtada
 çalışmazsa tahta eski sürümü buradan geri kurar (bkz. akal_eta_yonetim.py,
 kendini güncelleme).
 """
@@ -30,7 +32,8 @@ from tahtalar.services import depo_anahtari, kurulum_paketi
 log = logging.getLogger(__name__)
 
 DOSYALAR = ("InRelease", "Release", "Release.gpg", "Packages")
-ARSIV_KLASORU = Path(settings.BASE_DIR) / "tahta-paketleri"
+ARSIV_KLASORU = depo_anahtari.DEPO_KLASORU / "paketler"
+ESKI_ARSIV_KLASORU = Path(settings.BASE_DIR) / "tahta-paketleri"
 LISTEDEKI_SURUM_SAYISI = 5
 _ARSIV_KALIBI = re.compile(rf"^{re.escape(kurulum_paketi.PAKET_ADI)}_(\d+)\.(\d+)\.(\d+)_all\.deb$")
 
@@ -52,12 +55,25 @@ def arsivle(ad, paket):
     try:
         if yol.is_file() and yol.read_bytes() == paket:
             return
-        ARSIV_KLASORU.mkdir(mode=0o755, exist_ok=True)
+        ARSIV_KLASORU.mkdir(mode=0o755, parents=True, exist_ok=True)
         gecici = yol.with_name(f".{ad}.{os.getpid()}.tmp")
         gecici.write_bytes(paket)
         os.replace(gecici, yol)
     except OSError as hata:
         log.warning("Tahta paketi arşive yazılamadı (%s): %s", yol, hata)
+
+
+def arsivdeki_paketler():
+    """{dosya adı: yol} — arşivdeki (yeni ve eski klasör) bütün sürümler."""
+    paketler = {}
+    for klasor in (ESKI_ARSIV_KLASORU, ARSIV_KLASORU):  # aynı ad varsa yenisi geçerli
+        try:
+            for yol in klasor.iterdir():
+                if _ARSIV_KALIBI.match(yol.name) and yol.is_file():
+                    paketler[yol.name] = yol
+        except OSError:
+            continue
+    return paketler
 
 
 def guncel_surumu_arsivle():
@@ -78,13 +94,9 @@ def depodaki_paketler():
     guncel = kurulum_paketi.depo_paketi_olustur()
     arsivle(guncel_ad, guncel)
     surumler = {}
-    try:
-        for yol in ARSIV_KLASORU.iterdir():
-            eslesme = _ARSIV_KALIBI.match(yol.name)
-            if eslesme and yol.name != guncel_ad:
-                surumler[tuple(int(p) for p in eslesme.groups())] = yol
-    except OSError:
-        pass
+    for ad, yol in arsivdeki_paketler().items():
+        if ad != guncel_ad:
+            surumler[tuple(int(p) for p in _ARSIV_KALIBI.match(ad).groups())] = yol
     eskiler = sorted(surumler.items())[-(LISTEDEKI_SURUM_SAYISI - 1) :]
     paketler = {}
     for _, yol in eskiler:

@@ -72,21 +72,28 @@ akal-eta-yonetim'in güncel sürümü (`SURUM`) bulunur. Dosyalar diskte tutulma
 her istekte üretilir: sürüm artırılıp `main`'e alındığında deploy sonrası depo
 kendiliğinden güncellenir, `deploy.sh`'ye ek adım gerekmez.
 
-**Sunucuda bir kez** depo imza anahtarını üretin (uygulamayı çalıştıran
-kullanıcıyla, dosyayı gunicorn okuyabilmeli):
+**Sunucu tarafı kurulumcunun işidir:** kurulumcu (sunucu modu) proje içinde
+`tahta-deposu/` klasörünü servis kullanıcısına (`akalsite`, mod 700) ait olarak
+oluşturur ve depo imza anahtarını (`tahta-deposu/imza-anahtari.json`, mod 600)
+yoksa o kullanıcıyla üretir. Klasörde ayrıca sunulmuş paketlerin arşivi
+(`tahta-deposu/paketler/`) durur. Proje kökü `akalsite`'a yazılabilir olmadığı
+için bu ayrı klasör gerekir (`media/` gibi). Tekrar çalıştırmak güvenlidir: var
+olan anahtar korunur, sahiplik düzeltilir; ilk sürümün proje kökünde bıraktığı
+`tahta-apt-imza-anahtari.json` ve `tahta-paketleri/` buraya taşınır.
+
+Kurulumcu çalıştırılmadan elle yapmak gerekirse:
 
 ```sh
-python manage.py tahta_apt_anahtari_olustur --settings=config.settings.production
+sudo install -d -o akalsite -g akalsite -m 700 /srv/akalyonetim/tahta-deposu
+sudo -u akalsite env -C /srv/akalyonetim venv/bin/python manage.py \
+    tahta_apt_anahtari_olustur --settings=config.settings.production
 ```
 
-Anahtar `tahta-apt-imza-anahtari.json` dosyasına yazılır (yalnızca sahibi
-okur, repoya girmez). Anahtar varsa komut bir şey değiştirmez. Dosya,
-gunicorn'u çalıştıran kullanıcıya ait olmalı; komut `sudo` ile çalıştırıldıysa
-sahibini düzeltin (`sudo chown <KULLANICI>:<GRUP> tahta-apt-imza-anahtari.json`),
-yoksa sayfada "Permission denied" görünür.
+Anahtar varsa komut bir şey değiştirmez. Sayfada "Permission denied" görünürse
+dosya `akalsite`'a ait değildir; kurulumcuyu yeniden çalıştırın.
 
 **Yedekleme:** Yedekleme sayfasından alınan **medya yedeği** anahtarı ve
-`tahta-paketleri/` arşivini de içerir (arşivde `_akalyonetim_sistem/` altında).
+paket arşivini de içerir (arşivde `_akalyonetim_sistem/` altında).
 Geri yüklemede bunlar `media/`'ye değil asıl yerlerine yazılır: anahtar
 yalnızca sahibi okuyacak şekilde, mevcutsa ve farklıysa eskisi `.onceki` olarak
 saklanarak; paketlerden yalnızca eksik olanlar eklenir. Anahtar kaybolursa her
@@ -124,9 +131,8 @@ dönüldü"). Çalışıp yanlış iş yapan bir sürüm bu kontrolden geçer; o
 düzeltmesi de yeni sürümle yayınlanır.
 
 **Sürüm arşivi:** sunucu tahtalara sunduğu her sürümü bir kez
-`tahta-paketleri/` klasörüne kaydeder (repoya girmez; uygulamayı çalıştıran
-kullanıcı yazabilmeli, yazamazsa depo yine çalışır ama geri dönüş noktası
-kalmaz). Depo listesinde son 5 sürüm bulunur; geri dönüş buradan yapılır.
+`tahta-deposu/paketler/` klasörüne kaydeder (repoya girmez; yazamazsa depo yine
+çalışır ama geri dönüş noktası kalmaz, günlüğe uyarı düşer). Depo listesinde son 5 sürüm bulunur; geri dönüş buradan yapılır.
 Klasörü silmeyin; medya yedeğine kendiliğinden dahil edilir.
 
 **Sabitleme (pin):** paket kurulu sürümünü

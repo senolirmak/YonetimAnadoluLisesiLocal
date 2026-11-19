@@ -36,10 +36,10 @@ docker-compose.yaml
 # sertifikası (özel anahtar değil, ama kuruluma özgü — repo'ya girmemeli)
 yerel-ca-sertifikasi.crt
 
-# Tahtaların APT deposunun imza anahtarı (ÖZEL ANAHTAR — GİZLİ)
-tahta-apt-imza-anahtari.json
-tahta-apt-imza-anahtari.tmp
-# Tahtalara sunulmuş akal-eta-yonetim sürümlerinin arşivi (geri dönüş noktaları)
+# Tahtaların APT deposu: imza anahtarı (ÖZEL ANAHTAR — GİZLİ) ve tahtalara
+# sunulmuş akal-eta-yonetim sürümlerinin arşivi. İlk sürümdeki eski konumlar da.
+/tahta-deposu/
+tahta-apt-imza-anahtari.json*
 /tahta-paketleri/
 
 # yedekleme/ Google Drive OAuth istemci dosyası ve token'ı (GİZLİ) — admin
