@@ -47,6 +47,30 @@ class EtaDurumuIslemeTestCase(TestCase):
         )
         self.assertEqual(self.tahta.eta_kontrol_zamani.timestamp(), 1700000000)
 
+    def test_etada_degisen_birim_adi_tahta_adi_olur(self):
+        # Örn. ETA kaydı tahtadaki eta-register ile değiştirildi.
+        self._isle({"zaman": 1700000000, "kayitli": True, "okul_kodu": "1", "birim_adi": "10-A"})
+        self._isle({"zaman": 1700000100, "kayitli": True, "okul_kodu": "1", "birim_adi": "Kimya Lab"})
+        self.assertEqual(self.tahta.ad, "Kimya Lab")
+
+    def test_ilk_bildirilen_birim_adi_tahta_adi_olur(self):
+        self._isle({"zaman": 1700000000, "kayitli": True, "okul_kodu": "1", "birim_adi": "11-B"})
+        self.assertEqual(self.tahta.ad, "11-B")
+
+    def test_birim_adi_degismediyse_elle_verilen_ad_korunur(self):
+        self._isle({"zaman": 1700000000, "kayitli": True, "okul_kodu": "1", "birim_adi": "10-A"})
+        self.tahta.ad = "10-A sınıfı tahtası"
+        self.tahta.save()
+        self._isle({"zaman": 1700000100, "kayitli": True, "okul_kodu": "1", "birim_adi": "10-A"})
+        self.assertEqual(self.tahta.ad, "10-A sınıfı tahtası")
+
+    def test_kayitsiz_ya_da_hatali_sorgu_adi_degistirmez(self):
+        for bilgi in ({"zaman": 1700000000, "kayitli": False},
+                      {"zaman": 1700000100, "kayitli": None, "hata": "x"}):
+            with self.subTest(bilgi=bilgi):
+                self._isle(bilgi)
+                self.assertEqual(self.tahta.ad, "10-A")
+
     def test_kayitsiz_olunca_eski_bilgi_silinir(self):
         self._isle({"zaman": 1700000000, "kayitli": True, "okul_kodu": "1", "birim_adi": "X1"})
         self._isle({"zaman": 1700000100, "kayitli": False})
@@ -125,6 +149,67 @@ class EtaKomutuTestCase(TestCase):
         self.assertEqual(ajan_api.eta_birim_onerisi(self.t1), "11-C")
         self.t1.eta_birim_adi = "Lab-1"
         self.assertEqual(ajan_api.eta_birim_onerisi(self.t1), "Lab-1")
+
+
+@override_settings(TAHTA_KAYIT_ANAHTARI=ANAHTAR)
+class EtaKomutuSonucuTahtaAdiTestCase(TestCase):
+    """Başarılı ETA kaydı tahtanın panelde görünen adını birim adı yapar."""
+
+    def setUp(self):
+        self.tahta, self.token = ajan_api.tahta_kaydet(
+            {"kayit_anahtari": ANAHTAR, "makine_kimligi": "c" * 32, "hostname": "etap-pc"}
+        )
+        self.tahta.ad = "10-A"
+        self.tahta.save()
+
+    def _komut_ve_sonuc(self, birim, durum, diger_tahta=False):
+        ajan_api.eta_kayit_komutu_olustur([(self.tahta, birim)], "123456")
+        komut = ajan_api.bekleyen_komutlari_teslim_et(self.tahta)[0]
+        if diger_tahta:
+            baska, token = ajan_api.tahta_kaydet(
+                {"kayit_anahtari": ANAHTAR, "makine_kimligi": "d" * 32}
+            )
+        else:
+            token = self.token
+        yanit = self.client.post(
+            reverse("tahtalar:api_durum"),
+            json.dumps({"hostname": "etap-pc", "sonuclar": [
+                {"id": komut["id"], "durum": durum, "mesaj": "ok"}
+            ]}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(yanit.status_code, 200)
+        self.tahta.refresh_from_db()
+        return TahtaKomutu.objects.get(pk=komut["id"])
+
+    def test_basarili_kayit_tahta_adini_birim_adi_yapar(self):
+        komut = self._komut_ve_sonuc("Fizik Lab", TahtaKomutu.TAMAMLANDI)
+        self.assertEqual(komut.durum, TahtaKomutu.TAMAMLANDI)
+        self.assertEqual(self.tahta.ad, "Fizik Lab")
+
+    def test_basarisiz_kayit_adi_degistirmez(self):
+        komut = self._komut_ve_sonuc("Fizik Lab", TahtaKomutu.BASARISIZ)
+        self.assertEqual(komut.durum, TahtaKomutu.BASARISIZ)
+        self.assertEqual(self.tahta.ad, "10-A")
+
+    def test_baska_tahtanin_bildirdigi_sonuc_adi_degistirmez(self):
+        komut = self._komut_ve_sonuc("Fizik Lab", TahtaKomutu.TAMAMLANDI, diger_tahta=True)
+        self.assertEqual(komut.durum, TahtaKomutu.GONDERILDI)
+        self.assertEqual(self.tahta.ad, "10-A")
+
+    def test_diger_komutlar_adi_degistirmez(self):
+        ajan_api.komut_olustur([self.tahta], TahtaKomutu.GUNCELLE)
+        komut = ajan_api.bekleyen_komutlari_teslim_et(self.tahta)[0]
+        ajan_api.sonuclari_isle(self.tahta, [{"id": komut["id"], "durum": "tamamlandi"}])
+        self.tahta.refresh_from_db()
+        self.assertEqual(self.tahta.ad, "10-A")
+
+    def test_cevrimici_listesinde_yeni_ad_gorunur(self):
+        self._komut_ve_sonuc("Fizik Lab", TahtaKomutu.TAMAMLANDI)
+        self.client.force_login(kullanici_olustur("okul_muduru"))
+        yanit = self.client.get(reverse("tahtalar:liste") + "?filtre=cevrimici")
+        self.assertContains(yanit, "<strong>Fizik Lab</strong>", html=False)
 
 
 class EtaSayfasiTestCase(TestCase):

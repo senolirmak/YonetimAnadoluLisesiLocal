@@ -233,7 +233,12 @@ def eta_bilgisini_isle(tahta, bilgi):
     if kayitli:
         tahta.eta_okul_kodu = _metin(bilgi, "okul_kodu", 20)
         tahta.eta_okul_adi = _metin(bilgi, "okul_adi", 200)
-        tahta.eta_birim_adi = _metin(bilgi, "birim_adi", 20)
+        birim = _metin(bilgi, "birim_adi", 20)
+        # Birim adı ETA'da değiştiyse (panelden ya da tahtadaki eta-register ile)
+        # tahtanın adı da ETA'daki ada uyar. Değişmediyse elle verilen ada dokunulmaz.
+        if birim and birim != tahta.eta_birim_adi:
+            _eta_birim_adini_tahta_adi_yap(tahta, {"birim_adi": birim})
+        tahta.eta_birim_adi = birim
     else:
         tahta.eta_okul_kodu = tahta.eta_okul_adi = tahta.eta_birim_adi = ""
 
@@ -286,11 +291,27 @@ def sonuclari_isle(tahta, sonuclar):
         komut_id = sonuc.get("id")
         if not _secenek(durum, AJAN_SONUC_DURUMLARI) or not isinstance(komut_id, int):
             continue
-        TahtaKomutu.objects.filter(pk=komut_id, tahta=tahta, durum=TahtaKomutu.GONDERILDI).update(
-            durum=durum,
-            sonuc_mesaji=_metin(sonuc, "mesaj", 255),
-            tamamlanma=timezone.now(),
-        )
+        komut = TahtaKomutu.objects.filter(
+            pk=komut_id, tahta=tahta, durum=TahtaKomutu.GONDERILDI
+        ).first()
+        if komut is None:
+            continue
+        komut.durum = durum
+        komut.sonuc_mesaji = _metin(sonuc, "mesaj", 255)
+        komut.tamamlanma = timezone.now()
+        komut.save(update_fields=["durum", "sonuc_mesaji", "tamamlanma"])
+        if komut.komut == TahtaKomutu.ETA_KAYDET and durum == TahtaKomutu.TAMAMLANDI:
+            _eta_birim_adini_tahta_adi_yap(tahta, komut.parametreler)
+
+
+def _eta_birim_adini_tahta_adi_yap(tahta, parametreler):
+    """ETA'ya kayıt/güncelleme başarılıysa tahtanın adı verilen birim adı olur;
+    böylece paneldeki tahta adı ETA'daki adla aynı kalır. Tahta, çağıran
+    (durum_guncelle) tarafından kaydedilir."""
+    birim = parametreler.get("birim_adi") if isinstance(parametreler, dict) else None
+    birim = " ".join(birim.split()) if isinstance(birim, str) else ""
+    if birim:
+        tahta.ad = birim[: Tahta._meta.get_field("ad").max_length]
 
 
 def suresi_dolanlari_iptal_et(tahta=None):
