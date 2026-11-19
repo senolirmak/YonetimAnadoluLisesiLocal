@@ -18,6 +18,12 @@
     <table class="ay-tablo">
       <tr><th style="width:220px;">Dosya sayısı</th><td>{{ arsiv_bilgisi.dosya_sayisi }}</td></tr>
       <tr><th>Toplam boyut (sıkıştırılmamış)</th><td>{{ arsiv_bilgisi.toplam_boyut_mb }} MB</td></tr>
+      <tr><th>Etkileşimli tahtalar</th><td>
+        {% if arsiv_bilgisi.tahta_anahtari or arsiv_bilgisi.tahta_paket_sayisi %}
+          {% if arsiv_bilgisi.tahta_anahtari %}APT depo anahtarı{% endif %}{% if arsiv_bilgisi.tahta_anahtari and arsiv_bilgisi.tahta_paket_sayisi %}, {% endif %}{% if arsiv_bilgisi.tahta_paket_sayisi %}{{ arsiv_bilgisi.tahta_paket_sayisi }} akal-eta-yonetim paketi{% endif %}
+          <br><small>media/'ye değil asıl yerlerine geri yüklenir; mevcut paketler silinmez.</small>
+        {% else %}—{% endif %}
+      </td></tr>
     </table>
   </div>
   {% endif %}
