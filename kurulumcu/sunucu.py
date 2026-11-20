@@ -153,14 +153,23 @@ def nginx_yapilandir(proje_dizin: Path, servis_adi: str, allowed_hosts: str) -> 
         alias {proje_dizin}/staticfiles/;
     }}
 
+    # /media/ beyaz listeyle sunulur: yalnızca oturumsuz çalışan pano kiosk ekranının
+    # gösterdiği klasörler (pano.models: Etkinlik.afis → afisler/, MedyaIcerik.dosya →
+    # medya_icerik/) doğrudan açıktır. Geri kalan her şey 404 — sınav medyası
+    # (uygulama erişimi kontrol edip X-Accel-Redirect ile /korumali-medya/'ya yönlendirir,
+    # bkz. sinavmedia/services/erisim.py), sinav.DisVeri Excel'leri (dis_veri/) ve ileride
+    # eklenecek yeni klasörler oturumsuz indirilemesin diye (KVKK). Yeni bir klasör
+    # herkese açık olacaksa buraya ayrı bir location olarak bilerek eklenmelidir.
     location /media/ {{
-        alias {proje_dizin}/media/;
+        return 404;
     }}
 
-    # Sınav medyası (dinleme/izleme sınavı) doğrudan sunulmaz: uygulama erişimi kontrol
-    # edip X-Accel-Redirect ile /korumali-medya/'ya yönlendirir (bkz. sinavmedia/services/erisim.py).
-    location /media/sinavmedia/ {{
-        return 404;
+    location /media/afisler/ {{
+        alias {proje_dizin}/media/afisler/;
+    }}
+
+    location /media/medya_icerik/ {{
+        alias {proje_dizin}/media/medya_icerik/;
     }}
 
     location /korumali-medya/ {{
@@ -258,14 +267,23 @@ server {{
         alias {proje_dizin}/staticfiles/;
     }}
 
+    # /media/ beyaz listeyle sunulur: yalnızca oturumsuz çalışan pano kiosk ekranının
+    # gösterdiği klasörler (pano.models: Etkinlik.afis → afisler/, MedyaIcerik.dosya →
+    # medya_icerik/) doğrudan açıktır. Geri kalan her şey 404 — sınav medyası
+    # (uygulama erişimi kontrol edip X-Accel-Redirect ile /korumali-medya/'ya yönlendirir,
+    # bkz. sinavmedia/services/erisim.py), sinav.DisVeri Excel'leri (dis_veri/) ve ileride
+    # eklenecek yeni klasörler oturumsuz indirilemesin diye (KVKK). Yeni bir klasör
+    # herkese açık olacaksa buraya ayrı bir location olarak bilerek eklenmelidir.
     location /media/ {{
-        alias {proje_dizin}/media/;
+        return 404;
     }}
 
-    # Sınav medyası (dinleme/izleme sınavı) doğrudan sunulmaz: uygulama erişimi kontrol
-    # edip X-Accel-Redirect ile /korumali-medya/'ya yönlendirir (bkz. sinavmedia/services/erisim.py).
-    location /media/sinavmedia/ {{
-        return 404;
+    location /media/afisler/ {{
+        alias {proje_dizin}/media/afisler/;
+    }}
+
+    location /media/medya_icerik/ {{
+        alias {proje_dizin}/media/medya_icerik/;
     }}
 
     location /korumali-medya/ {{
