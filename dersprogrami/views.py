@@ -7,6 +7,7 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Count
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 
 from nobet.models import NobetAtanamayan, NobetGecmisi, NobetPersonel
 from okul.auth import (
@@ -19,8 +20,8 @@ from personeldevamsizlik.models import Devamsizlik
 from utility.constants import WEEKDAY_TO_DB as _WEEKDAY_TO_DB
 from veriaktar.forms import DersProgramiImportForm
 
-from .forms import FetSonucYukleForm, SinifSubeSecimForm
-from .models import DersProgrami
+from .forms import FetPaketYukleForm, FetSonucYukleForm, SinifSubeSecimForm
+from .models import DersProgrami, FetYayini
 
 # ─────────────────────────────────────────────
 # MultipleTeacherDersProxy — şablon yardımcısı
@@ -946,6 +947,8 @@ def fet_kopru(request):
     context = {
         "title": "FET Köprüsü",
         "form": form,
+        "paket_form": FetPaketYukleForm(),
+        "gelenler": FetYayini.objects.defer("fet_icerik").select_related("isleyen")[:20],
         "aktif_tarih": get_aktif_dp_tarihi(),
         "aktif_adet": DersProgrami.objects.aktif().count(),
         "surumler": [dict(s, fet=s["uygulama_tarihi"] in fet_tarihleri) for s in surumler],
@@ -992,3 +995,113 @@ def fet_aktif_yap(request):
     else:
         messages.success(request, f"{tarih:%d.%m.%Y} tarihli ders programı artık aktif.")
     return redirect("fet_kopru")
+
+
+# ─────────────────────────────────────────────
+# FET bilgisayarından gelen paketler (gelen kutusu)
+# bkz. dersprogrami/services/fet_yayin.py
+# ─────────────────────────────────────────────
+
+
+def _istek_anahtari(request):
+    yetki = request.headers.get("Authorization", "")
+    if yetki.startswith("Bearer "):
+        return yetki[7:].strip()
+    return request.headers.get("X-Fet-Yayin-Anahtari", "")
+
+
+@csrf_exempt
+def fet_yayin_al(request):
+    """FET bilgisayarının paket gönderdiği adres (oturum değil, ortak anahtar ister)."""
+    from django.conf import settings
+    from django.http import JsonResponse
+
+    from .services.fet_yayin import FetYayinHatasi, anahtar_dogru_mu, paket_kaydet
+
+    if request.method != "POST":
+        return JsonResponse({"hata": "Yalnızca POST."}, status=405)
+    if not getattr(settings, "FET_YAYIN_ANAHTARI", ""):
+        return JsonResponse({"hata": "Sunucuda FET_YAYIN_ANAHTARI tanımlı değil."}, status=503)
+    if not anahtar_dogru_mu(_istek_anahtari(request)):
+        return JsonResponse({"hata": "Anahtar geçersiz."}, status=403)
+    dosya = request.FILES.get("paket")
+    if dosya is None:
+        return JsonResponse({"hata": "'paket' alanında zip dosyası bekleniyor."}, status=400)
+    try:
+        yayin, yeni = paket_kaydet(dosya.read())
+    except FetYayinHatasi as e:
+        return JsonResponse({"hata": str(e)}, status=400)
+    return JsonResponse({
+        "id": yayin.pk, "yeni": yeni, "durum": yayin.durum,
+        "uygulama_tarihi": yayin.uygulama_tarihi.isoformat(), "ozet": yayin.ozet,
+    }, status=201 if yeni else 200)
+
+
+@ust_yonetici_required
+def fet_paket_yukle(request):
+    from .services.fet_yayin import FetYayinHatasi, paket_kaydet
+
+    form = FetPaketYukleForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            yayin, yeni = paket_kaydet(request.FILES["paket"].read())
+        except FetYayinHatasi as e:
+            messages.error(request, str(e))
+        else:
+            if not yeni:
+                messages.info(request, "Bu paket daha önce gelmiş; mevcut kayıt açıldı.")
+            return redirect("fet_gelen_detay", pk=yayin.pk)
+    return redirect("fet_kopru")
+
+
+def _yayin(pk):
+    from django.shortcuts import get_object_or_404
+
+    return get_object_or_404(FetYayini, pk=pk)
+
+
+@ust_yonetici_required
+def fet_gelen_detay(request, pk):
+    from okul.utils import get_aktif_dp_tarihi
+
+    from .services.fet_yayin import on_kontrol
+
+    yayin = _yayin(pk)
+    kontrol = on_kontrol(yayin) if yayin.durum == FetYayini.DURUM_BEKLIYOR else None
+    gunler = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]
+    nobet_gunleri = [(g, sorted((n for n in yayin.nobet if n["gun"] == g), key=lambda n: (n["yer"], n["ogretmen"])))
+                     for g in gunler]
+    return render(request, "dersprogrami/fet_gelen_detay.html", {
+        "title": "Gelen FET Programı",
+        "yayin": yayin,
+        "kontrol": kontrol,
+        "nobet_gunleri": nobet_gunleri,
+        "aktif_tarih": get_aktif_dp_tarihi(),
+    })
+
+
+@ust_yonetici_required
+def fet_gelen_islem(request, pk, islem):
+    from .services.fet_yayin import FetYayinHatasi, aktif_yap, ice_al, reddet
+
+    if request.method != "POST":
+        return redirect("fet_gelen_detay", pk=pk)
+    yayin = _yayin(pk)
+    try:
+        if islem == "ice-al":
+            sonuc = ice_al(yayin, kullanici=request.user)
+            messages.success(request, f"{yayin.uygulama_tarihi:%d.%m.%Y} tarihli yeni sürüm olarak içeri alındı: "
+                                      f"{sonuc['ders']} ders kaydı, {sonuc['nobet']} nöbet görevi. "
+                                      "Gözden geçirip aktif yapabilirsiniz.")
+            for u in sonuc["uyarilar"]:
+                messages.warning(request, u)
+        elif islem == "aktif-yap":
+            aktif_yap(yayin)
+            messages.success(request, f"{yayin.uygulama_tarihi:%d.%m.%Y} tarihli ders programı ve nöbet listesi "
+                                      "artık aktif.")
+        elif islem == "reddet":
+            reddet(yayin, kullanici=request.user)
+            messages.info(request, "Paket reddedildi; hiçbir veri değişmedi.")
+    except FetYayinHatasi as e:
+        messages.error(request, str(e))
+    return redirect("fet_gelen_detay", pk=pk)

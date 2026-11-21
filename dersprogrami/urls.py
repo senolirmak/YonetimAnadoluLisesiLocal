@@ -14,4 +14,8 @@ urlpatterns = [
     path("fet/", views.fet_kopru, name="fet_kopru"),
     path("fet/indir/", views.fet_indir, name="fet_indir"),
     path("fet/aktif-yap/", views.fet_aktif_yap, name="fet_aktif_yap"),
+    path("fet/yayin/gelen/", views.fet_yayin_al, name="fet_yayin_al"),
+    path("fet/gelen/yukle/", views.fet_paket_yukle, name="fet_paket_yukle"),
+    path("fet/gelen/<int:pk>/", views.fet_gelen_detay, name="fet_gelen_detay"),
+    path("fet/gelen/<int:pk>/<str:islem>/", views.fet_gelen_islem, name="fet_gelen_islem"),
 ]

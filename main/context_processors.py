@@ -92,6 +92,7 @@ DERS_PROGRAMI_MENUSU_SAYFALARI = {
     "ogretmen_program",
     "sinif_program",
     "fet_kopru",
+    "fet_gelen_detay",
     "sinif_ogretmenleri",
     "haftalik_ders_programi",
     "dersdefteri:ders_listesi",
@@ -316,6 +317,7 @@ UST_SAYFA = {
         "manuel_dagitim": "nobet_ders_doldurma",
     },
     "ders_programi": {
+        "fet_gelen_detay": "fet_kopru",
         "dersdefteri:gecmis_listesi": "dersdefteri:ders_listesi",
         "dersdefteri:kayit_form": "dersdefteri:ders_listesi",
     },

@@ -116,6 +116,10 @@ LOGOUT_REDIRECT_URL = "/giris/"
 # Boşsa yeni tahta kaydı kapalıdır; kayıtlı tahtalar çalışmaya devam eder.
 TAHTA_KAYIT_ANAHTARI = os.getenv("TAHTA_KAYIT_ANAHTARI", "")
 
+# FET bilgisayarının (timetableokul) kabul edilmiş ders programı paketini gönderirken
+# kullandığı ortak anahtar. Boşsa /dersprogrami/fet/yayin/gelen/ adresi kapalıdır.
+FET_YAYIN_ANAHTARI = os.getenv("FET_YAYIN_ANAHTARI", "")
+
 EBA_QR_WS_URL = os.getenv("EBA_QR_WS_URL", "wss://qr-etap.eba.gov.tr/api/v1/ws/{token}")
 
 # Önbellekler. "default" bilinçli olarak varsayılan (işlem içi) bellektir.
