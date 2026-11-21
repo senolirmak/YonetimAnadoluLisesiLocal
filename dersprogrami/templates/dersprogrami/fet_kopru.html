@@ -21,6 +21,9 @@
              border-radius: 5px; font-weight: 600; font-size: .9rem; cursor: pointer; text-decoration: none; }
   .fet-btn:hover { background: #345f75; color: #fff; }
   .fet-btn-kucuk { padding: .25rem .7rem; font-size: .82rem; }
+  .fet-rozet-bekliyor { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+  .fet-rozet-ice_alindi { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+  .fet-rozet-reddedildi { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
 </style>
 
 <div class="container-sm">
@@ -35,6 +38,40 @@
         {% endfor %}
       </div>
       {% endif %}
+
+      <div class="fet-bolum">
+        <h3>FET bilgisayarından gelen programlar</h3>
+        <p class="fet-not" style="margin-top:0">
+          Programlar okuldaki FET bilgisayarında üretilir; kabul edilen çözüm oradan
+          <em>Yayına al</em> ile, nöbet listesiyle birlikte buraya gönderilir. Gelen paket hiçbir
+          veriyi değiştirmez: açıp inceleyin, uygunsa <em>İçeri al</em> deyin.
+        </p>
+        {% if gelenler %}
+        <table class="fet-tablo">
+          <thead><tr><th>Alınma</th><th>Çözüm</th><th>Uygulama</th><th>Durum</th></tr></thead>
+          <tbody>
+            {% for g in gelenler %}
+            <tr>
+              <td><a href="{% url 'fet_gelen_detay' g.pk %}">{{ g.alinma|date:"d.m.Y H:i" }}</a></td>
+              <td>{{ g.cozum|truncatechars:40 }}</td>
+              <td>{{ g.uygulama_tarihi|date:"d.m.Y" }}</td>
+              <td><span class="fet-rozet fet-rozet-{{ g.durum }}">{{ g.get_durum_display }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="fet-not">Henüz gelen paket yok.</p>
+        {% endif %}
+        <details style="margin-top:.6rem">
+          <summary class="fet-not" style="cursor:pointer">Ağdan gönderilemediyse paketi elle yükleyin</summary>
+          <form method="post" action="{% url 'fet_paket_yukle' %}" enctype="multipart/form-data" style="margin-top:.5rem">
+            {% csrf_token %}
+            <div class="form-row">{{ paket_form.paket }}</div>
+            <button type="submit" class="fet-btn fet-btn-kucuk">Paketi Yükle</button>
+          </form>
+        </details>
+      </div>
 
       <div class="fet-bolum">
         <h3>1. Aktif programı FET'e aktar</h3>

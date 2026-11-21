@@ -1,0 +1,107 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - Okul Yönetim Sistemi{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<style>
+  .gk-kart { background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:1.1rem 1.4rem; margin-bottom:1.1rem; }
+  .gk-kart h3 { font-size:1.02rem; font-weight:700; color:#1a1a2e; margin:0 0 .7rem; }
+  .gk-bilgi { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:.6rem 1.2rem; }
+  .gk-bilgi div span { display:block; font-size:.78rem; color:#6b7280; }
+  .gk-bilgi div b { font-size:1rem; color:#1a1a2e; }
+  .gk-liste { margin:.3rem 0 0 1.1rem; font-size:.9rem; }
+  .gk-tamam { color:#065f46; } .gk-engel { color:#b91c1c; } .gk-uyari { color:#92400e; }
+  .gk-tablo { width:100%; border-collapse:collapse; font-size:.85rem; }
+  .gk-tablo th, .gk-tablo td { border:1px solid #e5e7eb; padding:.35rem .6rem; text-align:left; vertical-align:top; }
+  .gk-tablo th { background:#417690; color:#fff; }
+  .gk-butonlar { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }
+  .gk-butonlar form { margin:0; }
+  .fet-rozet { font-size:.8rem; border-radius:99px; padding:.15rem .6rem; }
+  .fet-rozet-bekliyor { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+  .fet-rozet-ice_alindi { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
+  .fet-rozet-reddedildi { background:#f3f4f6; color:#6b7280; border:1px solid #d1d5db; }
+</style>
+
+<div class="container">
+  <div class="flex-between mb-20">
+    <h2 class="page-title">{{ title }} <span class="fet-rozet fet-rozet-{{ yayin.durum }}">{{ yayin.get_durum_display }}</span></h2>
+    <a href="{% url 'fet_kopru' %}" class="btn btn-primary">← FET Köprüsü</a>
+  </div>
+
+  {% for msg in messages %}<div class="msg-box {% if msg.tags == 'error' %}msg-error{% elif msg.tags == 'success' %}msg-success{% else %}msg-info{% endif %}">{{ msg }}</div>{% endfor %}
+
+  <div class="gk-kart">
+    <h3>Paket</h3>
+    <div class="gk-bilgi">
+      <div><span>Okul</span><b>{{ yayin.okul_adi|default:"—" }}</b></div>
+      <div><span>Eğitim yılı / dönem</span><b>{{ yayin.egitim_yili|default:"—" }} {{ yayin.donem }}</b></div>
+      <div><span>Uygulama tarihi</span><b>{{ yayin.uygulama_tarihi|date:"d.m.Y" }}</b></div>
+      <div><span>Alınma</span><b>{{ yayin.alinma|date:"d.m.Y H:i" }}</b></div>
+      <div><span>Ders kaydı</span><b>{{ yayin.ozet.satir }}</b></div>
+      <div><span>Şube / öğretmen</span><b>{{ yayin.ozet.sube }} / {{ yayin.ozet.ogretmen }}</b></div>
+      <div><span>Şube başı haftalık saat</span><b>{{ yayin.ozet.sube_saat_en_az }}{% if yayin.ozet.sube_saat_en_az != yayin.ozet.sube_saat_en_cok %}–{{ yayin.ozet.sube_saat_en_cok }}{% endif %}</b></div>
+      <div><span>Nöbet görevi</span><b>{{ yayin.ozet.nobet }}</b></div>
+    </div>
+    <p class="text-muted" style="margin:.8rem 0 0; font-size:.85rem">Çözüm: {{ yayin.cozum }}{% if yayin.kaynak %} · Gönderen: {{ yayin.kaynak }}{% endif %}</p>
+    {% if yayin.isleyen %}<p class="text-muted" style="margin:.2rem 0 0; font-size:.85rem">İşleyen: {{ yayin.isleyen.get_full_name|default:yayin.isleyen.username }} · {{ yayin.islem_zamani|date:"d.m.Y H:i" }}</p>{% endif %}
+    {% if yayin.notlar %}<pre style="white-space:pre-wrap; font-size:.82rem; margin:.6rem 0 0">{{ yayin.notlar }}</pre>{% endif %}
+  </div>
+
+  {% if kontrol %}
+  <div class="gk-kart">
+    <h3>Ön kontrol</h3>
+    {% if not kontrol.engeller and not kontrol.eksik_ogretmen and not kontrol.eksik_sube and not kontrol.eksik_nobetci %}
+      <p class="gk-tamam" style="margin:0">✔ Tüm öğretmenler, şubeler ve nöbetçiler sistemle eşleşiyor.</p>
+    {% endif %}
+    {% if kontrol.engeller %}<ul class="gk-liste gk-engel">{% for e in kontrol.engeller %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    {% if kontrol.eksik_ogretmen %}<p class="gk-uyari">Sistemde olmayan öğretmenler (dersleri atlanır): {{ kontrol.eksik_ogretmen|join:", " }}</p>{% endif %}
+    {% if kontrol.eksik_sube %}<p class="gk-uyari">Sistemde olmayan şubeler (dersleri atlanır): {{ kontrol.eksik_sube|join:", " }}</p>{% endif %}
+    {% if kontrol.eksik_nobetci %}<p class="gk-uyari">Sistemde olmayan nöbetçiler (atlanır): {{ kontrol.eksik_nobetci|join:", " }}</p>{% endif %}
+    {% if kontrol.yeni_nobet_yeri %}<p class="text-muted">Yeni eklenecek nöbet yerleri: {{ kontrol.yeni_nobet_yeri|join:", " }}</p>{% endif %}
+    {% for u in kontrol.uyarilar %}<p class="gk-uyari">{{ u }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="gk-kart">
+    <h3>İşlemler</h3>
+    <div class="gk-butonlar">
+      {% if yayin.durum == "bekliyor" %}
+        <form method="post" action="{% url 'fet_gelen_islem' yayin.pk 'ice-al' %}"
+              onsubmit="return confirm('Ders programı ve nöbet listesi {{ yayin.uygulama_tarihi|date:"d.m.Y" }} tarihli YENİ sürüm olarak içeri alınsın mı? Aktif program değişmez.');">
+          {% csrf_token %}<button class="btn btn-success btn-lg" type="submit"{% if kontrol.engeller %} disabled title="Önce engelleri giderin"{% endif %}>İçeri al</button>
+        </form>
+        <form method="post" action="{% url 'fet_gelen_islem' yayin.pk 'reddet' %}" onsubmit="return confirm('Paket reddedilsin mi?');">
+          {% csrf_token %}<button class="btn btn-danger" type="submit">Reddet</button>
+        </form>
+        <span class="text-muted" style="font-size:.88rem">İçeri almak, aktif programı değiştirmez.</span>
+      {% elif yayin.durum == "ice_alindi" %}
+        {% if yayin.uygulama_tarihi == aktif_tarih %}
+          <span class="gk-tamam"><b>Bu program şu anda aktif.</b></span>
+        {% else %}
+          <form method="post" action="{% url 'fet_gelen_islem' yayin.pk 'aktif-yap' %}"
+                onsubmit="return confirm('{{ yayin.uygulama_tarihi|date:"d.m.Y" }} tarihli ders programı VE nöbet listesi aktif yapılsın mı? Tüm ekranlar (ders doldurma dahil) bunları kullanmaya başlar.');">
+            {% csrf_token %}<button class="btn btn-primary btn-lg" type="submit">Ders programını ve nöbeti aktif yap</button>
+          </form>
+        {% endif %}
+        <a href="{% url 'dersprogrami_listesi' %}" class="btn btn-info">Ders Programı Listesi</a>
+      {% else %}
+        <span class="text-muted">Bu paket reddedildi; veri değişmedi.</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="gk-kart">
+    <h3>Nöbet listesi ({{ yayin.nobet|length }})</h3>
+    <table class="gk-tablo">
+      <thead><tr>{% for g, _ in nobet_gunleri %}<th>{{ g }}</th>{% endfor %}</tr></thead>
+      <tbody><tr>
+        {% for g, liste in nobet_gunleri %}
+          <td>{% for n in liste %}<div><b>{{ n.yer|default:"—" }}</b>: {{ n.ogretmen }}</div>{% empty %}—{% endfor %}</td>
+        {% endfor %}
+      </tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

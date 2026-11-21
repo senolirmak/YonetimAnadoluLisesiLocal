@@ -106,3 +106,48 @@ class DersProgrami(models.Model):
     @property
     def ders_adi(self):
         return self.ders.ders_adi if self.ders else ""
+
+
+class FetYayini(models.Model):
+    """FET bilgisayarından (timetableokul) gönderilen, kabul edilmiş ders programı paketi.
+
+    Paket gelen kutusunda bekler; ders programı ve nöbet listesine ancak bir üst yönetici
+    "İçeri al" dediğinde, `uygulama_tarihi` ile YENİ sürümler olarak yazılır
+    (bkz. `dersprogrami/services/fet_yayin.py`). Aktif yapmak ayrı bir onaydır.
+    """
+
+    DURUM_BEKLIYOR = "bekliyor"
+    DURUM_ICE_ALINDI = "ice_alindi"
+    DURUM_REDDEDILDI = "reddedildi"
+    DURUM_CHOICES = (
+        (DURUM_BEKLIYOR, "Bekliyor"),
+        (DURUM_ICE_ALINDI, "İçeri alındı"),
+        (DURUM_REDDEDILDI, "Reddedildi"),
+    )
+
+    alinma = models.DateTimeField(auto_now_add=True, verbose_name="Alınma Zamanı")
+    kaynak = models.CharField(max_length=100, blank=True, verbose_name="Gönderen")
+    cozum = models.CharField(max_length=300, verbose_name="FET Çözümü")
+    uygulama_tarihi = models.DateField(verbose_name="Uygulama Tarihi")
+    okul_adi = models.CharField(max_length=200, blank=True, verbose_name="Okul Adı")
+    egitim_yili = models.CharField(max_length=9, blank=True, verbose_name="Eğitim-Öğretim Yılı")
+    donem = models.CharField(max_length=20, blank=True, verbose_name="Dönem")
+    fet_icerik = models.BinaryField(verbose_name="FET Çözüm Dosyası")
+    nobet = models.JSONField(default=list, blank=True, verbose_name="Nöbet Listesi")
+    ozet = models.JSONField(default=dict, blank=True, verbose_name="Özet")
+    imza = models.CharField(max_length=64, unique=True, verbose_name="İçerik İmzası (SHA-256)")
+    durum = models.CharField(max_length=12, choices=DURUM_CHOICES, default=DURUM_BEKLIYOR,
+                             verbose_name="Durum")
+    isleyen = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name="+", verbose_name="İşleyen")
+    islem_zamani = models.DateTimeField(null=True, blank=True, verbose_name="İşlem Zamanı")
+    notlar = models.TextField(blank=True, verbose_name="Notlar")
+
+    class Meta:
+        db_table = "dersprogrami_fet_yayini"
+        ordering = ["-alinma"]
+        verbose_name = "Gelen FET Programı"
+        verbose_name_plural = "Gelen FET Programları"
+
+    def __str__(self):
+        return f"{self.cozum} ({self.uygulama_tarihi:%d.%m.%Y})"

@@ -26,4 +26,12 @@ class FetSonucYukleForm(forms.Form):
     )
 
 
-__all__ = ["DersProgramiImportForm", "FetSonucYukleForm", "SinifSubeSecimForm"]
+class FetPaketYukleForm(forms.Form):
+    paket = forms.FileField(
+        label="FET Paketi (.zip)",
+        widget=forms.ClearableFileInput(attrs={"accept": ".zip"}),
+        help_text="FET bilgisayarında 'Paketi indir' ile alınan dosya (ağdan gönderilemediğinde).",
+    )
+
+
+__all__ = ["DersProgramiImportForm", "FetPaketYukleForm", "FetSonucYukleForm", "SinifSubeSecimForm"]
